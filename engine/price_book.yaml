@@ -14,3 +14,10 @@ providers:
       Standard_D2s_v3: 0.096
     disk:
       premium_ssd_p6_64gb: 5.89
+    networking:
+      public_ip_basic: 0.005  # $/hr
+      load_balancer_basic: 0.025  # $/hr
+      application_gateway_waf_v2: 0.0225  # $/hr for smallest
+    paas:
+      app_service_plan_premiumv3_p1v3: 0.077  # $/hr
+      sql_database_serverless_s0: 0.005  # $/hr
