@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Reaper | Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: radial-gradient(circle at top left, #1a1a2e, #16213e);
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-8">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-12">
+            <div>
+                <h1 class="text-4xl font-bold tracking-tight text-blue-400">CLOUD REAPER <span class="text-white text-sm font-mono bg-blue-600 px-2 py-1 rounded ml-2">v1.0</span></h1>
+                <p class="text-gray-400 mt-2">Azure Infrastructure FinOps Control</p>
+            </div>
+            <button onclick="runScan()" id="scanBtn" class="bg-blue-600 hover:bg-blue-500 transition px-6 py-3 rounded-lg font-bold shadow-lg shadow-blue-900/20">
+                INITIATE SCAN
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div class="glass p-6">
+                <p class="text-gray-400 text-sm">TOTAL SAVINGS</p>
+                <h2 id="savings-val" class="text-3xl font-bold text-green-400">$0.00</h2>
+            </div>
+            <div class="glass p-6">
+                <p class="text-gray-400 text-sm">ACTIVE VMs</p>
+                <h2 id="vm-count" class="text-3xl font-bold text-blue-400">0</h2>
+            </div>
+            <div class="glass p-6">
+                <p class="text-gray-400 text-sm">ZOMBIE DISKS</p>
+                <h2 id="disk-count" class="text-3xl font-bold text-red-400">0</h2>
+            </div>
+        </div>
+
+        <div class="glass overflow-hidden">
+            <div class="px-6 py-4 border-b border-white/10 flex justify-between bg-white/5">
+                <h3 class="font-bold">REAP TARGETS (ORPHANED DISKS)</h3>
+            </div>
+            <table class="w-full text-left">
+                <thead class="bg-white/5 text-gray-400 text-xs uppercase">
+                    <tr>
+                        <th class="px-6 py-3">Resource Name</th>
+                        <th class="px-6 py-3">Size</th>
+                        <th class="px-6 py-3">Monthly Waste</th>
+                        <th class="px-6 py-3 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="target-list" class="divide-y divide-white/5">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function runScan() {
+            const btn = document.getElementById('scanBtn');
+            btn.innerText = "SCANNING...";
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/scan');
+                const data = await response.json();
+                
+                document.getElementById('savings-val').innerText = data.total_savings;
+                document.getElementById('vm-count').innerText = data.vm_count;
+                document.getElementById('disk-count').innerText = data.orphans.length;
+
+                const list = document.getElementById('target-list');
+                list.innerHTML = '';
+                
+                data.orphans.forEach(item => {
+                    list.innerHTML += `
+                        <tr class="hover:bg-white/5 transition">
+                            <td class="px-6 py-4 font-mono text-sm">${item.name}</td>
+                            <td class="px-6 py-4">${item.size}</td>
+                            <td class="px-6 py-4 text-red-400 font-bold">${item.savings}</td>
+                            <td class="px-6 py-4 text-right">
+                                <button class="text-xs bg-red-500/20 border border-red-500/50 text-red-400 px-3 py-1 rounded hover:bg-red-500 hover:text-white">REAP</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (e) {
+                alert("Scan failed: " + e.message);
+            } finally {
+                btn.innerText = "INITIATE SCAN";
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
