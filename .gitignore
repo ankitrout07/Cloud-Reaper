@@ -1,32 +1,36 @@
-# cloud-reaper/.gitignore
-.env
+# Python
 venv/
 __pycache__/
 *.pyc
-logs/
-# OS Metadata
-.DS_Store
-Thumbs.db
-desktop.ini
+*.pyo
+*.pyd
+.python-version
+pip-log.txt
+pip-delete-this-directory.txt
 
-# IDEs
+# Environment & Secrets
+.env
+.venv
+env/
+ENV/
+auth.json
+
+# Infrastructure & Cloud
+.azure/
+.terraform/
+*.tfstate*
+*.tfvars
+aws_creds/
+
+# Logs & Data
+logs/
+*.log
+influxdb_data/
+*.sqlite
+
+# IDE & OS
 .vscode/
 .idea/
+.DS_Store
+Thumbs.db
 *.swp
-*.swo
-# Azure Identity & CLI caches
-.azure/
-az_login_response.json
-
-# Terraform (if used for testing)
-*.tfstate
-*.tfstate.backup
-.terraform/
-*.tfvars
-
-# Database & Metrics
-*.db
-*.sqlite
-influxdb_data/
-export.csv
-
