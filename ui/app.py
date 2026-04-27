@@ -58,13 +58,21 @@ def scan():
             })
 
             
+        # 7-Day Utilization Report
+        try:
+            utilization_report = az.get_utilization_report()
+        except AttributeError:
+            utilization_report = []
+            
         return jsonify({
             "status": "success",
             "vm_count": len(vms),
             "orphans": formatted_orphans,
             "idle_vms": formatted_idle,
+            "utilization_report": utilization_report,
             "total_savings": f"${total_savings:.2f}"
         })
+
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

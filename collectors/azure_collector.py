@@ -86,4 +86,61 @@ class AzureCollector:
             print(f"Error fetching idle VMs: {e}")
             return []
 
+    def _calculate_avg(self, metric_item):
+        avgs = []
+        for timeseries in metric_item.timeseries:
+            avgs.extend([d.average for d in timeseries.data if d.average is not None])
+        return sum(avgs) / len(avgs) if avgs else 0
+
+    def _calculate_max(self, metric_item):
+        maxs = []
+        for timeseries in metric_item.timeseries:
+            maxs.extend([d.maximum for d in timeseries.data if d.maximum is not None])
+        return max(maxs) if maxs else 0
+
+    def _determine_status(self, avg_cpu, peak_ram):
+        if avg_cpu < 10:
+            return "UNDER-UTILIZED", "Downgrade SKU", "text-yellow-400"
+        elif avg_cpu > 80:
+            return "OVER-UTILIZED", "Upgrade SKU (Performance Risk)", "text-red-500"
+        else:
+            return "OPTIMIZED", "Maintain", "text-green-400"
+
+    def get_utilization_report(self):
+        if not self.compute_client or not self.monitor_client: return []
+        report = []
+        try:
+            vms = self.compute_client.virtual_machines.list_all()
+            end_time = datetime.utcnow()
+            start_time = end_time - timedelta(days=7)
+            for vm in vms:
+                resource_id = vm.id
+                metrics = self.monitor_client.metrics.list(
+                    resource_id,
+                    timespan=f"{start_time.isoformat()}Z/{end_time.isoformat()}Z",
+                    interval='P1D',
+                    metricnames='Percentage CPU,Available Memory Bytes',
+                    aggregation='Average,Maximum'
+                )
+                cpu_avg, ram_peak = 0, 0
+                for item in metrics.value:
+                    if item.name.value == 'Percentage CPU':
+                        cpu_avg = self._calculate_avg(item)
+                    elif item.name.value == 'Available Memory Bytes':
+                        ram_peak = self._calculate_max(item)
+                status, rec, color = self._determine_status(cpu_avg, ram_peak)
+                report.append({
+                    "name": vm.name,
+                    "rg": self._extract_rg(vm.id),
+                    "current_sku": vm.hardware_profile.vm_size,
+                    "metrics": f"CPU: {cpu_avg:.1f}% | RAM Avail (Peak): {ram_peak / (1024**3):.1f} GB",
+                    "status": status,
+                    "recommendation": rec,
+                    "color": color
+                })
+            return report
+        except Exception as e:
+            print(f"Error generating utilization report: {e}")
+            return []
+
 

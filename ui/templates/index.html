@@ -71,6 +71,26 @@
                      </tbody>
             </table>
         </div>
+
+        <!-- Rightsizing Section -->
+        <div class="glass p-6 mt-12">
+            <h3 class="text-xl font-bold mb-4 text-blue-400 uppercase tracking-wider">SKU RIGHTSIZING & EFFICIENCY</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="text-gray-400 text-xs uppercase border-b border-white/10">
+                        <tr>
+                            <th class="py-3 px-4">Resource</th>
+                            <th class="py-3 px-4">Current SKU</th>
+                            <th class="py-3 px-4">Performance Metrics</th>
+                            <th class="py-3 px-4">Efficiency Status</th>
+                            <th class="py-3 px-4">Recommendation</th>
+                        </tr>
+                    </thead>
+                    <tbody id="efficiency-list" class="divide-y divide-white/5">
+                        </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -148,6 +168,27 @@
                             <td class="px-6 py-4 text-right"><button class="bg-yellow-600 px-3 py-1 rounded text-xs hover:bg-yellow-500 transition">INVESTIGATE</button></td>
                         </tr>`;
                 });
+
+                // Inject Utilization Report
+                const efficiencyList = document.getElementById('efficiency-list');
+                efficiencyList.innerHTML = '';
+                if (data.utilization_report) {
+                    data.utilization_report.forEach(item => {
+                        efficiencyList.innerHTML += `
+                            <tr class="hover:bg-white/5 border-b border-white/5 transition">
+                                <td class="py-4 px-4 font-mono text-sm">${item.name}</td>
+                                <td class="py-4 px-4 text-blue-300">${item.current_sku}</td>
+                                <td class="py-4 px-4 text-gray-400 text-xs">${item.metrics}</td>
+                                <td class="py-4 px-4">
+                                    <span class="px-2 py-1 rounded text-[10px] font-bold bg-white/10 ${item.color}">
+                                        ${item.status}
+                                    </span>
+                                </td>
+                                <td class="py-4 px-4 text-sm text-gray-300">${item.recommendation}</td>
+                            </tr>
+                        `;
+                    });
+                }
                 
                 // Re-apply filter if search box is not empty
                 filterTable();
@@ -159,6 +200,7 @@
                 btn.disabled = false;
             }
         }
+
 
     </script>
 </body>
