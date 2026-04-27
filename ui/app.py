@@ -20,25 +20,49 @@ def scan():
         az = AzureCollector()
         calc = CostCalculator()
         
+        # Real-time fetch from your Azure Tenant
         orphans = az.get_orphaned_disks()
+        # Ensure we have some data even if the collector is being updated
+        try:
+            idle_vms = az.get_idle_vms()
+        except AttributeError:
+            idle_vms = []
+            
         vms = az.get_vm_inventory()
         
-        formatted_orphans = []
         total_savings = 0.0
         
+        # Process Real Idle VMs (P2)
+        formatted_idle = []
+        for vm in idle_vms:
+            # In your case, vm['name'] will now be 'app1'
+            cost = calc.calculate_monthly_cost('azure', 'compute', 'standard_d2s_v3')
+            total_savings += cost
+            formatted_idle.append({
+                "name": vm['name'],
+                "usage": vm['usage'],
+                "savings": f"${cost:.2f}",
+                "rg": vm.get('rg', 'N/A')
+            })
+
+        # Process Real Orphaned Disks (P1)
+        formatted_orphans = []
         for d in orphans:
-            cost = calc.calculate_monthly_cost('azure', 'disk', 'premium_ssd_p6_64gb')
+            cost = calc.calculate_monthly_cost('azure', 'storage', 'premium_ssd_p6_64gb')
             total_savings += cost
             formatted_orphans.append({
                 "name": d['name'],
                 "size": f"{d['size_gb']} GB",
-                "savings": f"${cost:.2f}"
+                "savings": f"${cost:.2f}",
+                "rg": d.get('rg', 'N/A')
             })
+
             
         return jsonify({
             "status": "success",
             "vm_count": len(vms),
             "orphans": formatted_orphans,
+            "idle_vms": formatted_idle,
             "total_savings": f"${total_savings:.2f}"
         })
     except Exception as e:

@@ -47,25 +47,54 @@
         </div>
 
         <div class="glass overflow-hidden">
-            <div class="px-6 py-4 border-b border-white/10 flex justify-between bg-white/5">
-                <h3 class="font-bold">REAP TARGETS (ORPHANED DISKS)</h3>
+            <div class="px-6 py-4 border-b border-white/10 flex flex-col md:flex-row justify-between items-center bg-white/5 gap-4">
+                <h3 class="font-bold">REAP TARGETS</h3>
+                <div class="relative w-full md:w-64">
+                    <input type="text" id="resourceSearch" onkeyup="filterTable()" placeholder="Search resources..." 
+                        class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500/50 transition">
+                    <svg class="absolute right-3 top-2.5 h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
             </div>
-            <table class="w-full text-left">
+            <table class="w-full text-left" id="reapTable">
                 <thead class="bg-white/5 text-gray-400 text-xs uppercase">
                     <tr>
                         <th class="px-6 py-3">Resource Name</th>
-                        <th class="px-6 py-3">Size</th>
+                        <th class="px-6 py-3">Resource Group</th>
+                        <th class="px-6 py-3">Type/Size</th>
                         <th class="px-6 py-3">Monthly Waste</th>
                         <th class="px-6 py-3 text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody id="target-list" class="divide-y divide-white/5">
-                    </tbody>
+                     </tbody>
             </table>
         </div>
     </div>
 
     <script>
+        function filterTable() {
+            const input = document.getElementById("resourceSearch");
+            const filter = input.value.toUpperCase();
+            const table = document.getElementById("reapTable");
+            const tr = table.getElementsByTagName("tr");
+
+            for (let i = 1; i < tr.length; i++) {
+                const nameCol = tr[i].getElementsByTagName("td")[0];
+                const rgCol = tr[i].getElementsByTagName("td")[1];
+                if (nameCol || rgCol) {
+                    const nameText = nameCol.textContent || nameCol.innerText;
+                    const rgText = rgCol.textContent || rgCol.innerText;
+                    if (nameText.toUpperCase().indexOf(filter) > -1 || rgText.toUpperCase().indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+                }
+            }
+        }
+
         async function runScan() {
             const btn = document.getElementById('scanBtn');
             btn.innerText = "SCANNING...";
@@ -80,20 +109,49 @@
                 document.getElementById('disk-count').innerText = data.orphans.length;
 
                 const list = document.getElementById('target-list');
-                list.innerHTML = '';
+                list.innerHTML = ''; // Clear the "mock" rows first
                 
+                // Inject real P1s (Orphans)
                 data.orphans.forEach(item => {
                     list.innerHTML += `
-                        <tr class="hover:bg-white/5 transition">
-                            <td class="px-6 py-4 font-mono text-sm">${item.name}</td>
-                            <td class="px-6 py-4">${item.size}</td>
-                            <td class="px-6 py-4 text-red-400 font-bold">${item.savings}</td>
-                            <td class="px-6 py-4 text-right">
-                                <button class="text-xs bg-red-500/20 border border-red-500/50 text-red-400 px-3 py-1 rounded hover:bg-red-500 hover:text-white">REAP</button>
+                        <tr class="hover:bg-white/5 border-l-4 border-red-500 transition">
+                            <td class="px-6 py-4 font-mono text-sm">
+                                <span class="bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded mr-2">P1</span>
+                                ${item.name}
                             </td>
-                        </tr>
-                    `;
+                            <td class="px-6 py-4">
+                                <span class="text-xs bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-1 rounded">
+                                    ${item.rg}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-gray-400">Orphaned Disk</td>
+                            <td class="px-6 py-4 text-red-400 font-bold">${item.savings}/mo</td>
+                            <td class="px-6 py-4 text-right"><button class="bg-red-600 px-3 py-1 rounded text-xs hover:bg-red-500 transition">REAP</button></td>
+                        </tr>`;
                 });
+
+                // Inject real P2s (Idle VMs like 'app1')
+                data.idle_vms.forEach(vm => {
+                    list.innerHTML += `
+                        <tr class="hover:bg-white/5 border-l-4 border-yellow-500 transition">
+                            <td class="px-6 py-4 font-mono text-sm">
+                                <span class="bg-yellow-500/20 text-yellow-400 text-[10px] px-2 py-0.5 rounded mr-2">P2</span>
+                                ${vm.name}
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="text-xs bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-1 rounded">
+                                    ${vm.rg}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-gray-400">Idle VM (${vm.usage}% CPU)</td>
+                            <td class="px-6 py-4 text-yellow-400 font-bold">${vm.savings}/mo</td>
+                            <td class="px-6 py-4 text-right"><button class="bg-yellow-600 px-3 py-1 rounded text-xs hover:bg-yellow-500 transition">INVESTIGATE</button></td>
+                        </tr>`;
+                });
+                
+                // Re-apply filter if search box is not empty
+                filterTable();
+
             } catch (e) {
                 alert("Scan failed: " + e.message);
             } finally {
@@ -101,6 +159,7 @@
                 btn.disabled = false;
             }
         }
+
     </script>
 </body>
 </html>
