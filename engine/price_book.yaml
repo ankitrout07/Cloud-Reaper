@@ -8,16 +8,16 @@ providers:
     ebs:
       gp3_per_gb_month: 0.08
   azure:
-    vm:
-      Standard_B1s: 0.0101
-      Standard_B2s: 0.0403
-      Standard_D2s_v3: 0.096
-    disk:
+    compute:
+      standard_d2s_v3: 0.096
+      standard_b2s: 0.0416
+    storage:
       premium_ssd_p6_64gb: 5.89
+      standard_hdd_s4_32gb: 1.54
     networking:
-      public_ip_basic: 0.005  # $/hr
-      load_balancer_basic: 0.025  # $/hr
-      application_gateway_waf_v2: 0.0225  # $/hr for smallest
+      unassociated_ip: 0.005
+      idle_load_balancer: 0.025
+      application_gateway_waf_v2: 0.0225
     paas:
-      app_service_plan_premiumv3_p1v3: 0.077  # $/hr
-      sql_database_serverless_s0: 0.005  # $/hr
+      app_service_plan_premiumv3_p1v3: 0.077
+      sql_database_serverless_s0: 0.005
