@@ -30,9 +30,13 @@ class AzureCollector:
             return {"error": "Go engine binary not found. Run go build."}
 
         try:
+            env = os.environ.copy()
+            if self.subscription_id:
+                env["AZURE_SUBSCRIPTION_ID"] = str(self.subscription_id)
+            
             process = subprocess.run(
                 [self.engine_path], 
-                env={**os.environ, "AZURE_SUBSCRIPTION_ID": self.subscription_id},
+                env=env,
                 capture_output=True, 
                 text=True, 
                 check=True

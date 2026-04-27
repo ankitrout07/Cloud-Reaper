@@ -282,15 +282,19 @@
             try {
                 const response = await fetch('/api/scan');
                 const data = await response.json();
+
+                if (data.status === "error") {
+                    throw new Error(data.message || "Internal Server Error");
+                }
                 
                 // Show backend events
                 if (data.events) {
                     data.events.forEach(ev => notify(ev.msg, ev.type));
                 }
 
-                document.getElementById('savings-val').innerText = data.total_savings;
-                document.getElementById('vm-count').innerText = data.vm_count;
-                document.getElementById('disk-count').innerText = data.orphans.length;
+                document.getElementById('savings-val').innerText = data.total_savings || "$0.00";
+                document.getElementById('vm-count').innerText = data.vm_count || 0;
+                document.getElementById('disk-count').innerText = data.orphans ? data.orphans.length : 0;
 
                 // Update Forecast Chart
                 const monthlySavings = parseFloat(data.total_savings.replace('$', ''));
