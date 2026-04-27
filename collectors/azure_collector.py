@@ -11,7 +11,9 @@ class AzureCollector:
     def __init__(self):
         self.subscription_id = os.getenv('AZURE_SUBSCRIPTION_ID')
         self.credentials = DefaultAzureCredential()
-        # Only initialize client if subscription_id exists to avoid immediate crash
+        self.engine_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'engine-go', 'reaper-engine')
+        
+        # Only initialize client if subscription_id exists
         if self.subscription_id:
             self.compute_client = ComputeManagementClient(self.credentials, self.subscription_id)
             self.monitor_client = MonitorManagementClient(self.credentials, self.subscription_id)
@@ -19,7 +21,33 @@ class AzureCollector:
             self.compute_client = None
             self.monitor_client = None
 
+    def fast_scan(self):
+        """Execute the Go binary and capture the JSON output."""
+        import subprocess
+        import json
+        
+        if not os.path.exists(self.engine_path):
+            return {"error": "Go engine binary not found. Run go build."}
+
+        try:
+            process = subprocess.run(
+                [self.engine_path], 
+                env={**os.environ, "AZURE_SUBSCRIPTION_ID": self.subscription_id},
+                capture_output=True, 
+                text=True, 
+                check=True
+            )
+            return json.loads(process.stdout)
+        except Exception as e:
+            return {"error": f"Go Engine failed: {e}"}
+
     def get_vm_inventory(self):
+        """Returns active VMs. Uses Go fast_scan if available."""
+        scan = self.fast_scan()
+        if "active_vms" in scan:
+            return [{'name': name, 'size': 'Unknown (Fast Scan)'} for name in scan['active_vms']]
+        
+        # Fallback
         if not self.compute_client: return []
         try:
             vms = self.compute_client.virtual_machines.list_all()
@@ -28,13 +56,19 @@ class AzureCollector:
             return []
 
     def _extract_rg(self, resource_id):
-        # Azure IDs follow: /subscriptions/.../resourceGroups/{RG_NAME}/...
+        """Helper to extract resource group name from Azure Resource ID."""
         parts = resource_id.split('/')
         if len(parts) > 4:
             return parts[4]
         return "N/A"
 
     def get_orphaned_disks(self):
+        """Returns orphaned disks. Uses Go fast_scan if available."""
+        scan = self.fast_scan()
+        if "orphaned_disks" in scan:
+            return [{'name': name, 'size_gb': 0, 'rg': 'N/A'} for name in scan['orphaned_disks']]
+
+        # Fallback
         if not self.compute_client: return []
         try:
             disks = self.compute_client.disks.list()
@@ -49,34 +83,12 @@ class AzureCollector:
     def get_idle_vms(self, cpu_threshold=5.0):
         """
         Returns VMs with average CPU usage below the threshold.
-        Uses the Go-based 'reaper-engine' for high-concurrency metric collection.
+        Uses the high-speed unified Go scan result.
         """
-        import subprocess
-        import json
-
-        if not self.subscription_id:
-            return []
-
-        # Path to the Go binary
-        go_engine_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'engine-go', 'reaper-engine')
-        
-        if not os.path.exists(go_engine_path):
-            print(f"[!] Go engine not found at {go_engine_path}. Falling back to slow Python mode.")
-            return self._get_idle_vms_python(cpu_threshold)
-
-        try:
-            print(f"[+] Launching Go High-Velocity Engine...")
-            result = subprocess.run(
-                [go_engine_path],
-                env={**os.environ, "AZURE_SUBSCRIPTION_ID": self.subscription_id},
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            
-            reports = json.loads(result.stdout)
+        scan = self.fast_scan()
+        if "vm_reports" in scan:
             idle_vms = []
-            for r in reports:
+            for r in scan['vm_reports']:
                 if r['usage'] < cpu_threshold:
                     idle_vms.append({
                         "name": r['name'],
@@ -85,10 +97,9 @@ class AzureCollector:
                         "rg": self._extract_rg(r['id'])
                     })
             return idle_vms
-            
-        except Exception as e:
-            print(f"[!] Go engine failed: {e}. Falling back to Python.")
-            return self._get_idle_vms_python(cpu_threshold)
+
+        # Fallback to Python if Go result is missing
+        return self._get_idle_vms_python(cpu_threshold)
 
     def _get_idle_vms_python(self, cpu_threshold=5.0):
         """Original slow Python implementation as fallback."""
