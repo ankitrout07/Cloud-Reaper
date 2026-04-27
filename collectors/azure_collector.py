@@ -12,6 +12,7 @@ class AzureCollector:
         self.subscription_id = os.getenv('AZURE_SUBSCRIPTION_ID')
         self.credentials = DefaultAzureCredential()
         self.engine_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'engine-go', 'reaper-engine')
+        self._scan_cache = None
         
         # Only initialize client if subscription_id exists
         if self.subscription_id:
@@ -22,7 +23,10 @@ class AzureCollector:
             self.monitor_client = None
 
     def fast_scan(self):
-        """Execute the Go binary and capture the JSON output."""
+        """Execute the Go binary and capture the JSON output. Caches result."""
+        if self._scan_cache:
+            return self._scan_cache
+
         import subprocess
         import json
         
@@ -41,9 +45,15 @@ class AzureCollector:
                 text=True, 
                 check=True
             )
-            return json.loads(process.stdout)
+            self._scan_cache = json.loads(process.stdout)
+            return self._scan_cache
         except Exception as e:
             return {"error": f"Go Engine failed: {e}"}
+
+    def get_live_prices(self):
+        """Returns the live prices fetched by the Go engine."""
+        scan = self.fast_scan()
+        return scan.get("prices", [])
 
     def get_vm_inventory(self):
         """Returns active VMs. Uses Go fast_scan if available."""

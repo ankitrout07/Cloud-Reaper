@@ -23,6 +23,12 @@ def run_reaper():
     print("\n[+] AZURE: Initializing Resource Inventory...")
     az = AzureCollector()
     
+    # Load live prices from Go engine into calculator
+    print("    - Fetching Live Prices (Go Scraper)...")
+    live_prices = az.get_live_prices()
+    calc.load_prices(live_prices)
+    print(f"    - Loaded {len(live_prices)} live price items.")
+    
     # 1. Compute Inventory
     vms = az.get_vm_inventory()
     print(f"    - Active VMs Found: {len(vms)}")

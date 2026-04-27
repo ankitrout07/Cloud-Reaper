@@ -89,30 +89,21 @@
                         <thead class="text-gray-500 text-xs uppercase sticky top-0 bg-[#0d1117]/80 backdrop-blur-md z-10">
                             <tr>
                                 <th class="p-4 font-black">SKU Name</th>
-                                <th class="p-4 font-black">vCPU / RAM</th>
+                                <th class="p-4 font-black">Service</th>
                                 <th class="p-4 font-black">Region</th>
-                                <th class="p-4 font-black">Estimated Price</th>
+                                <th class="p-4 font-black">Hourly Price</th>
+                                <th class="p-4 font-black">Monthly Est.</th>
                             </tr>
                         </thead>
-                        <tbody class="space-y-2">
-                            <!-- VM Rows -->
-                            <tr class="glass hover:bg-white/5 transition cursor-pointer group">
-                                <td class="p-4 font-mono text-blue-400 font-bold group-hover:translate-x-1 transition-transform">Standard_D2s_v3</td>
-                                <td class="p-4 text-xs text-gray-400">2 vCPU | 8GB</td>
-                                <td class="p-4"><span class="bg-blue-900/30 text-blue-300 px-2 py-1 rounded text-[10px] font-bold">Central India</span></td>
-                                <td class="p-4 font-bold text-green-400">$70.08/mo</td>
-                            </tr>
-                            <tr class="glass hover:bg-white/5 transition cursor-pointer group">
-                                <td class="p-4 font-mono text-blue-400 font-bold group-hover:translate-x-1 transition-transform">Standard_B2s</td>
-                                <td class="p-4 text-xs text-gray-400">2 vCPU | 4GB</td>
-                                <td class="p-4"><span class="bg-purple-900/30 text-purple-300 px-2 py-1 rounded text-[10px] font-bold">East US</span></td>
-                                <td class="p-4 font-bold text-green-400">$30.37/mo</td>
-                            </tr>
-                            <tr class="glass hover:bg-white/5 transition cursor-pointer group">
-                                <td class="p-4 font-mono text-blue-400 font-bold group-hover:translate-x-1 transition-transform">Premium_SSD_P6</td>
-                                <td class="p-4 text-xs text-gray-400">64 GB | LRS</td>
-                                <td class="p-4"><span class="bg-blue-900/30 text-blue-300 px-2 py-1 rounded text-[10px] font-bold">Central India</span></td>
-                                <td class="p-4 font-bold text-green-400">$5.89/mo</td>
+                        <tbody id="priceTableBody" class="space-y-2">
+                            <!-- Dynamic Content -->
+                            <tr>
+                                <td colspan="5" class="p-12 text-center">
+                                    <div class="flex flex-col items-center gap-4">
+                                        <div class="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                        <p class="text-gray-500 font-bold animate-pulse">WAKING UP GO ENGINE...</p>
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -122,6 +113,43 @@
     </main>
 
     <script>
+        async function fetchPrices() {
+            const tbody = document.getElementById('priceTableBody');
+            try {
+                const response = await fetch('/api/prices');
+                const data = await response.json();
+                
+                if (data.status === 'success' && data.prices.length > 0) {
+                    tbody.innerHTML = '';
+                    data.prices.forEach(item => {
+                        const row = document.createElement('tr');
+                        row.className = 'glass hover:bg-white/5 transition cursor-pointer group';
+                        
+                        const monthly = (item.retailPrice * 730).toFixed(2);
+                        
+                        row.innerHTML = `
+                            <td class="p-4 font-mono text-blue-400 font-bold group-hover:translate-x-1 transition-transform text-xs">
+                                ${item.armResourceName || item.skuName}
+                            </td>
+                            <td class="p-4 text-xs text-gray-400">${item.serviceName}</td>
+                            <td class="p-4">
+                                <span class="bg-blue-900/30 text-blue-300 px-2 py-1 rounded text-[10px] font-bold">
+                                    ${item.armRegionName || 'Global'}
+                                </span>
+                            </td>
+                            <td class="p-4 font-mono text-xs text-gray-300">$${item.retailPrice.toFixed(4)}</td>
+                            <td class="p-4 font-bold text-green-400">$${monthly}/mo</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No live prices found. Ensure the Go engine is running.</td></tr>';
+                }
+            } catch (error) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-red-400">Error: ${error.message}</td></tr>`;
+            }
+        }
+
         function searchPrices() {
             const input = document.getElementById("priceSearch");
             const filter = input.value.toUpperCase();
@@ -133,6 +161,9 @@
                 tr[i].style.display = text.toUpperCase().indexOf(filter) > -1 ? "" : "none";
             }
         }
+
+        // Initial fetch
+        fetchPrices();
     </script>
 </body>
 </html>

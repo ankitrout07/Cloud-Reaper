@@ -92,5 +92,15 @@ def scan():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/prices')
+def get_prices():
+    try:
+        az = AzureCollector()
+        prices = az.get_live_prices()
+        # If no prices, maybe trigger a scan or return empty
+        return jsonify({"status": "success", "prices": prices})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
