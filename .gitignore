@@ -1,0 +1,32 @@
+# cloud-reaper/.gitignore
+.env
+venv/
+__pycache__/
+*.pyc
+logs/
+# OS Metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+# Azure Identity & CLI caches
+.azure/
+az_login_response.json
+
+# Terraform (if used for testing)
+*.tfstate
+*.tfstate.backup
+.terraform/
+*.tfvars
+
+# Database & Metrics
+*.db
+*.sqlite
+influxdb_data/
+export.csv
+
