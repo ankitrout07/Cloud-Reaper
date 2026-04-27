@@ -16,14 +16,22 @@ def index():
 
 @app.route('/api/scan')
 def scan():
+    events = [
+        {"msg": "Authenticating with Azure Identity...", "type": "info"},
+    ]
     try:
         az = AzureCollector()
         calc = CostCalculator()
         
+        events.append({"msg": "Fetching resource inventory from Azure...", "type": "info"})
         # Real-time fetch from your Azure Tenant
         orphans = az.get_orphaned_disks()
+        
+        events.append({"msg": f"Found {len(orphans)} orphaned disks.", "type": "info"})
+        
         # Ensure we have some data even if the collector is being updated
         try:
+            events.append({"msg": "Querying CPU/Memory metrics for rightsizing...", "type": "info"})
             idle_vms = az.get_idle_vms()
         except AttributeError:
             idle_vms = []
@@ -56,13 +64,15 @@ def scan():
                 "savings": f"${cost:.2f}",
                 "rg": d.get('rg', 'N/A')
             })
-
             
         # 7-Day Utilization Report
         try:
             utilization_report = az.get_utilization_report()
+            events.append({"msg": "7-day utilization report generated.", "type": "info"})
         except AttributeError:
             utilization_report = []
+            
+        events.append({"msg": "Scan complete. Targets identified.", "type": "success"})
             
         return jsonify({
             "status": "success",
@@ -70,8 +80,10 @@ def scan():
             "orphans": formatted_orphans,
             "idle_vms": formatted_idle,
             "utilization_report": utilization_report,
+            "events": events,
             "total_savings": f"${total_savings:.2f}"
         })
+
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

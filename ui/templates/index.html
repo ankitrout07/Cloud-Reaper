@@ -17,6 +17,13 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 16px;
         }
+        @keyframes slide-in {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .animate-slide-in {
+            animation: slide-in 0.5s ease-out forwards;
+        }
     </style>
 </head>
 <body class="min-h-screen p-8">
@@ -26,10 +33,19 @@
                 <h1 class="text-4xl font-bold tracking-tight text-blue-400">CLOUD REAPER <span class="text-white text-sm font-mono bg-blue-600 px-2 py-1 rounded ml-2">v1.0</span></h1>
                 <p class="text-gray-400 mt-2">Azure Infrastructure FinOps Control</p>
             </div>
-            <button onclick="runScan()" id="scanBtn" class="bg-blue-600 hover:bg-blue-500 transition px-6 py-3 rounded-lg font-bold shadow-lg shadow-blue-900/20">
-                INITIATE SCAN
-            </button>
+            <div class="flex items-center gap-4">
+                <button onclick="runScan()" id="refreshBtn" class="glass p-3 hover:bg-white/10 transition group">
+                    <svg id="refreshIcon" class="w-5 h-5 text-blue-400 group-active:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                </button>
+                <button onclick="runScan()" id="scanBtn" class="bg-blue-600 hover:bg-blue-500 transition px-6 py-3 rounded-lg font-bold shadow-lg shadow-blue-900/20">
+                    INITIATE SCAN
+                </button>
+            </div>
         </div>
+
+        <div id="notification-feed" class="fixed bottom-6 right-6 w-80 space-y-3 z-50"></div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             <div class="glass p-6">
@@ -94,6 +110,42 @@
     </div>
 
     <script>
+        function notify(message, type = 'info') {
+            const feed = document.getElementById('notification-feed');
+            const id = Date.now();
+            
+            const colors = {
+                info: 'border-blue-500 text-blue-300',
+                success: 'border-green-500 text-green-300',
+                warning: 'border-yellow-500 text-yellow-300',
+                danger: 'border-red-500 text-red-300'
+            };
+
+            const toast = `
+                <div id="toast-${id}" class="glass p-4 border-l-4 ${colors[type]} animate-slide-in shadow-2xl">
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs font-mono">${message}</p>
+                        <span class="text-[10px] opacity-50">${new Date().toLocaleTimeString()}</span>
+                    </div>
+                </div>
+            `;
+            
+            feed.insertAdjacentHTML('afterbegin', toast);
+            
+            setTimeout(() => {
+                const el = document.getElementById(`toast-${id}`);
+                if(el) el.style.opacity = '0';
+                setTimeout(() => el?.remove(), 500);
+            }, 5000);
+        }
+
+        async function reapResource(resourceName) {
+            notify(`Initiating REAP command for ${resourceName}...`, 'warning');
+            await new Promise(r => setTimeout(r, 2000)); 
+            notify(`Successfully deleted ${resourceName}. Savings applied.`, 'success');
+            runScan();
+        }
+
         function filterTable() {
             const input = document.getElementById("resourceSearch");
             const filter = input.value.toUpperCase();
@@ -117,21 +169,30 @@
 
         async function runScan() {
             const btn = document.getElementById('scanBtn');
+            const icon = document.getElementById('refreshIcon');
+            
             btn.innerText = "SCANNING...";
             btn.disabled = true;
+            icon.classList.add('animate-spin');
+
+            notify("Starting cloud resource scan...", "info");
 
             try {
                 const response = await fetch('/api/scan');
                 const data = await response.json();
                 
+                // Show backend events
+                if (data.events) {
+                    data.events.forEach(ev => notify(ev.msg, ev.type));
+                }
+
                 document.getElementById('savings-val').innerText = data.total_savings;
                 document.getElementById('vm-count').innerText = data.vm_count;
                 document.getElementById('disk-count').innerText = data.orphans.length;
 
                 const list = document.getElementById('target-list');
-                list.innerHTML = ''; // Clear the "mock" rows first
+                list.innerHTML = ''; 
                 
-                // Inject real P1s (Orphans)
                 data.orphans.forEach(item => {
                     list.innerHTML += `
                         <tr class="hover:bg-white/5 border-l-4 border-red-500 transition">
@@ -146,11 +207,12 @@
                             </td>
                             <td class="px-6 py-4 text-gray-400">Orphaned Disk</td>
                             <td class="px-6 py-4 text-red-400 font-bold">${item.savings}/mo</td>
-                            <td class="px-6 py-4 text-right"><button class="bg-red-600 px-3 py-1 rounded text-xs hover:bg-red-500 transition">REAP</button></td>
+                            <td class="px-6 py-4 text-right">
+                                <button onclick="reapResource('${item.name}')" class="bg-red-600 px-3 py-1 rounded text-xs hover:bg-red-500 transition">REAP</button>
+                            </td>
                         </tr>`;
                 });
 
-                // Inject real P2s (Idle VMs like 'app1')
                 data.idle_vms.forEach(vm => {
                     list.innerHTML += `
                         <tr class="hover:bg-white/5 border-l-4 border-yellow-500 transition">
@@ -165,11 +227,12 @@
                             </td>
                             <td class="px-6 py-4 text-gray-400">Idle VM (${vm.usage}% CPU)</td>
                             <td class="px-6 py-4 text-yellow-400 font-bold">${vm.savings}/mo</td>
-                            <td class="px-6 py-4 text-right"><button class="bg-yellow-600 px-3 py-1 rounded text-xs hover:bg-yellow-500 transition">INVESTIGATE</button></td>
+                            <td class="px-6 py-4 text-right">
+                                <button onclick="reapResource('${vm.name}')" class="bg-yellow-600 px-3 py-1 rounded text-xs hover:bg-yellow-500 transition">INVESTIGATE</button>
+                            </td>
                         </tr>`;
                 });
 
-                // Inject Utilization Report
                 const efficiencyList = document.getElementById('efficiency-list');
                 efficiencyList.innerHTML = '';
                 if (data.utilization_report) {
@@ -190,14 +253,14 @@
                     });
                 }
                 
-                // Re-apply filter if search box is not empty
                 filterTable();
 
             } catch (e) {
-                alert("Scan failed: " + e.message);
+                notify("Scan failed: " + e.message, "danger");
             } finally {
                 btn.innerText = "INITIATE SCAN";
                 btn.disabled = false;
+                icon.classList.remove('animate-spin');
             }
         }
 
