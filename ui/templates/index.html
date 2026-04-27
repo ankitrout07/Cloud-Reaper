@@ -10,6 +10,7 @@
             background: radial-gradient(circle at top left, #1a1a2e, #16213e);
             color: white;
             font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
         }
         .glass {
             background: rgba(255, 255, 255, 0.05);
@@ -86,7 +87,7 @@
         <div id="notification-feed" class="fixed bottom-6 right-6 w-80 space-y-3 z-50"></div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-            <div class="lg:col-span-2 glass p-6 min-h-[300px]">
+            <div class="lg:col-span-2 glass p-6">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-sm font-bold text-gray-400 uppercase tracking-widest">Waste Velocity & 6-Month Forecast</h3>
                     <div class="flex items-center gap-2">
@@ -94,7 +95,9 @@
                         <span class="text-[10px] text-gray-500 font-bold uppercase">Projected Savings</span>
                     </div>
                 </div>
-                <canvas id="forecastChart" height="120"></canvas>
+                <div class="h-[250px] w-full relative">
+                    <canvas id="forecastChart"></canvas>
+                </div>
             </div>
             <div class="flex flex-col gap-6">
                 <div class="glass p-6 flex-1">
