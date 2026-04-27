@@ -1,0 +1,16 @@
+currency: USD
+providers:
+  aws:
+    ec2:
+      t3.micro: 0.0104
+      t3.small: 0.0208
+      t3.medium: 0.0416
+    ebs:
+      gp3_per_gb_month: 0.08
+  azure:
+    vm:
+      Standard_B1s: 0.0101
+      Standard_B2s: 0.0403
+      Standard_D2s_v3: 0.096
+    disk:
+      premium_ssd_p6_64gb: 5.89
