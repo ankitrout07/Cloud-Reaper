@@ -37,7 +37,14 @@ def run_reaper():
         total_monthly_saving += cost
         print(f"      [!] REAP TARGET: {disk['name']} | Saving: ${cost:.2f}/mo")
 
-    # 3. Persistence
+    # 3. Idle VM Discovery (Go Engine Powered)
+    idle_vms = az.get_idle_vms(cpu_threshold=5.0)
+    print(f"    - Idle VMs Detected: {len(idle_vms)}")
+    
+    for vm in idle_vms:
+        print(f"      [!] IDLE VM: {vm['name']} | Avg CPU: {vm['usage']}%")
+
+    # 4. Persistence
     if total_monthly_saving > 0:
         pusher.push_savings('azure', total_monthly_saving)
         print(f"\n[+] Telemetry pushed to InfluxDB.")

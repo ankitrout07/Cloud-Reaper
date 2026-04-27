@@ -48,18 +48,57 @@ class AzureCollector:
 
     def get_idle_vms(self, cpu_threshold=5.0):
         """
-        Returns VMs with average CPU usage below the threshold over the last hour.
+        Returns VMs with average CPU usage below the threshold.
+        Uses the Go-based 'reaper-engine' for high-concurrency metric collection.
         """
+        import subprocess
+        import json
+
+        if not self.subscription_id:
+            return []
+
+        # Path to the Go binary
+        go_engine_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'engine-go', 'reaper-engine')
+        
+        if not os.path.exists(go_engine_path):
+            print(f"[!] Go engine not found at {go_engine_path}. Falling back to slow Python mode.")
+            return self._get_idle_vms_python(cpu_threshold)
+
+        try:
+            print(f"[+] Launching Go High-Velocity Engine...")
+            result = subprocess.run(
+                [go_engine_path],
+                env={**os.environ, "AZURE_SUBSCRIPTION_ID": self.subscription_id},
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            reports = json.loads(result.stdout)
+            idle_vms = []
+            for r in reports:
+                if r['usage'] < cpu_threshold:
+                    idle_vms.append({
+                        "name": r['name'],
+                        "usage": round(r['usage'], 2),
+                        "id": r['id'],
+                        "rg": self._extract_rg(r['id'])
+                    })
+            return idle_vms
+            
+        except Exception as e:
+            print(f"[!] Go engine failed: {e}. Falling back to Python.")
+            return self._get_idle_vms_python(cpu_threshold)
+
+    def _get_idle_vms_python(self, cpu_threshold=5.0):
+        """Original slow Python implementation as fallback."""
         if not self.compute_client or not self.monitor_client: return []
         
         idle_vms = []
         try:
             vms = self.compute_client.virtual_machines.list_all()
             for vm in vms:
-                # Construct resource ID
                 resource_id = vm.id
-                
-                # Query metrics for the last hour
                 end_time = datetime.utcnow()
                 start_time = end_time - timedelta(hours=1)
                 
@@ -83,7 +122,7 @@ class AzureCollector:
                                 })
             return idle_vms
         except Exception as e:
-            print(f"Error fetching idle VMs: {e}")
+            print(f"Error fetching idle VMs (Python): {e}")
             return []
 
     def _calculate_avg(self, metric_item):
