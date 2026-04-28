@@ -20,6 +20,7 @@ import (
 
 type VMReport struct {
 	Name       string             `json:"name"`
+	Size       string             `json:"size"`
 	Usage      float64            `json:"usage"`
 	NetworkIn  float64            `json:"network_in"`
 	NetworkOut float64            `json:"network_out"`
@@ -267,8 +268,14 @@ func main() {
 					}
 				}
 
+				size := "Unknown"
+				if vm.Properties != nil && vm.Properties.HardwareProfile != nil && vm.Properties.HardwareProfile.VMSize != nil {
+					size = string(*vm.Properties.HardwareProfile.VMSize)
+				}
+
 				reportChan <- VMReport{
 					Name:       *vm.Name,
+					Size:       size,
 					Usage:      usage,
 					NetworkIn:  netIn,
 					NetworkOut: netOut,

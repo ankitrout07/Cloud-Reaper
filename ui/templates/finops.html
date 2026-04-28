@@ -78,29 +78,29 @@
 </head>
 <body class="flex">
     <!-- Sidebar -->
-    <nav id="sidebar" class="fixed left-0 top-0 h-screen w-20 hover:w-64 transition-all duration-500 bg-[#0a1224] border-r border-white/5 z-50 overflow-hidden flex flex-col items-center py-8 group">
+    <nav id="sidebar" class="fixed left-0 top-0 h-screen w-20 hover:w-64 transition-all duration-300 glass border-r border-white/10 z-50 overflow-hidden flex flex-col items-center py-8 group">
         <div class="mb-12 flex items-center justify-center">
             <div class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
                 <span class="font-black text-white text-xl">R</span>
             </div>
         </div>
         
-        <div class="flex-1 flex flex-col gap-8 w-full px-4">
-            <a href="/" class="flex items-center gap-4 p-3 rounded-2xl hover:bg-white/5 transition group/item">
-                <svg class="w-6 h-6 text-slate-400 group-hover/item:text-cyan-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                <span class="text-sm font-semibold text-slate-400 group-hover/item:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Dashboard</span>
+        <div class="flex-1 flex flex-col gap-6 w-full px-4">
+            <a href="/" class="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition text-gray-400 group/item">
+                <svg class="w-6 h-6 shrink-0 group-hover/item:text-cyan-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                <span class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Dashboard</span>
             </a>
-            <a href="/finops" class="flex items-center gap-4 p-3 rounded-2xl bg-cyan-400/10 text-cyan-400 border border-cyan-400/20 group/item">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                <span class="text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">FinOps Intelligence</span>
+            <a href="/finops" class="flex items-center gap-4 p-3 rounded-xl bg-white/10 text-cyan-400 transition group/item">
+                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                <span class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">FinOps Intelligence</span>
             </a>
-            <a href="/pricing" class="flex items-center gap-4 p-3 rounded-2xl hover:bg-white/5 transition group/item">
-                <svg class="w-6 h-6 text-slate-400 group-hover/item:text-cyan-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3zM12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"/></svg>
-                <span class="text-sm font-semibold text-slate-400 group-hover/item:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Price Book</span>
+            <a href="/pricing" class="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition text-gray-400 group/item">
+                <svg class="w-6 h-6 shrink-0 group-hover/item:text-cyan-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3zM12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"/></svg>
+                <span class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Azure Prices</span>
             </a>
-            <a href="/settings" class="flex items-center gap-4 p-3 rounded-2xl hover:bg-white/5 transition group/item">
-                <svg class="w-6 h-6 text-slate-400 group-hover/item:text-cyan-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <span class="text-sm font-semibold text-slate-400 group-hover/item:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Settings</span>
+            <a href="/settings" class="flex items-center gap-4 p-3 rounded-xl hover:bg-white/10 transition text-gray-400 group/item">
+                <svg class="w-6 h-6 shrink-0 group-hover/item:text-cyan-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Settings</span>
             </a>
         </div>
     </nav>

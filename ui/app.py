@@ -174,7 +174,7 @@ def scan():
             
             # Update collector for current sub
             az.subscription_id = sub_id
-            az._scan_cache = False  # Force fresh scan for each subscription
+            az._scan_cache = None  # Force fresh scan for each subscription
             
             # Fetch inventory
             vms = az.get_vm_inventory()

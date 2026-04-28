@@ -78,8 +78,8 @@ class AzureCollector:
 
     def get_vm_inventory(self):
         """Returns active VMs. Uses Go fast_scan if available."""
-        scan = self.fast_scan()
-        if "active_vms" in scan:
+        scan = self.fast_scan() or {}
+        if "active_vms" in scan and scan["active_vms"] is not None:
             return [{'name': name, 'size': 'Unknown (Fast Scan)'} for name in scan['active_vms']]
         
         # Fallback
@@ -106,7 +106,7 @@ class AzureCollector:
         }
         
         # Go engine returns orphaned_disks as list of {name, tags} dicts
-        if "orphaned_disks" in scan:
+        if "orphaned_disks" in scan and scan["orphaned_disks"] is not None:
             for item in scan['orphaned_disks']:
                 if isinstance(item, dict):
                     results["disks"].append({'name': item.get('name', 'unknown'), 'size_gb': 0, 'rg': 'N/A'})
@@ -114,7 +114,7 @@ class AzureCollector:
                     results["disks"].append({'name': item, 'size_gb': 0, 'rg': 'N/A'})
         
         # Go engine returns orphaned_snapshots as list of {name, tags} dicts
-        if "orphaned_snapshots" in scan:
+        if "orphaned_snapshots" in scan and scan["orphaned_snapshots"] is not None:
             for item in scan['orphaned_snapshots']:
                 if isinstance(item, dict):
                     results["snapshots"].append({'name': item.get('name', 'unknown'), 'rg': 'N/A'})
@@ -136,22 +136,24 @@ class AzureCollector:
 
     def get_zombie_vms(self):
         """Deep idle logic: CPU < 1%, Network < 10KB, Disk IOPS < 1."""
-        scan = self.fast_scan()
+        scan = self.fast_scan() or {}
         zombies = []
-        if "vm_reports" in scan:
+        if "vm_reports" in scan and scan["vm_reports"] is not None:
             for r in scan['vm_reports']:
+                usage = r.get('usage', 0)
+                net_in = r.get('network_in', 0)
                 is_zombie = (
-                    r['usage'] < 1.0 and 
-                    r['network_in'] < 10240 and 
-                    r['network_out'] < 10240 and
-                    r['disk_iops'] < 1.0
+                    usage < 1.0 and 
+                    net_in < 10240 and 
+                    r.get('network_out', 0) < 10240 and
+                    r.get('disk_iops', 0) < 1.0
                 )
                 if is_zombie:
                     zombies.append({
-                        "name": r['name'],
-                        "usage": f"CPU: {r['usage']:.1f}% | Net: {r['network_in']/1024:.1f}KB",
-                        "id": r['id'],
-                        "rg": self._extract_rg(r['id'])
+                        "name": r.get('name', 'unknown'),
+                        "usage": f"CPU: {usage:.1f}% | Net: {net_in/1024:.1f}KB",
+                        "id": r.get('id', 'N/A'),
+                        "rg": self._extract_rg(r.get('id', ''))
                     })
         return zombies
 
@@ -160,16 +162,17 @@ class AzureCollector:
         Returns VMs with average CPU usage below the threshold.
         Uses the high-speed unified Go scan result.
         """
-        scan = self.fast_scan()
-        if "vm_reports" in scan:
+        scan = self.fast_scan() or {}
+        if "vm_reports" in scan and scan["vm_reports"] is not None:
             idle_vms = []
             for r in scan['vm_reports']:
-                if r['usage'] < cpu_threshold:
+                usage = r.get('usage', 0)
+                if usage < cpu_threshold:
                     idle_vms.append({
-                        "name": r['name'],
-                        "usage": round(r['usage'], 2),
-                        "id": r['id'],
-                        "rg": self._extract_rg(r['id'])
+                        "name": r.get('name', 'unknown'),
+                        "usage": round(usage, 2),
+                        "id": r.get('id', 'N/A'),
+                        "rg": self._extract_rg(r.get('id', ''))
                     })
             return idle_vms
 
@@ -411,11 +414,11 @@ class AzureCollector:
     # ─────────────────────────────────────────────────
     def get_ri_sp_candidates(self):
         """Analyzes real active VMs from scan for reservation opportunities."""
-        scan = self.fast_scan()
+        scan = self.fast_scan() or {}
         # active_vms is a list of strings (VM names) from the Go engine
-        active_vms = scan.get("active_vms", [])
+        active_vms = scan.get("active_vms") or []
         # vm_reports has richer data with size info
-        vm_reports = {r['name']: r for r in scan.get("vm_reports", [])}
+        vm_reports = {r.get('name', 'unknown'): r for r in (scan.get("vm_reports") or [])}
         candidates = []
         for vm_name in active_vms:
             # vm_name is a string
@@ -474,9 +477,9 @@ class AzureCollector:
     # ─────────────────────────────────────────────────
     def get_modernization_candidates(self):
         """Suggests real-time architecture upgrades based on current VM SKUs from scan."""
-        scan = self.fast_scan()
+        scan = self.fast_scan() or {}
         # active_vms is a list of strings (VM names) from the Go engine
-        vm_names = scan.get("active_vms", [])
+        vm_names = scan.get("active_vms") or []
         suggestions = []
         # Real-world ARM mapping for Azure
         arm_mapping = {
@@ -485,17 +488,25 @@ class AzureCollector:
             "Standard_D8s_v3": "Standard_D8ps_v5",
             "Standard_F2s_v2": "Standard_F2ps_v6",
         }
-        for vm in vm_names:
-            # vm is a string name; we can't know the SKU without vm_reports
-            name = vm if isinstance(vm, str) else vm.get("name", "unknown")
-            # Pick a random SKU to demonstrate modernization (real impl would use vm_reports)
-            sample_skus = list(arm_mapping.keys())
-            sku = random.choice(sample_skus)
+        vm_reports = {r.get('name', 'unknown'): r for r in (scan.get("vm_reports") or [])}
+        
+        for name in vm_names:
+            report = vm_reports.get(name, {})
+            sku = report.get("size", "Standard_D2s_v3") # Default to a common SKU if unknown
+            
+            # If SKU is in our modernization list, suggest it
+            if sku in arm_mapping:
+                target = arm_mapping[sku]
+            else:
+                # Fallback to a generic upgrade for demo purposes
+                target = sku.replace("v3", "v5").replace("v2", "v6")
+                if target == sku: target = sku + "_modernized"
+
             base_cost = random.uniform(100, 500)
             suggestions.append({
                 "name": name,
                 "current_sku": sku,
-                "suggested_sku": arm_mapping[sku],
+                "suggested_sku": target,
                 "arch": "ARM (Ampere Altra)",
                 "perf_gain_pct": 35,
                 "cost_saving_pct": 20,
@@ -510,11 +521,11 @@ class AzureCollector:
     # ─────────────────────────────────────────────────
     def get_policy_violations(self):
         """Audits real resources against FinOps guardrails."""
-        scan = self.fast_scan()
+        scan = self.fast_scan() or {}
         violations = []
         
         # 1. Block Ultra Disk in Non-Prod (orphaned_disks are {name, tags} dicts from Go)
-        disks = scan.get("orphaned_disks", []) 
+        disks = scan.get("orphaned_disks") or [] 
         for d in disks:
             if not isinstance(d, dict):
                 continue
@@ -532,8 +543,9 @@ class AzureCollector:
                 })
         
         # 2. Missing Owner Tag — use vm_reports which have tags
-        vm_reports = scan.get("vm_reports", [])
+        vm_reports = scan.get("vm_reports") or []
         for r in vm_reports:
+            if not isinstance(r, dict): continue
             tags = r.get("tags") or {}
             # Normalize tag keys (Go SDK uses *string values)
             tag_keys = [k for k in tags.keys()] if isinstance(tags, dict) else []
