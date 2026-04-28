@@ -20,7 +20,7 @@ cd "$SCRIPT_DIR"
 # 2. Go Build Logic
 if [ -d "engine-go" ]; then
     echo "[*] Building Go Core..."
-    cd engine-go && go build -o reaper-engine main.go && cd ..
+    (cd engine-go && go build -o reaper-engine main.go)
 else
     echo "[!] engine-go directory not found!"
     exit 1
