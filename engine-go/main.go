@@ -315,27 +315,32 @@ func main() {
 			
 			mu.Lock()
 			for _, item := range priceResult.Items {
-				// Process pricing logic
 				retailPrice, _ := item["retailPrice"].(float64)
-				minUnits, ok := item["minimumNumberOfUnits"].(float64)
-				if !ok || minUnits == 0 {
-					minUnits = 1.0
-				}
-				
+				minUnits, _ := item["minimumNumberOfUnits"].(float64)
+				serviceFamily, _ := item["serviceFamily"].(string)
+				meterName, _ := item["meterName"].(string)
 				unitOfMeasure, _ := item["unitOfMeasure"].(string)
-				
-				// Normalize to hourly if it's not monthly
-				var actualHourly float64
-				isMonthly := false
-				
-				if unitOfMeasure == "1 Month" || unitOfMeasure == "Month" {
-					actualHourly = retailPrice / 730.0 // Approximate
-					isMonthly = true
-				} else {
-					actualHourly = retailPrice / minUnits
+
+				// 1. Filter out Non-Compute/Non-Storage Noise and Support/Savings Plans
+				if (serviceFamily != "Compute" && serviceFamily != "Storage") || 
+					strings.Contains(meterName, "Support") || 
+					strings.Contains(meterName, "Savings Plan") {
+					continue
 				}
-				
-				item["normalizedHourly"] = actualHourly
+
+				// 2. Normalize based on Units (Critical Fix)
+				normalizedPrice := retailPrice
+				if minUnits > 0 {
+					normalizedPrice = retailPrice / minUnits
+				}
+
+				// 3. Determine if it's Monthly or Hourly
+				isMonthly := false
+				if strings.Contains(unitOfMeasure, "Month") {
+					isMonthly = true
+				}
+
+				item["retailPrice"] = normalizedPrice // Update with normalized
 				item["isMonthlyBilling"] = isMonthly
 				result.Prices = append(result.Prices, item)
 			}
