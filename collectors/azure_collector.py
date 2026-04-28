@@ -247,16 +247,20 @@ class AzureCollector:
                     aggregation='Average,Maximum'
                 )
                 cpu_avg = 0
+                ram_peak = 0
                 for item in metrics.value:
                     if item.name.value == 'Percentage CPU':
                         cpu_avg = self._calculate_avg(item)
+                    if item.name.value == 'Available Memory Bytes':
+                        # For available memory, we look for the minimum available (peak usage)
+                        ram_peak = self._calculate_max(item) 
                 
                 status, rec, color = self._determine_status(cpu_avg, vm.hardware_profile.vm_size)
                 report.append({
                     "name": vm.name,
                     "rg": self._extract_rg(vm.id),
                     "current_sku": vm.hardware_profile.vm_size,
-                    "metrics": f"CPU: {cpu_avg:.1f}% | RAM Avail (Peak): {ram_peak / (1024**3):.1f} GB",
+                    "metrics": f"CPU: {cpu_avg:.1f}% | RAM Avail (Min): {ram_peak / (1024**3):.1f} GB",
                     "status": status,
                     "recommendation": rec,
                     "color": color
