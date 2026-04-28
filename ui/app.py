@@ -1,6 +1,9 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect, url_for
 import sys
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Ensure the app can see the collectors and engine folders
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -8,6 +11,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from collectors.azure_collector import AzureCollector
 from collectors.auth_check import check_azure_status
 from engine.calculator import CostCalculator
+from collectors.config_manager import save_config
+
+def is_configured():
+    # Checks if the Subscription ID exists in environment or .env
+    return os.getenv("AZURE_SUBSCRIPTION_ID") is not None
 
 app = Flask(__name__)
 calc = CostCalculator()
@@ -16,6 +24,12 @@ settings_state = {
     "idle_strategy": "aggressive",
     "selected_subscriptions": []
 }
+
+@app.before_request
+def redirect_to_setup():
+    # If not configured and not already on the settings page or static files
+    if not is_configured() and request.endpoint not in ['settings', 'static', 'update_settings', 'save_initial_setup']:
+        return redirect(url_for('settings', setup=True))
 
 @app.route('/')
 def index():
@@ -53,6 +67,17 @@ def update_settings():
         return jsonify({"status": "success", "msg": f"Target scope updated: {len(subs)} subscriptions"})
 
     return jsonify({"status": "error", "msg": "Invalid action"}), 400
+
+@app.route('/api/settings/initial-setup', methods=['POST'])
+def save_initial_setup():
+    data = request.json
+    sub_id = data.get('sub_id')
+    if not sub_id:
+        return jsonify({"status": "error", "msg": "Subscription ID is required"}), 400
+    
+    if save_config(sub_id):
+        return jsonify({"status": "success", "msg": "Configuration saved successfully"})
+    return jsonify({"status": "error", "msg": "Failed to save configuration"}), 500
 
 @app.route('/api/settings/auth')
 
