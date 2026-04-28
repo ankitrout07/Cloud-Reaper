@@ -13,9 +13,10 @@ from collectors.auth_check import check_azure_status
 from engine.calculator import CostCalculator
 from collectors.config_manager import save_config
 
-def is_configured():
-    # Checks if the Subscription ID exists in environment or .env
-    return os.getenv("AZURE_SUBSCRIPTION_ID") is not None
+def is_first_run():
+    # If AZURE_SUBSCRIPTION_ID is missing or empty in .env/environment
+    sub_id = os.getenv("AZURE_SUBSCRIPTION_ID")
+    return not sub_id or len(sub_id) < 5
 
 app = Flask(__name__)
 calc = CostCalculator()
@@ -26,10 +27,14 @@ settings_state = {
 }
 
 @app.before_request
-def redirect_to_setup():
-    # If not configured and not already on the settings page or static files
-    if not is_configured() and request.endpoint not in ['settings', 'static', 'update_settings', 'save_initial_setup']:
-        return redirect(url_for('settings', setup=True))
+def check_setup():
+    # Allow access to static files and the update API so setup can function
+    if request.path.startswith('/static') or request.path == '/api/settings/update' or request.path == '/api/auth/status':
+        return
+    
+    # If it's the first run and the user isn't already going to settings
+    if is_first_run() and request.endpoint != 'settings':
+        return redirect(url_for('settings', mode='onboarding'))
 
 @app.route('/')
 def index():

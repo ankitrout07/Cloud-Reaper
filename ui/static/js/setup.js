@@ -4,7 +4,37 @@ function notify(message, type) {
         showToast(message, type === "danger" ? "error" : "success");
     } else {
         console.log(`Notification (${type}): ${message}`);
-        alert(message);
+    }
+}
+
+let validationTimeout;
+
+function triggerValidation() {
+    const subId = document.getElementById('setup_sub_id').value;
+    const spinner = document.getElementById('validation-spinner');
+    
+    if (subId.length > 30) { // Typical UUID length is 36
+        spinner.classList.remove('hidden');
+        
+        clearTimeout(validationTimeout);
+        validationTimeout = setTimeout(async () => {
+            try {
+                const res = await fetch('/api/auth/status');
+                const data = await res.json();
+                
+                if (data.status === "healthy") {
+                    notify("Azure Session Active", "success");
+                } else {
+                    notify("Azure Session Missing - Please run 'az login'", "danger");
+                }
+            } catch (e) {
+                console.error("Validation failed", e);
+            } finally {
+                spinner.classList.add('hidden');
+            }
+        }, 1000);
+    } else {
+        spinner.classList.add('hidden');
     }
 }
 
