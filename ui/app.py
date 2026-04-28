@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import sys
 import os
 
@@ -9,14 +9,58 @@ from collectors.azure_collector import AzureCollector
 from engine.calculator import CostCalculator
 
 app = Flask(__name__)
+calc = CostCalculator()
+settings_state = {
+    "currency": "USD",
+    "idle_strategy": "aggressive"
+}
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
+@app.route('/settings')
+def settings():
+    return render_template('settings.html')
+
+@app.route('/api/settings/sync', methods=['POST'])
+def sync_settings():
+    success = calc.reload_prices()
+    if success:
+        return jsonify({"status": "success", "message": "Price book reloaded."})
+    return jsonify({"status": "error", "message": "Failed to reload price book."}), 500
+
+@app.route('/api/settings/currency', methods=['POST'])
+def update_currency():
+    data = request.get_json()
+    currency = data.get('currency', 'USD')
+    settings_state['currency'] = currency
+    calc.set_currency(currency)
+    return jsonify({"status": "success", "currency": currency})
+
+@app.route('/api/settings/strategy', methods=['POST'])
+def update_strategy():
+    data = request.get_json()
+    strategy = data.get('strategy', 'aggressive')
+    settings_state['idle_strategy'] = strategy
+    return jsonify({"status": "success", "strategy": strategy})
+
+@app.route('/api/settings/auth')
+def check_auth():
+    import subprocess
+    try:
+        # Check if az is logged in
+        subprocess.run(['az', 'account', 'show'], capture_output=True, check=True)
+        return jsonify({"status": "success", "message": "Connected: Azure CLI (Active Subscription)"})
+    except Exception:
+        return jsonify({"status": "error", "message": "Disconnected: Please run 'az login'"})
+
+
+
 @app.route('/pricing')
 def pricing():
     return render_template('pricing.html')
+
 
 @app.route('/api/scan')
 def scan():
@@ -25,7 +69,8 @@ def scan():
     ]
     try:
         az = AzureCollector()
-        calc = CostCalculator()
+        # Using global calc instance to support hot-reloads
+
         
         events.append({"msg": "Fetching resource inventory from Azure...", "type": "info"})
         # Real-time fetch from your Azure Tenant
@@ -33,12 +78,13 @@ def scan():
         
         events.append({"msg": f"Found {len(orphans)} orphaned disks.", "type": "info"})
         
-        # Ensure we have some data even if the collector is being updated
+        threshold = 2.0 if settings_state['idle_strategy'] == 'aggressive' else 10.0
         try:
-            events.append({"msg": "Querying CPU/Memory metrics for rightsizing...", "type": "info"})
-            idle_vms = az.get_idle_vms()
+            events.append({"msg": f"Querying metrics (Threshold: {threshold}%)...", "type": "info"})
+            idle_vms = az.get_idle_vms(cpu_threshold=threshold)
         except AttributeError:
             idle_vms = []
+
             
         vms = az.get_vm_inventory()
         

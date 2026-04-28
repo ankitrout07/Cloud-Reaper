@@ -5,15 +5,9 @@ from collectors.azure_prices import AzurePriceClient
 class CostCalculator:
     def __init__(self, price_book_path='engine/price_book.yaml', currency='USD'):
         # Ensure we find the YAML file relative to the project root
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        full_path = os.path.join(project_root, price_book_path)
-        
-        try:
-            with open(full_path, 'r') as f:
-                self.prices_yaml = yaml.safe_load(f)
-        except FileNotFoundError:
-            print(f"[!] ERROR: Price book not found at {full_path}")
-            self.prices_yaml = {}
+        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.path = os.path.join(self.project_root, price_book_path)
+        self.load_config()
 
         self.currency = currency
         self.azure_price_client = AzurePriceClient(currency=currency)
@@ -26,6 +20,28 @@ class CostCalculator:
             "premium_ssd_p6": 0.008, # Hourly approx ($5.89/730)
             "standard_b2s": 0.0416
         }
+
+    def load_config(self):
+        """Loads or reloads the pricing YAML file"""
+        if os.path.exists(self.path):
+            with open(self.path, 'r') as f:
+                self.prices_yaml = yaml.safe_load(f)
+            return True
+        else:
+            print(f"[!] ERROR: Price book not found at {self.path}")
+            self.prices_yaml = {}
+            return False
+
+    def reload_prices(self):
+        return self.load_config()
+
+    def set_currency(self, currency):
+        self.currency = currency
+        self.azure_price_client = AzurePriceClient(currency=currency)
+        # Clear cache to force re-fetch in new currency if needed
+        self.price_cache = {}
+
+
 
     def load_prices(self, price_items):
         """Loads a list of price items (from Azure Retail API format) into the cache."""

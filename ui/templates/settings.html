@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings | Cloud-Reaper</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem;
+        }
+        body {
+            background: #0a0a0b;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="p-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="flex items-center justify-between mb-10">
+            <h1 class="text-3xl font-black tracking-tighter">SETTINGS</h1>
+            <a href="/" class="text-xs font-bold text-gray-500 hover:text-white transition">← BACK TO DASHBOARD</a>
+        </div>
+
+        <div class="glass p-8">
+            <div class="flex gap-8 border-b border-white/10 mb-8">
+                <button id="tab-general" onclick="showTab('general')" class="pb-4 text-sm font-bold border-b-2 border-blue-500 transition-all">General</button>
+                <button id="tab-advanced" onclick="showTab('advanced')" class="pb-4 text-sm font-bold text-gray-500 hover:text-white transition-all">Advanced Control</button>
+            </div>
+
+            <div id="general-tab" class="space-y-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-sm font-bold">Theme Mode</p>
+                        <p class="text-[10px] text-gray-500">Adjust the visual appearance of the interface.</p>
+                    </div>
+                    <select class="bg-black/20 border border-white/10 rounded px-3 py-2 text-xs outline-none focus:border-blue-500">
+                        <option>Midnight Dark</option>
+                        <option>Cloud Light</option>
+                    </select>
+                </div>
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-sm font-bold">Auto-Refresh Rate</p>
+                        <p class="text-[10px] text-gray-500">How often the dashboard data polls the backend.</p>
+                    </div>
+                    <select class="bg-black/20 border border-white/10 rounded px-3 py-2 text-xs outline-none focus:border-blue-500">
+                        <option>Real-time (5s)</option>
+                        <option>Standard (30s)</option>
+                        <option>Efficiency (5m)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="advanced-tab" class="hidden space-y-8 animate-fade-in">
+                <div class="p-6 bg-yellow-500/5 border border-yellow-500/20 rounded-2xl">
+                    <h4 class="text-xs font-black text-yellow-500 uppercase mb-6 tracking-widest">FinOps Parameters</h4>
+                    
+                    <div class="flex justify-between items-center mb-8">
+                        <div>
+                            <p class="text-sm font-bold">Global Currency</p>
+                            <p class="text-[10px] text-gray-500">Affects all dashboard cost projections.</p>
+                        </div>
+                        <div class="flex bg-black/40 p-1 rounded-xl">
+                            <button id="btn-usd" onclick="setCurrency('USD')" class="px-4 py-1.5 text-xs bg-blue-600 rounded-lg font-bold transition">USD ($)</button>
+                            <button id="btn-inr" onclick="setCurrency('INR')" class="px-4 py-1.5 text-xs hover:bg-white/5 rounded-lg font-bold transition">INR (₹)</button>
+                        </div>
+                    </div>
+
+                    <div class="mb-8">
+                        <p class="text-sm font-bold mb-2">Idle Resource Strategy</p>
+                        <p class="text-[10px] text-gray-500 mb-3">Defines the sensitivity for flagging underutilized assets.</p>
+                        <select id="idle-strategy" class="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs font-mono text-blue-300 outline-none focus:border-blue-500">
+                            <option value="aggressive">Aggressive: CPU < 2% (24h Window)</option>
+                            <option value="conservative">Conservative: CPU < 10% (7d Window)</option>
+                        </select>
+                    </div>
+
+                    <button onclick="syncPriceBook()" class="w-full py-4 bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-black rounded-xl transition flex items-center justify-center gap-3 group">
+                        <svg class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        RELOAD PRICE_BOOK.YAML
+                    </button>
+                </div>
+
+                <div class="p-6 bg-blue-500/5 border border-blue-500/20 rounded-2xl">
+                    <h4 class="text-xs font-black text-blue-500 uppercase mb-4 tracking-widest">System Diagnostics</h4>
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-sm font-bold">Azure Auth Status</p>
+                            <p id="auth-status" class="text-[10px] text-gray-500">Checking credentials...</p>
+                        </div>
+                        <div id="auth-indicator" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-8 right-8 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="bg-white text-black px-6 py-3 rounded-xl font-bold text-sm shadow-2xl flex items-center gap-3">
+            <span id="toast-icon">✓</span>
+            <span id="toast-message">Settings Updated</span>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tab) {
+            const generalTab = document.getElementById('general-tab');
+            const advancedTab = document.getElementById('advanced-tab');
+            const generalBtn = document.getElementById('tab-general');
+            const advancedBtn = document.getElementById('tab-advanced');
+
+            if (tab === 'general') {
+                generalTab.classList.remove('hidden');
+                advancedTab.classList.add('hidden');
+                generalBtn.classList.add('border-blue-500', 'border-b-2');
+                generalBtn.classList.remove('text-gray-500');
+                advancedBtn.classList.remove('border-blue-500', 'border-b-2');
+                advancedBtn.classList.add('text-gray-500');
+            } else {
+                generalTab.classList.add('hidden');
+                advancedTab.classList.remove('hidden');
+                advancedBtn.classList.add('border-blue-500', 'border-b-2');
+                advancedBtn.classList.remove('text-gray-500');
+                generalBtn.classList.remove('border-blue-500', 'border-b-2');
+                generalBtn.classList.add('text-gray-500');
+            }
+        }
+
+        async function setCurrency(curr) {
+            const usdBtn = document.getElementById('btn-usd');
+            const inrBtn = document.getElementById('btn-inr');
+
+            try {
+                const response = await fetch('/api/settings/currency', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ currency: curr })
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    if (curr === 'USD') {
+                        usdBtn.classList.add('bg-blue-600');
+                        inrBtn.classList.remove('bg-blue-600');
+                        inrBtn.classList.add('hover:bg-white/5');
+                    } else {
+                        inrBtn.classList.add('bg-blue-600');
+                        usdBtn.classList.remove('bg-blue-600');
+                        usdBtn.classList.add('hover:bg-white/5');
+                    }
+                    showToast(`Currency set to ${curr}`);
+                }
+            } catch (err) {
+                showToast('Failed to update currency', 'error');
+            }
+        }
+
+        document.getElementById('idle-strategy').addEventListener('change', async (e) => {
+            const strategy = e.target.value;
+            try {
+                const response = await fetch('/api/settings/strategy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ strategy: strategy })
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    showToast(`Strategy updated to ${strategy}`);
+                }
+            } catch (err) {
+                showToast('Failed to update strategy', 'error');
+            }
+        });
+
+
+        async function syncPriceBook() {
+            try {
+                const response = await fetch('/api/settings/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    showToast('Price Book Synced Successfully');
+                } else {
+                    showToast('Sync Failed', 'error');
+                }
+            } catch (err) {
+                showToast('Network Error', 'error');
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const msg = document.getElementById('toast-message');
+            const icon = document.getElementById('toast-icon');
+
+            msg.innerText = message;
+            icon.innerText = type === 'success' ? '✓' : '✕';
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Real Auth Check
+        async function checkAuth() {
+            const authStatus = document.getElementById('auth-status');
+            const authIndicator = document.getElementById('auth-indicator');
+            
+            try {
+                const response = await fetch('/api/settings/auth');
+                const data = await response.json();
+                
+                authStatus.innerText = data.message;
+                if (data.status === 'success') {
+                    authStatus.classList.replace('text-gray-500', 'text-green-400');
+                    authIndicator.classList.replace('bg-yellow-500', 'bg-green-500');
+                } else {
+                    authStatus.classList.replace('text-gray-500', 'text-red-400');
+                    authIndicator.classList.replace('bg-yellow-500', 'bg-red-500');
+                }
+                authIndicator.classList.remove('animate-pulse');
+            } catch (err) {
+                authStatus.innerText = 'Error checking auth status';
+            }
+        }
+
+        checkAuth();
+
+    </script>
+</body>
+</html>
