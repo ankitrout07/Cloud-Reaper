@@ -19,12 +19,12 @@ import (
 )
 
 type VMReport struct {
-	Name       string            `json:"name"`
-	Usage      float64           `json:"usage"`
-	NetworkIn  float64           `json:"network_in"`
-	NetworkOut float64           `json:"network_out"`
-	DiskIOPS   float64           `json:"disk_iops"`
-	ResourceID string            `json:"id"`
+	Name       string             `json:"name"`
+	Usage      float64            `json:"usage"`
+	NetworkIn  float64            `json:"network_in"`
+	NetworkOut float64            `json:"network_out"`
+	DiskIOPS   float64            `json:"disk_iops"`
+	ResourceID string             `json:"id"`
 	Tags       map[string]*string `json:"tags"`
 }
 
@@ -135,7 +135,7 @@ func main() {
 	ctx := context.Background()
 	var wg sync.WaitGroup
 	result := &ScanResult{
-		OrphanedDisks: []string{},
+		OrphanedDisks: []map[string]interface{}{},
 		ActiveVMs:     []string{},
 		VMReports:     []VMReport{},
 		Prices:        []map[string]interface{}{},

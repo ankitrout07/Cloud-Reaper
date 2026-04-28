@@ -13,6 +13,10 @@ if ! dpkg -s python3-venv >/dev/null 2>&1; then
     sudo apt update && sudo apt install -y python3-venv
 fi
 
+# Resolve repo root so the script works from any working directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # 2. Go Build Logic
 if [ -d "engine-go" ]; then
     echo "[*] Building Go Core..."
@@ -30,7 +34,7 @@ fi
 
 source venv/bin/activate
 echo "[*] Installing dependencies..."
-pip install -r requirements.txt --quiet
+pip install -r "$SCRIPT_DIR/requirements.txt" --quiet
 
 # 4. Persistence Check
 if [ ! -f .env ]; then
