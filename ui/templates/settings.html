@@ -5,8 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings | Cloud-Reaper</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/main.css">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/static/js/theme.js"></script>
     <style>
         .glass {
             background: rgba(255, 255, 255, 0.03);
@@ -186,16 +187,14 @@
             </div>
 
             <div id="general-tab" class="space-y-6">
-                <div class="flex justify-between items-center">
+                <div class="glass p-6 flex justify-between items-center mt-4">
                     <div>
-                        <p class="text-sm font-bold">Theme Mode</p>
-                        <p class="text-[10px] text-gray-500">Adjust the visual appearance of the interface.</p>
+                        <h4 class="text-xs font-black uppercase tracking-widest text-cyan-400">Interface Theme</h4>
+                        <p id="theme-status-text" class="text-[10px] text-gray-500 font-bold uppercase">DARK MODE</p>
                     </div>
-                    <select
-                        class="bg-black/20 border border-white/10 rounded px-3 py-2 text-xs outline-none focus:border-blue-500">
-                        <option>Midnight Dark</option>
-                        <option>Cloud Light</option>
-                    </select>
+                    <button onclick="toggleAppTheme()" class="px-6 py-2 bg-white/5 border border-white/10 rounded-xl hover:bg-cyan-500/20 hover:border-cyan-500/50 transition-all text-[10px] font-black uppercase">
+                        Switch Theme
+                    </button>
                 </div>
 
                 <div class="p-6 bg-green-500/5 border border-green-500/20 rounded-2xl mt-8">

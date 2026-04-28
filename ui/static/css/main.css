@@ -1,0 +1,54 @@
+:root {
+    /* Variables that change based on theme */
+    --bg-main: #0d1117;
+    --text-main: #ffffff;
+    --sidebar-bg: #090c10;
+    --card-bg: rgba(255, 255, 255, 0.03);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --cyan-primary: #06b6d4;
+}
+
+[data-theme="light"] {
+    --bg-main: #f8fafc; /* Clean Slate Blue/White */
+    --text-main: #0f172a; /* Deep Navy */
+    --sidebar-bg: #ffffff;
+    --card-bg: #ffffff;
+    --border-color: rgba(15, 23, 42, 0.1);
+}
+
+/* Apply variables to core elements */
+body { 
+    background-color: var(--bg-main) !important; 
+    color: var(--text-main) !important; 
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.glass { 
+    background: var(--card-bg) !important; 
+    border: 1px solid var(--border-color) !important; 
+}
+
+#sidebar { 
+    background: var(--sidebar-bg) !important; 
+    border-right: 2px solid var(--border-color);
+}
+
+/* Ensure text colors adapt */
+h1, h2, h3, h4, p, span, div {
+    color: var(--text-main);
+}
+
+/* Specialized overrides for light mode readability */
+[data-theme="light"] .text-gray-400,
+[data-theme="light"] .text-gray-500,
+[data-theme="light"] .text-slate-500 {
+    color: #475569;
+}
+
+[data-theme="light"] .bg-white\/5 {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .border-white\/10 {
+    border-color: rgba(0, 0, 0, 0.1);
+}
