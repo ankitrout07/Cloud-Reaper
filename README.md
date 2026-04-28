@@ -30,11 +30,6 @@ Cloud-Reaper leverages the strengths of two powerful languages:
 1.  **Go (Performance Core):** Handles parallel API requests to Azure SDKs for lightning-fast inventory and metrics collection.
 2.  **Python (Intelligence & UI):** Orchestrates the FinOps logic, cost calculation, and serves the **Cyan-Theme Glassmorphism Dashboard**.
 
-### Performance Comparison
-| Operation | Pure Python | Hybrid (Go + Python) | Speedup |
-| :--- | :--- | :--- | :--- |
-| Metric Scan (100 VMs) | ~150s | **~5-10s** | **20x** |
-
 ---
 
 ## 🛠 Tech Stack
