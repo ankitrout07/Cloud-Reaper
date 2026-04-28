@@ -1,18 +1,25 @@
 # ☁️ Cloud-Reaper
+A high-performance **Hybrid FinOps Intelligence Engine** designed to bridge the gap between cloud finance and engineering action.
 
-A high-performance **Hybrid FinOps Engine** designed to identify, quantify, and visualize infrastructure waste across multi-cloud environments. 
-
-Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive scanning speeds across large-scale Azure environments.
+Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive scanning speeds across large-scale Azure environments, providing real-time cost reduction recommendations.
 
 ---
 
 ## 🚀 Key Features
 
-*   **⚡ High-Velocity Scanning:** Uses a custom **Go-based engine** with Goroutines to scan hundreds of VMs and Disks in parallel.
-*   **🧟 Zombie Resource Detection:** Automatically identifies orphaned disks and unattached volumes.
-*   **📉 Idle Compute Discovery:** Detects under-utilized VMs with CPU usage < 5% over the last hour.
-*   **💰 Cost Projection:** Real-time monthly burn rate calculations using custom `price_book.yaml`.
-*   **🎨 Glassmorphism UI:** A modern, interactive dashboard for real-time waste visualization.
+### 1. 📊 Inform Phase (Visibility)
+*   **⚡ High-Velocity Scanning:** Custom Go-based engine with Goroutines for sub-second resource auditing.
+*   **🏷️ Tag Health Score:** Automated audit of critical tags (Owner, Env) for 100% cost attribution.
+*   **📈 Anomaly Detection:** Real-time detection of cost spikes using 7-day moving averages via Azure Consumption SDK.
+
+### 2. 📉 Optimize Phase (Waste Reduction)
+*   **🧟 Zombie Hunting:** Identifies orphaned disks, snapshots, and idle compute resources automatically.
+*   **💎 RI/SP Advisor:** Recommends Reserved Instances based on actual uptime and inventory.
+*   **❄️ Cold Storage Identifier:** Scans for unused storage and suggests movement to Cool/Archive tiers.
+
+### 3. ⚖️ Operate Phase (Governance)
+*   **🛡️ Policy Guardrails:** Real-time OPA-style audit against FinOps best practices (e.g., blocking UltraSSD in Non-Prod).
+*   **🚨 Budget Kill-Switch:** Automated VM deallocation safeguards for sandbox environments.
 
 ---
 
@@ -20,8 +27,8 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 
 Cloud-Reaper leverages the strengths of two powerful languages:
 
-1.  **Go (Performance Core):** Handles the "heavy lifting" of making hundreds of parallel API requests to Cloud SDKs for inventory and metrics.
-2.  **Python (Logic & UI):** Handles the orchestration, cost calculation logic, CLI interface, and the Flask-based web dashboard.
+1.  **Go (Performance Core):** Handles parallel API requests to Azure SDKs for lightning-fast inventory and metrics collection.
+2.  **Python (Intelligence & UI):** Orchestrates the FinOps logic, cost calculation, and serves the **Cyan-Theme Glassmorphism Dashboard**.
 
 ### Performance Comparison
 | Operation | Pure Python | Hybrid (Go + Python) | Speedup |
@@ -31,21 +38,21 @@ Cloud-Reaper leverages the strengths of two powerful languages:
 ---
 
 ## 🛠 Tech Stack
-- **Languages:** Python 3.12+, Go 1.23+
-- **Frameworks:** Flask (UI), Azure SDK for Go/Python
-- **Data Persistence:** InfluxDB v2 (Time-series)
-- **Design:** CSS Glassmorphism + Vanilla JS
+- **Languages:** Python 3.12+, Go 1.24+
+- **Frontend:** HTML5, Vanilla JS, CSS (Glassmorphism & Cyan Glow)
+- **Backend:** Flask, Azure SDK for Go/Python (Consumption, Storage, Monitor)
+- **Design:** Modern dark-mode aesthetic with interactive micro-animations.
 
 ---
 
 ## 📂 Project Structure
 ```text
 Cloud-Reaper/
-├── collectors/      # Python-Go Bridge & Cloud Modules
+├── collectors/      # Python-Go Bridge & Real-Time Azure SDK Modules
 ├── engine-go/       # High-Velocity Metric Engine (Go source)
-├── engine/          # Pricing data & Cost logic (Python)
-├── ui/              # Glassmorphism Dashboard (Flask)
-├── main.py          # CLI Orchestrator
+├── engine/          # Pricing data & Intelligence logic (Python)
+├── ui/              # Cyan-Theme Dashboard (Flask & JS)
+├── reap.sh          # Unified Entrypoint & Bootstrapper
 └── HOW_TO_RUN.md    # Detailed Setup Instructions
 ```
 
@@ -53,19 +60,15 @@ Cloud-Reaper/
 
 ## 🚦 Getting Started
 
-To get the system up and running, please refer to the detailed guide in:
-👉 **[HOW_TO_RUN.md](HOW_TO_RUN.md)**
-
-### Quick Build
+### The Fast Entrypoint
 ```bash
-# Build the Go core
-cd engine-go && go build -o reaper-engine main.go && cd ..
-
-# Run the app
-python main.py
+chmod +x reap.sh
+./reap.sh  # Handles Go build, Venv creation, and app launch
 ```
+
+Detailed guide: 👉 **[HOW_TO_RUN.md](HOW_TO_RUN.md)**
 
 ---
 
 ## 📝 License
-MIT License. Optimized for Azure-First environments.
+MIT License. Optimized for state-of-the-art Azure FinOps.

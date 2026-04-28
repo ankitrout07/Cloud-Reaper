@@ -141,10 +141,11 @@ func main() {
 	ctx := context.Background()
 	var wg sync.WaitGroup
 	result := &ScanResult{
-		OrphanedDisks: []map[string]interface{}{},
-		ActiveVMs:     []string{},
-		VMReports:     []VMReport{},
-		Prices:        []map[string]interface{}{},
+		OrphanedDisks:     []map[string]interface{}{},
+		OrphanedSnapshots: []map[string]interface{}{},
+		ActiveVMs:         []string{},
+		VMReports:         []VMReport{},
+		Prices:            []map[string]interface{}{},
 	}
 	mu := &sync.Mutex{}
 
@@ -317,7 +318,7 @@ func main() {
 			body, _ := io.ReadAll(resp.Body)
 			var priceResult AzurePriceResult
 			json.Unmarshal(body, &priceResult)
-			
+
 			mu.Lock()
 			for _, item := range priceResult.Items {
 				retailPrice, _ := item["retailPrice"].(float64)
@@ -327,8 +328,8 @@ func main() {
 				unitOfMeasure, _ := item["unitOfMeasure"].(string)
 
 				// 1. Filter out Non-Compute/Non-Storage Noise and Support/Savings Plans
-				if (serviceFamily != "Compute" && serviceFamily != "Storage") || 
-					strings.Contains(meterName, "Support") || 
+				if (serviceFamily != "Compute" && serviceFamily != "Storage") ||
+					strings.Contains(meterName, "Support") ||
 					strings.Contains(meterName, "Savings Plan") {
 					continue
 				}
