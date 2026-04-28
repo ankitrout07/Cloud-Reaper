@@ -39,6 +39,7 @@ type AzurePriceResult struct {
 
 type ScanResult struct {
 	UserName          string                   `json:"user_name"`
+	SubscriptionName  string                   `json:"subscription_name"`
 	OrphanedDisks     []map[string]interface{} `json:"orphaned_disks"`
 	OrphanedSnapshots []map[string]interface{} `json:"orphaned_snapshots"`
 	ActiveVMs         []string                 `json:"active_vms"`
@@ -357,6 +358,18 @@ func main() {
 	// Output result as JSON
 	// Fetch User Name
 	result.UserName = collectors.GetAzureUserName()
+
+	// Fetch Subscription Name
+	subClient, err := armsubscriptions.NewClient(cred, nil)
+	if err == nil {
+		sub, err := subClient.Get(ctx, subscriptionID, nil)
+		if err == nil && sub.Subscription.DisplayName != nil {
+			result.SubscriptionName = *sub.Subscription.DisplayName
+		}
+	}
+	if result.SubscriptionName == "" {
+		result.SubscriptionName = "Primary Subscription"
+	}
 
 	jsonResult, _ := json.Marshal(result)
 	fmt.Println(string(jsonResult))

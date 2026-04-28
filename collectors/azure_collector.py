@@ -81,6 +81,11 @@ class AzureCollector:
         scan = self.fast_scan()
         return scan.get("user_name", "Cloud Architect")
 
+    def get_subscription_name(self):
+        """Returns the active subscription name from Go engine."""
+        scan = self.fast_scan()
+        return scan.get("subscription_name", "Primary Subscription")
+
     def get_vm_inventory(self):
         """Returns active VMs. Uses Go fast_scan if available."""
         scan = self.fast_scan() or {}

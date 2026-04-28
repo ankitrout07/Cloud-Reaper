@@ -45,7 +45,8 @@ def check_setup():
 def index():
     az = AzureCollector()
     user_name = az.get_user_name()
-    return render_template('index.html', user_name=user_name)
+    sub_name = az.get_subscription_name()
+    return render_template('index.html', user_name=user_name, sub_name=sub_name)
 
 @app.route('/settings')
 def settings():
