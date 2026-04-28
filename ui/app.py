@@ -217,7 +217,7 @@ def scan():
         # Process Real Orphaned Disks
         formatted_orphans = []
         for d in all_orphans:
-            cost = calc.calculate_monthly_cost('azure', 'storage', 'premium_ssd_p6_64gb')
+            cost = calc.calculate_monthly_cost('azure', 'storage', 'premium_ssd_p6')
             total_savings += cost
             formatted_orphans.append({
                 "name": d['name'],
@@ -229,7 +229,7 @@ def scan():
         # Process Snapshots
         formatted_snapshots = []
         for s in all_snapshots:
-            cost = calc.calculate_monthly_cost('azure', 'storage', 'premium_ssd_p6_64gb') * 0.5 # Snapshot discount
+            cost = calc.calculate_monthly_cost('azure', 'storage', 'premium_ssd_p6') * 0.5 # Snapshot discount
             total_savings += cost
             formatted_snapshots.append({
                 "name": s['name'],

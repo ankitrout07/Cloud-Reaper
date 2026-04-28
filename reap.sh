@@ -44,6 +44,10 @@ echo "------------------------------------------------"
 echo "✅ ENVIRONMENT READY. STARTING CLOUD-REAPER..."
 echo "------------------------------------------------"
 
-# 5. Run the application using the venv binary directly
-# This eliminates the need for manual activation
+# 5. Run CLI Scan
 ./venv/bin/python3 main.py
+
+# 6. Start Dashboard
+echo "------------------------------------------------"
+echo "[+] Starting Dashboard..."
+./venv/bin/python3 ui/app.py

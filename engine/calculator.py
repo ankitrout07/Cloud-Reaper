@@ -56,7 +56,8 @@ class CostCalculator:
     def load_prices(self, price_items):
         """Loads a list of price items (from Azure Retail API format) into the cache."""
         for item in price_items:
-            arm_name = item.get('armResourceName')
+            # Check both armResourceName and armSkuName for maximum compatibility
+            arm_name = item.get('armResourceName') or item.get('armSkuName')
             if arm_name and item.get('type') == 'Consumption':
                 price = item.get('retailPrice', 0.0)
                 # Store the first one we find, or we could be more specific

@@ -44,8 +44,9 @@ class AzurePriceClient:
         filter_query = f"serviceName eq '{service_name}' and priceType eq 'Consumption'"
         return self.get_prices(filter_query)
 
-    def get_prices_by_resource_name(self, arm_resource_name):
-        filter_query = f"armResourceName eq '{arm_resource_name}' and priceType eq 'Consumption'"
+    def get_prices_by_resource_name(self, sku_name):
+        # Using armSkuName is often more reliable than armResourceName for many services
+        filter_query = f"armSkuName eq '{sku_name}' and priceType eq 'Consumption'"
         return self.get_prices(filter_query)
 
     def get_category_prices(self, category):

@@ -35,11 +35,12 @@ def run_reaper():
     
     # 2. Storage Inventory (Reap Targets)
     orphans = az.get_orphaned_disks()
-    print(f"    - Orphaned Disks Found: {len(orphans)}")
+    disks = orphans.get('disks', [])
+    print(f"    - Orphaned Disks Found: {len(disks)}")
     
-    for disk in orphans:
+    for disk in disks:
         # Dynamic pricing lookup
-        cost = calc.calculate_monthly_cost('azure', 'disk', 'premium_ssd_p6_64gb')
+        cost = calc.calculate_monthly_cost('azure', 'disk', 'premium_ssd_p6')
         total_monthly_saving += cost
         print(f"      [!] REAP TARGET: {disk['name']} | Saving: ${cost:.2f}/mo")
 
