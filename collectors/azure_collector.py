@@ -39,7 +39,7 @@ class AzureCollector:
                 env["AZURE_SUBSCRIPTION_ID"] = str(self.subscription_id)
             
             process = subprocess.run(
-                [self.engine_path], 
+                [self.engine_path, "--subscription", str(self.subscription_id)], 
                 env=env,
                 capture_output=True, 
                 text=True, 

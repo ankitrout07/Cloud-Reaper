@@ -13,7 +13,8 @@ app = Flask(__name__)
 calc = CostCalculator()
 settings_state = {
     "currency": "USD",
-    "idle_strategy": "aggressive"
+    "idle_strategy": "aggressive",
+    "selected_subscriptions": []
 }
 
 @app.route('/')
@@ -45,6 +46,11 @@ def update_settings():
         strategy = data.get('value')
         settings_state['idle_strategy'] = strategy
         return jsonify({"status": "success", "msg": f"Strategy set to {strategy}"})
+
+    if action == 'save_subscriptions':
+        subs = data.get('value', [])
+        settings_state['selected_subscriptions'] = subs
+        return jsonify({"status": "success", "msg": f"Target scope updated: {len(subs)} subscriptions"})
 
     return jsonify({"status": "error", "msg": "Invalid action"}), 400
 
@@ -100,32 +106,51 @@ def scan():
         {"msg": "Authenticating with Azure Identity...", "type": "info"},
     ]
     try:
+        # Use selected subscriptions if any, otherwise fallback to default
+        target_subs = settings_state.get('selected_subscriptions', [])
+        if not target_subs:
+            default_sub = os.getenv('AZURE_SUBSCRIPTION_ID')
+            if default_sub:
+                target_subs = [default_sub]
+            else:
+                return jsonify({"status": "error", "message": "No subscription ID configured."}), 400
+
+        all_vms_count = 0
+        all_orphans = []
+        all_idle_vms = []
+        all_utilization_report = []
+        
         az = AzureCollector()
-        # Using global calc instance to support hot-reloads
-
         
-        events.append({"msg": "Fetching resource inventory from Azure...", "type": "info"})
-        # Real-time fetch from your Azure Tenant
-        orphans = az.get_orphaned_disks()
-        
-        events.append({"msg": f"Found {len(orphans)} orphaned disks.", "type": "info"})
-        
-        threshold = 2.0 if settings_state['idle_strategy'] == 'aggressive' else 10.0
-        try:
-            events.append({"msg": f"Querying metrics (Threshold: {threshold}%)...", "type": "info"})
-            idle_vms = az.get_idle_vms(cpu_threshold=threshold)
-        except AttributeError:
-            idle_vms = []
-
+        for sub_id in target_subs:
+            events.append({"msg": f"Scanning subscription: {sub_id[:8]}...", "type": "info"})
             
-        vms = az.get_vm_inventory()
-        
+            # Update collector for current sub
+            az.subscription_id = sub_id
+            az._scan_cache = None # Force fresh scan for each sub
+            
+            # Fetch inventory
+            vms = az.get_vm_inventory()
+            all_vms_count += len(vms)
+            
+            orphans = az.get_orphaned_disks()
+            all_orphans.extend(orphans)
+            
+            threshold = 2.0 if settings_state['idle_strategy'] == 'aggressive' else 10.0
+            idle_vms = az.get_idle_vms(cpu_threshold=threshold)
+            all_idle_vms.extend(idle_vms)
+            
+            try:
+                utilization_report = az.get_utilization_report()
+                all_utilization_report.extend(utilization_report)
+            except Exception:
+                pass
+
         total_savings = 0.0
         
-        # Process Real Idle VMs (P2)
+        # Process Real Idle VMs
         formatted_idle = []
-        for vm in idle_vms:
-            # In your case, vm['name'] will now be 'app1'
+        for vm in all_idle_vms:
             cost = calc.calculate_monthly_cost('azure', 'compute', 'standard_d2s_v3')
             total_savings += cost
             formatted_idle.append({
@@ -135,35 +160,26 @@ def scan():
                 "rg": vm.get('rg', 'N/A')
             })
 
-
-        # Process Real Orphaned Disks (P1)
+        # Process Real Orphaned Disks
         formatted_orphans = []
-        for d in orphans:
+        for d in all_orphans:
             cost = calc.calculate_monthly_cost('azure', 'storage', 'premium_ssd_p6_64gb')
             total_savings += cost
             formatted_orphans.append({
                 "name": d['name'],
-                "size": f"{d['size_gb']} GB",
+                "size": f"{d.get('size_gb', 0)} GB",
                 "savings": calc.format_price(cost),
                 "rg": d.get('rg', 'N/A')
             })
-
             
-        # 7-Day Utilization Report
-        try:
-            utilization_report = az.get_utilization_report()
-            events.append({"msg": "7-day utilization report generated.", "type": "info"})
-        except AttributeError:
-            utilization_report = []
-            
-        events.append({"msg": "Scan complete. Targets identified.", "type": "success"})
+        events.append({"msg": "Global scan complete. Aggregate targets identified.", "type": "success"})
             
         return jsonify({
             "status": "success",
-            "vm_count": len(vms),
+            "vm_count": all_vms_count,
             "orphans": formatted_orphans,
             "idle_vms": formatted_idle,
-            "utilization_report": utilization_report,
+            "utilization_report": all_utilization_report,
             "events": events,
             "total_savings": calc.format_price(total_savings)
         })

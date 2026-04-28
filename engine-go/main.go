@@ -92,20 +92,34 @@ func GetSubscriptions() ([]map[string]string, error) {
 }
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "--list-subs" {
-		subs, err := GetSubscriptions()
-		if err != nil {
-			fmt.Printf("{\"error\": \"%s\"}\n", err)
-			os.Exit(1)
+	var subscriptionID string
+
+	// Parse custom flags
+	if len(os.Args) > 1 {
+		if os.Args[1] == "--list-subs" {
+			subs, err := GetSubscriptions()
+			if err != nil {
+				fmt.Printf("{\"error\": \"%s\"}\n", err)
+				os.Exit(1)
+			}
+			output, _ := json.Marshal(subs)
+			fmt.Println(string(output))
+			return
 		}
-		output, _ := json.Marshal(subs)
-		fmt.Println(string(output))
-		return
+		// Handle --subscription SUB_ID
+		for i, arg := range os.Args {
+			if arg == "--subscription" && i+1 < len(os.Args) {
+				subscriptionID = os.Args[i+1]
+			}
+		}
 	}
 
-	subscriptionID := os.Getenv("AZURE_SUBSCRIPTION_ID")
 	if subscriptionID == "" {
-		log.Fatal("AZURE_SUBSCRIPTION_ID not set")
+		subscriptionID = os.Getenv("AZURE_SUBSCRIPTION_ID")
+	}
+
+	if subscriptionID == "" {
+		log.Fatal("AZURE_SUBSCRIPTION_ID not set. Use --subscription [ID] or set environment variable.")
 	}
 
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
@@ -220,16 +234,31 @@ func main() {
 		}
 	}()
 
-	// Task 3: Fetch Live Prices for key services
-	myResources := []string{"Virtual Machines", "Storage", "Networking"}
+	// Task 3: Fetch Live Prices (Limit to first page for speed)
+	myResources := []string{"Virtual Machines", "Storage"}
 	for _, resource := range myResources {
 		wg.Add(1)
-		go fetchAllPrices(resource, &wg, mu, result)
+		go func(name string) {
+			defer wg.Done()
+			filter := fmt.Sprintf("serviceName eq '%s'", name)
+			baseURL := fmt.Sprintf("https://prices.azure.com/api/retail/prices?currencyCode=USD&$filter=%s", url.QueryEscape(filter))
+			resp, err := http.Get(baseURL)
+			if err != nil {
+				return
+			}
+			defer resp.Body.Close()
+			body, _ := io.ReadAll(resp.Body)
+			var priceResult AzurePriceResult
+			json.Unmarshal(body, &priceResult)
+			mu.Lock()
+			result.Prices = append(result.Prices, priceResult.Items...)
+			mu.Unlock()
+		}(resource)
 	}
 
 	wg.Wait()
 
-	// Output result as JSON for Python to ingest
+	// Output result as JSON
 	output, _ := json.Marshal(result)
 	fmt.Println(string(output))
 }
