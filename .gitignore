@@ -34,3 +34,14 @@ influxdb_data/
 .DS_Store
 Thumbs.db
 *.swp
+
+# Go
+engine-go/reaper-engine
+vendor/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
