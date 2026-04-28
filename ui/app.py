@@ -33,8 +33,8 @@ settings_state = {
 
 @app.before_request
 def check_setup():
-    # Allow access to static files and the update API so setup can function
-    if request.path.startswith('/static') or request.path == '/api/settings/update' or request.path == '/api/auth/status':
+    # Allow access to static files and all API endpoints so they always work
+    if request.path.startswith('/static') or request.path.startswith('/api/'):
         return
     
     # If it's the first run and the user isn't already going to settings
@@ -174,7 +174,7 @@ def scan():
             
             # Update collector for current sub
             az.subscription_id = sub_id
-            az._scan_cache = None # Force fresh scan for each sub
+            az._scan_cache = False  # Force fresh scan for each subscription
             
             # Fetch inventory
             vms = az.get_vm_inventory()
