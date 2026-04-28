@@ -10,7 +10,7 @@ from engine.calculator import CostCalculator
 from data.pusher import DataPusher
 
 def run_reaper():
-    load_dotenv()
+    load_dotenv(override=True)
     
     print("\n" + "="*50)
     print("             CLOUD REAPER v1.0 [AZURE MODE]  ")

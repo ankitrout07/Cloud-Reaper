@@ -170,6 +170,7 @@
         </div>
     </div>
 
+    <script src="/static/js/setup.js"></script>
     <script>
         let isLocked = true;
 
@@ -351,43 +352,6 @@
             } catch (e) {
                 pulse.className = "w-3 h-3 rounded-full bg-yellow-500";
                 msg.innerText = "AUTH SERVICE UNREACHABLE";
-            }
-        }
-
-        async function saveInitialSetup() {
-            const subId = document.getElementById('setup_sub_id').value;
-            const btn = document.getElementById('setup-btn');
-            
-            if (!subId) {
-                showToast("Subscription ID is required", "error");
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerText = "INITIALIZING...";
-
-            try {
-                const res = await fetch('/api/settings/initial-setup', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({sub_id: subId})
-                });
-                const data = await res.json();
-
-                if (data.status === 'success') {
-                    showToast(data.msg);
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
-                } else {
-                    showToast(data.msg, 'error');
-                    btn.disabled = false;
-                    btn.innerText = "INITIALIZE CONNECTION";
-                }
-            } catch (err) {
-                showToast("Network Error", "error");
-                btn.disabled = false;
-                btn.innerText = "INITIALIZE CONNECTION";
             }
         }
 

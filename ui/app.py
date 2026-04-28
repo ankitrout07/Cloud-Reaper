@@ -66,18 +66,19 @@ def update_settings():
         settings_state['selected_subscriptions'] = subs
         return jsonify({"status": "success", "msg": f"Target scope updated: {len(subs)} subscriptions"})
 
-    return jsonify({"status": "error", "msg": "Invalid action"}), 400
+    if action == 'initial_setup':
+        # 1. Save to .env for future boots
+        val = data.get('value')
+        success = save_config(sub_id=val)
+        
+        if success:
+            # 2. Trigger the Go Engine for a first-run health check
+            # (Optional: You could run a dry-run scan here)
+            return jsonify({"status": "success", "msg": "Environment configured"})
+        else:
+            return jsonify({"status": "error", "msg": "Could not write to .env"}), 500
 
-@app.route('/api/settings/initial-setup', methods=['POST'])
-def save_initial_setup():
-    data = request.json
-    sub_id = data.get('sub_id')
-    if not sub_id:
-        return jsonify({"status": "error", "msg": "Subscription ID is required"}), 400
-    
-    if save_config(sub_id):
-        return jsonify({"status": "success", "msg": "Configuration saved successfully"})
-    return jsonify({"status": "error", "msg": "Failed to save configuration"}), 500
+    return jsonify({"status": "error", "msg": "Invalid action"}), 400
 
 @app.route('/api/settings/auth')
 
