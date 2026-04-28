@@ -103,14 +103,29 @@
                             </button>
                         </div>
 
+                        <div class="p-6 bg-purple-500/5 border border-purple-500/20 rounded-2xl mb-8">
+                            <div class="flex justify-between items-center mb-6">
+                                <h4 class="text-xs font-black text-purple-400 uppercase tracking-widest">Target Subscriptions</h4>
+                                <button onclick="refreshSubs()" class="text-[10px] text-blue-500 hover:underline">Refresh List</button>
+                            </div>
+                            
+                            <div id="sub-checklist" class="glass bg-black/40 p-4 rounded-xl max-h-48 overflow-y-auto space-y-3 border border-white/5">
+                                <p class="text-[10px] text-gray-600 italic">Click refresh to discover subscriptions...</p>
+                            </div>
+                        </div>
+
                         <div class="p-6 bg-blue-500/5 border border-blue-500/20 rounded-2xl">
-                            <h4 class="text-xs font-black text-blue-500 uppercase mb-4 tracking-widest">System Diagnostics</h4>
-                            <div class="flex justify-between items-center">
-                                <div>
-                                    <p class="text-sm font-bold">Azure Auth Status</p>
-                                    <p id="auth-status" class="text-[10px] text-gray-500">Checking credentials...</p>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div id="auth-pulse" class="w-3 h-3 rounded-full bg-gray-500 shadow-[0_0_10px_rgba(156,163,175,0.5)]"></div>
+                                    <div>
+                                        <p class="text-[10px] font-black uppercase tracking-tighter text-gray-400">Credential Status</p>
+                                        <p id="auth-msg" class="text-[10px] font-mono text-gray-500">Checking...</p>
+                                    </div>
                                 </div>
-                                <div id="auth-indicator" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
+                                <button onclick="checkAuth()" class="text-[10px] px-2 py-1 glass hover:bg-white/10 text-blue-400 rounded transition font-bold uppercase tracking-widest">
+                                    REFRESH
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -224,6 +239,35 @@
             }
         }
 
+        async function refreshSubs() {
+            const listContainer = document.getElementById('sub-checklist');
+            listContainer.innerHTML = '<p class="text-[10px] animate-pulse text-blue-400">Scanning Azure Active Directory...</p>';
+            
+            try {
+                const res = await fetch('/api/settings/subscriptions');
+                const subs = await res.json();
+                
+                if (subs.error) {
+                    listContainer.innerHTML = `<p class="text-[10px] text-red-400">${subs.error}</p>`;
+                    showToast("Failed to fetch subscriptions", "error");
+                    return;
+                }
+
+                listContainer.innerHTML = subs.map(sub => `
+                    <label class="flex items-center justify-between group cursor-pointer">
+                        <span class="text-xs font-mono text-gray-300 group-hover:text-white transition">${sub.name}</span>
+                        <input type="checkbox" name="sub-scope" value="${sub.id}" checked 
+                               class="w-4 h-4 rounded border-gray-700 bg-black text-blue-600 focus:ring-blue-500">
+                    </label>
+                `).join('');
+                
+                showToast(`Discovered ${subs.length} subscriptions.`);
+            } catch (e) {
+                showToast("Failed to fetch subscriptions. Check az login status.", "error");
+                listContainer.innerHTML = '<p class="text-[10px] text-red-400">Error connecting to backend.</p>';
+            }
+        }
+
 
         function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
@@ -241,24 +285,25 @@
 
         // Real Auth Check
         async function checkAuth() {
-            const authStatus = document.getElementById('auth-status');
-            const authIndicator = document.getElementById('auth-indicator');
+            const pulse = document.getElementById('auth-pulse');
+            const msg = document.getElementById('auth-msg');
             
             try {
-                const response = await fetch('/api/settings/auth');
-                const data = await response.json();
+                const res = await fetch('/api/auth/status');
+                const data = await res.json();
                 
-                authStatus.innerText = data.message;
-                if (data.status === 'success') {
-                    authStatus.classList.replace('text-gray-500', 'text-green-400');
-                    authIndicator.classList.replace('bg-yellow-500', 'bg-green-500');
+                if (data.status === "healthy") {
+                    pulse.className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)] animate-pulse";
+                    msg.innerText = `ACTIVE (Expires: ${data.expiry.split(' ')[0]})`;
+                    msg.className = "text-[10px] font-mono text-green-400";
                 } else {
-                    authStatus.classList.replace('text-gray-500', 'text-red-400');
-                    authIndicator.classList.replace('bg-yellow-500', 'bg-red-500');
+                    pulse.className = "w-3 h-3 rounded-full bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]";
+                    msg.innerText = "EXPIRED - RE-AUTH REQUIRED";
+                    msg.className = "text-[10px] font-mono text-red-400";
                 }
-                authIndicator.classList.remove('animate-pulse');
-            } catch (err) {
-                authStatus.innerText = 'Error checking auth status';
+            } catch (e) {
+                pulse.className = "w-3 h-3 rounded-full bg-yellow-500";
+                msg.innerText = "AUTH SERVICE UNREACHABLE";
             }
         }
 

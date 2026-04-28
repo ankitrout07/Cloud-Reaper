@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 )
 
 type VMReport struct {
@@ -52,7 +53,7 @@ func fetchAllPrices(serviceName string, wg *sync.WaitGroup, mu *sync.Mutex, resu
 			resp.Body.Close()
 			return
 		}
-		
+
 		var priceResult AzurePriceResult
 		if err := json.Unmarshal(body, &priceResult); err != nil {
 			resp.Body.Close()
@@ -68,7 +69,40 @@ func fetchAllPrices(serviceName string, wg *sync.WaitGroup, mu *sync.Mutex, resu
 	}
 }
 
+func GetSubscriptions() ([]map[string]string, error) {
+	cred, _ := azidentity.NewDefaultAzureCredential(nil)
+	client, _ := armsubscriptions.NewClient(cred, nil)
+
+	var subs []map[string]string
+	pager := client.NewListPager(nil)
+
+	for pager.More() {
+		page, err := pager.NextPage(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		for _, sub := range page.Value {
+			subs = append(subs, map[string]string{
+				"id":   *sub.SubscriptionID,
+				"name": *sub.DisplayName,
+			})
+		}
+	}
+	return subs, nil
+}
+
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--list-subs" {
+		subs, err := GetSubscriptions()
+		if err != nil {
+			fmt.Printf("{\"error\": \"%s\"}\n", err)
+			os.Exit(1)
+		}
+		output, _ := json.Marshal(subs)
+		fmt.Println(string(output))
+		return
+	}
+
 	subscriptionID := os.Getenv("AZURE_SUBSCRIPTION_ID")
 	if subscriptionID == "" {
 		log.Fatal("AZURE_SUBSCRIPTION_ID not set")

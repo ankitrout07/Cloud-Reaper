@@ -162,36 +162,6 @@
             </div>
         </div>
 
-        <!-- Advanced Settings Component -->
-        <div class="glass p-6 border-t-4 border-blue-500/30 mt-12">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xs font-black tracking-widest text-blue-400 uppercase">Advanced Engine Control</h3>
-                <button onclick="toggleAdvancedLock()" id="lockBtnDashboard" class="text-gray-500 hover:text-white transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-                </button>
-            </div>
-
-            <div id="advanced-content-dashboard" class="opacity-40 pointer-events-none transition-all duration-500">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    <div class="p-6 bg-white/5 border border-white/10 rounded-2xl">
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <p class="text-sm font-bold">Base Currency</p>
-                                <p class="text-[10px] text-gray-500 italic">Multiplies USD values by 83.0 for INR.</p>
-                            </div>
-                            <div class="flex bg-black/40 p-1 rounded-lg border border-white/5">
-                                <button onclick="updateCurrency('USD')" id="btn-USD-dash" class="px-3 py-1 text-xs font-bold bg-blue-600 rounded">USD</button>
-                                <button onclick="updateCurrency('INR')" id="btn-INR-dash" class="px-3 py-1 text-xs font-bold hover:bg-white/5 rounded">INR</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="p-6 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
-                        <button onclick="syncPriceBook()" class="w-full py-3 bg-blue-600/10 border border-blue-500/20 hover:bg-blue-600/20 text-blue-400 text-xs font-bold rounded-lg transition uppercase tracking-widest">
-                            RELOAD PRICE_BOOK.YAML
-                        </button>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -422,63 +392,6 @@
 
         function openSettings() {
             window.location.href = '/settings';
-        }
-
-        let isLocked = true;
-
-        function toggleAdvancedLock() {
-            isLocked = !isLocked;
-            const content = document.getElementById('advanced-content-dashboard');
-            const lockBtn = document.getElementById('lockBtnDashboard');
-            content.style.opacity = isLocked ? "0.4" : "1";
-            content.style.pointerEvents = isLocked ? "none" : "auto";
-            lockBtn.classList.toggle('text-blue-500', !isLocked);
-            notify(isLocked ? "Advanced settings locked." : "Advanced settings unlocked.", "info");
-        }
-
-        async function updateCurrency(code) {
-            try {
-                const res = await fetch('/api/settings/update', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({action: 'set_currency', value: code})
-                });
-                const data = await res.json();
-                
-                if (data.status === 'success') {
-                    notify(data.msg, "success");
-                    // Update button styles
-                    document.getElementById('btn-USD-dash').classList.toggle('bg-blue-600', code === 'USD');
-                    document.getElementById('btn-USD-dash').classList.toggle('hover:bg-white/5', code !== 'USD');
-                    document.getElementById('btn-INR-dash').classList.toggle('bg-blue-600', code === 'INR');
-                    document.getElementById('btn-INR-dash').classList.toggle('hover:bg-white/5', code !== 'INR');
-                    
-                    // Trigger a re-scan to show prices in new currency
-                    runScan();
-                } else {
-                    notify(data.msg, "danger");
-                }
-            } catch (err) {
-                notify("Network error", "danger");
-            }
-        }
-
-        async function syncPriceBook() {
-            try {
-                const response = await fetch('/api/settings/update', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'sync_pricebook' })
-                });
-                const data = await response.json();
-                if (data.status === 'success') {
-                    notify(data.msg, "success");
-                } else {
-                    notify(data.msg, "danger");
-                }
-            } catch (err) {
-                notify("Network error", "danger");
-            }
         }
     </script>
 </body>

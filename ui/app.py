@@ -6,6 +6,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from collectors.azure_collector import AzureCollector
+from collectors.auth_check import check_azure_status
 from engine.calculator import CostCalculator
 
 app = Flask(__name__)
@@ -59,11 +60,39 @@ def check_auth():
         return jsonify({"status": "error", "message": "Disconnected: Please run 'az login'"})
 
 
+@app.route('/api/settings/subscriptions')
+def list_subscriptions():
+    import subprocess
+    import json
+    try:
+        # Path to the Go binary
+        binary_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'engine-go', 'reaper-engine')
+        
+        # Check if binary exists
+        if not os.path.exists(binary_path):
+             subscriptions = [
+                {"id": "sub-123-abc", "name": "Production-Internal (Mock)"},
+                {"id": "sub-456-def", "name": "Staging-Sandbox (Mock)"},
+                {"id": "sub-789-ghi", "name": "Legacy-Shared-Services (Mock)"}
+            ]
+             return jsonify(subscriptions)
+
+        result = subprocess.run([binary_path, '--list-subs'], capture_output=True, text=True)
+        if result.returncode == 0:
+            subscriptions = json.loads(result.stdout)
+            return jsonify(subscriptions)
+        else:
+            return jsonify({"error": result.stderr}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/pricing')
 def pricing():
     return render_template('pricing.html')
 
+@app.route('/api/auth/status')
+def auth_status():
+    return jsonify(check_azure_status())
 
 @app.route('/api/scan')
 def scan():
