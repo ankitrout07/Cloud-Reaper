@@ -77,8 +77,8 @@
                         <p class="text-slate-500 text-xs mt-1 font-bold uppercase tracking-widest">Real-time reference for cloud resource cost projection</p>
                     </div>
                     <div class="flex gap-2 bg-white/5 p-1 rounded-xl border border-white/5">
-                        <button class="px-6 py-2 bg-cyan-500 rounded-lg text-[#0d1117] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20">Hourly</button>
-                        <button class="px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition">Monthly</button>
+                        <button id="toggle-hourly" onclick="togglePricing('hourly')" class="toggle-btn px-6 py-2 bg-cyan-500 rounded-lg text-[#0d1117] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 transition-all">Hourly</button>
+                        <button id="toggle-monthly" onclick="togglePricing('monthly')" class="toggle-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all">Monthly</button>
                     </div>
                 </div>
 
@@ -95,8 +95,7 @@
                                 <th class="p-4 font-black">SKU Name</th>
                                 <th class="p-4 font-black">Service</th>
                                 <th class="p-4 font-black">Region</th>
-                                <th class="p-4 font-black">Hourly Price</th>
-                                <th class="p-4 font-black">Monthly Est.</th>
+                                <th class="p-4 font-black">Price Rate</th>
                             </tr>
                         </thead>
                         <tbody id="priceTableBody" class="space-y-2">
@@ -115,8 +114,26 @@
             </div>
         </div>
     </main>
-
     <script>
+        function togglePricing(mode) {
+            const hourlyElements = document.querySelectorAll('.hourly-price');
+            const monthlyElements = document.querySelectorAll('.monthly-price');
+            const hBtn = document.getElementById('toggle-hourly');
+            const mBtn = document.getElementById('toggle-monthly');
+
+            if (mode === 'monthly') {
+                hourlyElements.forEach(el => el.classList.add('hidden'));
+                monthlyElements.forEach(el => el.classList.remove('hidden'));
+                mBtn.className = "toggle-btn px-6 py-2 bg-cyan-500 rounded-lg text-[#0d1117] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 transition-all";
+                hBtn.className = "toggle-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all";
+            } else {
+                hourlyElements.forEach(el => el.classList.remove('hidden'));
+                monthlyElements.forEach(el => el.classList.add('hidden'));
+                hBtn.className = "toggle-btn px-6 py-2 bg-cyan-500 rounded-lg text-[#0d1117] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 transition-all";
+                mBtn.className = "toggle-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all";
+            }
+        }
+
         async function fetchPrices() {
             const tbody = document.getElementById('priceTableBody');
             try {
@@ -129,11 +146,14 @@
                         const row = document.createElement('tr');
                         row.className = 'glass hover:bg-white/5 transition cursor-pointer group';
                         
-                        const monthly = (item.retailPrice * 730).toFixed(2);
+                        const hourly = item.normalizedHourly || item.retailPrice;
+                        const monthly = (hourly * 730).toFixed(2);
+                        const isMonthly = item.isMonthlyBilling;
                         
                         row.innerHTML = `
                             <td class="p-4 font-mono text-blue-400 font-bold group-hover:translate-x-1 transition-transform text-xs">
                                 ${item.armResourceName || item.skuName}
+                                ${isMonthly ? '<span class="ml-2 text-[8px] text-yellow-500 border border-yellow-500/30 px-1 rounded">MONTHLY</span>' : ''}
                             </td>
                             <td class="p-4 text-xs text-gray-400">${item.serviceName}</td>
                             <td class="p-4">
@@ -141,16 +161,18 @@
                                     ${item.armRegionName || 'Global'}
                                 </span>
                             </td>
-                            <td class="p-4 font-mono text-xs text-gray-300">$${item.retailPrice.toFixed(4)}</td>
-                            <td class="p-4 font-bold text-green-400">$${monthly}/mo</td>
+                            <td class="p-4 font-mono text-xs">
+                                <span class="hourly-price text-gray-300">$${hourly.toFixed(4)}/hr</span>
+                                <span class="monthly-price hidden text-green-400 font-bold">$${monthly}/mo</span>
+                            </td>
                         `;
                         tbody.appendChild(row);
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No live prices found. Ensure the Go engine is running.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-gray-500">No live prices found. Ensure the Go engine is running.</td></tr>';
                 }
             } catch (error) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-red-400">Error: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-red-400">Error: ${error.message}</td></tr>`;
             }
         }
 

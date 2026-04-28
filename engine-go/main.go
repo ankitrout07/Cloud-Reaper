@@ -305,8 +305,33 @@ func main() {
 			body, _ := io.ReadAll(resp.Body)
 			var priceResult AzurePriceResult
 			json.Unmarshal(body, &priceResult)
+			
 			mu.Lock()
-			result.Prices = append(result.Prices, priceResult.Items...)
+			for _, item := range priceResult.Items {
+				// Process pricing logic
+				retailPrice, _ := item["retailPrice"].(float64)
+				minUnits, ok := item["minimumNumberOfUnits"].(float64)
+				if !ok || minUnits == 0 {
+					minUnits = 1.0
+				}
+				
+				unitOfMeasure, _ := item["unitOfMeasure"].(string)
+				
+				// Normalize to hourly if it's not monthly
+				var actualHourly float64
+				isMonthly := false
+				
+				if unitOfMeasure == "1 Month" || unitOfMeasure == "Month" {
+					actualHourly = retailPrice / 730.0 // Approximate
+					isMonthly = true
+				} else {
+					actualHourly = retailPrice / minUnits
+				}
+				
+				item["normalizedHourly"] = actualHourly
+				item["isMonthlyBilling"] = isMonthly
+				result.Prices = append(result.Prices, item)
+			}
 			mu.Unlock()
 		}(resource)
 	}
