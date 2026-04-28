@@ -7,9 +7,10 @@ class CostCalculator:
         # Ensure we find the YAML file relative to the project root
         self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.path = os.path.join(self.project_root, price_book_path)
+        self.currency = currency
+        self.exchange_rate = 83.0  # Static for now
         self.load_config()
 
-        self.currency = currency
         self.azure_price_client = AzurePriceClient(currency=currency)
         self.price_cache = {}
 
@@ -35,11 +36,20 @@ class CostCalculator:
     def reload_prices(self):
         return self.load_config()
 
-    def set_currency(self, currency):
-        self.currency = currency
-        self.azure_price_client = AzurePriceClient(currency=currency)
-        # Clear cache to force re-fetch in new currency if needed
-        self.price_cache = {}
+    def set_currency(self, code):
+        if code in ["USD", "INR"]:
+            self.currency = code
+            self.azure_price_client = AzurePriceClient(currency=code)
+            # Clear cache to force re-fetch in new currency if needed
+            self.price_cache = {}
+            return True
+        return False
+
+    def format_price(self, usd_amount):
+        if self.currency == "INR":
+            return f"₹{round(usd_amount * self.exchange_rate, 2)}"
+        return f"${round(usd_amount, 2)}"
+
 
 
 

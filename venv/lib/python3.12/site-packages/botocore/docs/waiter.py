@@ -28,8 +28,8 @@ class WaiterDocumenter:
         self._service_waiter_model = service_waiter_model
         self._root_docs_path = root_docs_path
         self._USER_GUIDE_LINK = (
-            'https://docs.aws.amazon.com/'
-            'boto3/latest/guide/clients.html#waiters'
+            'https://boto3.amazonaws.com/'
+            'v1/documentation/api/latest/guide/clients.html#waiters'
         )
 
     def document_waiters(self, section):
@@ -164,7 +164,7 @@ def document_wait_method(
         f'Polls :py:meth:`{get_service_module_name(service_model)}.Client.'
         f'{xform_name(waiter_model.operation)}` every {waiter_model.delay} '
         'seconds until a successful state is reached. An error is '
-        f'raised after {waiter_model.max_attempts} failed checks.'
+        f'returned after {waiter_model.max_attempts} failed checks.'
     )
 
     document_model_driven_method(

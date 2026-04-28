@@ -23,29 +23,32 @@ def index():
 def settings():
     return render_template('settings.html')
 
-@app.route('/api/settings/sync', methods=['POST'])
-def sync_settings():
-    success = calc.reload_prices()
-    if success:
-        return jsonify({"status": "success", "message": "Price book reloaded."})
-    return jsonify({"status": "error", "message": "Failed to reload price book."}), 500
+@app.route('/api/settings/update', methods=['POST'])
+def update_settings():
+    data = request.json
+    action = data.get('action')
+    
+    if action == 'set_currency':
+        code = data.get('value')
+        if calc.set_currency(code):
+            settings_state['currency'] = code
+            return jsonify({"status": "success", "msg": f"Currency set to {code}"})
+        return jsonify({"status": "error", "msg": "Invalid currency code"}), 400
+    
+    if action == 'sync_pricebook':
+        if calc.reload_prices():
+            return jsonify({"status": "success", "msg": "Price book reloaded from YAML"})
+        return jsonify({"status": "error", "msg": "File not found"}), 404
+    
+    if action == 'set_strategy':
+        strategy = data.get('value')
+        settings_state['idle_strategy'] = strategy
+        return jsonify({"status": "success", "msg": f"Strategy set to {strategy}"})
 
-@app.route('/api/settings/currency', methods=['POST'])
-def update_currency():
-    data = request.get_json()
-    currency = data.get('currency', 'USD')
-    settings_state['currency'] = currency
-    calc.set_currency(currency)
-    return jsonify({"status": "success", "currency": currency})
-
-@app.route('/api/settings/strategy', methods=['POST'])
-def update_strategy():
-    data = request.get_json()
-    strategy = data.get('strategy', 'aggressive')
-    settings_state['idle_strategy'] = strategy
-    return jsonify({"status": "success", "strategy": strategy})
+    return jsonify({"status": "error", "msg": "Invalid action"}), 400
 
 @app.route('/api/settings/auth')
+
 def check_auth():
     import subprocess
     try:
@@ -99,9 +102,10 @@ def scan():
             formatted_idle.append({
                 "name": vm['name'],
                 "usage": vm['usage'],
-                "savings": f"${cost:.2f}",
+                "savings": calc.format_price(cost),
                 "rg": vm.get('rg', 'N/A')
             })
+
 
         # Process Real Orphaned Disks (P1)
         formatted_orphans = []
@@ -111,9 +115,10 @@ def scan():
             formatted_orphans.append({
                 "name": d['name'],
                 "size": f"{d['size_gb']} GB",
-                "savings": f"${cost:.2f}",
+                "savings": calc.format_price(cost),
                 "rg": d.get('rg', 'N/A')
             })
+
             
         # 7-Day Utilization Report
         try:
@@ -131,8 +136,9 @@ def scan():
             "idle_vms": formatted_idle,
             "utilization_report": utilization_report,
             "events": events,
-            "total_savings": f"${total_savings:.2f}"
+            "total_savings": calc.format_price(total_savings)
         })
+
 
 
     except Exception as e:
