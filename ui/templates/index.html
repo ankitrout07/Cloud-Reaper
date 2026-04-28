@@ -110,36 +110,58 @@
                     <h2 id="vm-count" class="text-3xl font-bold text-blue-400">0</h2>
                 </div>
                 <div class="glass p-6 flex-1">
-                    <p class="text-gray-400 text-sm">ZOMBIE DISKS</p>
+                    <p class="text-gray-400 text-sm">ZOMBIE DISKS & SNAPS</p>
                     <h2 id="disk-count" class="text-3xl font-bold text-red-400">0</h2>
                 </div>
             </div>
         </div>
 
-        <div class="glass overflow-hidden">
-            <div class="px-6 py-4 border-b border-white/10 flex flex-col md:flex-row justify-between items-center bg-white/5 gap-4">
-                <h3 class="font-bold">REAP TARGETS</h3>
-                <div class="relative w-full md:w-64">
-                    <input type="text" id="resourceSearch" onkeyup="filterTable()" placeholder="Search resources..." 
-                        class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500/50 transition">
-                    <svg class="absolute right-3 top-2.5 h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                    </svg>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Reap Targets -->
+            <div class="glass overflow-hidden">
+                <div class="px-6 py-4 border-b border-white/10 flex flex-col md:flex-row justify-between items-center bg-white/5 gap-4">
+                    <h3 class="font-bold text-blue-400 uppercase tracking-widest text-xs">Orphaned Resources</h3>
+                    <div class="relative w-full md:w-48">
+                        <input type="text" id="resourceSearch" onkeyup="filterTable()" placeholder="Search..." 
+                            class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-xs focus:outline-none focus:border-blue-500/50 transition">
+                    </div>
                 </div>
+                <table class="w-full text-left text-xs" id="reapTable">
+                    <thead class="bg-white/5 text-gray-400 uppercase font-black">
+                        <tr>
+                            <th class="px-4 py-3">Resource</th>
+                            <th class="px-4 py-3">Type</th>
+                            <th class="px-4 py-3">Waste</th>
+                            <th class="px-4 py-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="target-list" class="divide-y divide-white/5">
+                    </tbody>
+                </table>
             </div>
-            <table class="w-full text-left" id="reapTable">
-                <thead class="bg-white/5 text-gray-400 text-xs uppercase">
-                    <tr>
-                        <th class="px-6 py-3">Resource Name</th>
-                        <th class="px-6 py-3">Resource Group</th>
-                        <th class="px-6 py-3">Type/Size</th>
-                        <th class="px-6 py-3">Monthly Waste</th>
-                        <th class="px-6 py-3 text-right">Action</th>
-                    </tr>
-                </thead>
-                <tbody id="target-list" class="divide-y divide-white/5">
-                     </tbody>
-            </table>
+
+            <!-- Zombie Kill-List -->
+            <div class="glass overflow-hidden border-l-4 border-purple-500">
+                <div class="px-6 py-4 border-b border-white/10 bg-purple-500/5 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-black text-purple-400 uppercase tracking-widest text-xs">Zombie Kill-List</h3>
+                        <p class="text-[9px] text-gray-500 font-bold uppercase mt-1">Idle VMs detected via Telemetry</p>
+                    </div>
+                    <div class="w-2 h-2 bg-purple-500 rounded-full animate-ping"></div>
+                </div>
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-white/5 text-gray-400 uppercase font-black">
+                        <tr>
+                            <th class="px-4 py-3">Zombie Name</th>
+                            <th class="px-4 py-3">Metrics</th>
+                            <th class="px-4 py-3">Potential Savings</th>
+                            <th class="px-4 py-3 text-right">Kill</th>
+                        </tr>
+                    </thead>
+                    <tbody id="zombie-list" class="divide-y divide-white/5">
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- Rightsizing Section -->
@@ -297,7 +319,9 @@
 
                 document.getElementById('savings-val').innerText = data.total_savings || "$0.00";
                 document.getElementById('vm-count').innerText = data.vm_count || 0;
-                document.getElementById('disk-count').innerText = data.orphans ? data.orphans.length : 0;
+                
+                const diskCount = (data.orphans ? data.orphans.length : 0) + (data.snapshots ? data.snapshots.length : 0);
+                document.getElementById('disk-count').innerText = diskCount;
 
                 // Update Forecast Chart
                 const monthlySavings = parseFloat(data.total_savings.replace(/[^\d.]/g, ''));
@@ -318,39 +342,49 @@
                 data.orphans.forEach(item => {
                     list.innerHTML += `
                         <tr class="hover:bg-white/5 border-l-4 border-red-500 transition">
-                            <td class="px-6 py-4 font-mono text-sm">
-                                <span class="bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded mr-2">P1</span>
-                                ${item.name}
+                            <td class="px-4 py-4 font-mono">
+                                <span class="text-gray-300">${item.name}</span>
                             </td>
-                            <td class="px-6 py-4">
-                                <span class="text-xs bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-1 rounded">
-                                    ${item.rg}
+                            <td class="px-4 py-4">
+                                <span class="text-[10px] bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-0.5 rounded">
+                                    DISK
                                 </span>
                             </td>
-                            <td class="px-6 py-4 text-gray-400">Orphaned Disk</td>
-                            <td class="px-6 py-4 text-red-400 font-bold">${item.savings}/mo</td>
-                            <td class="px-6 py-4 text-right">
-                                <button onclick="reapResource('${item.name}')" class="bg-red-600 px-3 py-1 rounded text-xs hover:bg-red-500 hover:scale-110 active:scale-95 transition-all duration-200">REAP</button>
+                            <td class="px-4 py-4 text-red-400 font-bold">${item.savings}/mo</td>
+                            <td class="px-4 py-4 text-right">
+                                <button onclick="reapResource('${item.name}')" class="bg-red-600/20 border border-red-600 text-red-400 px-3 py-1 rounded text-[10px] hover:bg-red-600 hover:text-white transition-all">REAP</button>
                             </td>
                         </tr>`;
                 });
 
-                data.idle_vms.forEach(vm => {
+                data.snapshots.forEach(item => {
                     list.innerHTML += `
-                        <tr class="hover:bg-white/5 border-l-4 border-yellow-500 transition">
-                            <td class="px-6 py-4 font-mono text-sm">
-                                <span class="bg-yellow-500/20 text-yellow-400 text-[10px] px-2 py-0.5 rounded mr-2">P2</span>
-                                ${vm.name}
+                        <tr class="hover:bg-white/5 border-l-4 border-orange-500 transition">
+                            <td class="px-4 py-4 font-mono">
+                                <span class="text-gray-300">${item.name}</span>
                             </td>
-                            <td class="px-6 py-4">
-                                <span class="text-xs bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-1 rounded">
-                                    ${vm.rg}
+                            <td class="px-4 py-4">
+                                <span class="text-[10px] bg-orange-500/10 text-orange-300 border border-orange-500/20 px-2 py-0.5 rounded">
+                                    SNAP
                                 </span>
                             </td>
-                            <td class="px-6 py-4 text-gray-400">Idle VM (${vm.usage}% CPU)</td>
-                            <td class="px-6 py-4 text-yellow-400 font-bold">${vm.savings}/mo</td>
-                            <td class="px-6 py-4 text-right">
-                                <button onclick="reapResource('${vm.name}')" class="bg-yellow-600 px-3 py-1 rounded text-xs hover:bg-yellow-500 hover:scale-110 active:scale-95 transition-all duration-200">INVESTIGATE</button>
+                            <td class="px-4 py-4 text-orange-400 font-bold">${item.savings}/mo</td>
+                            <td class="px-4 py-4 text-right">
+                                <button onclick="reapResource('${item.name}')" class="bg-orange-600/20 border border-orange-600 text-orange-400 px-3 py-1 rounded text-[10px] hover:bg-orange-600 hover:text-white transition-all">REAP</button>
+                            </td>
+                        </tr>`;
+                });
+
+                const zombieList = document.getElementById('zombie-list');
+                zombieList.innerHTML = '';
+                data.zombies.forEach(vm => {
+                    zombieList.innerHTML += `
+                        <tr class="hover:bg-white/5 border-l-4 border-purple-500 transition">
+                            <td class="px-4 py-4 font-mono text-gray-300">${vm.name}</td>
+                            <td class="px-4 py-4 text-[10px] text-gray-400">${vm.usage}</td>
+                            <td class="px-4 py-4 text-purple-400 font-bold">${vm.savings}/mo</td>
+                            <td class="px-4 py-4 text-right">
+                                <button onclick="reapResource('${vm.name}')" class="bg-purple-600 text-white px-3 py-1 rounded text-[10px] font-black hover:bg-purple-500 hover:scale-110 active:scale-95 transition-all">KILL</button>
                             </td>
                         </tr>`;
                 });

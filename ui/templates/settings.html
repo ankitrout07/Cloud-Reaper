@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,57 +14,78 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 1.5rem;
         }
+
         body {
             background: #0a0a0b;
             color: white;
             font-family: 'Inter', sans-serif;
         }
+
         .animate-fade-in {
             animation: fadeIn 0.3s ease-out;
         }
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
 </head>
+
 <body class="p-8">
     {% if request.args.get('mode') == 'onboarding' %}
     <!-- Specialized Onboarding Overlay -->
-    <div id="onboarding-overlay" class="fixed inset-0 z-[100] bg-[#0a0a0b]/90 flex items-center justify-center backdrop-blur-3xl animate-fade-in">
+    <div id="onboarding-overlay"
+        class="fixed inset-0 z-[100] bg-[#0a0a0b]/90 flex items-center justify-center backdrop-blur-3xl animate-fade-in">
         <div class="max-w-md w-full p-10 glass border border-blue-500/30 shadow-[0_0_50px_rgba(37,99,235,0.2)]">
             <div class="flex flex-col items-center mb-8">
-                <div class="w-16 h-16 bg-blue-600/20 rounded-2xl flex items-center justify-center mb-6 border border-blue-500/30">
-                    <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <div
+                    class="w-16 h-16 bg-blue-600/20 rounded-2xl flex items-center justify-center mb-6 border border-blue-500/30">
+                    <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
                 </div>
                 <h2 class="text-2xl font-black text-white text-center">Welcome, Engineer</h2>
-                <p class="text-gray-400 text-xs text-center mt-2">Let's link your Azure Environment to start scanning.</p>
+                <p class="text-gray-400 text-xs text-center mt-2">Let's link your Azure Environment to start scanning.
+                </p>
             </div>
-            
+
             <div class="space-y-6">
                 <div class="space-y-2">
-                    <label class="text-[10px] uppercase font-black tracking-widest text-blue-400">Subscription ID</label>
-                    <input type="text" id="setup_sub_id" placeholder="00000000-0000-0000-0000-000000000000" 
-                           class="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-mono focus:border-blue-500 outline-none transition-all"
-                           oninput="triggerValidation()">
+                    <label class="text-[10px] uppercase font-black tracking-widest text-blue-400">Subscription
+                        ID</label>
+                    <input type="text" id="setup_sub_id" placeholder="00000000-0000-0000-0000-000000000000"
+                        class="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-mono focus:border-blue-500 outline-none transition-all"
+                        oninput="triggerValidation()">
                 </div>
 
-                <div id="validation-spinner" class="hidden flex items-center gap-3 p-4 bg-blue-500/5 border border-blue-500/10 rounded-xl">
+                <div id="validation-spinner"
+                    class="hidden flex items-center gap-3 p-4 bg-blue-500/5 border border-blue-500/10 rounded-xl">
                     <div class="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Testing Connection...</span>
+                    <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Testing
+                        Connection...</span>
                 </div>
-                
-                <button id="setup-btn" onclick="saveInitialSetup()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl transition-all shadow-lg shadow-blue-600/20 uppercase tracking-widest text-xs">
+
+                <button id="setup-btn" onclick="saveInitialSetup()"
+                    class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl transition-all shadow-lg shadow-blue-600/20 uppercase tracking-widest text-xs">
                     INITIALIZE CONNECTION
                 </button>
-                
+
                 <p class="text-[10px] text-center text-gray-500">
                     Tip: You can also run <code class="text-blue-300">az login</code> to auto-connect.
                 </p>
             </div>
         </div>
     </div>
-    
+
     <style>
         #main-content {
             filter: blur(8px);
@@ -81,8 +103,11 @@
 
         <div class="glass p-8">
             <div class="flex gap-8 border-b border-white/10 mb-8">
-                <button id="tab-general" onclick="showTab('general')" class="pb-4 text-sm font-bold border-b-2 border-blue-500 transition-all">General</button>
-                <button id="tab-advanced" onclick="showTab('advanced')" class="pb-4 text-sm font-bold text-gray-500 hover:text-white transition-all">Advanced Control</button>
+                <button id="tab-general" onclick="showTab('general')"
+                    class="pb-4 text-sm font-bold border-b-2 border-blue-500 transition-all">General</button>
+                <button id="tab-advanced" onclick="showTab('advanced')"
+                    class="pb-4 text-sm font-bold text-gray-500 hover:text-white transition-all">Advanced
+                    Control</button>
             </div>
 
             <div id="general-tab" class="space-y-6">
@@ -91,21 +116,41 @@
                         <p class="text-sm font-bold">Theme Mode</p>
                         <p class="text-[10px] text-gray-500">Adjust the visual appearance of the interface.</p>
                     </div>
-                    <select class="bg-black/20 border border-white/10 rounded px-3 py-2 text-xs outline-none focus:border-blue-500">
+                    <select
+                        class="bg-black/20 border border-white/10 rounded px-3 py-2 text-xs outline-none focus:border-blue-500">
                         <option>Midnight Dark</option>
                         <option>Cloud Light</option>
                     </select>
                 </div>
-                <div class="flex justify-between items-center">
-                    <div>
-                        <p class="text-sm font-bold">Auto-Refresh Rate</p>
-                        <p class="text-[10px] text-gray-500">How often the dashboard data polls the backend.</p>
+
+                <div class="p-6 bg-green-500/5 border border-green-500/20 rounded-2xl mt-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <p class="text-sm font-bold">Automated "Scheduled Sleep"</p>
+                            <p class="text-[10px] text-gray-500 italic">Automatically stop Dev/Test VMs after hours to
+                                save up to 65%.</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="sleep-enabled" class="sr-only peer"
+                                onchange="saveSleepSchedule()">
+                            <div
+                                class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600">
+                            </div>
+                        </label>
                     </div>
-                    <select class="bg-black/20 border border-white/10 rounded px-3 py-2 text-xs outline-none focus:border-blue-500">
-                        <option>Real-time (5s)</option>
-                        <option>Standard (30s)</option>
-                        <option>Efficiency (5m)</option>
-                    </select>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[9px] uppercase font-black text-gray-500">Sleep At (PM)</label>
+                            <input type="time" id="sleep-stop" value="20:00" onchange="saveSleepSchedule()"
+                                class="w-full bg-black/40 border border-white/10 p-2 rounded-lg text-xs outline-none focus:border-green-500">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[9px] uppercase font-black text-gray-500">Wake At (AM)</label>
+                            <input type="time" id="sleep-start" value="08:00" onchange="saveSleepSchedule()"
+                                class="w-full bg-black/40 border border-white/10 p-2 rounded-lg text-xs outline-none focus:border-green-500">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -113,51 +158,73 @@
                 <div class="glass p-6 border-t-4 border-blue-500/30">
                     <div class="flex justify-between items-center mb-6">
                         <h3 class="text-xs font-black tracking-widest text-blue-400">ADVANCED SETTINGS</h3>
-                        <button onclick="toggleAdvancedLock()" id="lockBtn" class="text-gray-500 hover:text-white transition">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        <button onclick="toggleAdvancedLock()" id="lockBtn"
+                            class="text-gray-500 hover:text-white transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+                                </path>
+                            </svg>
                         </button>
                     </div>
 
                     <div id="advanced-content" class="opacity-40 pointer-events-none transition-all duration-500">
                         <div class="p-6 bg-yellow-500/5 border border-yellow-500/20 rounded-2xl mb-8">
-                            <h4 class="text-xs font-black text-yellow-500 uppercase mb-6 tracking-widest">FinOps Parameters</h4>
-                            
+                            <h4 class="text-xs font-black text-yellow-500 uppercase mb-6 tracking-widest">FinOps
+                                Parameters</h4>
+
                             <div class="flex justify-between items-center mb-8">
                                 <div>
                                     <p class="text-sm font-bold">Base Currency</p>
-                                    <p class="text-[10px] text-gray-500 italic">Multiplies USD values by 83.0 for INR.</p>
+                                    <p class="text-[10px] text-gray-500 italic">Multiplies USD values by 83.0 for INR.
+                                    </p>
                                 </div>
                                 <div class="flex bg-black/40 p-1 rounded-xl border border-white/5">
-                                    <button onclick="updateCurrency('USD')" id="btn-USD" class="px-4 py-1.5 text-xs bg-blue-600 rounded-lg font-bold transition">USD</button>
-                                    <button onclick="updateCurrency('INR')" id="btn-INR" class="px-4 py-1.5 text-xs hover:bg-white/5 rounded-lg font-bold transition">INR</button>
+                                    <button onclick="updateCurrency('USD')" id="btn-USD"
+                                        class="px-4 py-1.5 text-xs bg-blue-600 rounded-lg font-bold transition">USD</button>
+                                    <button onclick="updateCurrency('INR')" id="btn-INR"
+                                        class="px-4 py-1.5 text-xs hover:bg-white/5 rounded-lg font-bold transition">INR</button>
                                 </div>
                             </div>
 
                             <div class="mb-8">
                                 <p class="text-sm font-bold mb-2">Idle Resource Strategy</p>
-                                <p class="text-[10px] text-gray-500 mb-3">Defines the sensitivity for flagging underutilized assets.</p>
-                                <select id="idle-strategy" class="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs font-mono text-blue-300 outline-none focus:border-blue-500">
+                                <p class="text-[10px] text-gray-500 mb-3">Defines the sensitivity for flagging
+                                    underutilized assets.</p>
+                                <select id="idle-strategy"
+                                    class="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs font-mono text-blue-300 outline-none focus:border-blue-500">
                                     <option value="aggressive">Aggressive: CPU < 2% (24h Window)</option>
                                     <option value="conservative">Conservative: CPU < 10% (7d Window)</option>
                                 </select>
                             </div>
 
-                            <button onclick="syncPriceBook()" class="w-full py-4 bg-blue-600/10 border border-blue-500/20 hover:bg-blue-600/20 text-blue-400 text-xs font-black rounded-xl transition flex items-center justify-center gap-3 group">
-                                <svg class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            <button onclick="syncPriceBook()"
+                                class="w-full py-4 bg-blue-600/10 border border-blue-500/20 hover:bg-blue-600/20 text-blue-400 text-xs font-black rounded-xl transition flex items-center justify-center gap-3 group">
+                                <svg class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500"
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                                    </path>
+                                </svg>
                                 RELOAD PRICE_BOOK.YAML
                             </button>
                         </div>
 
                         <div class="p-6 bg-purple-500/5 border border-purple-500/20 rounded-2xl mb-8">
                             <div class="flex justify-between items-center mb-6">
-                                <h4 class="text-xs font-black text-purple-400 uppercase tracking-widest">Target Subscriptions</h4>
-                                <button onclick="refreshSubs()" class="text-[10px] text-blue-500 hover:underline">Refresh List</button>
+                                <h4 class="text-xs font-black text-purple-400 uppercase tracking-widest">Target
+                                    Subscriptions</h4>
+                                <button onclick="refreshSubs()"
+                                    class="text-[10px] text-blue-500 hover:underline">Refresh List</button>
                             </div>
-                            
-                            <div id="sub-checklist" class="glass bg-black/40 p-4 rounded-xl max-h-48 overflow-y-auto space-y-3 border border-white/5 mb-4">
-                                <p class="text-[10px] text-gray-600 italic">Click refresh to discover subscriptions...</p>
+
+                            <div id="sub-checklist"
+                                class="glass bg-black/40 p-4 rounded-xl max-h-48 overflow-y-auto space-y-3 border border-white/5 mb-4">
+                                <p class="text-[10px] text-gray-600 italic">Click refresh to discover subscriptions...
+                                </p>
                             </div>
-                            <button onclick="saveSubscriptions()" class="w-full py-2 bg-purple-600/20 border border-purple-500/30 hover:bg-purple-600/30 text-purple-300 text-[10px] font-black rounded-lg transition uppercase tracking-widest">
+                            <button onclick="saveSubscriptions()"
+                                class="w-full py-2 bg-purple-600/20 border border-purple-500/30 hover:bg-purple-600/30 text-purple-300 text-[10px] font-black rounded-lg transition uppercase tracking-widest">
                                 SAVE TARGET SCOPE
                             </button>
                         </div>
@@ -165,13 +232,17 @@
                         <div class="p-6 bg-blue-500/5 border border-blue-500/20 rounded-2xl">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-3">
-                                    <div id="auth-pulse" class="w-3 h-3 rounded-full bg-gray-500 shadow-[0_0_10px_rgba(156,163,175,0.5)]"></div>
+                                    <div id="auth-pulse"
+                                        class="w-3 h-3 rounded-full bg-gray-500 shadow-[0_0_10px_rgba(156,163,175,0.5)]">
+                                    </div>
                                     <div>
-                                        <p class="text-[10px] font-black uppercase tracking-tighter text-gray-400">Credential Status</p>
+                                        <p class="text-[10px] font-black uppercase tracking-tighter text-gray-400">
+                                            Credential Status</p>
                                         <p id="auth-msg" class="text-[10px] font-mono text-gray-500">Checking...</p>
                                     </div>
                                 </div>
-                                <button onclick="checkAuth()" class="text-[10px] px-2 py-1 glass hover:bg-white/10 text-blue-400 rounded transition font-bold uppercase tracking-widest">
+                                <button onclick="checkAuth()"
+                                    class="text-[10px] px-2 py-1 glass hover:bg-white/10 text-blue-400 rounded transition font-bold uppercase tracking-widest">
                                     REFRESH
                                 </button>
                             </div>
@@ -183,7 +254,8 @@
         </div>
     </div>
 
-    <div id="toast" class="fixed bottom-8 right-8 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div id="toast"
+        class="fixed bottom-8 right-8 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
         <div class="bg-white text-black px-6 py-3 rounded-xl font-bold text-sm shadow-2xl flex items-center gap-3">
             <span id="toast-icon">✓</span>
             <span id="toast-message">Settings Updated</span>
@@ -231,11 +303,11 @@
             try {
                 const res = await fetch('/api/settings/update', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({action: 'set_currency', value: code})
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'set_currency', value: code })
                 });
                 const data = await res.json();
-                
+
                 if (data.status === 'success') {
                     showToast(data.msg);
                     // Update button styles
@@ -291,11 +363,11 @@
         async function refreshSubs() {
             const listContainer = document.getElementById('sub-checklist');
             listContainer.innerHTML = '<p class="text-[10px] animate-pulse text-blue-400">Scanning Azure Active Directory...</p>';
-            
+
             try {
                 const res = await fetch('/api/settings/subscriptions');
                 const subs = await res.json();
-                
+
                 if (subs.error) {
                     listContainer.innerHTML = `<p class="text-[10px] text-red-400">${subs.error}</p>`;
                     showToast("Failed to fetch subscriptions", "error");
@@ -309,7 +381,7 @@
                                class="w-4 h-4 rounded border-gray-700 bg-black text-blue-600 focus:ring-blue-500">
                     </label>
                 `).join('');
-                
+
                 showToast(`Discovered ${subs.length} subscriptions.`);
             } catch (e) {
                 showToast("Failed to fetch subscriptions. Check az login status.", "error");
@@ -322,8 +394,8 @@
             try {
                 const res = await fetch('/api/settings/update', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({action: 'save_subscriptions', value: selected})
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'save_subscriptions', value: selected })
                 });
                 const data = await res.json();
                 if (data.status === 'success') {
@@ -336,6 +408,27 @@
             }
         }
 
+        async function saveSleepSchedule() {
+            const payload = {
+                enabled: document.getElementById('sleep-enabled').checked,
+                stop_time: document.getElementById('sleep-stop').value,
+                start_time: document.getElementById('sleep-start').value
+            };
+            try {
+                const res = await fetch('/api/settings/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'set_sleep_schedule', value: payload })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    showToast(data.msg);
+                }
+            } catch (err) {
+                console.error("Failed to save schedule");
+            }
+        }
+
 
         function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
@@ -345,7 +438,7 @@
             msg.innerText = message;
             icon.innerText = type === 'success' ? '✓' : '✕';
             toast.classList.remove('translate-y-20', 'opacity-0');
-            
+
             setTimeout(() => {
                 toast.classList.add('translate-y-20', 'opacity-0');
             }, 3000);
@@ -355,11 +448,11 @@
         async function checkAuth() {
             const pulse = document.getElementById('auth-pulse');
             const msg = document.getElementById('auth-msg');
-            
+
             try {
                 const res = await fetch('/api/auth/status');
                 const data = await res.json();
-                
+
                 if (data.status === "healthy") {
                     pulse.className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)] animate-pulse";
                     msg.innerText = `ACTIVE (Expires: ${data.expiry.split(' ')[0]})`;
@@ -379,4 +472,5 @@
 
     </script>
 </body>
+
 </html>

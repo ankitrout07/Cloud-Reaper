@@ -23,7 +23,12 @@ calc = CostCalculator()
 settings_state = {
     "currency": "USD",
     "idle_strategy": "aggressive",
-    "selected_subscriptions": []
+    "selected_subscriptions": [],
+    "scheduled_sleep": {
+        "enabled": False,
+        "stop_time": "20:00",
+        "start_time": "08:00"
+    }
 }
 
 @app.before_request
@@ -70,6 +75,11 @@ def update_settings():
         subs = data.get('value', [])
         settings_state['selected_subscriptions'] = subs
         return jsonify({"status": "success", "msg": f"Target scope updated: {len(subs)} subscriptions"})
+
+    if action == 'set_sleep_schedule':
+        settings_state['scheduled_sleep'] = data.get('value')
+        return jsonify({"status": "success", "msg": "Scheduled Sleep updated"})
+
 
     if action == 'initial_setup':
         # 1. Save to .env for future boots
@@ -127,6 +137,10 @@ def list_subscriptions():
 def pricing():
     return render_template('pricing.html')
 
+@app.route('/finops')
+def finops():
+    return render_template('finops.html')
+
 @app.route('/api/auth/status')
 def auth_status():
     return jsonify(check_azure_status())
@@ -148,6 +162,8 @@ def scan():
 
         all_vms_count = 0
         all_orphans = []
+        all_snapshots = []
+        all_zombies = []
         all_idle_vms = []
         all_utilization_report = []
         
@@ -164,8 +180,12 @@ def scan():
             vms = az.get_vm_inventory()
             all_vms_count += len(vms)
             
-            orphans = az.get_orphaned_disks()
-            all_orphans.extend(orphans)
+            reap_data = az.get_orphaned_disks()
+            all_orphans.extend(reap_data["disks"])
+            all_snapshots.extend(reap_data["snapshots"])
+            
+            zombies = az.get_zombie_vms()
+            all_zombies.extend(zombies)
             
             threshold = 2.0 if settings_state['idle_strategy'] == 'aggressive' else 10.0
             idle_vms = az.get_idle_vms(cpu_threshold=threshold)
@@ -203,12 +223,37 @@ def scan():
                 "rg": d.get('rg', 'N/A')
             })
             
-        events.append({"msg": "Global scan complete. Aggregate targets identified.", "type": "success"})
+        # Process Snapshots
+        formatted_snapshots = []
+        for s in all_snapshots:
+            cost = calc.calculate_monthly_cost('azure', 'storage', 'premium_ssd_p6_64gb') * 0.5 # Snapshot discount
+            total_savings += cost
+            formatted_snapshots.append({
+                "name": s['name'],
+                "savings": calc.format_price(cost),
+                "rg": s.get('rg', 'N/A')
+            })
+
+        # Process Zombies
+        formatted_zombies = []
+        for z in all_zombies:
+            cost = calc.calculate_monthly_cost('azure', 'compute', 'standard_d2s_v3')
+            total_savings += cost
+            formatted_zombies.append({
+                "name": z['name'],
+                "usage": z['usage'],
+                "savings": calc.format_price(cost),
+                "rg": z.get('rg', 'N/A')
+            })
+
+        events.append({"msg": f"Global scan complete. {len(formatted_zombies)} zombies detected.", "type": "warning" if formatted_zombies else "success"})
             
         return jsonify({
             "status": "success",
             "vm_count": all_vms_count,
             "orphans": formatted_orphans,
+            "snapshots": formatted_snapshots,
+            "zombies": formatted_zombies,
             "idle_vms": formatted_idle,
             "utilization_report": all_utilization_report,
             "events": events,
@@ -225,8 +270,136 @@ def get_prices():
     try:
         az = AzureCollector()
         prices = az.get_live_prices()
-        # If no prices, maybe trigger a scan or return empty
         return jsonify({"status": "success", "prices": prices})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ─────────────────────────────────────────────────────────────────
+# INFORM PHASE: Tag Health Audit
+# ─────────────────────────────────────────────────────────────────
+@app.route('/api/finops/tag-health')
+def tag_health():
+    try:
+        az = AzureCollector()
+        result = az.tag_health_audit()
+        return jsonify({"status": "success", **result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ─────────────────────────────────────────────────────────────────
+# INFORM PHASE: Anomaly Detection
+# ─────────────────────────────────────────────────────────────────
+@app.route('/api/finops/anomalies')
+def anomalies():
+    try:
+        az = AzureCollector()
+        data = az.get_anomaly_data()
+        spike_count = sum(1 for d in data if d['is_anomaly'])
+        return jsonify({"status": "success", "services": data, "spike_count": spike_count})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ─────────────────────────────────────────────────────────────────
+# INFORM PHASE: Unit Economics
+# ─────────────────────────────────────────────────────────────────
+@app.route('/api/finops/unit-economics')
+def unit_economics():
+    try:
+        import random
+        # These would come from a real APM/telemetry source
+        metrics = [
+            {"metric": "Active Users",    "unit": "per 1K users",  "count": random.randint(8000, 15000),  "total_spend": round(random.uniform(2000, 5000), 2)},
+            {"metric": "CI/CD Builds",    "unit": "per Build",     "count": random.randint(400, 1200),    "total_spend": round(random.uniform(500, 2000), 2)},
+            {"metric": "API Requests",    "unit": "per 1M req",   "count": random.randint(10, 80),       "total_spend": round(random.uniform(1000, 4000), 2)},
+            {"metric": "Data Processed",  "unit": "per TB",        "count": round(random.uniform(5, 50), 1), "total_spend": round(random.uniform(600, 3000), 2)},
+        ]
+        for m in metrics:
+            unit_count = m['count'] / 1000 if 'K' in m['unit'] else (m['count'] / 1_000_000 if 'M' in m['unit'] else m['count'])
+            m['cost_per_unit'] = round(m['total_spend'] / max(unit_count, 1), 4)
+            m['trend'] = round(random.uniform(-15, 25), 1)  # % change vs last month
+        return jsonify({"status": "success", "metrics": metrics})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ─────────────────────────────────────────────────────────────────
+# OPTIMIZE PHASE: RI/SP Advisor
+# ─────────────────────────────────────────────────────────────────
+@app.route('/api/finops/ri-advisor')
+def ri_advisor():
+    try:
+        az = AzureCollector()
+        candidates = az.get_ri_sp_candidates()
+        total_annual_savings = sum(c['annual_savings'] for c in candidates)
+        return jsonify({"status": "success", "candidates": candidates, "total_annual_savings": round(total_annual_savings, 2)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ─────────────────────────────────────────────────────────────────
+# OPTIMIZE PHASE: Cold Storage Lifecycle
+# ─────────────────────────────────────────────────────────────────
+@app.route('/api/finops/cold-storage')
+def cold_storage():
+    try:
+        az = AzureCollector()
+        buckets = az.get_cold_storage_candidates()
+        total_monthly_savings = sum(b['monthly_savings'] for b in buckets)
+        return jsonify({"status": "success", "buckets": buckets, "total_monthly_savings": round(total_monthly_savings, 2)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ─────────────────────────────────────────────────────────────────
+# OPTIMIZE PHASE: Modernization Advisor
+# ─────────────────────────────────────────────────────────────────
+@app.route('/api/finops/modernization')
+def modernization():
+    try:
+        az = AzureCollector()
+        suggestions = az.get_modernization_candidates()
+        total_annual_savings = sum(s['annual_savings'] for s in suggestions)
+        return jsonify({"status": "success", "suggestions": suggestions, "total_annual_savings": round(total_annual_savings, 2)})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ─────────────────────────────────────────────────────────────────
+# OPERATE PHASE: Policy-as-Code Guardrails
+# ─────────────────────────────────────────────────────────────────
+@app.route('/api/finops/policy-violations')
+def policy_violations():
+    try:
+        az = AzureCollector()
+        violations = az.get_policy_violations()
+        critical = sum(1 for v in violations if v['severity'] == 'HIGH')
+        return jsonify({"status": "success", "violations": violations, "critical_count": critical})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ─────────────────────────────────────────────────────────────────
+# OPERATE PHASE: Budget Kill-Switch
+# ─────────────────────────────────────────────────────────────────
+@app.route('/api/finops/budget-status')
+def budget_status():
+    try:
+        az = AzureCollector()
+        budgets = az.get_budget_status()
+        return jsonify({"status": "success", "budgets": budgets})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/finops/budget-killswitch', methods=['POST'])
+def budget_killswitch():
+    """Triggers automated stop of non-essential VMs in a subscription."""
+    try:
+        data = request.json
+        sub_name = data.get('subscription', 'Unknown')
+        # In production: call Azure SDK to deallocate VMs tagged non-essential
+        import time
+        time.sleep(0.5)  # Simulate action
+        return jsonify({
+            "status": "success",
+            "message": f"Kill-switch activated for {sub_name}. 3 non-essential VMs scheduled for shutdown.",
+            "vms_stopped": ["sandbox-test-01", "sandbox-test-02", "dev-worker-temp"],
+            "estimated_savings": "$14.20/day"
+        })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

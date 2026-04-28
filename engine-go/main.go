@@ -19,9 +19,13 @@ import (
 )
 
 type VMReport struct {
-	Name       string  `json:"name"`
-	Usage      float64 `json:"usage"`
-	ResourceID string  `json:"id"`
+	Name       string            `json:"name"`
+	Usage      float64           `json:"usage"`
+	NetworkIn  float64           `json:"network_in"`
+	NetworkOut float64           `json:"network_out"`
+	DiskIOPS   float64           `json:"disk_iops"`
+	ResourceID string            `json:"id"`
+	Tags       map[string]*string `json:"tags"`
 }
 
 type AzurePriceResult struct {
@@ -30,10 +34,11 @@ type AzurePriceResult struct {
 }
 
 type ScanResult struct {
-	OrphanedDisks []string                 `json:"orphaned_disks"`
-	ActiveVMs     []string                 `json:"active_vms"`
-	VMReports     []VMReport               `json:"vm_reports"`
-	Prices        []map[string]interface{} `json:"prices,omitempty"`
+	OrphanedDisks     []map[string]interface{} `json:"orphaned_disks"`
+	OrphanedSnapshots []map[string]interface{} `json:"orphaned_snapshots"`
+	ActiveVMs         []string                 `json:"active_vms"`
+	VMReports         []VMReport               `json:"vm_reports"`
+	Prices            []map[string]interface{} `json:"prices,omitempty"`
 }
 
 func fetchAllPrices(serviceName string, wg *sync.WaitGroup, mu *sync.Mutex, result *ScanResult) {
@@ -137,8 +142,8 @@ func main() {
 	}
 	mu := &sync.Mutex{}
 
-	// Task 1: Scan for Orphaned Disks
-	wg.Add(1)
+	// Task 1: Scan for Orphaned Disks & Snapshots
+	wg.Add(2)
 	go func() {
 		defer wg.Done()
 		client, err := armcompute.NewDisksClient(subscriptionID, cred, nil)
@@ -154,7 +159,35 @@ func main() {
 			for _, disk := range page.Value {
 				if disk.ManagedBy == nil {
 					mu.Lock()
-					result.OrphanedDisks = append(result.OrphanedDisks, *disk.Name)
+					result.OrphanedDisks = append(result.OrphanedDisks, map[string]interface{}{
+						"name": *disk.Name,
+						"tags": disk.Tags,
+					})
+					mu.Unlock()
+				}
+			}
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		client, err := armcompute.NewSnapshotsClient(subscriptionID, cred, nil)
+		if err != nil {
+			return
+		}
+		pager := client.NewListPager(nil)
+		for pager.More() {
+			page, err := pager.NextPage(ctx)
+			if err != nil {
+				break
+			}
+			for _, snap := range page.Value {
+				if snap.Properties.TimeCreated != nil && time.Since(*snap.Properties.TimeCreated) > 30*24*time.Hour {
+					mu.Lock()
+					result.OrphanedSnapshots = append(result.OrphanedSnapshots, map[string]interface{}{
+						"name": *snap.Name,
+						"tags": snap.Tags,
+					})
 					mu.Unlock()
 				}
 			}
@@ -204,22 +237,44 @@ func main() {
 				res, err := monitorClient.List(ctx, *vm.ID, &armmonitor.MetricsClientListOptions{
 					Timespan:    &timespan,
 					Interval:    ptr("PT1H"),
-					Metricnames: ptr("Percentage CPU"),
+					Metricnames: ptr("Percentage CPU,Network In Total,Network Out Total,Disk Read Operations/Sec"),
 					Aggregation: ptr("Average"),
 				})
 
 				usage := 0.0
-				if err == nil && len(res.Value) > 0 && len(res.Value[0].Timeseries) > 0 {
-					data := res.Value[0].Timeseries[0].Data
-					if len(data) > 0 && data[0].Average != nil {
-						usage = *data[0].Average
+				netIn := 0.0
+				netOut := 0.0
+				diskOps := 0.0
+
+				if err == nil {
+					for _, m := range res.Value {
+						if len(m.Timeseries) > 0 && len(m.Timeseries[0].Data) > 0 {
+							val := 0.0
+							if m.Timeseries[0].Data[0].Average != nil {
+								val = *m.Timeseries[0].Data[0].Average
+							}
+							switch *m.Name.Value {
+							case "Percentage CPU":
+								usage = val
+							case "Network In Total":
+								netIn = val
+							case "Network Out Total":
+								netOut = val
+							case "Disk Read Operations/Sec":
+								diskOps = val
+							}
+						}
 					}
 				}
 
 				reportChan <- VMReport{
 					Name:       *vm.Name,
 					Usage:      usage,
+					NetworkIn:  netIn,
+					NetworkOut: netOut,
+					DiskIOPS:   diskOps,
 					ResourceID: *vm.ID,
+					Tags:       vm.Tags,
 				}
 			}(vm)
 		}
