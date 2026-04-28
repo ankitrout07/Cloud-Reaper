@@ -109,6 +109,23 @@
                 <span class="text-gray-300">Dashboard</span>
             </div>
 
+            <!-- Mission Briefing Section -->
+            <div class="mb-10 animate-slide-in">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-xl font-black shadow-lg shadow-cyan-500/20 text-white">
+                        {{ user_name[0] if user_name else 'A' }}
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-black tracking-tighter uppercase">
+                            Welcome back, <span class="text-cyan-400">{{ user_name or 'Cloud Architect' }}</span>
+                        </h1>
+                        <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                            System Status: <span class="text-green-500">All Modules Operational</span> • Subscription: <span class="text-blue-400">Azure-Internal-01</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-16 animate-fade-in">
                 <div>
                     <div class="flex items-center gap-3">

@@ -17,6 +17,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
+
+	"cloud-reaper/engine-go/collectors"
 )
 
 type VMReport struct {
@@ -36,6 +38,7 @@ type AzurePriceResult struct {
 }
 
 type ScanResult struct {
+	UserName          string                   `json:"user_name"`
 	OrphanedDisks     []map[string]interface{} `json:"orphaned_disks"`
 	OrphanedSnapshots []map[string]interface{} `json:"orphaned_snapshots"`
 	ActiveVMs         []string                 `json:"active_vms"`
@@ -352,8 +355,11 @@ func main() {
 	wg.Wait()
 
 	// Output result as JSON
-	output, _ := json.Marshal(result)
-	fmt.Println(string(output))
+	// Fetch User Name
+	result.UserName = collectors.GetAzureUserName()
+
+	jsonResult, _ := json.Marshal(result)
+	fmt.Println(string(jsonResult))
 }
 
 func ptr[T any](v T) *T {

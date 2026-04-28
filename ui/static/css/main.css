@@ -42,7 +42,11 @@ h1, h2, h3, h4, p, span, div {
 [data-theme="light"] .text-gray-400,
 [data-theme="light"] .text-gray-500,
 [data-theme="light"] .text-slate-500 {
-    color: #475569;
+    color: #64748b; /* Slate-500 for better visibility in light mode */
+}
+
+[data-theme="light"] h1 {
+    color: #0f172a;
 }
 
 [data-theme="light"] .bg-white\/5 {
