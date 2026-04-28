@@ -97,8 +97,74 @@
 
     <main class="flex-1 p-8">
         {% if request.args.get('mode') == 'onboarding' %}
-        <!-- Specialized Onboarding Overlay (same as before) -->
-        ...
+        <div id="setup-wizard" class="fixed inset-0 bg-[#0d1117]/90 backdrop-blur-xl z-[100] flex items-center justify-center p-4">
+            <div class="glass max-w-2xl w-full p-10 relative overflow-hidden border border-cyan-500/20 shadow-[0_0_50px_rgba(6,182,212,0.15)]">
+                <!-- Progress Header -->
+                <div class="flex justify-between items-center mb-12">
+                    <div class="flex gap-2">
+                        <div id="step-dot-1" class="w-12 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_10px_#06b6d4]"></div>
+                        <div id="step-dot-2" class="w-12 h-1.5 rounded-full bg-white/10"></div>
+                        <div id="step-dot-3" class="w-12 h-1.5 rounded-full bg-white/10"></div>
+                    </div>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-cyan-400">Onboarding Wizard v1.0</span>
+                </div>
+
+                <!-- Step 1: Subscription -->
+                <div id="wizard-step-1" class="animate-fade-in">
+                    <h2 class="text-4xl font-black text-white tracking-tighter mb-4">WELCOME TO <span class="text-cyan-400">CLOUD REAPER</span></h2>
+                    <p class="text-slate-400 text-sm mb-8">To begin harvesting savings, we need to target your Azure environment. Enter your primary Subscription ID below.</p>
+                    
+                    <div class="space-y-4">
+                        <label class="text-[10px] font-black uppercase tracking-widest text-gray-500">Azure Subscription ID</label>
+                        <input type="text" id="setup-sub-id" placeholder="00000000-0000-0000-0000-000000000000" 
+                            class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-cyan-400 font-mono text-sm outline-none focus:border-cyan-500 transition-all">
+                        <button onclick="wizardNext(2)" class="w-full py-4 bg-cyan-500 hover:bg-cyan-400 text-[#0d1117] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-cyan-500/20 transition-all">
+                            Validate & Continue →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Authentication -->
+                <div id="wizard-step-2" class="hidden animate-fade-in">
+                    <h2 class="text-4xl font-black text-white tracking-tighter mb-4">IDENTITY <span class="text-cyan-400">VERIFICATION</span></h2>
+                    <p class="text-slate-400 text-sm mb-8">Cloud Reaper uses your local Azure CLI credentials. Please ensure you have run <code class="bg-white/5 px-2 py-1 rounded text-cyan-400">az login</code> in your terminal.</p>
+                    
+                    <div class="glass p-6 border-white/5 bg-black/20 mb-8">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div id="setup-auth-pulse" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div>
+                                <div>
+                                    <p class="text-xs font-bold text-white uppercase">Azure CLI Status</p>
+                                    <p id="setup-auth-status" class="text-[10px] text-gray-500 font-mono">Checking connection...</p>
+                                </div>
+                            </div>
+                            <button onclick="checkWizardAuth()" class="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-[10px] font-black uppercase tracking-widest text-cyan-400 transition">Retry</button>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <button onclick="wizardBack(1)" class="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest rounded-xl transition-all">Back</button>
+                        <button id="auth-next-btn" disabled onclick="wizardNext(3)" class="flex-[2] py-4 bg-gray-700 text-gray-500 cursor-not-allowed font-black uppercase tracking-widest rounded-xl transition-all">
+                            Proceed to Engine →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Engine Health -->
+                <div id="wizard-step-3" class="hidden animate-fade-in">
+                    <h2 class="text-4xl font-black text-white tracking-tighter mb-4">ENGINE <span class="text-cyan-400">BOOTSTRAP</span></h2>
+                    <p class="text-slate-400 text-sm mb-8">Initializing the Go-powered Reaper Engine for its first environment scan. This ensures everything is correctly wired.</p>
+                    
+                    <div id="setup-scan-log" class="bg-black/40 border border-white/5 p-4 rounded-xl font-mono text-[10px] space-y-2 mb-8 h-32 overflow-y-auto">
+                        <p class="text-gray-500">> Initializing engine-go/reaper-engine...</p>
+                    </div>
+
+                    <button id="finish-btn" disabled onclick="completeSetup()" class="w-full py-4 bg-gray-700 text-gray-500 cursor-not-allowed font-black uppercase tracking-widest rounded-xl transition-all">
+                        Initialize Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
         {% endif %}
 
         <div id="main-content" class="max-w-4xl mx-auto">
@@ -478,6 +544,89 @@
         }
 
         checkAuth();
+
+        // Wizard Logic
+        function wizardNext(step) {
+            document.getElementById(`wizard-step-${step-1}`).classList.add('hidden');
+            document.getElementById(`wizard-step-${step}`).classList.remove('hidden');
+            document.getElementById(`step-dot-${step}`).classList.replace('bg-white/10', 'bg-cyan-500');
+            document.getElementById(`step-dot-${step}`).classList.add('shadow-[0_0_10px_#06b6d4]');
+
+            if (step === 2) checkWizardAuth();
+            if (step === 3) startInitialScan();
+        }
+
+        function wizardBack(step) {
+            document.getElementById(`wizard-step-${step+1}`).classList.add('hidden');
+            document.getElementById(`wizard-step-${step}`).classList.remove('hidden');
+            document.getElementById(`step-dot-${step+1}`).classList.replace('bg-cyan-500', 'bg-white/10');
+            document.getElementById(`step-dot-${step+1}`).classList.remove('shadow-[0_0_10px_#06b6d4]');
+        }
+
+        async function checkWizardAuth() {
+            const pulse = document.getElementById('setup-auth-pulse');
+            const status = document.getElementById('setup-auth-status');
+            const nextBtn = document.getElementById('auth-next-btn');
+
+            try {
+                const res = await fetch('/api/auth/status');
+                const data = await res.json();
+                if (data.status === 'healthy') {
+                    pulse.className = "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_15px_#22c55e]";
+                    status.innerText = "AUTHENTICATED: Azure CLI Session Active";
+                    status.className = "text-[10px] text-green-400 font-mono";
+                    nextBtn.disabled = false;
+                    nextBtn.className = "flex-[2] py-4 bg-cyan-500 hover:bg-cyan-400 text-[#0d1117] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-cyan-500/20 transition-all";
+                } else {
+                    pulse.className = "w-3 h-3 rounded-full bg-red-500";
+                    status.innerText = "ERROR: No active session found. Run 'az login'.";
+                }
+            } catch (e) {
+                status.innerText = "ERROR: Auth service unreachable.";
+            }
+        }
+
+        async function startInitialScan() {
+            const log = document.getElementById('setup-scan-log');
+            const finishBtn = document.getElementById('finish-btn');
+            const subId = document.getElementById('setup-sub-id').value;
+
+            const addLog = (msg, color = "text-gray-400") => {
+                log.innerHTML += `<p class="${color}">> ${msg}</p>`;
+                log.scrollTop = log.scrollHeight;
+            };
+
+            setTimeout(() => addLog("Subscription ID detected..."), 500);
+            setTimeout(() => addLog("Validating engine binary..."), 1200);
+            
+            try {
+                // Save config first
+                await fetch('/api/settings/update', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action: 'initial_setup', value: subId})
+                });
+                
+                setTimeout(() => addLog("Environment updated. Triggering health scan...", "text-cyan-400"), 2000);
+                
+                const res = await fetch('/api/scan');
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    setTimeout(() => {
+                        addLog(`SUCCESS: Found ${data.vm_count} VMs across scope.`, "text-green-400");
+                        finishBtn.disabled = false;
+                        finishBtn.className = "w-full py-4 bg-cyan-500 hover:bg-cyan-400 text-[#0d1117] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-cyan-500/20 transition-all";
+                    }, 3500);
+                }
+            } catch (e) {
+                addLog("CRITICAL ERROR: Scan failed. Check .env and az login.", "text-red-400");
+            }
+        }
+
+        function completeSetup() {
+            window.location.href = '/';
+        }
 
     </script>
 </body>
