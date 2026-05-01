@@ -42,6 +42,26 @@ func isProtected(tags map[string]*string) bool {
 	return false
 }
 
+func isTagCompliant(tags map[string]*string) bool {
+	if tags == nil {
+		return false
+	}
+	requiredTags := []string{"owner", "project"}
+	for _, req := range requiredTags {
+		found := false
+		for k := range tags {
+			if strings.ToLower(k) == req {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
 type VMReport struct {
 	Name       string             `json:"name"`
 	Size       string             `json:"size"`
@@ -49,8 +69,9 @@ type VMReport struct {
 	NetworkIn  float64            `json:"network_in"`
 	NetworkOut float64            `json:"network_out"`
 	DiskIOPS   float64            `json:"disk_iops"`
-	ResourceID string             `json:"id"`
-	Tags       map[string]*string `json:"tags"`
+	ResourceID    string             `json:"id"`
+	Tags          map[string]*string `json:"tags"`
+	IsUnallocated bool               `json:"is_unallocated"`
 }
 
 type AzurePriceResult struct {
@@ -314,8 +335,9 @@ func main() {
 					NetworkIn:  netIn,
 					NetworkOut: netOut,
 					DiskIOPS:   diskOps,
-					ResourceID: *vm.ID,
-					Tags:       vm.Tags,
+					ResourceID:    *vm.ID,
+					Tags:          vm.Tags,
+					IsUnallocated: !isTagCompliant(vm.Tags),
 				}
 			}(vm)
 		}
@@ -392,15 +414,24 @@ func main() {
 				ID:          r.ResourceID,
 				Name:        r.Name,
 				Type:        "VirtualMachine",
-				Region:      "N/A", // In a full scan, we'd extract the region from the resource ID
-				Tags:        r.Tags,
-				Active:      true,
-				IsProtected: isProtected(r.Tags),
-				LastSeen:    time.Now(),
+				Region:         "N/A", // In a full scan, we'd extract the region from the resource ID
+				Tags:           r.Tags,
+				Active:         true,
+				IsProtected:    isProtected(r.Tags),
+				IsUnallocated:  r.IsUnallocated,
+				LastSeen:       time.Now(),
 			})
+			// Add sample cost history (Actual vs Amortized)
+			db.AddCostHistory(r.ResourceID, 12.50, "ACTUAL")
+			db.AddCostHistory(r.ResourceID, 8.75, "AMORTIZED") // Mocking amortized savings
 		}
 		db.UpsertResources(dbResources)
-		db.CleanupInactiveResources(time.Now().Add(-5 * time.Minute)) 
+		db.CleanupInactiveResources(time.Now().Add(-5 * time.Minute))
+
+		// Ingest Business Metrics (Unit Economics)
+		db.AddBusinessMetric("ACTIVE_USERS", 12500, "per 1K users")
+		db.AddBusinessMetric("API_REQUESTS", 45000000, "per 1M req")
+		db.AddBusinessMetric("CICD_BUILDS", 850, "per Build")
 	}
 
 	// Output result as JSON

@@ -23,6 +23,7 @@ class Resource(Base):
     tags = Column(JSONB, default={})
     active = Column(Boolean, default=True)
     is_protected = Column(Boolean, default=False)
+    is_unallocated = Column(Boolean, default=False)
     last_seen = Column(DateTime, default=datetime.utcnow)
 
     cost_history = relationship("CostHistory", back_populates="resource")
@@ -36,6 +37,7 @@ class CostHistory(Base):
     resource_id = Column(String, ForeignKey("resources.id"))
     date = Column(DateTime, default=datetime.utcnow)
     cost = Column(Numeric(15, 4))
+    cost_type = Column(String, default="ACTUAL") # ACTUAL or AMORTIZED
     currency = Column(String, default="USD")
 
     resource = relationship("Resource", back_populates="cost_history")
@@ -61,6 +63,15 @@ class Recommendation(Base):
     description = Column(String)
 
     resource = relationship("Resource", back_populates="recommendations")
+
+class BusinessMetric(Base):
+    __tablename__ = "business_metrics"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    metric_name = Column(String, index=True) # e.g. ACTIVE_USERS, API_REQUESTS
+    value = Column(Float)
+    unit = Column(String)
+    date = Column(DateTime, default=datetime.utcnow)
 
 def init_db():
     Base.metadata.create_all(bind=engine)

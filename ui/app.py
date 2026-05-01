@@ -12,6 +12,7 @@ from collectors.azure_collector import AzureCollector
 from engine.models import init_db
 from collectors.auth_check import check_azure_status
 from engine.calculator import CostCalculator
+from engine.models import SessionLocal, Resource, BusinessMetric, CostHistory
 from collectors.config_manager import save_config
 
 def is_first_run():
@@ -284,8 +285,30 @@ def get_prices():
 @app.route('/api/finops/tag-health')
 def tag_health():
     try:
-        az = AzureCollector()
-        result = az.tag_health_audit()
+        session = SessionLocal()
+        resources = session.query(Resource).all()
+        
+        total_resources = len(resources)
+        unallocated_resources = [r for r in resources if r.is_unallocated]
+        unallocated_count = len(unallocated_resources)
+        
+        compliant_count = total_resources - unallocated_count
+        compliance_rate = (compliant_count / total_resources * 100) if total_resources > 0 else 100
+        
+        # Mocking some unallocated spend for the UI
+        unallocated_spend = unallocated_count * 45.0 # Average cost per resource
+        
+        result = {
+            "total_resources": total_resources,
+            "compliant_count": compliant_count,
+            "unallocated_count": unallocated_count,
+            "compliance_rate": round(compliance_rate, 1),
+            "unallocated_spend": round(unallocated_spend, 2),
+            "missing_tags_summary": [
+                {"resource": r.name, "type": r.type, "missing": "Owner, Project"} for r in unallocated_resources[:5]
+            ]
+        }
+        session.close()
         return jsonify({"status": "success", **result})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -309,31 +332,42 @@ def anomalies():
 @app.route('/api/finops/unit-economics')
 def unit_economics():
     try:
-        import random
-        az = AzureCollector()
-        budget_data = az.get_budget_status()
-        # Find the total actual spend across the mock budgets or actual budgets
-        total_cloud_spend = sum([b.get('spent', 0) for b in budget_data])
-        if total_cloud_spend == 0:
-            total_cloud_spend = random.uniform(5000, 15000)
-            
-        # These would come from a real APM/telemetry source
-        metrics = [
-            {"metric": "Active Users",    "unit": "per 1K users",  "count": random.randint(8000, 15000)},
-            {"metric": "CI/CD Builds",    "unit": "per Build",     "count": random.randint(400, 1200)},
-            {"metric": "API Requests",    "unit": "per 1M req",   "count": random.randint(10, 80)},
-            {"metric": "Data Processed",  "unit": "per TB",        "count": round(random.uniform(5, 50), 1)},
-        ]
+        session = SessionLocal()
         
-        # We split the total spend among the 4 business metrics for a realistic distribution
-        for i, m in enumerate(metrics):
-            m['total_spend'] = round(total_cloud_spend * [0.4, 0.2, 0.25, 0.15][i], 2)
-            unit_count = m['count'] / 1000 if 'K' in m['unit'] else (m['count'] / 1_000_000 if 'M' in m['unit'] else m['count'])
-            m['cost_per_unit'] = round(m['total_spend'] / max(unit_count, 1), 4)
-            m['trend'] = round(random.uniform(-15, 25), 1)  # % change vs last month
+        # Fetch business metrics from DB
+        db_metrics = session.query(BusinessMetric).order_by(BusinessMetric.date.desc()).limit(10).all()
+        
+        # Fetch total spend (Actual)
+        total_actual_spend = session.query(CostHistory).filter(CostHistory.cost_type == "ACTUAL").sum(CostHistory.cost) or 10000.0
+        total_amortized_spend = session.query(CostHistory).filter(CostHistory.cost_type == "AMORTIZED").sum(CostHistory.cost) or 7500.0
+
+        metrics = []
+        for m in db_metrics:
+            unit_count = m.value / 1000 if '1K' in m.unit else (m.value / 1_000_000 if '1M' in m.unit else m.value)
             
-        return jsonify({"status": "success", "metrics": metrics, "total_spend": round(total_cloud_spend, 2)})
+            # Distribute spend (Mock logic for ROI)
+            metric_spend = float(total_actual_spend) * 0.25 
+            cost_per_unit = metric_spend / max(unit_count, 1)
+            
+            metrics.append({
+                "metric": m.metric_name.replace("_", " ").title(),
+                "unit": m.unit,
+                "count": m.value,
+                "total_spend": round(metric_spend, 2),
+                "cost_per_unit": round(cost_per_unit, 4),
+                "trend": round(8.5, 1) # Mock trend
+            })
+            
+        session.close()
+        return jsonify({
+            "status": "success", 
+            "metrics": metrics, 
+            "total_actual_spend": round(float(total_actual_spend), 2),
+            "total_amortized_spend": round(float(total_amortized_spend), 2)
+        })
     except Exception as e:
+        import traceback
+        print(traceback.format_exc())
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ─────────────────────────────────────────────────────────────────

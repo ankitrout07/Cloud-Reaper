@@ -410,27 +410,34 @@
             const data = await res.json();
             
             const indicator = document.getElementById('tag-health-indicator');
-            indicator.innerText = data.health_score + '%';
+            indicator.innerText = data.compliance_rate + '%';
             
-            const colorClass = data.health_score > 80 ? 'bg-emerald-500/20 text-emerald-500' : (data.health_score > 50 ? 'bg-amber-500/20 text-amber-500' : 'bg-rose-500/20 text-rose-500');
+            const colorClass = data.compliance_rate > 80 ? 'bg-emerald-500/20 text-emerald-500' : (data.compliance_rate > 50 ? 'bg-amber-500/20 text-amber-500' : 'bg-rose-500/20 text-rose-500');
             indicator.className = `w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg metric-value ${colorClass}`;
             
-            document.getElementById('tag-integrity-pct').innerText = data.health_score + '%';
-            document.getElementById('tag-health-bar').style.width = data.health_score + '%';
+            document.getElementById('tag-integrity-pct').innerText = data.compliance_rate + '%';
+            document.getElementById('tag-health-bar').style.width = data.compliance_rate + '%';
 
             const list = document.getElementById('tag-missing-list');
             list.innerHTML = '';
             
-            // Show top 3 missing tags
-            const missingEntries = Object.entries(data.missing_by_tag).sort((a,b) => b[1] - a[1]).slice(0, 3);
-            missingEntries.forEach(([tag, count]) => {
+            // Show summary of unallocated spend
+            list.innerHTML += `
+                <div class="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl mb-4">
+                    <p class="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Unallocated Spend</p>
+                    <p class="text-2xl font-black text-white">$${data.unallocated_spend.toLocaleString()}</p>
+                    <p class="text-[10px] text-slate-500 mt-1">${data.unallocated_count} resources missing Owner/Project tags</p>
+                </div>
+            `;
+
+            data.missing_tags_summary.forEach(item => {
                 list.innerHTML += `
-                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 mb-2">
                         <div class="flex items-center gap-3">
                             <div class="w-1.5 h-1.5 rounded-full bg-rose-500"></div>
-                            <span class="text-sm font-semibold">${tag}</span>
+                            <span class="text-sm font-semibold truncate max-w-[120px]">${item.resource}</span>
                         </div>
-                        <span class="text-xs text-slate-500 font-bold">${count} missing</span>
+                        <span class="text-[9px] text-slate-500 font-bold uppercase">${item.type}</span>
                     </div>
                 `;
             });
@@ -473,17 +480,31 @@
             const list = document.getElementById('unit-economics-list');
             list.innerHTML = '';
             
+            // Add Actual vs Amortized Spend Overview
+            list.innerHTML += `
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="p-3 bg-white/5 rounded-xl border border-white/5">
+                        <p class="text-[9px] font-bold text-slate-500 uppercase">Actual Spend</p>
+                        <p class="text-sm font-bold text-white">$${data.total_actual_spend.toLocaleString()}</p>
+                    </div>
+                    <div class="p-3 bg-cyan-500/5 rounded-xl border border-cyan-500/10">
+                        <p class="text-[9px] font-bold text-cyan-400 uppercase">Amortized</p>
+                        <p class="text-sm font-bold text-cyan-400">$${data.total_amortized_spend.toLocaleString()}</p>
+                    </div>
+                </div>
+            `;
+
             data.metrics.forEach(m => {
                 const trendColor = m.trend > 0 ? 'text-rose-400' : 'text-emerald-400';
                 list.innerHTML += `
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 mb-4">
                         <div>
                             <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">${m.metric}</p>
                             <p class="text-lg font-bold text-white metric-value">$${m.cost_per_unit} <span class="text-[10px] text-slate-500 font-normal">/ ${m.unit}</span></p>
                         </div>
                         <div class="text-right">
                             <p class="text-[10px] font-bold ${trendColor}">${m.trend > 0 ? '↑' : '↓'} ${Math.abs(m.trend)}%</p>
-                            <p class="text-[9px] text-slate-600 uppercase">vs last month</p>
+                            <p class="text-[9px] text-slate-600 uppercase">Trend</p>
                         </div>
                     </div>
                 `;
