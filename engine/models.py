@@ -29,6 +29,7 @@ class Resource(Base):
     cost_history = relationship("CostHistory", back_populates="resource")
     reap_actions = relationship("ReapAction", back_populates="resource")
     recommendations = relationship("Recommendation", back_populates="resource")
+    action_logs = relationship("ActionLog", back_populates="resource")
 
 class CostHistory(Base):
     __tablename__ = "cost_history"
@@ -63,6 +64,18 @@ class Recommendation(Base):
     description = Column(String)
 
     resource = relationship("Resource", back_populates="recommendations")
+
+class ActionLog(Base):
+    __tablename__ = "action_logs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    resource_id = Column(String, ForeignKey("resources.id"))
+    action_type = Column(String) # REAP, KILL, PROTECTION_ADD
+    status = Column(String) # SUCCESS, FAILED
+    details = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+    resource = relationship("Resource", back_populates="action_logs")
 
 class BusinessMetric(Base):
     __tablename__ = "business_metrics"
