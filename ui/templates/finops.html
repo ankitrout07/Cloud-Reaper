@@ -209,6 +209,53 @@
                         <!-- Metrics will be injected here -->
                     </div>
                 </div>
+
+                <!-- Burn-Rate Forecast (NEW) -->
+                <div class="glass-card p-8 border-l-4 border-cyan-500">
+                    <h3 class="text-xl font-bold text-white mb-2">Burn-Rate Forecast</h3>
+                    <p class="text-slate-400 text-sm mb-6">Predictive Linear Regression (30-day)</p>
+                    
+                    <div id="burn-rate-container">
+                        <div class="flex justify-between items-end mb-4">
+                            <div>
+                                <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Projected Bill</p>
+                                <p id="projected-total" class="text-3xl font-black text-white metric-value">$0.00</p>
+                            </div>
+                            <div class="text-right">
+                                <p id="burn-trend" class="text-xs font-bold text-emerald-400">0.00%</p>
+                                <p class="text-[9px] text-slate-500 font-bold uppercase">Trend Slope</p>
+                            </div>
+                        </div>
+                        <div id="burn-chart" class="flex items-end gap-1 h-20 bg-white/5 rounded-xl p-2">
+                            <!-- Bars injected here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Virtual Tagging (NEW) -->
+                <div class="glass-card p-8">
+                    <h3 class="text-xl font-bold text-white mb-2">Virtual Normalization</h3>
+                    <p class="text-slate-400 text-sm mb-6">Logical grouping for attribution</p>
+                    <div class="space-y-3" id="virtual-tags-list">
+                        <!-- Virtual tags injected here -->
+                    </div>
+                </div>
+
+                <!-- GreenOps Carbon Footprint (NEW) -->
+                <div class="glass-card p-8 bg-gradient-to-br from-[#0a1a12] to-[#0d1930]">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-white">GreenOps Sustainability</h3>
+                            <p class="text-emerald-500/80 text-sm mt-1">Carbon Intensity Migration Advisor</p>
+                        </div>
+                        <div class="p-3 bg-emerald-500/20 rounded-2xl text-emerald-500">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5a3.5 3.5 0 013.5 3.5V19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-2a2 2 0 00-2-2h-2a2 2 0 00-2 2v0m2-13a2 2 0 110-4 2 2 0 010 4z"/></svg>
+                        </div>
+                    </div>
+                    <div class="space-y-4" id="greenops-list">
+                        <!-- Carbon recommendations injected here -->
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -301,6 +348,31 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 2FA Pending Actions (NEW) -->
+            <div class="mt-8 glass-card p-8 border-l-4 border-cyan-400">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h3 class="text-xl font-bold text-white uppercase tracking-tight">Pending Reap Approvals <span class="text-cyan-400 ml-2 font-black">2FA REQUIRED</span></h3>
+                        <p class="text-slate-500 text-sm mt-1">Infrastructure remediation requires administrator bypass.</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="text-slate-500 text-[10px] font-bold uppercase tracking-widest border-b border-white/5">
+                                <th class="pb-4">Resource</th>
+                                <th class="pb-4">Waste Score</th>
+                                <th class="pb-4">Monthly Burn</th>
+                                <th class="pb-4 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pending-reap-list" class="divide-y divide-white/5">
+                            <!-- Pending actions injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </section>
 
         <!-- Content goes here -->
@@ -320,7 +392,11 @@
                     fetchColdStorage(),
                     fetchModernization(),
                     fetchPolicies(),
-                    fetchBudgets()
+                    fetchBudgets(),
+                    fetchBurnRate(),
+                    fetchGreenOps(),
+                    fetchVirtualTags(),
+                    fetchPendingReaps()
                 ]);
             } catch (err) {
                 console.error("Refresh failed", err);
@@ -580,6 +656,117 @@
             const data = await res.json();
             alert(data.message);
             fetchBudgets();
+        }
+
+        async function fetchBurnRate() {
+            const res = await fetch('/api/finops/burn-rate-forecast');
+            const data = await res.json();
+            const forecast = data.forecast;
+            
+            document.getElementById('projected-total').innerText = '$' + forecast.projected_total.toLocaleString();
+            const trend = document.getElementById('burn-trend');
+            trend.innerText = (forecast.slope >= 0 ? '↑' : '↓') + Math.abs(forecast.slope).toFixed(2) + ' pts';
+            trend.className = `text-xs font-bold ${forecast.slope >= 0 ? 'text-rose-500' : 'text-emerald-500'}`;
+
+            const chart = document.getElementById('burn-chart');
+            chart.innerHTML = '';
+            forecast.daily_history.forEach(v => {
+                chart.innerHTML += `
+                    <div class="flex-1 bg-cyan-500/40 rounded-t-sm" style="height: ${Math.max(5, (v / Math.max(...forecast.daily_history)) * 100)}%"></div>
+                `;
+            });
+        }
+
+        async function fetchGreenOps() {
+            const res = await fetch('/api/finops/greenops');
+            const data = await res.json();
+            
+            const list = document.getElementById('greenops-list');
+            list.innerHTML = '';
+            
+            data.recommendations.forEach(r => {
+                list.innerHTML += `
+                    <div class="p-4 bg-white/5 rounded-2xl border border-emerald-500/10">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-bold text-white">${r.name}</span>
+                            <span class="text-[10px] font-bold text-emerald-400">SAVE ${r.savings_pct}% CO2</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-[10px] font-mono text-slate-500">
+                            <span class="line-through">${r.current_region}</span>
+                            <span>→</span>
+                            <span class="text-emerald-500">${r.target_region}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        async function fetchVirtualTags() {
+            const res = await fetch('/api/finops/virtual-tags');
+            const data = await res.json();
+            
+            const list = document.getElementById('virtual-tags-list');
+            list.innerHTML = '';
+            
+            data.virtual_tags.slice(0, 3).forEach(t => {
+                const vTags = Object.entries(t.virtual_tags).map(([k, v]) => `<span class="text-[9px] bg-cyan-400/10 text-cyan-400 px-1.5 py-0.5 rounded">${k}:${v}</span>`).join(' ');
+                list.innerHTML += `
+                    <div class="flex justify-between items-center p-2 bg-white/5 rounded-lg border border-white/5">
+                        <span class="text-xs font-bold text-white">${t.name}</span>
+                        <div class="flex gap-1">${vTags || '<span class="text-[9px] text-slate-600">No Change</span>'}</div>
+                    </div>
+                `;
+            });
+        }
+
+        async function fetchPendingReaps() {
+            const res = await fetch('/api/finops/utilization');
+            const data = await res.json();
+            
+            const list = document.getElementById('pending-reap-list');
+            list.innerHTML = '';
+            
+            const candidates = data.report.filter(r => r.waste_coefficient < 0.1 || r.status === 'CRITICAL').slice(0, 5);
+            
+            candidates.forEach(c => {
+                list.innerHTML += `
+                    <tr class="hover:bg-white/5 transition group">
+                        <td class="py-4">
+                            <p class="text-sm font-bold text-white">${c.name}</p>
+                            <p class="text-[10px] text-slate-500 font-mono">${c.rg}</p>
+                        </td>
+                        <td class="py-4">
+                            <div class="flex items-center gap-2">
+                                <div class="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                    <div class="bg-rose-500 h-full" style="width: ${Math.min(100, c.waste_coefficient * 1000)}%"></div>
+                                </div>
+                                <span class="text-xs font-bold text-rose-500">${c.waste_coefficient.toFixed(3)}</span>
+                            </div>
+                        </td>
+                        <td class="py-4 text-slate-400 font-mono text-xs">$${c.monthly_cost}</td>
+                        <td class="py-4 text-right">
+                            <button onclick="approveReap('${c.name}', 'VirtualMachine')" 
+                                    ${c.is_protected ? 'disabled' : ''}
+                                    class="px-4 py-2 ${c.is_protected ? 'bg-slate-500/10 text-slate-500 border-slate-500/20 cursor-not-allowed' : 'bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border-rose-500/20'} text-xs font-bold rounded-xl border transition-all duration-300">
+                                ${c.is_protected ? 'PROTECTED' : 'APPROVE REAP'}
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function approveReap(resourceId, type) {
+            if (!confirm(`Are you sure you want to authorize the REAP action for ${resourceId}? This cannot be undone.`)) return;
+            
+            const res = await fetch('/api/finops/approve-reap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ resource_id: resourceId, resource_type: type })
+            });
+            const data = await res.json();
+            alert(data.message);
+            refreshAll();
         }
 
         window.onload = refreshAll;

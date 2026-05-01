@@ -19,7 +19,28 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 
 	"cloud-reaper/engine-go/collectors"
+	"cloud-reaper/engine-go/db"
+	"golang.org/x/time/rate"
 )
+
+var limiter = rate.NewLimiter(rate.Every(time.Second/10), 10) // 10 requests per second
+
+func isProtected(tags map[string]*string) bool {
+	if tags == nil {
+		return false
+	}
+	for k, v := range tags {
+		if v == nil {
+			continue
+		}
+		key := strings.ToLower(k)
+		val := strings.ToLower(*v)
+		if (key == "reaper-ignore" && val == "true") || (key == "environment" && val == "production") {
+			return true
+		}
+	}
+	return false
+}
 
 type VMReport struct {
 	Name       string             `json:"name"`
@@ -157,8 +178,10 @@ func main() {
 		if err != nil {
 			return
 		}
+		limiter.Wait(ctx)
 		pager := client.NewListPager(nil)
 		for pager.More() {
+			limiter.Wait(ctx)
 			page, err := pager.NextPage(ctx)
 			if err != nil {
 				break
@@ -182,8 +205,10 @@ func main() {
 		if err != nil {
 			return
 		}
+		limiter.Wait(ctx)
 		pager := client.NewListPager(nil)
 		for pager.More() {
+			limiter.Wait(ctx)
 			page, err := pager.NextPage(ctx)
 			if err != nil {
 				break
@@ -214,9 +239,11 @@ func main() {
 			return
 		}
 
+		limiter.Wait(ctx)
 		pager := vmClient.NewListAllPager(nil)
 		var vms []*armcompute.VirtualMachine
 		for pager.More() {
+			limiter.Wait(ctx)
 			page, err := pager.NextPage(ctx)
 			if err != nil {
 				break
@@ -241,6 +268,7 @@ func main() {
 			go func(vm *armcompute.VirtualMachine) {
 				defer metricWg.Done()
 
+				limiter.Wait(ctx)
 				res, err := monitorClient.List(ctx, *vm.ID, &armmonitor.MetricsClientListOptions{
 					Timespan:    &timespan,
 					Interval:    ptr("PT1H"),
@@ -355,6 +383,25 @@ func main() {
 	}
 
 	wg.Wait()
+
+	// Push to PostgreSQL if requested (Production Mode)
+	if os.Getenv("DATABASE_URL") != "" {
+		var dbResources []db.Resource
+		for _, r := range result.VMReports {
+			dbResources = append(dbResources, db.Resource{
+				ID:          r.ResourceID,
+				Name:        r.Name,
+				Type:        "VirtualMachine",
+				Region:      "N/A", // In a full scan, we'd extract the region from the resource ID
+				Tags:        r.Tags,
+				Active:      true,
+				IsProtected: isProtected(r.Tags),
+				LastSeen:    time.Now(),
+			})
+		}
+		db.UpsertResources(dbResources)
+		db.CleanupInactiveResources(time.Now().Add(-5 * time.Minute)) 
+	}
 
 	// Output result as JSON
 	// Fetch User Name

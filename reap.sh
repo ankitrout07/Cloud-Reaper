@@ -11,6 +11,12 @@ echo "------------------------------------------------"
 echo "  🛠️  SYSTEM CHECK & INITIALIZATION"
 echo "------------------------------------------------"
 
+# 0. Ensure PostgreSQL is running (Production Requirement)
+if [[ "$APP_ENV" == "production" ]] || [[ -n "$DATABASE_URL" ]]; then
+    echo "[*] Checking PostgreSQL Readiness..."
+    pg_isready -h localhost -p 5432 || (echo "[!] PostgreSQL is down! Start it to enable persistence." && exit 1)
+fi
+
 # 1. Ensure Python VENV is available
 if ! dpkg -s python3-venv >/dev/null 2>&1; then
     echo "[!] python3-venv is missing. Installing..."

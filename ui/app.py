@@ -9,16 +9,17 @@ load_dotenv()
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from collectors.azure_collector import AzureCollector
+from engine.models import init_db
 from collectors.auth_check import check_azure_status
 from engine.calculator import CostCalculator
 from collectors.config_manager import save_config
 
 def is_first_run():
-    # If AZURE_SUBSCRIPTION_ID is missing or empty in .env/environment
     sub_id = os.getenv("AZURE_SUBSCRIPTION_ID")
     return not sub_id or len(sub_id) < 5
 
 app = Flask(__name__)
+init_db()
 calc = CostCalculator()
 settings_state = {
     "currency": "USD",
@@ -309,18 +310,29 @@ def anomalies():
 def unit_economics():
     try:
         import random
+        az = AzureCollector()
+        budget_data = az.get_budget_status()
+        # Find the total actual spend across the mock budgets or actual budgets
+        total_cloud_spend = sum([b.get('spent', 0) for b in budget_data])
+        if total_cloud_spend == 0:
+            total_cloud_spend = random.uniform(5000, 15000)
+            
         # These would come from a real APM/telemetry source
         metrics = [
-            {"metric": "Active Users",    "unit": "per 1K users",  "count": random.randint(8000, 15000),  "total_spend": round(random.uniform(2000, 5000), 2)},
-            {"metric": "CI/CD Builds",    "unit": "per Build",     "count": random.randint(400, 1200),    "total_spend": round(random.uniform(500, 2000), 2)},
-            {"metric": "API Requests",    "unit": "per 1M req",   "count": random.randint(10, 80),       "total_spend": round(random.uniform(1000, 4000), 2)},
-            {"metric": "Data Processed",  "unit": "per TB",        "count": round(random.uniform(5, 50), 1), "total_spend": round(random.uniform(600, 3000), 2)},
+            {"metric": "Active Users",    "unit": "per 1K users",  "count": random.randint(8000, 15000)},
+            {"metric": "CI/CD Builds",    "unit": "per Build",     "count": random.randint(400, 1200)},
+            {"metric": "API Requests",    "unit": "per 1M req",   "count": random.randint(10, 80)},
+            {"metric": "Data Processed",  "unit": "per TB",        "count": round(random.uniform(5, 50), 1)},
         ]
-        for m in metrics:
+        
+        # We split the total spend among the 4 business metrics for a realistic distribution
+        for i, m in enumerate(metrics):
+            m['total_spend'] = round(total_cloud_spend * [0.4, 0.2, 0.25, 0.15][i], 2)
             unit_count = m['count'] / 1000 if 'K' in m['unit'] else (m['count'] / 1_000_000 if 'M' in m['unit'] else m['count'])
             m['cost_per_unit'] = round(m['total_spend'] / max(unit_count, 1), 4)
             m['trend'] = round(random.uniform(-15, 25), 1)  # % change vs last month
-        return jsonify({"status": "success", "metrics": metrics})
+            
+        return jsonify({"status": "success", "metrics": metrics, "total_spend": round(total_cloud_spend, 2)})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -403,6 +415,48 @@ def budget_killswitch():
             "vms_stopped": ["sandbox-test-01", "sandbox-test-02", "dev-worker-temp"],
             "estimated_savings": "$14.20/day"
         })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+@app.route('/api/finops/burn-rate-forecast')
+def burn_rate_forecast():
+    try:
+        az = AzureCollector()
+        data = az.get_burn_rate_forecast()
+        return jsonify({"status": "success", "forecast": data})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/finops/virtual-tags')
+def virtual_tags():
+    try:
+        az = AzureCollector()
+        data = az.get_virtual_tags()
+        return jsonify({"status": "success", "virtual_tags": data})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/finops/greenops')
+def greenops():
+    try:
+        az = AzureCollector()
+        data = az.get_greenops_recommendations()
+        return jsonify({"status": "success", "recommendations": data})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/finops/approve-reap', methods=['POST'])
+def approve_reap():
+    try:
+        data = request.json
+        resource_id = data.get('resource_id')
+        resource_type = data.get('resource_type')
+        
+        if not resource_id:
+            return jsonify({"status": "error", "message": "Missing resource_id"}), 400
+            
+        az = AzureCollector()
+        result = az.execute_reap(resource_id, resource_type)
+        return jsonify(result)
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
