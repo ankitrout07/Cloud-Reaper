@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from dotenv import load_dotenv
@@ -22,6 +22,7 @@ class Resource(Base):
     region = Column(String)
     tags = Column(JSONB, default={})
     active = Column(Boolean, default=True)
+    is_protected = Column(Boolean, default=False)
     last_seen = Column(DateTime, default=datetime.utcnow)
 
     cost_history = relationship("CostHistory", back_populates="resource")
@@ -34,7 +35,7 @@ class CostHistory(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     resource_id = Column(String, ForeignKey("resources.id"))
     date = Column(DateTime, default=datetime.utcnow)
-    cost = Column(Float)
+    cost = Column(Numeric(15, 4))
     currency = Column(String, default="USD")
 
     resource = relationship("Resource", back_populates="cost_history")
@@ -56,7 +57,7 @@ class Recommendation(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     resource_id = Column(String, ForeignKey("resources.id"))
     recommendation_type = Column(String) # e.g. RIGHTSIZE, GREENOPS
-    savings = Column(Float)
+    savings = Column(Numeric(15, 4))
     description = Column(String)
 
     resource = relationship("Resource", back_populates="recommendations")

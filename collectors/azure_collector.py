@@ -289,6 +289,9 @@ class AzureCollector:
                 cost = calc.calculate_monthly_cost('azure', 'compute', vm.hardware_profile.vm_size)
                 waste_score = calc.calculate_waste_coefficient(cpu_avg, cost)
                 
+                # Check protection status from DB or Tags
+                is_protected = self._is_resource_protected(vm.id, vm.tags)
+                
                 report.append({
                     "name": vm.name,
                     "rg": self._extract_rg(vm.id),
@@ -298,7 +301,8 @@ class AzureCollector:
                     "recommendation": rec,
                     "color": color,
                     "waste_coefficient": waste_score,
-                    "monthly_cost": round(cost, 2)
+                    "monthly_cost": round(cost, 2),
+                    "is_protected": is_protected
                 })
             return report
         except Exception as e:
@@ -826,10 +830,51 @@ class AzureCollector:
     # ACTIONABILITY FRAMEWORK (2FA REAP)
     # ─────────────────────────────────────────────────
     def execute_reap(self, resource_id, resource_type):
-        """Simulates deleting a resource via Azure SDK after 2FA approval."""
-        print(f"[ACTION] 2FA Approved. Simulating DELETE for {resource_type}: {resource_id}")
-        return {
-            "status": "success",
-            "message": f"Resource {resource_id} has been securely reaped.",
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        }
+        """Simulates deleting a resource via Azure SDK after 2FA approval and safety checks."""
+        session = SessionLocal()
+        try:
+            # SAFETY CHECK: Verify protection status in DB
+            res = session.query(Resource).filter_by(id=resource_id).first()
+            if res and res.is_protected:
+                return {"status": "error", "message": f"CRITICAL: Resource {resource_id} is PROTECTED and cannot be reaped."}
+            
+            # Simulate execution
+            import time
+            time.sleep(1)
+            
+            # Log action
+            action = ReapAction(resource_id=resource_id, action="REAP_DELETE", authorized_by="Admin-UI")
+            session.add(action)
+            session.commit()
+            
+            return {
+                "status": "success",
+                "message": f"Successfully reaped {resource_type} ({resource_id}). Action logged for audit.",
+                "action_id": action.id,
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            }
+        except Exception as e:
+            session.rollback()
+            return {"status": "error", "message": str(e)}
+        finally:
+            session.close()
+
+    def _is_resource_protected(self, resource_id, tags):
+        """Checks if a resource is protected via DB or tags."""
+        # Check tags first (immediate)
+        if tags:
+            for k, v in tags.items():
+                key = k.lower()
+                val = v.lower() if v else ""
+                if (key == "reaper-ignore" and val == "true") or (key == "environment" and val == "production"):
+                    return True
+        
+        # Check DB (persistent)
+        session = SessionLocal()
+        try:
+            res = session.query(Resource).filter_by(id=resource_id).first()
+            if res:
+                return res.is_protected
+        finally:
+            session.close()
+        return False

@@ -9,6 +9,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/jackc/pgx/v5 v5.5.3
 	github.com/microsoftgraph/msgraph-sdk-go v1.97.0
+	golang.org/x/time v0.5.0
 )
 
 require (

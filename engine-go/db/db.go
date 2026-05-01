@@ -12,13 +12,14 @@ import (
 )
 
 type Resource struct {
-	ID       string
-	Name     string
-	Type     string
-	Region   string
-	Tags     map[string]*string
-	Active   bool
-	LastSeen time.Time
+	ID          string
+	Name        string
+	Type        string
+	Region      string
+	Tags        map[string]*string
+	Active      bool
+	IsProtected bool
+	LastSeen    time.Time
 }
 
 var (
@@ -47,17 +48,18 @@ func UpsertResources(resources []Resource) error {
 	batch := &pgx.Batch{}
 	for _, r := range resources {
 		sql := `
-			INSERT INTO resources (id, name, type, region, tags, active, last_seen)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			INSERT INTO resources (id, name, type, region, tags, active, is_protected, last_seen)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			ON CONFLICT (id) DO UPDATE SET
 				name = EXCLUDED.name,
 				type = EXCLUDED.type,
 				region = EXCLUDED.region,
 				tags = EXCLUDED.tags,
 				active = EXCLUDED.active,
+				is_protected = EXCLUDED.is_protected,
 				last_seen = EXCLUDED.last_seen
 		`
-		batch.Queue(sql, r.ID, r.Name, r.Type, r.Region, r.Tags, r.Active, r.LastSeen)
+		batch.Queue(sql, r.ID, r.Name, r.Type, r.Region, r.Tags, r.Active, r.IsProtected, r.LastSeen)
 	}
 
 	br := db.SendBatch(context.Background(), batch)
@@ -71,4 +73,13 @@ func UpsertResources(resources []Resource) error {
 	}
 
 	return nil
+}
+
+func CleanupInactiveResources(lastScanStart time.Time) error {
+	db, err := Connect()
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(context.Background(), "UPDATE resources SET active = false WHERE last_seen < $1", lastScanStart)
+	return err
 }

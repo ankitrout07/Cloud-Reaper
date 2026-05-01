@@ -1,5 +1,6 @@
 import yaml
 import os
+from decimal import Decimal
 from collectors.azure_prices import AzurePriceClient
 
 class CostCalculator:
@@ -16,10 +17,10 @@ class CostCalculator:
 
         # Hardcoded prices for the new Tier Logic as requested
         self.prices = {
-            "unassociated_ip": 0.005,
-            "idle_lb": 0.025,
-            "premium_ssd_p6": 0.008, # Hourly approx ($5.89/730)
-            "standard_b2s": 0.0416
+            "unassociated_ip": Decimal("0.005"),
+            "idle_lb": Decimal("0.025"),
+            "premium_ssd_p6": Decimal("0.008"), # Hourly approx ($5.89/730)
+            "standard_b2s": Decimal("0.0416")
         }
 
     def load_config(self):
@@ -59,9 +60,9 @@ class CostCalculator:
             # Check both armResourceName and armSkuName for maximum compatibility
             arm_name = item.get('armResourceName') or item.get('armSkuName')
             if arm_name and item.get('type') == 'Consumption':
-                price = item.get('retailPrice', 0.0)
+                price = Decimal(str(item.get('retailPrice', 0.0)))
                 # Store the first one we find, or we could be more specific
-                if arm_name not in self.price_cache or self.price_cache[arm_name] == 0.0:
+                if arm_name not in self.price_cache or self.price_cache[arm_name] == Decimal("0.0"):
                     self.price_cache[arm_name] = price
 
     def _get_azure_live_price(self, arm_resource_name):
@@ -75,13 +76,13 @@ class CostCalculator:
             if results:
                 retail_prices = [p for p in results if p.get('type') == 'Consumption']
                 if retail_prices:
-                    price = retail_prices[0].get('retailPrice', 0.0)
+                    price = Decimal(str(retail_prices[0].get('retailPrice', 0.0)))
                     self.price_cache[arm_resource_name] = price
                     return price
         except Exception as e:
             print(f"[!] Error fetching live price for {arm_resource_name}: {e}")
             
-        return self.price_cache.get(arm_resource_name, 0.0)
+        return self.price_cache.get(arm_resource_name, Decimal("0.0"))
 
     def calculate_monthly_cost(self, provider, resource_type, sku, quantity=1):
         """
@@ -91,22 +92,22 @@ class CostCalculator:
         # For Azure, try live API first if it's a known SKU format
         if provider == 'azure':
             live_price = self._get_azure_live_price(sku)
-            if live_price > 0:
+            if live_price > Decimal("0"):
                 # Azure Retail API usually returns hourly prices
-                return float(live_price) * 730 * quantity
+                return live_price * Decimal("730") * Decimal(str(quantity))
 
         try:
-            rate = self.prices_yaml['providers'][provider][resource_type][sku]
+            rate = Decimal(str(self.prices_yaml['providers'][provider][resource_type][sku]))
             
             # If SKU represents a monthly rate (disks/ebs), return as is
             if 'month' in sku or resource_type in ['ebs', 'disk']:
-                return float(rate) * quantity
+                return rate * Decimal(str(quantity))
             
             # Standard month = 730 hours
-            return float(rate) * 730 * quantity
+            return rate * Decimal("730") * Decimal(str(quantity))
         except (KeyError, TypeError):
             # Fallback to hardcoded prices if not in YAML
-            return self.prices.get(sku, 0.0) * 730 * quantity
+            return self.prices.get(sku, Decimal("0.0")) * Decimal("730") * Decimal(str(quantity))
 
     def categorize_resource(self, resource_type, state, usage=None):
         """
@@ -127,11 +128,15 @@ class CostCalculator:
         Returns a lower number for higher waste.
         If cost is 0, returns a default high score.
         """
-        if cost_per_month <= 0:
+        util = Decimal(str(utilization_pct))
+        cost = Decimal(str(cost_per_month))
+        
+        if cost <= Decimal("0"):
             return 100.0
         # If a $500 VM has 5% utilization, score = 5 / 500 = 0.01 (High Waste)
         # If a $50 VM has 90% utilization, score = 90 / 50 = 1.8 (High Efficiency)
-        return round(utilization_pct / cost_per_month, 4)
+        score = util / cost
+        return float(round(score, 4))
 
     def calculate_carbon_emission(self, region, vcpu_count, hours=730):
         """
