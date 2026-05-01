@@ -19,6 +19,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 
 	"cloud-reaper/engine-go/collectors"
+	"cloud-reaper/engine-go/db"
 )
 
 type VMReport struct {
@@ -355,6 +356,23 @@ func main() {
 	}
 
 	wg.Wait()
+
+	// Push to PostgreSQL if requested (Production Mode)
+	if os.Getenv("DATABASE_URL") != "" {
+		var dbResources []db.Resource
+		for _, r := range result.VMReports {
+			dbResources = append(dbResources, db.Resource{
+				ID:       r.ResourceID,
+				Name:     r.Name,
+				Type:     "VirtualMachine",
+				Region:   "N/A", // In a full scan, we'd extract the region from the resource ID
+				Tags:     r.Tags,
+				Active:   true,
+				LastSeen: time.Now(),
+			})
+		}
+		db.UpsertResources(dbResources)
+	}
 
 	// Output result as JSON
 	// Fetch User Name

@@ -121,3 +121,42 @@ class CostCalculator:
             
         return "P3", "Check Manually", 0.0
 
+    def calculate_waste_coefficient(self, utilization_pct, cost_per_month):
+        """
+        Calculates EfficiencyScore = AvgUtilization% / CostPerUnit
+        Returns a lower number for higher waste.
+        If cost is 0, returns a default high score.
+        """
+        if cost_per_month <= 0:
+            return 100.0
+        # If a $500 VM has 5% utilization, score = 5 / 500 = 0.01 (High Waste)
+        # If a $50 VM has 90% utilization, score = 90 / 50 = 1.8 (High Efficiency)
+        return round(utilization_pct / cost_per_month, 4)
+
+    def calculate_carbon_emission(self, region, vcpu_count, hours=730):
+        """
+        Calculates estimated carbon footprint based on Azure Region.
+        Returns emissions in kgCO2e.
+        """
+        # Simplified emission factors (gCO2e per kWh)
+        # Assuming 1 vCPU ~ 3.5 watts/hour on average for calculation simplicity
+        emission_factors = {
+            "centralindia": 700, # High carbon (coal heavy)
+            "eastus": 400,
+            "westeurope": 200,
+            "northeurope": 150,
+            "swedencentral": 10, # Very low carbon (renewable)
+            "norwayeast": 15,
+            "default": 350
+        }
+        
+        region_key = str(region).lower().replace(" ", "")
+        factor = emission_factors.get(region_key, emission_factors["default"])
+        
+        # Power calculation: vCPU * 3.5 watts * hours = Watt-hours
+        # kWh = Watt-hours / 1000
+        kwh = (vcpu_count * 3.5 * hours) / 1000.0
+        
+        # Emissions in grams, convert to kg
+        kg_co2e = (kwh * factor) / 1000.0
+        return round(kg_co2e, 2)
