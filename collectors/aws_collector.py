@@ -15,32 +15,44 @@ class AWSCollector:
         )
 
     def get_ec2_inventory(self):
-        try:
-            instances = self.ec2.describe_instances()
-            inventory = []
-            for reservation in instances.get('Reservations', []):
-                for instance in reservation.get('Instances', []):
-                    inventory.append({
-                        'id': instance['InstanceId'],
-                        'type': instance['InstanceType'],
-                        'state': instance['State']['Name']
-                    })
-            return inventory
-        except Exception:
-            return []
+        """Lists all EC2 instances and their types."""
+        instances = self.ec2.describe_instances()
+        inventory = []
+        for reservation in instances['Reservations']:
+            for instance in reservation['Instances']:
+                inventory.append({
+                    'id': instance['InstanceId'],
+                    'type': instance['InstanceType'],
+                    'state': instance['State']['Name'],
+                    'tags': instance.get('Tags', [])
+                })
+        return inventory
 
     def get_orphaned_volumes(self):
-        try:
-            volumes = self.ec2.describe_volumes(
-                Filters=[{'Name': 'status', 'Values': ['available']}]
-            )
-            orphans = []
-            for vol in volumes.get('Volumes', []):
-                orphans.append({
-                    'id': vol['VolumeId'],
-                    'size': vol['Size'],
-                    'type': vol['VolumeType']
-                })
-            return orphans
-        except Exception:
-            return []
+        """Identifies EBS volumes with state 'available' (not attached)."""
+        volumes = self.ec2.describe_volumes(
+            Filters=[{'Name': 'status', 'Values': ['available']}]
+        )
+        orphans = []
+        for vol in volumes['Volumes']:
+            orphans.append({
+                'id': vol['VolumeId'],
+                'size': vol['Size'],
+                'type': vol['VolumeType'], # e.g., gp3
+                'iops': vol.get('Iops', 0)
+            })
+        return orphans
+
+if __name__ == "__main__":
+    collector = AWSCollector()
+    print(f"--- Scanning AWS EC2 in {collector.region} ---")
+    instances = collector.get_ec2_inventory()
+    for ins in instances:
+        print(f"Found Instance: {ins['id']} [{ins['type']}] - State: {ins['state']}")
+
+    print("\n--- Hunting Orphaned EBS Volumes ---")
+    orphans = collector.get_orphaned_volumes()
+    if not orphans:
+        print("No orphaned volumes found. AWS storage is optimized.")
+    for vol in orphans:
+        print(f"[!] REAPER TARGET: {vol['id']} ({vol['size']}GB) - Type: {vol['type']}")
