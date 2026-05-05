@@ -36,7 +36,9 @@ Thumbs.db
 *.swp
 
 # Go
-engine-go/reaper-engine
+src/engine-go/reaper-engine
+bin/
+build/
 vendor/
 *.exe
 *.exe~
@@ -45,3 +47,11 @@ vendor/
 *.dylib
 *.test
 *.out
+
+# Coverage
+htmlcov/
+.coverage
+coverage.xml
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/

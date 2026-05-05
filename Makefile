@@ -1,5 +1,7 @@
 .PHONY: help install build test lint run clean
 
+export PYTHONPATH := $(shell pwd)/src
+
 # Default target
 help:
 	@echo "Cloud-Reaper Development Commands:"
@@ -12,10 +14,10 @@ help:
 
 install:
 	pip install -r requirements.txt -r requirements-dev.txt
-	cd engine-go && go mod download
+	cd src/engine-go && go mod download
 
 build:
-	cd engine-go && go build -o reaper-engine main.go
+	cd src/engine-go && go build -o reaper-engine main.go
 
 test: test-python test-go
 
@@ -23,21 +25,21 @@ test-python:
 	pytest
 
 test-go:
-	cd engine-go && go test -v ./...
+	cd src/engine-go && go test -v ./...
 
 lint: lint-python lint-go
 
 lint-python:
-	ruff check .
-	mypy collectors engine
+	ruff check src/reaper
+	mypy src/reaper --ignore-missing-imports
 
 lint-go:
-	golangci-lint run ./...
+	cd src/engine-go && golangci-lint run ./...
 
 run: build
-	./reap.sh
+	./scripts/reap.sh
 
 clean:
-	rm -f engine-go/reaper-engine
+	rm -f src/engine-go/reaper-engine
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	rm -rf .pytest_cache .ruff_cache .mypy_cache

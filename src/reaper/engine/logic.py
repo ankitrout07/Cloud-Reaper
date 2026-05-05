@@ -6,7 +6,7 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 import os
 import json
 import datetime
-from engine.notifier import send_discord_alert
+from reaper.engine.notifier import send_discord_alert
 
 class ZombieScorer:
     def __init__(self):

@@ -5,16 +5,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Ensure the app can see the collectors and engine folders
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from collectors.azure_collector import AzureCollector
-from engine.models import init_db
-from collectors.auth_check import check_azure_status
-from engine.calculator import CostCalculator
-from engine.models import SessionLocal, Resource, BusinessMetric, CostHistory, ActionLog
-from collectors.config_manager import save_config
-from engine.logic import RightSizer, ZombieScorer, BudgetForecaster
+from reaper.collectors.azure_collector import AzureCollector
+from reaper.engine.models import init_db
+from reaper.collectors.auth_check import check_azure_status
+from reaper.engine.calculator import CostCalculator
+from reaper.engine.models import SessionLocal, Resource, BusinessMetric, CostHistory, ActionLog
+from reaper.collectors.config_manager import save_config
+from reaper.engine.logic import RightSizer, ZombieScorer, BudgetForecaster
 
 def is_first_run():
     sub_id = os.getenv("AZURE_SUBSCRIPTION_ID")
@@ -192,7 +189,8 @@ def list_subscriptions():
     import json
     try:
         # Path to the Go binary
-        binary_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'engine-go', 'reaper-engine')
+        # Path to the Go binary (adjusted for src/reaper/web/app.py)
+        binary_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'engine-go', 'reaper-engine')
         
         # Check if binary exists
         if not os.path.exists(binary_path):
@@ -229,7 +227,8 @@ def get_rightsizing():
     az = AzureCollector()
     
     # Path to the Go binary
-    go_binary = "./engine-go/reaper-engine"
+    # Path to the Go binary
+    go_binary = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'engine-go', 'reaper-engine')
     if not os.path.exists(go_binary):
         return jsonify({"status": "error", "message": "Go Engine binary not found"}), 500
 

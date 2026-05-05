@@ -237,7 +237,8 @@ class AzureCollector:
         Executes the Go Performance Core to fetch real-time Azure pricing data.
         """
         # Path to the Go binary we built in engine-go/
-        go_binary = "./engine-go/reaper-engine"
+        # Path to the Go binary (adjusted for src/reaper/collectors/azure_collector.py)
+        go_binary = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'engine-go', 'reaper-engine')
         
         if not os.path.exists(go_binary):
             print(f"[-] Error: Go binary not found at {go_binary}. Run ./reap.sh to build.")
@@ -259,8 +260,8 @@ class AzureCollector:
         """
         Calculates burn rate and EOM forecast using ARIMA.
         """
-        from engine.models import SessionLocal, CostHistory
-        from engine.logic import BudgetForecaster
+        from reaper.engine.models import SessionLocal, CostHistory
+        from reaper.engine.logic import BudgetForecaster
         
         db = SessionLocal()
         # Fetch last 30 days of daily spend

@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PYTHONPATH: ${{ github.workspace }}/src
+
 jobs:
   lint-python:
     name: Python Lint
@@ -25,7 +28,7 @@ jobs:
       - name: Type Check (Mypy)
         run: |
           pip install mypy types-PyYAML types-requests
-          mypy collectors engine --ignore-missing-imports
+          mypy src/reaper --ignore-missing-imports
 
   lint-go:
     name: Go Lint
@@ -36,12 +39,12 @@ jobs:
         with:
           go-version: '1.24'
           cache: true
-          cache-dependency-path: engine-go/go.mod
+          cache-dependency-path: src/engine-go/go.mod
       - name: Go Lint
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          working-directory: engine-go
+          working-directory: src/engine-go
 
   test-python:
     name: Python Tests
@@ -72,25 +75,27 @@ jobs:
     needs: lint-go
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
           go-version: '1.24'
           cache: true
+          cache-dependency-path: src/engine-go/go.mod
       - name: Run Tests
-        working-directory: engine-go
+        working-directory: src/engine-go
         run: go test -v -coverprofile=coverage.out ./...
       - name: Build Engine
-        working-directory: engine-go
+        working-directory: src/engine-go
         run: go build -o reaper-engine main.go
       - name: Upload Go Artifact
         uses: actions/upload-artifact@v4
         with:
           name: reaper-engine
-          path: engine-go/reaper-engine
+          path: src/engine-go/reaper-engine
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
         with:
-          files: ./engine-go/coverage.out
+          files: ./src/engine-go/coverage.out
           flags: go
           fail_ci_if_error: false
 
@@ -105,7 +110,7 @@ jobs:
       - name: Run Bandit
         run: |
           pip install bandit
-          bandit -r collectors engine ui -f json -o bandit-report.json || true
+          bandit -r src/reaper -f json -o bandit-report.json || true
       - name: Run Safety
         run: |
           pip install safety
@@ -145,17 +150,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: reaper-engine
-          path: engine-go/
+          path: src/engine-go/
       - name: Install Dependencies
         run: |
           pip install -r requirements.txt
-          chmod +x engine-go/reaper-engine
+          chmod +x src/engine-go/reaper-engine
       - name: Verify Core Wiring
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cloud_reaper
         run: |
-          python -c "import collectors.azure_collector; import engine.calculator; print('✅ Wiring OK')"
-          ./engine-go/reaper-engine --help || true
+          python -c "from reaper.collectors.azure_collector import AzureCollector; from reaper.engine.calculator import CostCalculator; print('✅ Wiring OK')"
+          ./src/engine-go/reaper-engine --help || true
       - name: Summary
         run: |
           echo "### 🚀 Cloud-Reaper CI Successful" >> $GITHUB_STEP_SUMMARY

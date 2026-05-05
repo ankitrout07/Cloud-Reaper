@@ -5,7 +5,11 @@ set -e
 
 # Resolve repo root so the script works from any working directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT_DIR"
+
+# Set PYTHONPATH to include src directory
+export PYTHONPATH="$PYTHONPATH:$ROOT_DIR/src"
 
 echo "------------------------------------------------"
 echo "  🛠️  SYSTEM CHECK & INITIALIZATION"
@@ -45,17 +49,15 @@ if command -v docker &> /dev/null; then
     fi
 else
     echo "[!] Docker not found. Please install Docker or start PostgreSQL manually."
-    echo "   For Ubuntu/Debian: sudo apt install docker.io"
-    echo "   For other distros: check your package manager"
 fi
 
 # 1. Build Go Core (Performance Engine)
-if [ -d "engine-go" ]; then
+if [ -d "src/engine-go" ]; then
     echo "[*] Building Go Core..."
-    (cd engine-go && go build -o reaper-engine main.go)
+    (cd src/engine-go && go build -o reaper-engine main.go)
     echo "[+] Go engine built successfully"
 else
-    echo "[!] engine-go directory not found!"
+    echo "[!] src/engine-go directory not found!"
     exit 1
 fi
 
@@ -67,7 +69,7 @@ fi
 
 echo "[*] Activating virtual environment and installing/updating dependencies..."
 ./venv/bin/pip install --upgrade pip --quiet
-./venv/bin/pip install -r requirements.txt --quiet
+./venv/bin/pip install -r requirements.txt -r requirements-dev.txt --quiet
 
 # 3. Environment Configuration
 if [ ! -f .env ]; then
@@ -114,7 +116,7 @@ if grep -q "your_subscription_id" .env; then
     echo ""
     echo "    Please update your .env file with a real Subscription ID."
     echo "    Or launch the Dashboard to use the Onboarding Wizard:"
-    echo "    ./venv/bin/python3 ui/app.py"
+    echo "    ./venv/bin/python3 -m reaper.web.app"
     echo ""
     echo "=================================================="
     echo ""
@@ -127,7 +129,7 @@ echo "------------------------------------------------"
 
 # 5. Run CLI Scan
 echo "[*] Running resource scan..."
-./venv/bin/python3 main.py
+./venv/bin/python3 -m reaper.cli
 
 # 6. Start Dashboard (in background)
 echo "------------------------------------------------"
@@ -135,4 +137,4 @@ echo "[+] Starting Dashboard..."
 echo "    Access at: http://localhost:5000"
 echo "    Press Ctrl+C to stop"
 echo "------------------------------------------------"
-./venv/bin/python3 ui/app.py
+./venv/bin/python3 -m reaper.web.app
