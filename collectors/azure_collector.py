@@ -1,5 +1,7 @@
 import os
 import datetime
+import subprocess
+import json
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.network import NetworkManagementClient
@@ -172,6 +174,29 @@ class AzureCollector:
                         'sku': db.sku.name if db.sku else 'Unknown'
                     })
         return databases
+
+    def get_live_prices(self):
+        """
+        Executes the Go Performance Core to fetch real-time Azure pricing data.
+        """
+        # Path to the Go binary we built in engine-go/
+        go_binary = "./engine-go/reaper-engine"
+        
+        if not os.path.exists(go_binary):
+            print(f"[-] Error: Go binary not found at {go_binary}. Run ./reap.sh to build.")
+            return {}
+
+        try:
+            # Run the Go scraper and capture JSON output
+            result = subprocess.run([go_binary, "--mode", "prices"], capture_output=True, text=True)
+            if result.returncode == 0:
+                return json.loads(result.stdout)
+            else:
+                print(f"[-] Go Engine Error: {result.stderr}")
+                return {}
+        except Exception as e:
+            print(f"[-] Failed to execute Go Scraper: {e}")
+            return {}
 
 if __name__ == "__main__":
     collector = AzureCollector()
