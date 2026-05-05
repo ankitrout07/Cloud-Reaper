@@ -338,29 +338,35 @@ func processVMMetrics(vm *armcompute.VirtualMachine, res armmonitor.MetricsClien
 	}
 }
 
-func main() {
-	var subscriptionID string
-	var mode string
+func parseArgs() (string, string, bool) {
+	var subID, mode string
+	var listSubs bool
+	for i := 0; i < len(os.Args); i++ {
+		if os.Args[i] == "--list-subs" {
+			listSubs = true
+		}
+		if os.Args[i] == "--subscription" && i+1 < len(os.Args) {
+			subID = os.Args[i+1]
+		}
+		if os.Args[i] == "--mode" && i+1 < len(os.Args) {
+			mode = os.Args[i+1]
+		}
+	}
+	return subID, mode, listSubs
+}
 
-	if len(os.Args) > 1 {
-		if os.Args[1] == "--list-subs" {
-			subs, err := GetSubscriptions()
-			if err != nil {
-				fmt.Printf("{\"error\": \"%s\"}\n", err)
-				os.Exit(1)
-			}
-			output, _ := json.Marshal(subs)
-			fmt.Println(string(output))
-			return
+func main() {
+	subscriptionID, mode, listSubs := parseArgs()
+
+	if listSubs {
+		subs, err := GetSubscriptions()
+		if err != nil {
+			fmt.Printf("{\"error\": \"%s\"}\n", err)
+			os.Exit(1)
 		}
-		for i, arg := range os.Args {
-			if arg == "--subscription" && i+1 < len(os.Args) {
-				subscriptionID = os.Args[i+1]
-			}
-			if arg == "--mode" && i+1 < len(os.Args) {
-				mode = os.Args[i+1]
-			}
-		}
+		output, _ := json.Marshal(subs)
+		fmt.Println(string(output))
+		return
 	}
 
 	if mode == "prices" {
@@ -375,6 +381,10 @@ func main() {
 		log.Fatal("AZURE_SUBSCRIPTION_ID not set. Use --subscription [ID] or set environment variable.")
 	}
 
+	runScan(subscriptionID)
+}
+
+func runScan(subscriptionID string) {
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		log.Fatal(err)

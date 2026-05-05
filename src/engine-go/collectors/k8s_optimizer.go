@@ -14,9 +14,9 @@ type K8sNodeMetrics struct {
 }
 
 type ConsolidationPlan struct {
-	Action         string  `json:"action"`
-	TargetNode     string  `json:"target_node"`
-	Reason         string  `json:"reason"`
+	Action          string  `json:"action"`
+	TargetNode      string  `json:"target_node"`
+	Reason          string  `json:"reason"`
 	PotentialSaving float64 `json:"potential_saving"`
 }
 
@@ -29,9 +29,9 @@ func MostAllocatedOptimizer(nodes []K8sNodeMetrics) []ConsolidationPlan {
 		// MostAllocated logic: If density is below 20%, suggest moving pods
 		if cpuUtil < 0.20 && node.PodsScheduled > 0 {
 			plans = append(plans, ConsolidationPlan{
-				Action:         "DRAIN",
-				TargetNode:     node.NodeName,
-				Reason:         fmt.Sprintf("Underutilized density (%.1f%%). Consolidation required.", cpuUtil*100),
+				Action:          "DRAIN",
+				TargetNode:      node.NodeName,
+				Reason:          fmt.Sprintf("Underutilized density (%.1f%%). Consolidation required.", cpuUtil*100),
 				PotentialSaving: 40.0, // Average cost of a Standard_D2s_v3 node in USD/mo
 			})
 		}

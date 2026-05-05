@@ -9,6 +9,8 @@ azure-mgmt-recoveryservices==2.0.0
 azure-mgmt-consumption==10.0.0
 azure-mgmt-storage==24.0.1
 azure-mgmt-resource==25.0.0
+azure-mgmt-authorization==4.0.0
+azure-mgmt-subscription==3.1.1
 azure-identity==1.15.0
 pyyaml==6.0.1
 python-dotenv==1.0.0
