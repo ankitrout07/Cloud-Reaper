@@ -84,18 +84,23 @@ Then open `http://localhost:5000` in your browser.
 If you prefer automated setup:
 
 ```bash
-# Make the script executable
+# Make the script executable (first time only)
 chmod +x reap.sh
 
-# Run it (handles venv creation, dependencies, and Go build)
+# Run it (handles everything automatically)
 ./reap.sh
 ```
 
 The script automatically:
-- ✅ Creates a virtual environment
-- ✅ Installs Python dependencies
+- ✅ Checks for Go, Python 3.12+, and Docker
+- ✅ Starts PostgreSQL in a Docker container
 - ✅ Builds the Go performance core
-- ✅ Launches the main engine
+- ✅ Creates and configures virtual environment
+- ✅ Installs all Python dependencies
+- ✅ Creates a sample .env file (if needed)
+- ✅ Validates Azure configuration
+- ✅ Runs a resource scan
+- ✅ Starts the web dashboard
 
 ---
 
@@ -158,8 +163,11 @@ python3 main.py
 |-------|----------|
 | `No module named 'azure'` | Ensure venv is activated: `source venv/bin/activate` |
 | `Invalid subscription ID` | Update `.env` with real Azure subscription ID |
-| `PostgreSQL connection refused` | Start PostgreSQL: `sudo systemctl start postgresql` |
-| `Go binary not found` | Run `./reap.sh` or manually: `cd engine-go && go build -o reaper-engine main.go` |
+| `PostgreSQL connection refused` | The script auto-starts PostgreSQL via Docker. If issues persist: `docker restart cloud-reaper-db` |
+| `Go binary not found` | Install Go 1.24+: `wget https://go.dev/dl/go1.24.0.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf go1.24.0.linux-amd64.tar.gz` |
+| `Python version too old` | Install Python 3.12+: check your distro's package manager |
+| `Docker not found` | Install Docker: `sudo apt install docker.io` (Ubuntu/Debian) |
+| `Permission denied` | Make script executable: `chmod +x reap.sh` |
 
 ---
 
