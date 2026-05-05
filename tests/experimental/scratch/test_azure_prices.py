@@ -4,7 +4,7 @@ from reaper.collectors.azure_prices import AzurePriceClient
 def test_azure_price_client_init():
     client = AzurePriceClient(currency="USD")
     assert client.currency == "USD"
-    assert client.base_url is not None
+    assert client.BASE_URL is not None
 
 
 def test_azure_price_fetch_logic():

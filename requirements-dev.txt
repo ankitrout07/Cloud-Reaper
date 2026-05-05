@@ -3,7 +3,6 @@ ruff==0.1.9
 pytest==7.4.3
 pytest-cov==4.1.0
 mypy==1.8.0
-pyarrow
 types-PyYAML
 types-requests
 bandit==1.7.6
