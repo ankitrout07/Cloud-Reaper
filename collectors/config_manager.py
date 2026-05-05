@@ -1,6 +1,6 @@
 import os
 
-def save_config(sub_id, tenant_id=None):
+def save_config(sub_id, tenant_id=None, client_id=None, client_secret=None):
     # Write to a .env file locally
     try:
         env_path = ".env"
@@ -14,6 +14,10 @@ def save_config(sub_id, tenant_id=None):
         keys_to_update = {"AZURE_SUBSCRIPTION_ID": sub_id}
         if tenant_id:
             keys_to_update["AZURE_TENANT_ID"] = tenant_id
+        if client_id:
+            keys_to_update["AZURE_CLIENT_ID"] = client_id
+        if client_secret:
+            keys_to_update["AZURE_CLIENT_SECRET"] = client_secret
             
         keys_handled = set()
         
@@ -40,10 +44,11 @@ def save_config(sub_id, tenant_id=None):
         os.environ["AZURE_SUBSCRIPTION_ID"] = sub_id
         if tenant_id:
             os.environ["AZURE_TENANT_ID"] = tenant_id
+        if client_id:
+            os.environ["AZURE_CLIENT_ID"] = client_id
+        if client_secret:
+            os.environ["AZURE_CLIENT_SECRET"] = client_secret
             
-        # Also try to clear the AzureCollector cache if any
-        # (This is handled by fresh instance creation in app.py routes)
-        
         return True
     except Exception as e:
         print(f"Error saving config: {e}")

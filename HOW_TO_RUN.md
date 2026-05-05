@@ -59,16 +59,19 @@ cd ..
 ---
 
 ## 🧙‍♂️ The Onboarding Flow
-1. Ensure you have run `az login` in your terminal.
-2. Launch the Dashboard via `ui/app.py`.
-3. If uninitialized, the UI will prompt for your **Azure Subscription ID**.
-4. The system will validate your credentials and unlock the **FinOps Intelligence Suite**.
+1. **Option A (Developer):** Ensure you have run `az login` in your terminal.
+2. **Option B (Enterprise):** Navigate to **Settings > Connect Azure Cloud** and input your **Service Principal** (Client ID, Secret, Tenant ID).
+3. Launch the Dashboard via `ui/app.py`.
+4. The system will validate your credentials (CLI or SP) and unlock the **FinOps Intelligence Suite**.
 
 ---
 
 ## 🏗 Key Environment Variables
 You can set these in a `.env` file (created automatically by `reap.sh`):
 - `AZURE_SUBSCRIPTION_ID`: Target subscription for scanning.
+- `AZURE_TENANT_ID`: Azure AD Directory ID.
+- `AZURE_CLIENT_ID`: Service Principal Application ID.
+- `AZURE_CLIENT_SECRET`: Service Principal Secret Key.
 - `APP_ENV`: `production` or `development`.
 - `INFLUX_TOKEN`: (Optional) For historical data persistence.
 

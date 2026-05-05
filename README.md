@@ -20,6 +20,7 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 ### 3. ⚖️ Operate Phase (Governance)
 *   **🛡️ Policy Guardrails:** Real-time OPA-style audit against FinOps best practices (e.g., blocking UltraSSD in Non-Prod).
 *   **🚨 Budget Kill-Switch:** Automated VM deallocation safeguards for sandbox environments.
+*   **🔑 Multi-Tenant Connect:** Support for high-velocity scanning via **Azure Service Principals** (SPN), enabling enterprise-grade cross-subscription auditing.
 
 ---
 

@@ -34,13 +34,21 @@ def run_reaper():
     print(f"    - Active VMs Found: {len(vms)}")
     
     # 2. Storage Inventory (Reap Targets)
-    orphans = az.get_orphaned_disks()
-    disks = orphans.get('disks', [])
+    disks = az.get_orphaned_disks()
     print(f"    - Orphaned Disks Found: {len(disks)}")
     
     for disk in disks:
-        # Dynamic pricing lookup
-        cost = calc.calculate_monthly_cost('azure', 'disk', 'premium_ssd_p6')
+        # Dynamic pricing lookup - Normalize SKU for lookup
+        sku_lookup = disk['tier'].lower().replace(' ', '_')
+        cost = calc.calculate_monthly_cost('azure', 'disk', sku_lookup)
+        
+        if cost == 0:
+            # Fallback for common tiers
+            if 'premium' in sku_lookup:
+                cost = 5.89
+            else:
+                cost = 1.54
+
         total_monthly_saving += cost
         print(f"      [!] REAP TARGET: {disk['name']} | Saving: ${cost:.2f}/mo")
 
@@ -49,7 +57,7 @@ def run_reaper():
     print(f"    - Idle VMs Detected: {len(idle_vms)}")
     
     for vm in idle_vms:
-        print(f"      [!] IDLE VM: {vm['name']} | Avg CPU: {vm['usage']}%")
+        print(f"      [!] IDLE VM: {vm['name']} | Avg CPU: {vm['average_cpu']}%")
 
     # 4. Persistence
     if total_monthly_saving > 0:

@@ -148,6 +148,7 @@ func main() {
 	var subscriptionID string
 
 	// Parse custom flags
+	var mode string
 	if len(os.Args) > 1 {
 		if os.Args[1] == "--list-subs" {
 			subs, err := GetSubscriptions()
@@ -159,12 +160,69 @@ func main() {
 			fmt.Println(string(output))
 			return
 		}
-		// Handle --subscription SUB_ID
+		// Handle flags
 		for i, arg := range os.Args {
 			if arg == "--subscription" && i+1 < len(os.Args) {
 				subscriptionID = os.Args[i+1]
 			}
+			if arg == "--mode" && i+1 < len(os.Args) {
+				mode = os.Args[i+1]
+			}
 		}
+	}
+
+	// Fast Path: Only fetch prices if mode is 'prices'
+	if mode == "prices" {
+		mu := &sync.Mutex{}
+		result := &ScanResult{Prices: []map[string]interface{}{}}
+		var wg sync.WaitGroup
+		
+		myResources := []string{"Virtual Machines", "Storage"}
+		for _, resource := range myResources {
+			wg.Add(1)
+			go func(name string) {
+				defer wg.Done()
+				filter := fmt.Sprintf("serviceName eq '%s'", name)
+				baseURL := fmt.Sprintf("https://prices.azure.com/api/retail/prices?currencyCode=USD&$filter=%s", url.QueryEscape(filter))
+				resp, err := http.Get(baseURL)
+				if err != nil {
+					return
+				}
+				defer resp.Body.Close()
+				body, _ := io.ReadAll(resp.Body)
+				var priceResult AzurePriceResult
+				json.Unmarshal(body, &priceResult)
+
+				mu.Lock()
+				for _, item := range priceResult.Items {
+					retailPrice, _ := item["retailPrice"].(float64)
+					minUnits, _ := item["minimumNumberOfUnits"].(float64)
+					serviceFamily, _ := item["serviceFamily"].(string)
+					meterName, _ := item["meterName"].(string)
+					unitOfMeasure, _ := item["unitOfMeasure"].(string)
+
+					if (serviceFamily != "Compute" && serviceFamily != "Storage") ||
+						strings.Contains(meterName, "Support") ||
+						strings.Contains(meterName, "Savings Plan") {
+						continue
+					}
+
+					normalizedPrice := retailPrice
+					if minUnits > 0 {
+						normalizedPrice = retailPrice / minUnits
+					}
+
+					item["retailPrice"] = normalizedPrice
+					item["isMonthlyBilling"] = strings.Contains(unitOfMeasure, "Month")
+					result.Prices = append(result.Prices, item)
+				}
+				mu.Unlock()
+			}(resource)
+		}
+		wg.Wait()
+		output, _ := json.Marshal(result)
+		fmt.Println(string(output))
+		return
 	}
 
 	if subscriptionID == "" {

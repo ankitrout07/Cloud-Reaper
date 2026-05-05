@@ -118,8 +118,60 @@ def update_settings():
 
     return jsonify({"status": "error", "msg": "Invalid action"}), 400
 
-@app.route('/api/settings/auth')
+@app.route('/api/settings/connect-azure', methods=['POST'])
+def connect_azure():
+    data = request.json
+    sub_id = data.get('subscription_id')
+    tenant_id = data.get('tenant_id')
+    client_id = data.get('client_id')
+    client_secret = data.get('client_secret')
 
+    if not all([sub_id, tenant_id, client_id, client_secret]):
+        return jsonify({"status": "error", "message": "All fields are required."}), 400
+
+    # 1. Temporarily set environment variables to validate
+    old_env = {
+        "AZURE_SUBSCRIPTION_ID": os.getenv("AZURE_SUBSCRIPTION_ID"),
+        "AZURE_TENANT_ID": os.getenv("AZURE_TENANT_ID"),
+        "AZURE_CLIENT_ID": os.getenv("AZURE_CLIENT_ID"),
+        "AZURE_CLIENT_SECRET": os.getenv("AZURE_CLIENT_SECRET"),
+    }
+    
+    try:
+        os.environ["AZURE_SUBSCRIPTION_ID"] = sub_id
+        os.environ["AZURE_TENANT_ID"] = tenant_id
+        os.environ["AZURE_CLIENT_ID"] = client_id
+        os.environ["AZURE_CLIENT_SECRET"] = client_secret
+
+        # 2. Validation Scan: Try to fetch live prices using the new credentials
+        az = AzureCollector()
+        # We use a small timeout or just one call to verify connectivity
+        prices = az.get_live_prices()
+        
+        if not prices or (isinstance(prices, dict) and not prices.get('prices')):
+            # If Go engine returned empty/error, check if it's just a Go binary issue or auth issue
+            # For robustness, we'll try a simple Python SDK call too
+            from azure.identity import DefaultAzureCredential
+            from azure.mgmt.resource import SubscriptionClient
+            cred = DefaultAzureCredential()
+            sub_client = SubscriptionClient(cred)
+            list(sub_client.subscriptions.list()) # This will raise an exception if auth fails
+
+        # 3. If we reached here, credentials work! Save them permanently.
+        if save_config(sub_id, tenant_id, client_id, client_secret):
+            return jsonify({"status": "success", "message": "Azure Cloud Connected Successfully!"})
+        else:
+            raise Exception("Failed to write to .env file")
+
+    except Exception as e:
+        # Restore old env on failure
+        for k, v in old_env.items():
+            if v: os.environ[k] = v
+            else: os.environ.pop(k, None)
+            
+        return jsonify({"status": "error", "message": f"Connection Failed: {str(e)}"}), 500
+
+@app.route('/api/settings/auth')
 def check_auth():
     import subprocess
     try:
