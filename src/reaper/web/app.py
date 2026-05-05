@@ -188,7 +188,7 @@ def check_auth():
     try:
         # Use full path for az if possible, or suppress if safe.
         # For simplicity in this dev tool, we use the command name.
-        subprocess.run(["az", "account", "show"], capture_output=True, check=True)
+        subprocess.run(["az", "account", "show"], capture_output=True, check=True)  # noqa: S607
         return jsonify(
             {"status": "success", "message": "Connected: Azure CLI (Active Subscription)"}
         )
@@ -209,8 +209,11 @@ def list_subscriptions():
                 ]
             )
 
-        result = subprocess.run(
-            [str(binary_path), "--list-subs"], capture_output=True, text=True, check=False
+        result = subprocess.run(  # noqa: S603
+            [str(binary_path), "--list-subs"],
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if result.returncode == 0:
             return jsonify(json.loads(result.stdout))
@@ -242,7 +245,7 @@ def get_rightsizing():
         return jsonify({"status": "error", "message": "Go Engine binary not found"}), 500
 
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             [str(go_binary), "--subscription", az.subscription_id],
             capture_output=True,
             text=True,
@@ -280,7 +283,7 @@ def scan():
 
         events.append(
             {
-                "msg": f"Global scan complete. {len(formatted_results['zombies'])} zombies detected.",
+                "msg": f"Scan complete. {len(formatted_results['zombies'])} zombies detected.",
                 "type": "warning" if formatted_results["zombies"] else "success",
             }
         )
@@ -563,7 +566,7 @@ def budget_killswitch():
         return jsonify(
             {
                 "status": "success",
-                "message": f"Kill-switch activated for {sub_name}. 3 non-essential VMs scheduled for shutdown.",
+                "message": f"Kill-switch activated for {sub_name}.",
                 "vms_stopped": ["sandbox-test-01", "sandbox-test-02", "dev-worker-temp"],
                 "estimated_savings": "$14.20/day",
             }

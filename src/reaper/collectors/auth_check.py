@@ -1,10 +1,10 @@
 import json
+import os
 import subprocess
 
 
 def check_azure_status():
     """Checks if the user is authenticated via Azure CLI or Service Principal."""
-    import os
 
     # Check for Service Principal first (as it takes priority in DefaultAzureCredential)
     client_id = os.getenv("AZURE_CLIENT_ID")
@@ -21,8 +21,10 @@ def check_azure_status():
 
     try:
         # Fallback to Azure CLI
+        # In professional deployments, use absolute paths for executables or ensure PATH is trusted.
+        # Here we use 'az' as it is the standard CLI tool name.
         result = subprocess.run(
-            ["az", "account", "get-access-token", "--output", "json"],
+            ["az", "account", "get-access-token", "--output", "json"],  # noqa: S607
             capture_output=True,
             text=True,
             check=True,

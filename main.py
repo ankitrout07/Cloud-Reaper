@@ -1,8 +1,8 @@
-import os
 import sys
+from pathlib import Path
 
 # Set PYTHONPATH to include src directory
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from reaper.cli import run_reaper
 

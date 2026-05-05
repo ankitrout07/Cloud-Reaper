@@ -1,4 +1,5 @@
 import json
+import re
 
 import numpy as np
 import pandas as pd
@@ -41,8 +42,10 @@ class ZombieScorer:
         if is_zombie:
             title = "ZOMBIE RESOURCE DETECTED"
             msg = (
-                f"**Resource:** `{resource_data['name']}`\n**Type:** `{resource_data['type']}`\n**Heuristic Score:** `{score}`\n\n**Reasons:**\n"
-                + "\n".join([f"• {r}" for r in reasons])
+                f"**Resource:** `{resource_data['name']}`\n"
+                f"**Type:** `{resource_data['type']}`\n"
+                f"**Heuristic Score:** `{score}`\n\n"
+                "**Reasons:**\n" + "\n".join([f"• {r}" for r in reasons])
             )
             send_discord_alert(title, msg, color=0xEF4444)  # Rose/Red for alert
 
@@ -107,8 +110,6 @@ class RightSizer:
                 break
 
         # Extract vCPU-ish number from SKU (e.g., D2s_v3 -> 2)
-        import re
-
         match = re.search(r"(\d+)", sku_name)
         vcpus = int(match.group(1)) if match else 1
 
@@ -127,19 +128,16 @@ class RightSizer:
                 continue
 
             # Create a simple regression to see the trend/stability
-            X = np.array(range(len(usage))).reshape(-1, 1)
-            y = np.array(usage)
+            x_vals = np.array(range(len(usage))).reshape(-1, 1)
+            y_vals = np.array(usage)
 
             model = LinearRegression()
-            model.fit(X, y)
+            model.fit(x_vals, y_vals)
 
             # Predict "Safe Peak" (Mean + 2*Std or similar heuristic from regression)
             predicted_mean = model.predict([[len(usage)]])[0]
             max_usage = max(usage)
             safe_target = max(predicted_mean, max_usage) * 1.2  # 20% buffer
-
-            current_perf = self._get_perf_score(vm["size"])
-            (safe_target / 100.0) * current_perf
 
             # Find better SKU
             # For simplicity, we suggest a smaller version of the same family if usage is low
@@ -154,7 +152,6 @@ class RightSizer:
                     recommended_size = "Standard_B2s"  # Extreme downsize
 
             # Calculate Savings (Mock calculation if price book is empty)
-            # In a real app, we'd lookup prices for both sizes
             if recommended_size != vm["size"]:
                 potential_saving = 25.0  # Mock $25/mo saving
 
@@ -180,7 +177,7 @@ class AnomalyDetector:
         """
         Detects anomalies using Seasonality-Aware Decomposition.
         """
-        if len(daily_spend_history) < 14:  # Need at least 2 full weeks for seasonal detection
+        if len(daily_spend_history) < 14:  # Need at least 2 full weeks for detection
             return self._detect_z_score_only(daily_spend_history)
 
         try:
@@ -202,7 +199,12 @@ class AnomalyDetector:
 
             if is_anomaly:
                 title = "CRITICAL SPEND ANOMALY"
-                msg = f"**Residual Variance Detected!**\n\n**Z-Score:** `{z_score:.2f}`\n**Deviation:** `${latest_residual:.2f}`\n\n*Note: This alert accounts for weekly seasonality (backups, traffic cycles) and triggers only on unexplained noise.*"
+                msg = (
+                    "**Residual Variance Detected!**\n\n"
+                    f"**Z-Score:** `{z_score:.2f}`\n"
+                    f"**Deviation:** `${latest_residual:.2f}`\n\n"
+                    "*Note: This alert accounts for weekly seasonality.*"
+                )
                 send_discord_alert(title, msg, color=0xFFA500)  # Orange/Warning
 
             return {
@@ -236,7 +238,7 @@ class AnomalyDetector:
 
 if __name__ == "__main__":
     # Test Logic
-    rs = RightSizer()
+    rs_engine = RightSizer()
     test_vms = [
         {
             "name": "web-server-01",
@@ -245,4 +247,4 @@ if __name__ == "__main__":
         },
         {"name": "db-prod-01", "size": "Standard_D2s_v3", "usage_history": [80, 85, 75, 90, 88]},
     ]
-    print(json.dumps(rs.calculate_recommendation(test_vms), indent=2))
+    print(json.dumps(rs_engine.calculate_recommendation(test_vms), indent=2))

@@ -1,19 +1,16 @@
-import os
 import sys
-
-# LEVEL 1 DEBUG: Immediate execution check
-print(">>> CORE: Python is executing main.py")
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Ensure the script can find our local modules
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Set PYTHONPATH to include src directory if running as a script
+# But in a professional structure, we should run with `python -m reaper.collectors.main`
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 try:
-    from engine.calculator import CostCalculator
-
-    from collectors.aws_collector import AWSCollector
-    from collectors.azure_collector import AzureCollector
+    from reaper.collectors.aws_collector import AWSCollector
+    from reaper.collectors.azure_collector import AzureCollector
+    from reaper.engine.calculator import CostCalculator
 
     print(">>> CORE: Modules imported successfully")
 except Exception as e:

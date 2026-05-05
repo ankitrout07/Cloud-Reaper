@@ -243,7 +243,7 @@ class AzureCollector:
 
         try:
             # Run the Go scraper and capture JSON output
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603
                 [str(go_binary), "--mode", "prices"], capture_output=True, text=True, check=False
             )
             if result.returncode == 0:

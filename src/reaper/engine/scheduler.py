@@ -62,7 +62,7 @@ class BuildNodeEnv(gym.Env):
         truncated = False
         return self.state, reward, done, truncated, {}
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed=None, options=None):  # noqa: ARG002
         super().reset(seed=seed)
         self.state = np.array([DEFAULT_NODE_COUNT, 0, 0], dtype=np.float32)
         return self.state, {}

@@ -1,11 +1,21 @@
+import logging
+from pathlib import Path
+
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 class CostCalculator:
     def __init__(self, price_book_path="engine/price_book.yaml"):
-        self.price_book_path = price_book_path
-        with open(price_book_path) as f:
-            self.prices = yaml.safe_load(f)
+        self.price_book_path = Path(price_book_path)
+        try:
+            with self.price_book_path.open() as f:
+                self.prices = yaml.safe_load(f)
+        except Exception as e:
+            logger.error(f"Failed to load price book: {e}")
+            self.prices = {"providers": {}}
+
         self.currency = "USD"
 
     def calculate_monthly_cost(self, provider, resource_type, sku, quantity=1):
@@ -18,7 +28,7 @@ class CostCalculator:
 
             return rate * 730 * quantity
         except KeyError:
-            print(f"[!] Warning: SKU {sku} not found in Price Book for {provider}.")
+            logger.warning(f"SKU {sku} not found in Price Book for {provider}.")
             return 0.0
 
     def calculate_hourly_cost(self, provider, resource_type, sku, quantity=1):
@@ -31,7 +41,7 @@ class CostCalculator:
 
             return rate * quantity
         except KeyError:
-            print(f"[!] Warning: SKU {sku} not found in Price Book for {provider}.")
+            logger.warning(f"SKU {sku} not found in Price Book for {provider}.")
             return 0.0
 
     def calculate_total_hourly_burn(self, burn_items):
@@ -45,7 +55,9 @@ class CostCalculator:
             frequency = item.get("frequency", "hourly")
 
             if frequency == "monthly":
-                total += self.calculate_monthly_cost(provider, resource_type, sku, quantity) / 730
+                total += (
+                    self.calculate_monthly_cost(provider, resource_type, sku, quantity) / 730
+                )
             else:
                 total += self.calculate_hourly_cost(provider, resource_type, sku, quantity)
 
@@ -60,10 +72,12 @@ class CostCalculator:
             return
 
         # Extract items if wrapped in 'prices' key
-        items = price_data.get("prices", []) if isinstance(price_data, dict) else price_data
+        items = (
+            price_data.get("prices", []) if isinstance(price_data, dict) else price_data
+        )
 
         if not isinstance(items, list):
-            print("[!] Warning: Invalid price data format received.")
+            logger.warning("Invalid price data format received.")
             return
 
         for item in items:
@@ -73,7 +87,7 @@ class CostCalculator:
                 sku = item.get("armSkuName", item.get("meterName", "")).lower()
                 price = item.get("retailPrice", 0.0)
 
-                # Internal mapping: Azure API 'Virtual Machines' -> 'compute', 'Storage' -> 'storage'
+                # Internal mapping: Azure API 'Virtual Machines' -> 'compute'
                 category = None
                 if "virtual machines" in service:
                     category = "compute"
@@ -89,16 +103,17 @@ class CostCalculator:
                     # Store both SKU and normalized SKU
                     self.prices["providers"]["azure"][category][sku] = price
 
-                    # Also map to 'disk' if it's storage for main.py compatibility
+                    # Also map to 'disk' if it's storage for compatibility
                     if category == "storage":
                         if "disk" not in self.prices["providers"]["azure"]:
                             self.prices["providers"]["azure"]["disk"] = {}
                         self.prices["providers"]["azure"]["disk"][sku] = price
 
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Error processing price item: {e}")
                 continue
 
-        print(f"    [+] Price Book synchronized with {len(items)} live entries.")
+        logger.info(f"Price Book synchronized with {len(items)} live entries.")
 
     def reload_prices(self):
         """
@@ -106,14 +121,14 @@ class CostCalculator:
         Returns True if successful, False otherwise.
         """
         try:
-            with open(self.price_book_path) as f:
+            with self.price_book_path.open() as f:
                 self.prices = yaml.safe_load(f)
             return True
         except FileNotFoundError:
-            print(f"[!] Error: Price book file not found at {self.price_book_path}")
+            logger.error(f"Price book file not found at {self.price_book_path}")
             return False
         except Exception as e:
-            print(f"[!] Error reloading price book: {e}")
+            logger.error(f"Error reloading price book: {e}")
             return False
 
     def set_currency(self, currency_code):
@@ -125,10 +140,8 @@ class CostCalculator:
         if currency_code.upper() in valid_currencies:
             self.currency = currency_code.upper()
             return True
-        print(f"[!] Error: Unsupported currency code {currency_code}")
+        logger.error(f"Unsupported currency code {currency_code}")
         return False
-
-    # TODO: Implement real-time pricing using Azure Retail Prices API
 
 
 # Validation block

@@ -21,14 +21,9 @@ class BusinessCorrelation:
         df["cpu"] = df["cost"] / df["users"]
 
         # Simple Linear Regression to find the cost function C(u)
-        # C = m*u + b
         z = np.polyfit(df["users"], df["cost"], 1)
-        np.poly1d(z)
 
         marginal_cost = z[0]  # The derivative dC/du is constant 'm' in linear fit
-
-        user_history[-1]
-        cost_history[-1]
 
         # Identify if we are in "Efficiency Zone"
         # If marginal cost < revenue per user (let's assume $0.50 ARPU for now)

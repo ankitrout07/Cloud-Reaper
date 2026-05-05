@@ -1,12 +1,16 @@
-import os
 import sys
+from pathlib import Path
 
 from sqlalchemy import inspect
 
-# Ensure the app can see the collectors and engine folders
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Set PYTHONPATH to include src directory
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent / "src"))
 
-from engine.models import BusinessMetric, SessionLocal, engine, init_db
+try:
+    from reaper.engine.models import BusinessMetric, SessionLocal, engine, init_db
+except ImportError:
+    print("Error: Could not import reaper modules. Check PYTHONPATH.")
+    sys.exit(1)
 
 
 def verify():
