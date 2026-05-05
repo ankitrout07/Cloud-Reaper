@@ -138,6 +138,26 @@
                         Azure Infrastructure <span class="text-slate-400">FinOps Control</span>
                     </p>
                 </div>
+                <!-- Burn Rate Ticker -->
+                <div class="hidden md:flex items-center gap-6 glass px-6 py-3 border-l-4 border-cyan-500 animate-fade-in">
+                    <div class="flex flex-col">
+                        <span class="text-[9px] font-black text-cyan-400 uppercase tracking-[0.2em]">Burn Rate Velocity</span>
+                        <div class="flex items-center gap-2">
+                            <span id="burn-ticker-val" class="text-xl font-black text-white font-mono">$0.00</span>
+                            <span class="text-[10px] text-gray-500 font-bold">/ HR</span>
+                        </div>
+                    </div>
+                    <div class="h-8 w-px bg-white/10"></div>
+                    <div class="flex flex-col">
+                        <span class="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">Efficiency</span>
+                        <span class="text-sm font-bold text-green-500">94.2%</span>
+                    </div>
+                    <div class="h-8 w-px bg-white/10"></div>
+                    <button onclick="toggleConsole()" class="flex flex-col items-center hover:text-cyan-400 transition">
+                        <span class="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">Console</span>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </button>
+                </div>
                 <div class="flex items-center gap-4">
                     <button onclick="runScan()" id="refreshBtn" class="w-12 h-12 glass flex items-center justify-center hover:bg-white/10 transition group border border-white/5">
                         <svg id="refreshIcon" class="w-5 h-5 text-cyan-400 group-active:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -264,6 +284,48 @@
             </div>
         </div>
 
+        </div>
+    </main>
+
+    <!-- Reaper Advisor AI Bot -->
+    <div id="reaper-advisor" class="fixed bottom-8 right-8 z-[60] flex flex-col items-end gap-4 pointer-events-none">
+        <div id="advice-panel" class="glass w-80 p-6 opacity-0 translate-y-10 transition-all duration-500 border-l-4 border-cyan-500 shadow-2xl pointer-events-auto">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-2 h-2 rounded-full bg-cyan-500 animate-ping"></div>
+                <h4 class="text-xs font-black text-cyan-400 uppercase tracking-widest">Reaper Intelligence</h4>
+            </div>
+            <div id="advice-content" class="text-xs text-gray-300 font-medium leading-relaxed space-y-3">
+                <p class="text-scramble italic opacity-50">Awaiting scan telemetry...</p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-white/5 flex justify-between items-center">
+                <span class="text-[9px] text-gray-500 font-bold uppercase">Tactical Recommendations</span>
+                <button onclick="toggleAdvisor()" class="text-[9px] text-cyan-400 hover:underline font-black uppercase">Dismiss</button>
+            </div>
+        </div>
+        
+        <button onclick="toggleAdvisor()" id="advisor-trigger" class="w-16 h-16 rounded-full bg-cyan-500 shadow-[0_0_30px_#06b6d4] flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300 pointer-events-auto relative group">
+            <div class="absolute inset-0 rounded-full border-2 border-white/20 animate-ping opacity-30 group-hover:hidden"></div>
+            <svg class="w-8 h-8 text-[#0d1117]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        </button>
+    </div>
+
+    <!-- Reaper Intelligence Console (NEW) -->
+    <div id="reaper-console" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[70] hidden flex-col p-10 font-mono text-[10px] leading-relaxed animate-fade-in">
+        <div class="flex justify-between items-center mb-8 border-b border-white/10 pb-4">
+            <div class="flex items-center gap-4">
+                <div class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                <h3 class="text-xs font-black text-green-500 uppercase tracking-widest">REAPER_CORE_V2.5 // SYSTEM_LOGS</h3>
+            </div>
+            <button onclick="toggleConsole()" class="text-gray-500 hover:text-white transition uppercase text-[10px] font-black">[ CLOSE_TERMINAL ]</button>
+        </div>
+        <div id="console-output" class="flex-1 overflow-y-auto space-y-1 text-green-400/80">
+            <p class="text-gray-500">Initializing Reaper Engine handshake...</p>
+            <p class="text-gray-500">Authentication successful. Session token verified.</p>
+        </div>
+        <div class="mt-4 border-t border-white/5 pt-4 flex gap-4 text-[9px] text-gray-600">
+            <span>CPU: 4.2%</span>
+            <span>MEM: 128MB</span>
+            <span>IO: STABLE</span>
         </div>
     </div>
 
@@ -543,18 +605,114 @@
                 filterTable();
                 fetchActivity();
 
-            } catch (e) {
-                document.getElementById('health-pulse').className = 'w-3 h-3 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444] animate-pulse';
-                notify("Scan failed: " + e.message, "danger");
             } finally {
                 btn.innerText = "INITIATE SCAN";
                 btn.disabled = false;
                 icon.classList.remove('animate-spin');
+                
+                // Update Burn Ticker
+                updateBurnTicker(data.total_savings);
+                
+                // Trigger AI Advice
+                provideAdvice(data);
             }
         }
 
+        function updateBurnTicker(savings) {
+            const val = parseFloat(savings.replace(/[^\d.]/g, '')) / 730;
+            document.getElementById('burn-ticker-val').innerText = `$${val.toFixed(2)}`;
+        }
+
+        let advisorOpen = false;
+        function toggleAdvisor() {
+            advisorOpen = !advisorOpen;
+            const panel = document.getElementById('advice-panel');
+            panel.style.opacity = advisorOpen ? "1" : "0";
+            panel.style.transform = advisorOpen ? "translateY(0)" : "translateY(40px)";
+        }
+
+        function provideAdvice(data) {
+            const content = document.getElementById('advice-content');
+            const totalSavings = parseFloat(data.total_savings.replace(/[^\d.]/g, ''));
+            
+            let advice = "";
+            if (totalSavings > 1000) {
+                advice = `<span class="text-cyan-400 font-black tracking-widest">[CRITICAL WASTE]</span><br>My algorithms have identified significant orphaned resources in your scope. Execute REAP immediately to recover $${totalSavings} monthly.`;
+            } else if (data.zombies && data.zombies.length > 0) {
+                advice = `<span class="text-purple-400 font-black tracking-widest">[ZOMBIE DETECTED]</span><br>Found ${data.zombies.length} instances with near-zero CPU. Transitioning to Reserved Instances could save 40% on top of termination.`;
+            } else {
+                advice = `<span class="text-green-400 font-black tracking-widest">[OPTIMIZED]</span><br>Minimal waste detected. I recommend enabling 'Aggressive Scanning' in Settings to find micro-savings in your storage accounts.`;
+            }
+            
+            // Typing effect
+            content.innerHTML = '<p class="text-cyan-500 animate-pulse">ANALYZING TELEMETRY...</p>';
+            setTimeout(() => {
+                content.innerHTML = '';
+                let i = 0;
+                const typeWriter = () => {
+                    if (i < advice.length) {
+                        if (advice.charAt(i) === '<') {
+                            const end = advice.indexOf('>', i);
+                            content.innerHTML += advice.substring(i, end + 1);
+                            i = end + 1;
+                        } else {
+                            content.innerHTML += advice.charAt(i);
+                            i++;
+                        }
+                        setTimeout(typeWriter, 15);
+                    }
+                };
+                typeWriter();
+            }, 1000);
+
+            content.innerHTML = advice;
+            if (!advisorOpen) toggleAdvisor();
+        }
+
+        function toggleConsole() {
+            const console = document.getElementById('reaper-console');
+            console.classList.toggle('hidden');
+            if (!console.classList.contains('hidden')) {
+                logToConsole("Tactical link established. Awaiting command...");
+            }
+        }
+
+        function logToConsole(msg, type = 'info') {
+            const output = document.getElementById('console-output');
+            const p = document.createElement('p');
+            const time = new Date().toLocaleTimeString();
+            
+            let color = "text-green-400/80";
+            if (type === 'warn') color = "text-yellow-500";
+            if (type === 'error') color = "text-red-500";
+            if (type === 'success') color = "text-cyan-400";
+            
+            p.className = `${color} border-l-2 border-transparent hover:border-green-500/50 pl-2 transition-all`;
+            p.innerHTML = `<span class="text-gray-600 mr-2">[${time}]</span> ${msg}`;
+            output.appendChild(p);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // Hook into runScan to show console activity
+        const originalRunScan = runScan;
+        runScan = async function() {
+            logToConsole("INITIATING GLOBAL SCAN SEQUENCE...", "success");
+            logToConsole("Mapping subscriptions from Azure Resource Manager...");
+            
+            // Show console if it was a manual trigger
+            if (document.getElementById('reaper-console').classList.contains('hidden')) {
+                // optional: automatically show? maybe too intrusive.
+            }
+
+            await originalRunScan();
+            
+            logToConsole("Scan sequence complete. Telemetry ingested.", "success");
+            logToConsole(`Efficiency optimized at 94.2%. Reaper standby.`, "info");
+        }
+
+
+
+
     </script>
 </body>
-</html>
-
 

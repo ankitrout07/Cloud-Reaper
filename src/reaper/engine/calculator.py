@@ -7,7 +7,10 @@ logger = logging.getLogger(__name__)
 
 
 class CostCalculator:
-    def __init__(self, price_book_path="engine/price_book.yaml"):
+    def __init__(self, price_book_path=None):
+        if price_book_path is None:
+            # Path relative to the current file
+            price_book_path = Path(__file__).resolve().parent / "price_book.yaml"
         self.price_book_path = Path(price_book_path)
         try:
             with self.price_book_path.open() as f:
@@ -142,6 +145,12 @@ class CostCalculator:
             return True
         logger.error(f"Unsupported currency code {currency_code}")
         return False
+
+    def format_price(self, amount):
+        """Formats a float as a currency string."""
+        symbols = {"USD": "$", "EUR": "€", "GBP": "£", "JPY": "¥"}
+        symbol = symbols.get(self.currency, "$")
+        return f"{symbol}{amount:,.2f}"
 
 
 # Validation block

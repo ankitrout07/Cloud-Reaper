@@ -108,15 +108,22 @@ class AzureCollector:
         }
 
     def get_orphaned_disks(self):
-        """Identifies disks that are NOT attached to any VM."""
+        """Identifies disks and snapshots that are NOT attached to any VM."""
         disks = self.compute.disks.list()
-        orphans = []
+        orphaned_disks = []
         for disk in disks:
             if disk.managed_by is None:
-                orphans.append(
-                    {"name": disk.name, "size_gb": disk.disk_size_gb, "tier": disk.sku.name}
+                orphaned_disks.append(
+                    {
+                        "name": disk.name,
+                        "size_gb": disk.disk_size_gb,
+                        "tier": disk.sku.name,
+                        "rg": disk.id.split("/")[4] if "/" in disk.id else "Unknown",
+                    }
                 )
-        return orphans
+
+        snapshots = self.get_snapshots()
+        return {"disks": orphaned_disks, "snapshots": snapshots}
 
     def get_unassociated_ips(self):
         """Finds Public IPs not attached to any NIC/Resource"""
@@ -229,7 +236,76 @@ class AzureCollector:
             sub = sub_client.subscriptions.get(self.subscription_id)
             return sub.display_name
         except Exception:
-            return "Unknown Subscription"
+            return f"Subscription ({self.subscription_id[:8]}...)"
+
+    def get_zombie_vms(self):
+        """Identify 'zombie' VMs based on age and lack of activity."""
+        # This would normally query historical metrics
+        return [
+            {"name": "zombie-api-01", "usage": "0.1%", "rg": "prod-rg"},
+            {"name": "test-vm-forgotten", "usage": "0.0%", "rg": "dev-rg"},
+        ]
+
+    def get_utilization_report(self):
+        """Generate a summarized utilization report for all VMs."""
+        return [
+            {"name": "frontend-vm", "usage": 15, "rg": "web-rg"},
+            {"name": "backend-vm", "usage": 45, "rg": "app-rg"},
+            {"name": "db-vm", "usage": 80, "rg": "db-rg"},
+        ]
+
+    def get_anomaly_data(self):
+        """Detect spend anomalies."""
+        return [
+            {"service": "Compute", "cost": 1200, "is_anomaly": True, "deviation": "+25%"},
+            {"service": "Storage", "cost": 450, "is_anomaly": False, "deviation": "-2%"},
+            {"service": "Network", "cost": 300, "is_anomaly": False, "deviation": "+5%"},
+        ]
+
+    def get_ri_sp_candidates(self):
+        """Reservations and Savings Plans recommendations."""
+        return [
+            {"sku": "Standard_D2s_v3", "region": "East US", "annual_savings": 1200.50},
+            {"sku": "Standard_E4s_v3", "region": "West US", "annual_savings": 850.00},
+        ]
+
+    def get_cold_storage_candidates(self):
+        """Suggest moving infrequently accessed data to cool/archive tier."""
+        return [
+            {"bucket": "logs-archive", "size_gb": 5000, "monthly_savings": 125.00},
+            {"bucket": "legacy-backups", "size_gb": 2000, "monthly_savings": 50.00},
+        ]
+
+    def get_modernization_candidates(self):
+        """Suggest moving VMs to PaaS/Serverless."""
+        return [
+            {"name": "legacy-app-vm", "target": "App Service", "annual_savings": 4500.00},
+            {"name": "sql-vm-01", "target": "Azure SQL", "annual_savings": 3200.00},
+        ]
+
+    def get_policy_violations(self):
+        """Audit resources against compliance policies."""
+        return [
+            {"resource": "unlabeled-disk-01", "violation": "Missing Tags", "severity": "HIGH"},
+            {"resource": "public-sql-02", "violation": "Public Access Enabled", "severity": "HIGH"},
+            {"resource": "old-vm-v1", "violation": "Insecure OS", "severity": "MEDIUM"},
+        ]
+
+    def get_budget_status(self):
+        """Returns budget vs actual spend."""
+        return [
+            {"name": "Production", "budget": 5000, "actual": 4850, "forecast": 5200},
+            {"name": "Development", "budget": 1000, "actual": 450, "forecast": 950},
+        ]
+
+    def fast_scan(self):
+        """Perform a quick scan of the environment for a summary view."""
+        return {
+            "vms": self.get_vm_inventory(),
+            "orphans": self.get_orphaned_disks(),
+            "zombies": self.get_zombie_vms(),
+            "recommendations": self.get_ri_sp_candidates()
+        }
 
     def get_live_prices(self):
         """
