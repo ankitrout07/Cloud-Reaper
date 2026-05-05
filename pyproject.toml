@@ -1,0 +1,20 @@
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "N", "UP", "S", "B", "A", "COM", "C4", "DTZ", "T20", "RET", "SIM", "ARG", "PTH", "ERA", "PL", "RUF"]
+ignore = ["D100", "D101", "D103"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "collectors", "engine"]
+python_files = "test_*.py"
+addopts = "-v --cov=collectors --cov=engine --cov-report=term-missing"
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
