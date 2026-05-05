@@ -6,7 +6,7 @@ from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.monitor import MonitorManagementClient
 from azure.mgmt.web import WebSiteManagementClient
 from azure.mgmt.sql import SqlManagementClient
-from azure.mgmt.recoveryservices import RecoveryServicesManagementClient
+from azure.mgmt.recoveryservices import RecoveryServicesClient
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,7 +20,7 @@ class AzureCollector:
         self.monitor = MonitorManagementClient(self.credentials, self.subscription_id)
         self.web = WebSiteManagementClient(self.credentials, self.subscription_id)
         self.sql = SqlManagementClient(self.credentials, self.subscription_id)
-        self.recovery = RecoveryServicesManagementClient(self.credentials, self.subscription_id)
+        self.recovery = RecoveryServicesClient(self.credentials, self.subscription_id)
 
     def get_vm_inventory(self):
         """Fetches all VMs and their sizes."""
