@@ -14,6 +14,7 @@ from collectors.auth_check import check_azure_status
 from engine.calculator import CostCalculator
 from engine.models import SessionLocal, Resource, BusinessMetric, CostHistory, ActionLog
 from collectors.config_manager import save_config
+from engine.logic import RightSizer, ZombieScorer, BudgetForecaster
 
 def is_first_run():
     sub_id = os.getenv("AZURE_SUBSCRIPTION_ID")
@@ -222,6 +223,36 @@ def finops():
 @app.route('/api/auth/status')
 def auth_status():
     return jsonify(check_azure_status())
+
+@app.route('/api/rightsizing')
+def get_rightsizing():
+    az = AzureCollector()
+    
+    # Path to the Go binary
+    go_binary = "./engine-go/reaper-engine"
+    if not os.path.exists(go_binary):
+        return jsonify({"status": "error", "message": "Go Engine binary not found"}), 500
+
+    try:
+        # Run Go engine to get VM reports with usage history
+        result = subprocess.run([go_binary, "--subscription", az.subscription_id], capture_output=True, text=True)
+        if result.returncode != 0:
+            return jsonify({"status": "error", "message": result.stderr}), 500
+        
+        data = json.loads(result.stdout)
+        vm_reports = data.get('vm_reports', [])
+        
+        # Pass to RightSizer
+        rs = RightSizer()
+        recommendations = rs.calculate_recommendation(vm_reports)
+        
+        return jsonify({
+            "status": "success",
+            "recommendations": recommendations,
+            "total_saving": sum(r['monthly_saving'] for r in recommendations)
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/scan')
 def scan():

@@ -63,12 +63,13 @@ func isTagCompliant(tags map[string]*string) bool {
 }
 
 type VMReport struct {
-	Name       string             `json:"name"`
-	Size       string             `json:"size"`
-	Usage      float64            `json:"usage"`
-	NetworkIn  float64            `json:"network_in"`
-	NetworkOut float64            `json:"network_out"`
-	DiskIOPS   float64            `json:"disk_iops"`
+	Name         string             `json:"name"`
+	Size         string             `json:"size"`
+	Usage        float64            `json:"usage"`
+	UsageHistory []float64          `json:"usage_history"`
+	NetworkIn    float64            `json:"network_in"`
+	NetworkOut   float64            `json:"network_out"`
+	DiskIOPS     float64            `json:"disk_iops"`
 	ResourceID    string             `json:"id"`
 	Tags          map[string]*string `json:"tags"`
 	IsUnallocated bool               `json:"is_unallocated"`
@@ -334,7 +335,7 @@ func main() {
 		var metricWg sync.WaitGroup
 		reportChan := make(chan VMReport, len(vms))
 
-		startTime := time.Now().Add(-1 * time.Hour).Format(time.RFC3339)
+		startTime := time.Now().Add(-30 * 24 * time.Hour).Format(time.RFC3339)
 		endTime := time.Now().Format(time.RFC3339)
 		timespan := fmt.Sprintf("%s/%s", startTime, endTime)
 
@@ -350,11 +351,12 @@ func main() {
 				limiter.Wait(ctx)
 				res, err := monitorClient.List(ctx, *vm.ID, &armmonitor.MetricsClientListOptions{
 					Timespan:    &timespan,
-					Interval:    ptr("PT1H"),
+					Interval:    ptr("PT12H"),
 					Metricnames: ptr("Percentage CPU,Network In Total,Network Out Total,Disk Read Operations/Sec"),
 					Aggregation: ptr("Average"),
 				})
 
+				usageHistory := []float64{}
 				usage := 0.0
 				netIn := 0.0
 				netOut := 0.0
@@ -362,20 +364,24 @@ func main() {
 
 				if err == nil {
 					for _, m := range res.Value {
-						if len(m.Timeseries) > 0 && len(m.Timeseries[0].Data) > 0 {
-							val := 0.0
-							if m.Timeseries[0].Data[0].Average != nil {
-								val = *m.Timeseries[0].Data[0].Average
-							}
-							switch *m.Name.Value {
-							case "Percentage CPU":
-								usage = val
-							case "Network In Total":
-								netIn = val
-							case "Network Out Total":
-								netOut = val
-							case "Disk Read Operations/Sec":
-								diskOps = val
+						if len(m.Timeseries) > 0 {
+							for _, point := range m.Timeseries[0].Data {
+								val := 0.0
+								if point.Average != nil {
+									val = *point.Average
+								}
+								
+								switch *m.Name.Value {
+								case "Percentage CPU":
+									usageHistory = append(usageHistory, val)
+									usage = val // Latest
+								case "Network In Total":
+									netIn = val
+								case "Network Out Total":
+									netOut = val
+								case "Disk Read Operations/Sec":
+									diskOps = val
+								}
 							}
 						}
 					}
@@ -390,6 +396,7 @@ func main() {
 					Name:       *vm.Name,
 					Size:       size,
 					Usage:      usage,
+					UsageHistory: usageHistory,
 					NetworkIn:  netIn,
 					NetworkOut: netOut,
 					DiskIOPS:   diskOps,

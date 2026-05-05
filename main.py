@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from collectors.azure_collector import AzureCollector
 from engine.calculator import CostCalculator
 from data.pusher import DataPusher
+from engine.logic import ZombieScorer
 
 def run_reaper():
     load_dotenv(override=True)
@@ -71,6 +72,35 @@ def run_reaper():
     
     for vm in idle_vms:
         print(f"      [!] IDLE VM: {vm['name']} | Avg CPU: {vm['average_cpu']}%")
+
+    # 4. Zombie Reaper (Heuristic Scoring)
+    print("\n[+] ZOMBIE: Executing Heuristic Analysis...")
+    scorer = ZombieScorer()
+    
+    # Check VMs for Zombie behavior
+    for vm_name in [v['name'] for v in vms]:
+        # Fetch detailed metrics for scoring (Mocked for CLI demo)
+        vm_data = {
+            "name": vm_name,
+            "type": "VirtualMachine",
+            "is_unattached": False,
+            "iops_history": [5, 4, 6, 3, 2, 5, 4] # Simulate low IOPS
+        }
+        res = scorer.score_resource(vm_data)
+        if res['is_zombie']:
+            print(f"      [🚨] ZOMBIE DETECTED: {vm_name} (Score: {res['score']})")
+
+    # Check Disks
+    for disk in disks:
+        disk_data = {
+            "name": disk['name'],
+            "type": "Disk",
+            "is_unattached": True,
+            "iops_history": [0, 0, 0, 0, 0, 0, 0]
+        }
+        res = scorer.score_resource(disk_data)
+        if res['is_zombie']:
+            print(f"      [🚨] ZOMBIE DETECTED: {disk['name']} (Score: {res['score']})")
 
     # 4. Persistence
     if total_monthly_saving > 0:

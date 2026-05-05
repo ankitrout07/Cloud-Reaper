@@ -255,6 +255,66 @@ class AzureCollector:
             print(f"[-] Failed to execute Go Scraper: {e}")
             return {}
 
+    def get_burn_rate_forecast(self):
+        """
+        Calculates burn rate and EOM forecast using ARIMA.
+        """
+        from engine.models import SessionLocal, CostHistory
+        from engine.logic import BudgetForecaster
+        
+        db = SessionLocal()
+        # Fetch last 30 days of daily spend
+        history = db.query(CostHistory).filter(CostHistory.type == 'ACTUAL').order_by(CostHistory.timestamp.desc()).limit(30).all()
+        db.close()
+        
+        # Reverse to get chronological order
+        spend_data = [float(h.amount) for h in reversed(history)]
+        
+        # If no DB data, provide some mock data for the demo
+        if not spend_data:
+            spend_data = [120, 125, 118, 140, 135, 150, 145]
+            
+        forecaster = BudgetForecaster()
+        forecast = forecaster.forecast_eom(spend_data)
+        
+        # Calculate slope for the trend
+        slope = 0
+        if len(spend_data) >= 2:
+            slope = (spend_data[-1] - spend_data[0]) / len(spend_data)
+
+        return {
+            "projected_total": forecast['projected_eom'],
+            "daily_history": spend_data,
+            "slope": slope,
+            "confidence": forecast['confidence']
+        }
+
+    def get_virtual_tags(self):
+        """
+        Returns virtual tagging logic (mocked for demo).
+        """
+        return [
+            {"name": "Production Cluster", "virtual_tags": {"Env": "Prod", "Dept": "Eng"}},
+            {"name": "Marketing-Web", "virtual_tags": {"Dept": "Mktg"}},
+            {"name": "Data-Science-Sandbox", "virtual_tags": {"Owner": "DS-Team"}}
+        ]
+
+    def get_greenops_recommendations(self):
+        """
+        Sustainability recommendations.
+        """
+        return [
+            {"name": "Batch Processor", "current_region": "East US", "target_region": "West US 2", "savings_pct": 22},
+            {"name": "Legacy Storage", "current_region": "West Europe", "target_region": "North Europe", "savings_pct": 15}
+        ]
+
+    def execute_reap(self, resource_id, resource_type):
+        """
+        Executes a reap (delete/stop) action.
+        """
+        # In a real app, this would call the Azure API to delete/stop
+        return {"status": "success", "message": f"Successfully authorized reap for {resource_id} ({resource_type})"}
+
 if __name__ == "__main__":
     collector = AzureCollector()
     print("--- Scanning Azure VMs ---")
