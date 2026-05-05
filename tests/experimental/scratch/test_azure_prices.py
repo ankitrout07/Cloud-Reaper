@@ -3,7 +3,7 @@ import json
 from reaper.collectors.azure_prices import AzurePriceClient
 
 
-def test_prices():
+def run_test_prices():
     client = AzurePriceClient(currency="USD")
 
     print("Fetching Virtual Machines prices...")
@@ -27,4 +27,4 @@ def test_prices():
 
 
 if __name__ == "__main__":
-    test_prices()
+    run_test_prices()

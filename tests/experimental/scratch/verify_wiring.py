@@ -1,6 +1,6 @@
 import json
 
-from collectors.azure_collector import AzureCollector
+from reaper.collectors.azure_collector import AzureCollector
 
 
 def verify_wiring():
