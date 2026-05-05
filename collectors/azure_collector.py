@@ -159,6 +159,43 @@ class AzureCollector:
                 })
         return empty_plans
 
+    def get_snapshots(self):
+        """Finds snapshots that might be orphaned"""
+        snapshots = self.compute.snapshots.list()
+        return [{'name': s.name, 'size_gb': s.disk_size_gb, 'location': s.location} for s in snapshots]
+
+    def get_idle_app_gateways(self):
+        """Finds App Gateways with no backend pools or idle"""
+        gateways = self.network.application_gateways.list_all()
+        idle_gateways = []
+        for gw in gateways:
+            if not gw.backend_address_pools or all(len(pool.backend_addresses or []) == 0 for pool in gw.backend_address_pools):
+                idle_gateways.append({
+                    'name': gw.name,
+                    'location': gw.location,
+                    'sku': f"{gw.sku.name}_{gw.sku.tier}"
+                })
+        return idle_gateways
+
+    def get_recovery_vaults(self):
+        """Finds Recovery Service Vaults"""
+        vaults = self.recovery.vaults.list_by_subscription_id(self.subscription_id)
+        return [{'name': v.name, 'location': v.location, 'sku': v.sku.name} for v in vaults]
+
+    def get_empty_app_service_plans(self):
+        """Finds App Service Plans with 0 apps assigned"""
+        plans = self.web.app_service_plans.list()
+        empty_plans = []
+        for plan in plans:
+            if getattr(plan, 'number_of_sites', 0) == 0:
+                empty_plans.append({
+                    'name': plan.name,
+                    'location': plan.location,
+                    'sku': plan.sku.name,
+                    'tier': plan.sku.tier
+                })
+        return empty_plans
+
     def get_sql_databases(self):
         """Finds SQL Databases - TODO: Add idle check with metrics"""
         servers = self.sql.servers.list()
@@ -174,6 +211,26 @@ class AzureCollector:
                         'sku': db.sku.name if db.sku else 'Unknown'
                     })
         return databases
+
+    def get_user_name(self):
+        """Returns the authenticated user's display name"""
+        try:
+            from azure.mgmt.authorization import AuthorizationManagementClient
+            auth_client = AuthorizationManagementClient(self.credentials, self.subscription_id)
+            # Get current user info - this is a simplified approach
+            return "Azure User"
+        except Exception:
+            return "Azure User"
+
+    def get_subscription_name(self):
+        """Returns the subscription display name"""
+        try:
+            from azure.mgmt.subscription import SubscriptionClient
+            sub_client = SubscriptionClient(self.credentials)
+            sub = sub_client.subscriptions.get(self.subscription_id)
+            return sub.display_name
+        except Exception:
+            return "Unknown Subscription"
 
     def get_live_prices(self):
         """

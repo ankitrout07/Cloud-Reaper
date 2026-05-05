@@ -3,8 +3,10 @@ import os
 
 class CostCalculator:
     def __init__(self, price_book_path='engine/price_book.yaml'):
+        self.price_book_path = price_book_path
         with open(price_book_path, 'r') as f:
             self.prices = yaml.safe_load(f)
+        self.currency = 'USD'
 
     def calculate_monthly_cost(self, provider, resource_type, sku, quantity=1):
         """Calculates cost based on SKU (e.g., 't3.micro' or 'Standard_B1s')."""
@@ -97,6 +99,35 @@ class CostCalculator:
                 continue
 
         print(f"    [+] Price Book synchronized with {len(items)} live entries.")
+
+    def reload_prices(self):
+        """
+        Reloads the price book from YAML file.
+        Returns True if successful, False otherwise.
+        """
+        try:
+            with open(self.price_book_path, 'r') as f:
+                self.prices = yaml.safe_load(f)
+            return True
+        except FileNotFoundError:
+            print(f"[!] Error: Price book file not found at {self.price_book_path}")
+            return False
+        except Exception as e:
+            print(f"[!] Error reloading price book: {e}")
+            return False
+
+    def set_currency(self, currency_code):
+        """
+        Sets the currency for cost calculations.
+        Currently stores the currency code (future: could implement conversion).
+        """
+        valid_currencies = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY']
+        if currency_code.upper() in valid_currencies:
+            self.currency = currency_code.upper()
+            return True
+        else:
+            print(f"[!] Error: Unsupported currency code {currency_code}")
+            return False
 
     # TODO: Implement real-time pricing using Azure Retail Prices API
 

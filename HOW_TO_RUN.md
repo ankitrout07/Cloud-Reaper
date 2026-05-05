@@ -1,79 +1,171 @@
 # 📖 How to Run Cloud-Reaper
 
-Cloud-Reaper is a hybrid Python/Go engine. We recommend using the **Unified Bootstrapper** (`reap.sh`) for the fastest and most reliable setup.
-
-## 🛠 Prerequisites
-- **Python 3.12+**
-- **Go 1.24+**
-- **Azure CLI** (`az login` required for data extraction)
+A simple guide to set up and run Cloud-Reaper for Azure cost optimization.
 
 ---
 
-## ⚡ The Primary Entrypoint (Linux / macOS)
-The `reap.sh` script acts as a silent entrypoint that handles system checks, Go compilation, and virtual environment management automatically.
+## 🛠 Prerequisites
+
+Before you start, make sure you have:
+- **Python 3.12+** installed
+- **Go 1.24+** installed (for the pricing engine)
+- **Azure CLI** installed (`az login` to authenticate)
+- **PostgreSQL** running (for data storage)
+
+---
+
+## ⚡ Quick Start (Recommended)
+
+### Step 1: Set Up Virtual Environment
 
 ```bash
-# 1. Make the script executable (One-time)
+# Create a virtual environment
+python3 -m venv venv
+
+# Activate it
+source venv/bin/activate    # On Linux/macOS
+# OR
+venv\Scripts\activate       # On Windows
+```
+
+### Step 2: Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Step 3: Set Up Azure Credentials
+
+Edit the `.env` file and add your Azure subscription ID:
+
+```bash
+# Copy the template
+cp .env.example .env        # If available, or create manually
+
+# Edit .env and add:
+AZURE_SUBSCRIPTION_ID=your-subscription-id-here
+AZURE_TENANT_ID=your-tenant-id
+INFLUXDB_URL=http://localhost:8086
+INFLUXDB_TOKEN=your-token
+```
+
+Get your subscription ID:
+```bash
+az account list --query "[].{Name:name, ID:id}" -o table
+```
+
+### Step 4: Start PostgreSQL
+
+```bash
+# On Linux
+sudo systemctl start postgresql
+
+# Or with Docker
+docker run --name cloud-reaper-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres
+```
+
+### Step 5: Run Cloud-Reaper
+
+**Option A: CLI Mode (Resource Scanning)**
+```bash
+python3 main.py
+```
+
+**Option B: Dashboard Mode (Web UI)**
+```bash
+python3 ui/app.py
+```
+Then open `http://localhost:5000` in your browser.
+
+---
+
+## 🤖 Automated Setup (Using the Bootstrap Script)
+
+If you prefer automated setup:
+
+```bash
+# Make the script executable
 chmod +x reap.sh
 
-# 2. Run the engine
+# Run it (handles venv creation, dependencies, and Go build)
 ./reap.sh
 ```
 
-**What `reap.sh` does:**
-1.  Verifies the `python3-venv` module is installed.
-2.  Compiles the Go Performance Core (`engine-go`).
-3.  Creates a virtual environment and installs dependencies from `requirements.txt`.
-4.  Launches the **Cloud-Reaper Engine** (`main.py`) using the venv binary directly.
+The script automatically:
+- ✅ Creates a virtual environment
+- ✅ Installs Python dependencies
+- ✅ Builds the Go performance core
+- ✅ Launches the main engine
 
 ---
 
-## 🖥 Running the FinOps Dashboard (Web UI)
-To launch the interactive Glassmorphism dashboard instead of the CLI engine:
+## 📋 Environment Variables Reference
 
-```bash
-# Ensure you have run ./reap.sh at least once to build dependencies
-./venv/bin/python3 ui/app.py
-```
-Then visit `http://localhost:5000` in your browser.
+Create a `.env` file in the project root with these values:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `AZURE_SUBSCRIPTION_ID` | Yes | Your Azure subscription ID |
+| `AZURE_TENANT_ID` | Optional | Azure AD tenant ID (for Service Principal auth) |
+| `AZURE_CLIENT_ID` | Optional | Service Principal client ID |
+| `AZURE_CLIENT_SECRET` | Optional | Service Principal secret |
+| `INFLUXDB_URL` | Optional | InfluxDB endpoint (default: `http://localhost:8086`) |
+| `INFLUXDB_TOKEN` | Optional | InfluxDB authentication token |
+| `INFLUXDB_ORG` | Optional | InfluxDB organization name |
+| `INFLUXDB_BUCKET` | Optional | InfluxDB bucket name |
 
 ---
 
-## 🚀 Manual Setup (Advanced)
+## 🔑 Azure Authentication
 
-### 1. Python Environment
+### Option 1: Azure CLI (Easiest)
 ```bash
-python3 -m venv venv
-./venv/bin/pip install -r requirements.txt
-```
-
-### 2. Build the Go Performance Core
-The Python collector detects this binary for high-speed parallel scanning:
-```bash
-cd engine-go
-go mod tidy
-go build -o reaper-engine main.go
-cd ..
+az login
+# Cloud-Reaper will use your CLI credentials automatically
 ```
 
+### Option 2: Service Principal (Enterprise)
+```bash
+# Create a service principal
+az ad sp create-for-rbac --name "cloud-reaper" --role Reader
+
+# Add the credentials to .env:
+AZURE_TENANT_ID=...
+AZURE_CLIENT_ID=...
+AZURE_CLIENT_SECRET=...
+```
+
 ---
 
-## 🧙‍♂️ The Onboarding Flow
-1. **Option A (Developer):** Ensure you have run `az login` in your terminal.
-2. **Option B (Enterprise):** Navigate to **Settings > Connect Azure Cloud** and input your **Service Principal** (Client ID, Secret, Tenant ID).
-3. Launch the Dashboard via `ui/app.py`.
-4. The system will validate your credentials (CLI or SP) and unlock the **FinOps Intelligence Suite**.
+## ✅ Verify Your Setup
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Test Python dependencies
+python3 -c "import azure; print('✅ Azure SDK installed')"
+
+# Test the main script
+python3 main.py
+```
 
 ---
 
-## 🏗 Key Environment Variables
-You can set these in a `.env` file (created automatically by `reap.sh`):
-- `AZURE_SUBSCRIPTION_ID`: Target subscription for scanning.
-- `AZURE_TENANT_ID`: Azure AD Directory ID.
-- `AZURE_CLIENT_ID`: Service Principal Application ID.
-- `AZURE_CLIENT_SECRET`: Service Principal Secret Key.
-- `APP_ENV`: `production` or `development`.
-- `INFLUX_TOKEN`: (Optional) For historical data persistence.
+## 🆘 Troubleshooting
 
-> [!TIP]
-> Always ensure your Azure identity has at least **Reader** and **Cost Management Reader** permissions to unlock the full potential of the Anomaly Detection and RI Advisor modules.
+| Issue | Solution |
+|-------|----------|
+| `No module named 'azure'` | Ensure venv is activated: `source venv/bin/activate` |
+| `Invalid subscription ID` | Update `.env` with real Azure subscription ID |
+| `PostgreSQL connection refused` | Start PostgreSQL: `sudo systemctl start postgresql` |
+| `Go binary not found` | Run `./reap.sh` or manually: `cd engine-go && go build -o reaper-engine main.go` |
+
+---
+
+## 📚 Next Steps
+
+1. Explore the **Dashboard** at `http://localhost:5000`
+2. Configure **Settings** with your Azure subscription
+3. Run scans to identify **cost optimization opportunities**
+4. Review **reports** and take action on recommendations
