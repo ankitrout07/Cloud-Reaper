@@ -1,10 +1,12 @@
-from reaper.engine.models import Resource, CostHistory
 import datetime
+
+from reaper.engine.models import CostHistory, Resource
 
 try:
     from datetime import UTC
 except ImportError:
-    UTC = datetime.timezone.utc
+    # Shim for local verification on older Python versions
+    UTC = getattr(datetime, "UTC", datetime.timezone.utc)  # noqa: UP017
 
 def test_resource_model_instantiation():
     resource = Resource(

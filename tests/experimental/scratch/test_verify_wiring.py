@@ -1,5 +1,3 @@
-import json
-
 from reaper.collectors.azure_collector import AzureCollector
 
 

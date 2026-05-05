@@ -21,6 +21,9 @@ known-first-party = ["reaper"]
 quote-style = "double"
 indent-style = "space"
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests", "src/reaper"]
 python_files = "test_*.py"
