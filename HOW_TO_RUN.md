@@ -14,25 +14,22 @@ Before you start, ensure you have the following installed:
 
 ---
 
-## ⚡ Quick Start (Recommended)
+## ⚡ Quick Start (Cross-Platform)
 
-The easiest way to get started is using the automated bootstrap script.
+The easiest way to get started on **macOS, Windows, or Linux** is using the universal bootstrap script.
 
 ```bash
-# 1. Make the script executable
-chmod +x scripts/reap.sh
-
-# 2. Run the script
-./scripts/reap.sh
+# Run the universal bootstrap script
+python bootstrap.py
 ```
 
 The script automatically:
 - ✅ Checks for Go, Python, and Docker
 - ✅ Starts PostgreSQL in a Docker container
-- ✅ Builds the Go performance core
+- ✅ Builds the Go performance core (cross-platform)
 - ✅ Sets up a Python virtual environment
 - ✅ Installs all dependencies
-- ✅ Launches the dashboard at `http://localhost:5000`
+- ✅ Launches the dashboard at `http://localhost:5001`
 
 ---
 
@@ -110,6 +107,7 @@ pytest
 | `Go binary not found` | Ensure you built the engine into the `bin/` directory |
 | `DB Connection Refused` | Start Docker and ensure the postgres container is running |
 | `az: command not found` | Install Azure CLI and ensure it is in your PATH |
+| `403 Forbidden on 5000` | macOS AirPlay conflict. Use port 5001 or disable AirPlay Receiver. |
 
 ---
 

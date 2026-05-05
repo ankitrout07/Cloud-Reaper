@@ -66,17 +66,18 @@ Cloud-Reaper/
 
 ## 🚦 Getting Started
 
-### Quick Start
+### ⚡ Quick Start
+
 ```bash
-# 1. Clone and enter
+# Clone the repository
 git clone https://github.com/ankitrout07/Cloud-Reaper.git
 cd Cloud-Reaper
 
-# 2. Run the bootstrapper
-# This handles Go build, Venv setup, and launches the dashboard
-chmod +x scripts/reap.sh
-./scripts/reap.sh
+# Run the universal bootstrap script (macOS, Windows, Linux)
+python bootstrap.py
 ```
+
+The dashboard will be available at **http://localhost:5001**.
 
 ### Professional Entry Points
 - **Web Dashboard:** `python -m reaper.web.app`
