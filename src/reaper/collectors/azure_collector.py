@@ -1,7 +1,7 @@
 import datetime
 import json
-import subprocess
 import os
+import subprocess
 from pathlib import Path
 
 from azure.identity import DefaultAzureCredential
