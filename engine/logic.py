@@ -4,17 +4,8 @@ from sklearn.linear_model import LinearRegression
 from statsmodels.tsa.arima.model import ARIMA
 import os
 import json
-import requests
 import datetime
-
-def notify_discord(message):
-    webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
-    if not webhook_url:
-        return
-    try:
-        requests.post(webhook_url, json={"content": message})
-    except Exception as e:
-        print(f"[-] Discord Notification Failed: {e}")
+from engine.notifier import send_discord_alert
 
 class ZombieScorer:
     def __init__(self):
@@ -46,8 +37,9 @@ class ZombieScorer:
         is_zombie = score >= self.threshold
         
         if is_zombie:
-            msg = f"🚨 **ZOMBIE DETECTED** 🚨\nResource: `{resource_data['name']}`\nType: `{resource_data['type']}`\nScore: `{score}`\nReasons: {', '.join(reasons)}"
-            notify_discord(msg)
+            title = "ZOMBIE RESOURCE DETECTED"
+            msg = f"**Resource:** `{resource_data['name']}`\n**Type:** `{resource_data['type']}`\n**Heuristic Score:** `{score}`\n\n**Reasons:**\n" + "\n".join([f"• {r}" for r in reasons])
+            send_discord_alert(title, msg, color=0xef4444) # Rose/Red for alert
 
         return {
             'is_zombie': is_zombie,
