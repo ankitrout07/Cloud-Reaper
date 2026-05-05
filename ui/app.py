@@ -17,7 +17,10 @@ from collectors.config_manager import save_config
 
 def is_first_run():
     sub_id = os.getenv("AZURE_SUBSCRIPTION_ID")
-    return not sub_id or len(sub_id) < 5
+    # Check for empty or common placeholders like 'your_subscription_id'
+    if not sub_id or "your_" in sub_id or len(sub_id) < 5:
+        return True
+    return False
 
 app = Flask(__name__)
 init_db()

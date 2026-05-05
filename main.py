@@ -12,6 +12,19 @@ from data.pusher import DataPusher
 def run_reaper():
     load_dotenv(override=True)
     
+    sub_id = os.getenv("AZURE_SUBSCRIPTION_ID")
+    if not sub_id or "your_" in sub_id or len(sub_id) < 5:
+        print("\n" + "="*50)
+        print("             CLOUD REAPER v1.0 [AZURE MODE]  ")
+        print("==================================================")
+        print("\n[!] CONFIGURATION ERROR: Azure Subscription ID is invalid.")
+        print("    Current ID: " + str(sub_id))
+        print("\n    Please update your .env file with a real Subscription ID.")
+        print("    Or launch the Dashboard to use the Onboarding Wizard:")
+        print("    python3 ui/app.py")
+        print("\n" + "="*50 + "\n")
+        return
+
     print("\n" + "="*50)
     print("             CLOUD REAPER v1.0 [AZURE MODE]  ")
     print("==================================================")
