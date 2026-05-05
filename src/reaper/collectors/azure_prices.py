@@ -1,11 +1,12 @@
-import requests
-import json
 import logging
+
+import requests
+
 
 class AzurePriceClient:
     BASE_URL = "https://prices.azure.com/api/retail/prices"
 
-    def __init__(self, currency='USD'):
+    def __init__(self, currency="USD"):
         self.currency = currency
         self.session = requests.Session()
         self.logger = logging.getLogger(__name__)
@@ -14,30 +15,30 @@ class AzurePriceClient:
         """
         Fetches prices from the Azure Retail Prices API with pagination support.
         """
-        params = {'currencyCode': self.currency}
+        params = {"currencyCode": self.currency}
         if filter_query:
-            params['$filter'] = filter_query
+            params["$filter"] = filter_query
 
         prices = []
         url = self.BASE_URL
-        
+
         while url:
             try:
                 response = self.session.get(url, params=params if url == self.BASE_URL else None)
                 response.raise_for_status()
                 data = response.json()
-                
-                items = data.get('Items', [])
+
+                items = data.get("Items", [])
                 prices.extend(items)
-                
-                url = data.get('NextPageLink')
+
+                url = data.get("NextPageLink")
                 # Once we have NextPageLink, params are already included in the URL
-                params = None 
-                
+                params = None
+
             except Exception as e:
                 self.logger.error(f"Error fetching prices from Azure: {e}")
                 break
-        
+
         return prices
 
     def get_prices_by_service(self, service_name):
@@ -55,11 +56,11 @@ class AzurePriceClient:
         Categories: Compute, Networking, Storage
         """
         category_map = {
-            'Compute': ['Virtual Machines', 'Cloud Services'],
-            'Networking': ['Networking', 'Bandwidth'],
-            'Storage': ['Storage']
+            "Compute": ["Virtual Machines", "Cloud Services"],
+            "Networking": ["Networking", "Bandwidth"],
+            "Storage": ["Storage"],
         }
-        
+
         services = category_map.get(category, [])
         all_prices = []
         for service in services:

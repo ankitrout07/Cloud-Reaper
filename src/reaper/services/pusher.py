@@ -1,17 +1,19 @@
 import os
+
+from dotenv import load_dotenv
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
-from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class DataPusher:
     def __init__(self):
-        self.url = os.getenv('INFLUXDB_URL', 'http://localhost:8086')
-        self.token = os.getenv('INFLUXDB_TOKEN')
-        self.org = os.getenv('INFLUXDB_ORG')
-        self.bucket = os.getenv('INFLUXDB_BUCKET')
-        
+        self.url = os.getenv("INFLUXDB_URL", "http://localhost:8086")
+        self.token = os.getenv("INFLUXDB_TOKEN")
+        self.org = os.getenv("INFLUXDB_ORG")
+        self.bucket = os.getenv("INFLUXDB_BUCKET")
+
         if all([self.token, self.org, self.bucket]):
             self.client = InfluxDBClient(url=self.url, token=self.token, org=self.org)
             self.write_api = self.client.write_api(write_options=SYNCHRONOUS)
@@ -21,11 +23,13 @@ class DataPusher:
     def push_savings(self, provider, amount):
         if not self.write_api:
             return
-            
-        point = Point("cloud_waste") \
-            .tag("provider", provider) \
-            .field("potential_savings", float(amount)) \
+
+        point = (
+            Point("cloud_waste")
+            .tag("provider", provider)
+            .field("potential_savings", float(amount))
             .time(WritePrecision.NS)
+        )
 
         try:
             self.write_api.write(bucket=self.bucket, org=self.org, record=point)
@@ -33,5 +37,5 @@ class DataPusher:
             print(f"[!] InfluxDB Push Failed: {e}")
 
     def close(self):
-        if hasattr(self, 'client'):
+        if hasattr(self, "client"):
             self.client.close()

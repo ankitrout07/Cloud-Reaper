@@ -1,19 +1,19 @@
 import yaml
-import os
+
 
 class CostCalculator:
-    def __init__(self, price_book_path='engine/price_book.yaml'):
+    def __init__(self, price_book_path="engine/price_book.yaml"):
         self.price_book_path = price_book_path
-        with open(price_book_path, 'r') as f:
+        with open(price_book_path) as f:
             self.prices = yaml.safe_load(f)
-        self.currency = 'USD'
+        self.currency = "USD"
 
     def calculate_monthly_cost(self, provider, resource_type, sku, quantity=1):
         """Calculates cost based on SKU (e.g., 't3.micro' or 'Standard_B1s')."""
         try:
-            rate = self.prices['providers'][provider][resource_type][sku]
-            
-            if resource_type in ['ebs', 'disk', 'storage'] or 'per_gb_month' in sku:
+            rate = self.prices["providers"][provider][resource_type][sku]
+
+            if resource_type in ["ebs", "disk", "storage"] or "per_gb_month" in sku:
                 return rate * quantity
 
             return rate * 730 * quantity
@@ -24,9 +24,9 @@ class CostCalculator:
     def calculate_hourly_cost(self, provider, resource_type, sku, quantity=1):
         """Calculates hourly burn rate based on SKU."""
         try:
-            rate = self.prices['providers'][provider][resource_type][sku]
+            rate = self.prices["providers"][provider][resource_type][sku]
 
-            if resource_type in ['ebs', 'disk', 'storage'] or 'per_gb_month' in sku:
+            if resource_type in ["ebs", "disk", "storage"] or "per_gb_month" in sku:
                 return (rate * quantity) / 730
 
             return rate * quantity
@@ -38,13 +38,13 @@ class CostCalculator:
         """Normalizes a list of burn items into a total hourly rate."""
         total = 0.0
         for item in burn_items:
-            provider = item.get('provider')
-            resource_type = item.get('resource_type')
-            sku = item.get('sku')
-            quantity = item.get('quantity', 1)
-            frequency = item.get('frequency', 'hourly')
+            provider = item.get("provider")
+            resource_type = item.get("resource_type")
+            sku = item.get("sku")
+            quantity = item.get("quantity", 1)
+            frequency = item.get("frequency", "hourly")
 
-            if frequency == 'monthly':
+            if frequency == "monthly":
                 total += self.calculate_monthly_cost(provider, resource_type, sku, quantity) / 730
             else:
                 total += self.calculate_hourly_cost(provider, resource_type, sku, quantity)
@@ -60,8 +60,8 @@ class CostCalculator:
             return
 
         # Extract items if wrapped in 'prices' key
-        items = price_data.get('prices', []) if isinstance(price_data, dict) else price_data
-        
+        items = price_data.get("prices", []) if isinstance(price_data, dict) else price_data
+
         if not isinstance(items, list):
             print("[!] Warning: Invalid price data format received.")
             return
@@ -69,33 +69,33 @@ class CostCalculator:
         for item in items:
             try:
                 # Normalizing Azure Retail Prices API schema
-                service = item.get('serviceName', '').lower()
-                sku = item.get('armSkuName', item.get('meterName', '')).lower()
-                price = item.get('retailPrice', 0.0)
-                
+                service = item.get("serviceName", "").lower()
+                sku = item.get("armSkuName", item.get("meterName", "")).lower()
+                price = item.get("retailPrice", 0.0)
+
                 # Internal mapping: Azure API 'Virtual Machines' -> 'compute', 'Storage' -> 'storage'
                 category = None
-                if 'virtual machines' in service:
-                    category = 'compute'
-                elif 'storage' in service:
-                    category = 'storage'
-                
-                if category and sku:
-                    if 'azure' not in self.prices['providers']:
-                        self.prices['providers']['azure'] = {}
-                    if category not in self.prices['providers']['azure']:
-                        self.prices['providers']['azure'][category] = {}
-                    
-                    # Store both SKU and normalized SKU
-                    self.prices['providers']['azure'][category][sku] = price
-                    
-                    # Also map to 'disk' if it's storage for main.py compatibility
-                    if category == 'storage':
-                        if 'disk' not in self.prices['providers']['azure']:
-                            self.prices['providers']['azure']['disk'] = {}
-                        self.prices['providers']['azure']['disk'][sku] = price
+                if "virtual machines" in service:
+                    category = "compute"
+                elif "storage" in service:
+                    category = "storage"
 
-            except Exception as e:
+                if category and sku:
+                    if "azure" not in self.prices["providers"]:
+                        self.prices["providers"]["azure"] = {}
+                    if category not in self.prices["providers"]["azure"]:
+                        self.prices["providers"]["azure"][category] = {}
+
+                    # Store both SKU and normalized SKU
+                    self.prices["providers"]["azure"][category][sku] = price
+
+                    # Also map to 'disk' if it's storage for main.py compatibility
+                    if category == "storage":
+                        if "disk" not in self.prices["providers"]["azure"]:
+                            self.prices["providers"]["azure"]["disk"] = {}
+                        self.prices["providers"]["azure"]["disk"][sku] = price
+
+            except Exception:
                 continue
 
         print(f"    [+] Price Book synchronized with {len(items)} live entries.")
@@ -106,7 +106,7 @@ class CostCalculator:
         Returns True if successful, False otherwise.
         """
         try:
-            with open(self.price_book_path, 'r') as f:
+            with open(self.price_book_path) as f:
                 self.prices = yaml.safe_load(f)
             return True
         except FileNotFoundError:
@@ -121,18 +121,18 @@ class CostCalculator:
         Sets the currency for cost calculations.
         Currently stores the currency code (future: could implement conversion).
         """
-        valid_currencies = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY']
+        valid_currencies = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY"]
         if currency_code.upper() in valid_currencies:
             self.currency = currency_code.upper()
             return True
-        else:
-            print(f"[!] Error: Unsupported currency code {currency_code}")
-            return False
+        print(f"[!] Error: Unsupported currency code {currency_code}")
+        return False
 
     # TODO: Implement real-time pricing using Azure Retail Prices API
+
 
 # Validation block
 if __name__ == "__main__":
     calc = CostCalculator()
-    aws_test = calc.calculate_monthly_cost('aws', 'ec2', 't3.micro')
+    aws_test = calc.calculate_monthly_cost("aws", "ec2", "t3.micro")
     print(f"Projected Monthly Cost for AWS t3.micro: ${aws_test:.2f}")

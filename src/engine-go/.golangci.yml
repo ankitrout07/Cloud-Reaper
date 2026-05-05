@@ -30,7 +30,6 @@ linters-settings:
 run:
   timeout: 5m
   tests: true
-  working-directory: engine-go
 
 issues:
   exclude-use-default: false

@@ -1,14 +1,15 @@
 import os
 
+
 def save_config(sub_id, tenant_id=None, client_id=None, client_secret=None):
     # Write to a .env file locally
     try:
         env_path = ".env"
         lines = []
         if os.path.exists(env_path):
-            with open(env_path, "r") as f:
+            with open(env_path) as f:
                 lines = f.readlines()
-        
+
         # Prepare new content
         new_lines = []
         keys_to_update = {"AZURE_SUBSCRIPTION_ID": sub_id}
@@ -18,9 +19,9 @@ def save_config(sub_id, tenant_id=None, client_id=None, client_secret=None):
             keys_to_update["AZURE_CLIENT_ID"] = client_id
         if client_secret:
             keys_to_update["AZURE_CLIENT_SECRET"] = client_secret
-            
+
         keys_handled = set()
-        
+
         for line in lines:
             handled = False
             for key in keys_to_update:
@@ -31,15 +32,13 @@ def save_config(sub_id, tenant_id=None, client_id=None, client_secret=None):
                     break
             if not handled:
                 new_lines.append(line)
-        
-        # Add keys that weren't in the file
-        for key in keys_to_update:
+
+        for key, value in keys_to_update.items():
             if key not in keys_handled:
-                new_lines.append(f"{key}={keys_to_update[key]}\n")
-                
-        with open(env_path, "w") as f:
-            f.writelines(new_lines)
-        
+                new_lines.append(f"{key}={value}\n")
+
+        env_path.write_text("".join(new_lines))
+
         # Load it into the current process memory immediately
         os.environ["AZURE_SUBSCRIPTION_ID"] = sub_id
         if tenant_id:
@@ -48,7 +47,7 @@ def save_config(sub_id, tenant_id=None, client_id=None, client_secret=None):
             os.environ["AZURE_CLIENT_ID"] = client_id
         if client_secret:
             os.environ["AZURE_CLIENT_SECRET"] = client_secret
-            
+
         return True
     except Exception as e:
         print(f"Error saving config: {e}")
