@@ -33,37 +33,29 @@ func GetNetworkMetrics(subscriptionID string, resourceIDs []string) ([]NetworkUs
 	aggregation := "Total"
 
 	for _, rid := range resourceIDs {
-		pager := client.NewListPager(rid, &armmonitor.MetricsClientListOptions{
-			Timespan:        &timespan,
-			Interval:        nil,
-			Metricnames:     &metricName,
-			Aggregation:     &aggregation,
-			Top:             nil,
-			Orderby:         nil,
-			Filter:          nil,
-			ResultType:      nil,
-			Metricnamespace: nil,
+		ctx := context.Background()
+		resp, err := client.List(ctx, rid, &armmonitor.MetricsClientListOptions{
+			Timespan:    &timespan,
+			Metricnames: &metricName,
+			Aggregation: &aggregation,
 		})
+		if err != nil {
+			continue
+		}
 
-		for pager.More() {
-			page, err := pager.NextPage(context.Background())
-			if err != nil {
-				break
-			}
-			for _, m := range page.Value {
-				if m.Name != nil && *m.Name.Value == metricName {
-					for _, ts := range m.Timeseries {
-						var total float64
-						for _, data := range ts.Data {
-							if data.Total != nil {
-								total += *data.Total
-							}
+		for _, m := range resp.Value {
+			if m.Name != nil && m.Name.Value != nil && *m.Name.Value == metricName {
+				for _, ts := range m.Timeseries {
+					var total float64
+					for _, data := range ts.Data {
+						if data.Total != nil {
+							total += *data.Total
 						}
-						results = append(results, NetworkUsage{
-							ResourceID: rid,
-							NetworkOut: total,
-						})
 					}
+					results = append(results, NetworkUsage{
+						ResourceID: rid,
+						NetworkOut: total,
+					})
 				}
 			}
 		}
