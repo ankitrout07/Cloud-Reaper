@@ -1,6 +1,7 @@
 import datetime
 import json
 import subprocess
+import os
 from pathlib import Path
 
 from azure.identity import DefaultAzureCredential
@@ -22,7 +23,7 @@ load_dotenv()
 
 class AzureCollector:
     def __init__(self, subscription_id=None):
-        self.subscription_id = subscription_id or Path.getenv("AZURE_SUBSCRIPTION_ID")
+        self.subscription_id = subscription_id or os.getenv("AZURE_SUBSCRIPTION_ID")
         self.credentials = DefaultAzureCredential()
         self.compute = ComputeManagementClient(self.credentials, self.subscription_id)
         self.network = NetworkManagementClient(self.credentials, self.subscription_id)
