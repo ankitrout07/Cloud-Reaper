@@ -1,4 +1,5 @@
 # ☁️ Cloud-Reaper
+
 A high-performance **Hybrid FinOps Intelligence Engine** designed to bridge the gap between cloud finance and engineering action.
 
 Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive scanning speeds across large-scale Azure environments, providing real-time cost reduction recommendations.
@@ -10,7 +11,7 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 ### 1. 📊 Inform Phase (Visibility)
 *   **⚡ High-Velocity Scanning:** Custom Go-based engine with Goroutines for sub-second resource auditing.
 *   **🏷️ Tag Health Score:** Automated audit of critical tags (Owner, Env) for 100% cost attribution.
-*   **📈 Anomaly Detection:** Real-time detection of cost spikes using 7-day moving averages via Azure Consumption SDK.
+*   **📈 Anomaly Detection:** Real-time detection of cost spikes using seasonal-aware ARIMA forecasting.
 
 ### 2. 📉 Optimize Phase (Waste Reduction)
 *   **🧟 Zombie Hunting:** Identifies orphaned disks, snapshots, and idle compute resources automatically.
@@ -18,9 +19,9 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 *   **❄️ Cold Storage Identifier:** Scans for unused storage and suggests movement to Cool/Archive tiers.
 
 ### 3. ⚖️ Operate Phase (Governance)
-*   **🛡️ Policy Guardrails:** Real-time OPA-style audit against FinOps best practices (e.g., blocking UltraSSD in Non-Prod).
+*   **🛡️ Policy Guardrails:** Real-time audit against FinOps best practices.
 *   **🚨 Budget Kill-Switch:** Automated VM deallocation safeguards for sandbox environments.
-*   **🔑 Multi-Tenant Connect:** Support for high-velocity scanning via **Azure Service Principals** (SPN), enabling enterprise-grade cross-subscription auditing.
+*   **🔑 Multi-Tenant Connect:** Support for high-velocity scanning via **Azure Service Principals**.
 
 ---
 
@@ -28,41 +29,61 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 
 Cloud-Reaper leverages the strengths of two powerful languages:
 
-1.  **Go (Performance Core):** Handles parallel API requests to Azure SDKs for lightning-fast inventory and metrics collection.
-2.  **Python (Intelligence & UI):** Orchestrates the FinOps logic, cost calculation, and serves the **Cyan-Theme Glassmorphism Dashboard**.
+1.  **Go (Performance Core):** Handles parallel API requests to Azure SDKs for lightning-fast inventory collection.
+2.  **Python (Intelligence & UI):** Orchestrates the FinOps logic, cost calculation, and serves the **Cyan-Theme Dashboard**.
+
+---
+
+## 📂 Project Structure
+
+The project follows a professional, modular structure:
+
+```text
+Cloud-Reaper/
+├── src/
+│   ├── reaper/         # Python Intelligence & Web Layer
+│   │   ├── collectors/ # Azure/AWS Scrapers & Auth
+│   │   ├── engine/     # FinOps Models, Logic & DB
+│   │   └── web/        # Flask App & UI Templates
+│   └── engine-go/      # Go High-Velocity Performance Core
+├── scripts/            # Bootstrapping & Utility Scripts
+├── tests/              # Comprehensive Test Suite
+├── pyproject.toml      # Modern Python Configuration (Ruff, Mypy, Pytest)
+└── main.py             # Global Entry Point
+```
 
 ---
 
 ## 🛠 Tech Stack
 - **Languages:** Python 3.12+, Go 1.24+
+- **Database:** PostgreSQL (with SQLAlchemy 2.0 type safety)
 - **Frontend:** HTML5, Vanilla JS, CSS (Glassmorphism & Cyan Glow)
-- **Backend:** Flask, Azure SDK for Go/Python (Consumption, Storage, Monitor)
-- **Design:** Modern dark-mode aesthetic with interactive micro-animations.
-
----
-
-## 📂 Project Structure
-```text
-Cloud-Reaper/
-├── collectors/      # Python-Go Bridge & Real-Time Azure SDK Modules
-├── engine-go/       # High-Velocity Metric Engine (Go source)
-├── engine/          # Pricing data & Intelligence logic (Python)
-├── ui/              # Cyan-Theme Dashboard (Flask & JS)
-├── reap.sh          # Unified Entrypoint & Bootstrapper
-└── HOW_TO_RUN.md    # Detailed Setup Instructions
-```
+- **Quality Gates:** 
+    - **Python:** Ruff (Linting), Mypy (Type Safety), Pytest (Testing)
+    - **Go:** Golangci-lint (Static Analysis)
 
 ---
 
 ## 🚦 Getting Started
 
-### The Fast Entrypoint
+### Quick Start
 ```bash
-chmod +x reap.sh
-./reap.sh  # Handles Go build, Venv creation, and app launch
+# 1. Clone and enter
+git clone https://github.com/ankitrout07/Cloud-Reaper.git
+cd Cloud-Reaper
+
+# 2. Run the bootstrapper
+# This handles Go build, Venv setup, and launches the dashboard
+chmod +x scripts/reap.sh
+./scripts/reap.sh
 ```
 
-Detailed guide: 👉 **[HOW_TO_RUN.md](HOW_TO_RUN.md)**
+### Professional Entry Points
+- **Web Dashboard:** `python -m reaper.web.app`
+- **CLI Scanner:** `python main.py`
+- **Go Engine (Direct):** `./bin/reaper-engine --help`
+
+Detailed setup guide: 👉 **[HOW_TO_RUN.md](HOW_TO_RUN.md)**
 
 ---
 
