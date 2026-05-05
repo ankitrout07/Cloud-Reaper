@@ -1,6 +1,6 @@
 import json
 
-from collectors.azure_prices import AzurePriceClient
+from reaper.collectors.azure_prices import AzurePriceClient
 
 
 def test_prices():

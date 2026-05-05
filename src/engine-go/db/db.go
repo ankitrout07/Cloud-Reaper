@@ -12,15 +12,15 @@ import (
 )
 
 type Resource struct {
-	ID          string
-	Name        string
-	Type        string
-	Region      string
-	Tags        map[string]*string
-	Active         bool
-	IsProtected    bool
-	IsUnallocated  bool
-	LastSeen       time.Time
+	ID            string
+	Name          string
+	Type          string
+	Region        string
+	Tags          map[string]*string
+	Active        bool
+	IsProtected   bool
+	IsUnallocated bool
+	LastSeen      time.Time
 }
 
 var (
@@ -65,12 +65,14 @@ func UpsertResources(resources []Resource) error {
 	}
 
 	br := db.SendBatch(context.Background(), batch)
-	defer br.Close()
+	defer func() {
+		_ = br.Close()
+	}()
 
 	for i := 0; i < len(resources); i++ {
 		_, err := br.Exec()
 		if err != nil {
-			return fmt.Errorf("error in batch exec at index %d: %v", i, err)
+			return fmt.Errorf("error in batch exec at index %d: %w", i, err)
 		}
 	}
 

@@ -1,6 +1,6 @@
 import os
 
-from collectors.azure_collector import AzureCollector
+from reaper.collectors.azure_collector import AzureCollector
 
 # Force set the subscription ID for this test
 os.environ["AZURE_SUBSCRIPTION_ID"] = "7ef42162-83d2-4247-8010-38bf34dd1453"
