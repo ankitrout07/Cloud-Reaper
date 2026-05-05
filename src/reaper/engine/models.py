@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, UTC
 
 from dotenv import load_dotenv
 from sqlalchemy import (
@@ -14,15 +14,20 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres"
+)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 class Resource(Base):
@@ -36,7 +41,7 @@ class Resource(Base):
     active = Column(Boolean, default=True)
     is_protected = Column(Boolean, default=False)
     is_unallocated = Column(Boolean, default=False)
-    last_seen = Column(DateTime, default=datetime.utcnow)
+    last_seen = Column(DateTime, default=lambda: datetime.now(UTC))
 
     cost_history = relationship("CostHistory", back_populates="resource")
     reap_actions = relationship("ReapAction", back_populates="resource")
@@ -49,7 +54,7 @@ class CostHistory(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     resource_id = Column(String, ForeignKey("resources.id"))
-    date = Column(DateTime, default=datetime.utcnow)
+    date = Column(DateTime, default=lambda: datetime.now(UTC))
     cost = Column(Numeric(15, 4))
     cost_type = Column(String, default="ACTUAL")  # ACTUAL or AMORTIZED
     currency = Column(String, default="USD")
@@ -64,7 +69,7 @@ class ReapAction(Base):
     resource_id = Column(String, ForeignKey("resources.id"))
     action = Column(String)  # e.g. DEALLOCATE, DELETE
     authorized_by = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
 
     resource = relationship("Resource", back_populates="reap_actions")
 
@@ -89,7 +94,7 @@ class ActionLog(Base):
     action_type = Column(String)  # REAP, KILL, PROTECTION_ADD
     status = Column(String)  # SUCCESS, FAILED
     details = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
 
     resource = relationship("Resource", back_populates="action_logs")
 
@@ -101,7 +106,7 @@ class BusinessMetric(Base):
     metric_name = Column(String, index=True)  # e.g. ACTIVE_USERS, API_REQUESTS
     value = Column(Float)
     unit = Column(String)
-    date = Column(DateTime, default=datetime.utcnow)
+    date = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
 def init_db():

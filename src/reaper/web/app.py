@@ -7,7 +7,7 @@ import traceback
 from pathlib import Path
 
 from azure.identity import DefaultAzureCredential
-from azure.mgmt.resource import SubscriptionClient
+from azure.mgmt.subscription import SubscriptionClient
 from dotenv import load_dotenv
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
