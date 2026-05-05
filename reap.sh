@@ -83,7 +83,7 @@ AZURE_CLIENT_ID=your_client_id
 AZURE_CLIENT_SECRET=your_client_secret
 
 # Database (PostgreSQL via Docker)
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/cloudreaper
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
 
 # InfluxDB (Optional - for metrics storage)
 INFLUXDB_URL=http://localhost:8086
@@ -92,6 +92,14 @@ INFLUXDB_ORG=ReaperOps
 INFLUXDB_BUCKET=cloud_burn
 EOF
     echo "[+] .env file created. Please update Azure credentials!"
+else
+    # Check if DATABASE_URL is missing from existing .env
+    if ! grep -q "^DATABASE_URL=" .env; then
+        echo "[*] Adding DATABASE_URL to existing .env file..."
+        echo "" >> .env
+        echo "# Database (PostgreSQL via Docker)" >> .env
+        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres" >> .env
+    fi
 fi
 
 # 4. Validate Azure Configuration

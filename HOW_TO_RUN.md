@@ -164,6 +164,7 @@ python3 main.py
 | `No module named 'azure'` | Ensure venv is activated: `source venv/bin/activate` |
 | `Invalid subscription ID` | Update `.env` with real Azure subscription ID |
 | `PostgreSQL connection refused` | The script auto-starts PostgreSQL via Docker. If issues persist: `docker restart cloud-reaper-db` |
+| `FATAL: database "cloudreaper" does not exist` | Database configuration updated - script now uses default postgres database |
 | `Go binary not found` | Install Go 1.24+: `wget https://go.dev/dl/go1.24.0.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf go1.24.0.linux-amd64.tar.gz` |
 | `Python version too old` | Install Python 3.12+: check your distro's package manager |
 | `Docker not found` | Install Docker: `sudo apt install docker.io` (Ubuntu/Debian) |
