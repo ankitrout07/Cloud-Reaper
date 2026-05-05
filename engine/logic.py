@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.seasonal import seasonal_decompose
 import os
 import json
 import datetime
@@ -164,6 +165,72 @@ class RightSizer:
             })
             
         return recommendations
+
+
+class AnomalyDetector:
+    def __init__(self, sensitivity_z=3.0):
+        self.sensitivity_z = sensitivity_z
+
+    def detect_anomalies(self, daily_spend_history):
+        """
+        Detects anomalies using Seasonality-Aware Decomposition.
+        """
+        if len(daily_spend_history) < 14: # Need at least 2 full weeks for seasonal detection
+            return self._detect_z_score_only(daily_spend_history)
+
+        try:
+            # Period=7 for weekly seasonality
+            result = seasonal_decompose(daily_spend_history, model='additive', period=7)
+            residuals = result.resid
+            
+            # Clean residuals (remove NaNs from edges)
+            clean_residuals = pd.Series(residuals).dropna()
+            
+            # Calculate Z-Score on Residuals
+            mean_res = clean_residuals.mean()
+            std_res = clean_residuals.std()
+            
+            latest_residual = clean_residuals.iloc[-1] if not clean_residuals.empty else 0
+            z_score = abs(latest_residual - mean_res) / std_res if std_res > 0 else 0
+            
+            is_anomaly = z_score > self.sensitivity_z
+            
+            if is_anomaly:
+                title = "CRITICAL SPEND ANOMALY"
+                msg = f"**Residual Variance Detected!**\n\n**Z-Score:** `{z_score:.2f}`\n**Deviation:** `${latest_residual:.2f}`\n\n*Note: This alert accounts for weekly seasonality (backups, traffic cycles) and triggers only on unexplained noise.*"
+                send_discord_alert(title, msg, color=0xffa500) # Orange/Warning
+                
+            return {
+                'is_anomaly': is_anomaly,
+                'z_score': z_score,
+                'method': 'seasonal_decomposition',
+                'residual': float(latest_residual)
+            }
+        except Exception as e:
+            print(f"[-] Seasonal Decomposition Failed: {e}")
+            return self._detect_z_score_only(daily_spend_history)
+
+    def _detect_z_score_only(self, history):
+        """Fallback to rolling Z-score for small datasets."""
+        if len(history) < 3:
+            return {'is_anomaly': False, 'z_score': 0, 'method': 'insufficient_data'}
+            
+        df = pd.Series(history)
+        rolling_mean = df.rolling(window=7, min_periods=1).mean()
+        rolling_std = df.rolling(window=7, min_periods=1).std()
+        
+        latest_val = history[-1]
+        latest_mean = rolling_mean.iloc[-1]
+        latest_std = rolling_std.iloc[-1]
+        
+        z_score = abs(latest_val - latest_mean) / latest_std if latest_std > 0 else 0
+        is_anomaly = z_score > self.sensitivity_z
+        
+        return {
+            'is_anomaly': is_anomaly,
+            'z_score': z_score,
+            'method': 'rolling_z_score'
+        }
 
 if __name__ == "__main__":
     # Test Logic
