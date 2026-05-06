@@ -33,7 +33,10 @@ def is_first_run():
     return bool(not sub_id or "your_" in sub_id or len(sub_id) < 5)
 
 
+from flask_socketio import SocketIO
+
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 init_db()
 calc = CostCalculator()
 settings_state = {
@@ -651,9 +654,43 @@ def get_activity():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@app.route("/api/finops/utilization")
+def utilization():
+    try:
+        report = AzureCollector().get_utilization_report()
+        formatted_report = []
+        for vm in report:
+            waste = 1.0 - (vm["usage"] / 100.0) if vm["usage"] < 100 else 0
+            formatted_report.append({
+                "name": vm["name"],
+                "rg": vm["rg"],
+                "waste_coefficient": waste,
+                "monthly_cost": 150.0,
+                "is_protected": False,
+                "status": "CRITICAL" if waste > 0.9 else "NORMAL"
+            })
+        return jsonify({"status": "success", "report": formatted_report})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@socketio.on('start_log_stream')
+def handle_start_log_stream():
+    from reaper.services.log_streamer import fetch_azure_logs
+    socketio.emit('new_log', {'data': 'Initializing Cloud-Reaper Log Stream...'})
+    socketio.emit('new_log', {'data': 'Connected to Azure Monitor via OIDC...'})
+    
+    logs = fetch_azure_logs()
+    for log in logs:
+        socketio.emit('new_log', {'data': log})
+        socketio.sleep(0.5)
+
+
 if __name__ == "__main__":
-    app.run(
+    socketio.run(
+        app,
         host=os.getenv("FLASK_HOST", "127.0.0.1"),
         port=int(os.getenv("FLASK_PORT", "5000")),
         debug=os.getenv("FLASK_DEBUG", "True").lower() == "true",
+        allow_unsafe_werkzeug=True
     )

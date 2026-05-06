@@ -310,27 +310,19 @@
     </div>
 
     <!-- Reaper Intelligence Console (NEW) -->
-    <div id="reaper-console" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[70] hidden flex-col p-10 font-mono text-[10px] leading-relaxed animate-fade-in">
-        <div class="flex justify-between items-center mb-8 border-b border-white/10 pb-4">
-            <div class="flex items-center gap-4">
-                <div class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                <h3 class="text-xs font-black text-green-500 uppercase tracking-widest">REAPER_CORE_V2.5 // SYSTEM_LOGS</h3>
-            </div>
-            <button onclick="toggleConsole()" class="text-gray-500 hover:text-white transition uppercase text-[10px] font-black">[ CLOSE_TERMINAL ]</button>
+    <div id="console-terminal" class="terminal-container" style="display:none;">
+        <div class="flex justify-between items-center mb-2">
+            <span class="text-cyan-400 font-bold uppercase tracking-widest text-xs">AZURE BACKEND LOGS</span>
+            <button onclick="toggleConsole()" class="text-cyan-400 font-black hover:text-white transition">X</button>
         </div>
-        <div id="console-output" class="flex-1 overflow-y-auto space-y-1 text-green-400/80">
-            <p class="text-gray-500">Initializing Reaper Engine handshake...</p>
-            <p class="text-gray-500">Authentication successful. Session token verified.</p>
-        </div>
-        <div class="mt-4 border-t border-white/5 pt-4 flex gap-4 text-[9px] text-gray-600">
-            <span>CPU: 4.2%</span>
-            <span>MEM: 128MB</span>
-            <span>IO: STABLE</span>
+        <div id="log-output" class="log-stream">
+            <p class="system-msg text-slate-500">> Initializing Cloud-Reaper Log Stream...</p>
         </div>
     </div>
 
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
     <script>
         let forecastChart;
 
@@ -669,27 +661,36 @@
             if (!advisorOpen) toggleAdvisor();
         }
 
+        const socket = io();
+        socket.on('new_log', function(msg) {
+            const output = document.getElementById('log-output');
+            const logEntry = document.createElement('p');
+            logEntry.className = 'log-line';
+            logEntry.innerText = `[${new Date().toLocaleTimeString()}] ${msg.data}`;
+            output.appendChild(logEntry);
+            output.scrollTop = output.scrollHeight;
+        });
+
+        function startLogStream() {
+            socket.emit('start_log_stream');
+        }
+
         function toggleConsole() {
-            const console = document.getElementById('reaper-console');
-            console.classList.toggle('hidden');
-            if (!console.classList.contains('hidden')) {
-                logToConsole("Tactical link established. Awaiting command...");
+            const terminal = document.getElementById('console-terminal');
+            terminal.style.display = (terminal.style.display === 'none') ? 'block' : 'none';
+            
+            if (terminal.style.display === 'block') {
+                document.getElementById('log-output').innerHTML = ''; // Clear previous logs
+                startLogStream();
             }
         }
 
         function logToConsole(msg, type = 'info') {
-            const output = document.getElementById('console-output');
-            const p = document.createElement('p');
-            const time = new Date().toLocaleTimeString();
-            
-            let color = "text-green-400/80";
-            if (type === 'warn') color = "text-yellow-500";
-            if (type === 'error') color = "text-red-500";
-            if (type === 'success') color = "text-cyan-400";
-            
-            p.className = `${color} border-l-2 border-transparent hover:border-green-500/50 pl-2 transition-all`;
-            p.innerHTML = `<span class="text-gray-600 mr-2">[${time}]</span> ${msg}`;
-            output.appendChild(p);
+            const output = document.getElementById('log-output');
+            const logEntry = document.createElement('p');
+            logEntry.className = 'log-line text-slate-400';
+            logEntry.innerText = `[${new Date().toLocaleTimeString()}] > ${msg}`;
+            output.appendChild(logEntry);
             output.scrollTop = output.scrollHeight;
         }
 

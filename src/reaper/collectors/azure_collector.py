@@ -411,12 +411,41 @@ class AzureCollector:
         ]
 
     def get_policy_violations(self):
-        """Audit resources against compliance policies."""
-        return [
-            {"resource": "unlabeled-disk-01", "violation": "Missing Tags", "severity": "HIGH"},
-            {"resource": "public-sql-02", "violation": "Public Access Enabled", "severity": "HIGH"},
-            {"resource": "old-vm-v1", "violation": "Insecure OS", "severity": "MEDIUM"},
-        ]
+        """Audit resources against compliance policies using Azure Resource Graph."""
+        try:
+            from azure.mgmt.resourcegraph import ResourceGraphClient
+            from azure.mgmt.resourcegraph.models import QueryRequest
+
+            client = ResourceGraphClient(self.credentials)
+            query = \"\"\"
+                Resources 
+                | where type =~ 'Microsoft.Compute/virtualMachines' 
+                | where isnull(tags.owner) or isnull(tags.project)
+                | project name, type, resourceGroup, tags
+                | take 5
+            \"\"\"
+            request = QueryRequest(
+                subscriptions=[self.subscription_id],
+                query=query
+            )
+            response = client.resources(request)
+            
+            violations = []
+            if hasattr(response, 'data'):
+                for item in response.data:
+                    violations.append({
+                        "resource": item.get("name", "Unknown"),
+                        "violation": "Missing Owner/Project Tags",
+                        "severity": "HIGH",
+                        "rule": "Tagging Compliance",
+                        "action": "FLAGGED",
+                        "detected_at": datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+                    })
+            
+            return violations
+        except Exception as e:
+            print(f"Resource Graph API Error: {e}")
+            return []
 
     def get_budget_status(self):
         """Returns budget vs actual spend."""
