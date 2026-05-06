@@ -3,7 +3,6 @@ import sys
 import subprocess
 import platform
 import shutil
-import time
 from pathlib import Path
 
 def print_banner():
@@ -23,14 +22,12 @@ def run_command(cmd, cwd=None, env=None):
 def check_requirements():
     print("[*] Checking system requirements...")
     
-    # Check Go
     if not shutil.which("go"):
         print("[!] Go not found. Please install Go 1.24+")
         return False
     
-    # Check Docker
     if shutil.which("docker"):
-        print("[*] Docker found. Checking PostgreSQL container...")
+        print("[!] Docker found. Checking PostgreSQL container...")
         try:
             result = subprocess.run(["docker", "ps", "-a"], capture_output=True, text=True)
             if "cloud-reaper-db" not in result.stdout:
@@ -109,7 +106,6 @@ def main():
     print("   Dashboard: http://localhost:5001")
     print("-" * 60)
     
-    # Run the Flask app
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path("src").absolute())
     
