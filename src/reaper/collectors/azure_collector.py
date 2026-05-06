@@ -244,20 +244,89 @@ class AzureCollector:
             return f"Subscription ({self.subscription_id[:8]}...)"
 
     def get_zombie_vms(self):
-        """Identify 'zombie' VMs based on age and lack of activity."""
-        # This would normally query historical metrics
-        return [
-            {"name": "zombie-api-01", "usage": "0.1%", "rg": "prod-rg"},
-            {"name": "test-vm-forgotten", "usage": "0.0%", "rg": "dev-rg"},
-        ]
+        """Identify 'zombie' VMs based on age and lack of activity (CPU < 1% for 7 days)."""
+        vms = self.compute.virtual_machines.list_all()
+        zombies = []
+        end_time = datetime.datetime.now(datetime.UTC)
+        start_time = end_time - datetime.timedelta(days=7)
+
+        for vm in vms:
+            resource_group = vm.id.split("/")[4] if "/" in vm.id else "Unknown"
+            resource_id = (
+                f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
+                f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
+            )
+            try:
+                metrics = self.monitor.metrics.list(
+                    resource_id,
+                    timespan=f"{start_time.isoformat()}/{end_time.isoformat()}",
+                    interval="PT12H",
+                    metricnames="Percentage CPU",
+                    aggregation="Average",
+                )
+                avg_usage = 0.0
+                has_data = False
+                for item in metrics.value:
+                    for timeseries in item.timeseries:
+                        data_points = [
+                            p.average for p in timeseries.data if p.average is not None
+                        ]
+                        if data_points:
+                            avg_usage = sum(data_points) / len(data_points)
+                            has_data = True
+
+                if has_data and avg_usage < 1.0:
+                    zombies.append({
+                        "name": vm.name,
+                        "usage": f"{round(avg_usage, 2)}%",
+                        "rg": resource_group,
+                    })
+            except Exception:
+                continue
+
+        return zombies
 
     def get_utilization_report(self):
-        """Generate a summarized utilization report for all VMs."""
-        return [
-            {"name": "frontend-vm", "usage": 15, "rg": "web-rg"},
-            {"name": "backend-vm", "usage": 45, "rg": "app-rg"},
-            {"name": "db-vm", "usage": 80, "rg": "db-rg"},
-        ]
+        """Generate a summarized utilization report for all VMs (24h CPU average)."""
+        vms = self.compute.virtual_machines.list_all()
+        report = []
+        end_time = datetime.datetime.now(datetime.UTC)
+        start_time = end_time - datetime.timedelta(days=1)
+
+        for vm in vms:
+            resource_group = vm.id.split("/")[4] if "/" in vm.id else "Unknown"
+            resource_id = (
+                f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
+                f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
+            )
+            try:
+                metrics = self.monitor.metrics.list(
+                    resource_id,
+                    timespan=f"{start_time.isoformat()}/{end_time.isoformat()}",
+                    interval="PT1H",
+                    metricnames="Percentage CPU",
+                    aggregation="Average",
+                )
+                avg_usage = 0.0
+                for item in metrics.value:
+                    for timeseries in item.timeseries:
+                        data_points = [
+                            p.average for p in timeseries.data if p.average is not None
+                        ]
+                        if data_points:
+                            avg_usage = sum(data_points) / len(data_points)
+
+                report.append({
+                    "name": vm.name,
+                    "usage": round(avg_usage, 1),
+                    "rg": resource_group,
+                })
+            except Exception:
+                continue
+
+        # Sort by highest usage
+        report.sort(key=lambda x: x["usage"], reverse=True)
+        return report
 
     def get_anomaly_data(self):
         """Detect spend anomalies using real Azure Cost Management data."""
