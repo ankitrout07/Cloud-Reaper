@@ -130,3 +130,22 @@ h1, h2, h3, h4, p, span, div {
     letter-spacing: 1px;
 }
 
+.card-header i {
+    color: #00f2ff; /* Your signature cyan color */
+    margin-right: 10px;
+    font-size: 1.2rem;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.toggle-password:hover {
+    color: #00f2ff;
+}
+

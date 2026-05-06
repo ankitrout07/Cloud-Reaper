@@ -78,3 +78,16 @@ async function saveInitialSetup() {
         btn.disabled = false;
     }
 }
+
+function toggleSecretVisibility() {
+    const secretInput = document.getElementById('clientSecret');
+    const icon = document.getElementById('toggleIcon');
+    
+    if (secretInput.type === "password") {
+        secretInput.type = "text";
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        secretInput.type = "password";
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
