@@ -26,3 +26,4 @@ stable-baselines3==2.2.1
 scipy==1.12.0
 requests==2.31.0
 pyarrow
+azure-mgmt-costmanagement==4.0.1

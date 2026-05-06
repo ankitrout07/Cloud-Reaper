@@ -31,6 +31,11 @@ class AzureCollector:
         self.web = WebSiteManagementClient(self.credentials, self.subscription_id)
         self.sql = SqlManagementClient(self.credentials, self.subscription_id)
         self.recovery = RecoveryServicesClient(self.credentials, self.subscription_id)
+        try:
+            from azure.mgmt.costmanagement import CostManagementClient
+            self.cost_management = CostManagementClient(self.credentials)
+        except ImportError:
+            self.cost_management = None
 
     def get_vm_inventory(self):
         """Fetches all VMs and their sizes."""
@@ -255,12 +260,65 @@ class AzureCollector:
         ]
 
     def get_anomaly_data(self):
-        """Detect spend anomalies."""
-        return [
-            {"service": "Compute", "cost": 1200, "is_anomaly": True, "deviation": "+25%"},
-            {"service": "Storage", "cost": 450, "is_anomaly": False, "deviation": "-2%"},
-            {"service": "Network", "cost": 300, "is_anomaly": False, "deviation": "+5%"},
-        ]
+        """Detect spend anomalies using real Azure Cost Management data."""
+        if not self.cost_management:
+            return []
+
+        scope = f"/subscriptions/{self.subscription_id}"
+        end_date = datetime.datetime.now(datetime.UTC)
+        start_date = end_date - datetime.timedelta(days=30)
+
+        from azure.mgmt.costmanagement.models import (
+            QueryAggregation,
+            QueryDataset,
+            QueryDefinition,
+            QueryGrouping,
+            QueryTimePeriod,
+        )
+
+        query = QueryDefinition(
+            type="Usage",
+            timeframe="Custom",
+            time_period=QueryTimePeriod(from_property=start_date, to=end_date),
+            dataset=QueryDataset(
+                granularity="Daily",
+                aggregation={"totalCost": QueryAggregation(name="PreTaxCost", function="Sum")},
+                grouping=[QueryGrouping(type="Dimension", name="ServiceName")],
+            ),
+        )
+
+        try:
+            result = self.cost_management.query.usage(scope, query)
+            services_data = {}
+            for row in result.rows:
+                cost = float(row[0])
+                service = row[2]
+                if service not in services_data:
+                    services_data[service] = []
+                services_data[service].append(cost)
+
+            anomalies = []
+            for service, costs in services_data.items():
+                if len(costs) < 7:
+                    continue
+                recent_avg = sum(costs[-3:]) / 3
+                hist_avg = sum(costs[:-3]) / len(costs[:-3]) if len(costs[:-3]) > 0 else 0
+
+                dev = ((recent_avg - hist_avg) / hist_avg) * 100 if hist_avg > 0 else 0
+                is_anomaly = dev > 20 and recent_avg > 10
+
+                anomalies.append({
+                    "service": service,
+                    "cost": round(sum(costs), 2),
+                    "is_anomaly": is_anomaly,
+                    "deviation": f"{'+' if dev > 0 else ''}{round(dev)}%",
+                })
+
+            anomalies.sort(key=lambda x: x["cost"], reverse=True)
+            return anomalies[:5]
+        except Exception as e:
+            print(f"Cost Management API Error: {e}")
+            return []
 
     def get_ri_sp_candidates(self):
         """Reservations and Savings Plans recommendations."""
@@ -332,31 +390,58 @@ class AzureCollector:
             return {}
 
     def get_burn_rate_forecast(self):
-        """
-        Calculates burn rate and EOM forecast using ARIMA.
-        """
-        db = SessionLocal()
-        # Fetch last 30 days of daily spend
-        history = (
-            db.query(CostHistory)
-            .filter(CostHistory.type == "ACTUAL")
-            .order_by(CostHistory.timestamp.desc())
-            .limit(30)
-            .all()
-        )
-        db.close()
+        """Calculates burn rate and EOM forecast using real Azure Cost data and ARIMA."""
+        spend_data = []
 
-        # Reverse to get chronological order
-        spend_data = [float(h.amount) for h in reversed(history)]
+        if self.cost_management:
+            scope = f"/subscriptions/{self.subscription_id}"
+            end_date = datetime.datetime.now(datetime.UTC)
+            start_date = end_date - datetime.timedelta(days=30)
 
-        # If no DB data, provide some mock data for the demo
+            from azure.mgmt.costmanagement.models import (
+                QueryAggregation,
+                QueryDataset,
+                QueryDefinition,
+                QueryTimePeriod,
+            )
+
+            query = QueryDefinition(
+                type="Usage",
+                timeframe="Custom",
+                time_period=QueryTimePeriod(from_property=start_date, to=end_date),
+                dataset=QueryDataset(
+                    granularity="Daily",
+                    aggregation={"totalCost": QueryAggregation(name="PreTaxCost", function="Sum")},
+                ),
+            )
+
+            try:
+                result = self.cost_management.query.usage(scope, query)
+                if result.rows:
+                    rows = sorted(result.rows, key=lambda x: x[1])
+                    spend_data = [float(r[0]) for r in rows]
+            except Exception as e:
+                print(f"Cost Management API Error: {e}")
+
+        # Fallback to DB or mocked if API fails
+        if not spend_data:
+            db = SessionLocal()
+            history = (
+                db.query(CostHistory)
+                .filter(CostHistory.type == "ACTUAL")
+                .order_by(CostHistory.timestamp.desc())
+                .limit(30)
+                .all()
+            )
+            db.close()
+            spend_data = [float(h.amount) for h in reversed(history)]
+
         if not spend_data:
             spend_data = [120, 125, 118, 140, 135, 150, 145]
 
         forecaster = BudgetForecaster()
         forecast = forecaster.forecast_eom(spend_data)
 
-        # Calculate slope for the trend
         slope = 0
         if len(spend_data) >= 2:
             slope = (spend_data[-1] - spend_data[0]) / len(spend_data)
