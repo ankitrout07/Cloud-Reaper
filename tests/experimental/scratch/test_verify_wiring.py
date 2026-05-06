@@ -14,11 +14,14 @@ def test_verify_wiring():
     assert hasattr(az, 'fast_scan')
 
     # Deep schema verification of the Go-Python bridge
-    go_binary = Path(__file__).resolve().parent.parent.parent.parent / "src" / "engine-go" / "reaper-engine"
+    go_binary = (
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "src" / "engine-go" / "reaper-engine"
+    )
 
     if go_binary.exists():
         # Test the prices mode JSON schema handoff
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             [str(go_binary), "--mode", "prices"], 
             capture_output=True, 
             text=True, 

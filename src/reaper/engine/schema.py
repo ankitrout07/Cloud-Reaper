@@ -5,25 +5,25 @@ This ensures the Python intelligence layer knows exactly what structure
 to expect from the Go Performance Engine's JSON output.
 """
 
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, TypedDict
 
 
 class VMReport(TypedDict):
     name: str
     size: str
     usage: float
-    usage_history: List[float]
+    usage_history: list[float]
     network_in: float
     network_out: float
     disk_iops: float
     id: str
-    tags: Dict[str, Optional[str]]
+    tags: dict[str, str | None]
     is_unallocated: bool
 
 
 class OrphanedResource(TypedDict):
     name: str
-    tags: Optional[Dict[str, Optional[str]]]
+    tags: dict[str, str | None] | None
 
 
 class GoEngineScanResult(TypedDict, total=False):
@@ -33,14 +33,14 @@ class GoEngineScanResult(TypedDict, total=False):
     """
     user_name: str
     subscription_name: str
-    orphaned_disks: List[OrphanedResource]
-    orphaned_snapshots: List[OrphanedResource]
-    active_vms: List[str]
-    vm_reports: List[VMReport]
-    prices: List[Dict[str, Any]]  # Only present when Go runs with --mode prices
+    orphaned_disks: list[OrphanedResource]
+    orphaned_snapshots: list[OrphanedResource]
+    active_vms: list[str]
+    vm_reports: list[VMReport]
+    prices: list[dict[str, Any]]  # Only present when Go runs with --mode prices
 
 
-def validate_scan_result(data: Dict[str, Any]) -> bool:
+def validate_scan_result(data: dict[str, Any]) -> bool:
     """
     Basic runtime validation to ensure the Go engine's JSON matches our expected schema.
     """
@@ -59,8 +59,4 @@ def validate_scan_result(data: Dict[str, Any]) -> bool:
     if "prices" in data and len(data.keys()) == 1:
         return True
         
-    for key in required_keys:
-        if key not in data and "prices" not in data:
-            return False
-            
-    return True
+    return all(key in data or "prices" in data for key in required_keys)
