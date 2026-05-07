@@ -42,13 +42,38 @@ def _docker(args: list[str]) -> subprocess.CompletedProcess:
 
 
 def check_requirements() -> bool:
-    """Verify Go and Docker are present; start the PostgreSQL container if needed."""
+    """Verify Go, Docker, and critical PDF libraries are present."""
     print("[*] Checking system requirements...")
 
+    # Go Check
     if not shutil.which("go"):
         print("[!] Go not found. Please install Go 1.24+")
         return False
 
+    # PDF Library Check (Linux)
+    if platform.system() == "Linux":
+        print("[*] Checking PDF guardrails (Pango/Cairo)...")
+        try:
+            ldconfig = shutil.which("ldconfig")
+            if ldconfig:
+                pango_check = subprocess.run([ldconfig, "-p"], capture_output=True, text=True, check=False)
+                if "libpango-1.0" not in pango_check.stdout or "libpangocairo-1.0" not in pango_check.stdout:
+                    print("[!] WARNING: libpango-1.0 or libpangocairo-1.0 not found.")
+                    print("    BOM Export (PDF) will fail. Install with: sudo apt install libpango-1.0-0")
+        except Exception:
+            print("[!] Could not verify PDF libraries. Proceeding...")
+
+    # PDF Library Check (Windows)
+    if platform.system() == "Windows":
+        print("[*] Checking PDF guardrails (GTK/Pango)...")
+        # Common names for the Pango DLL in Windows GTK distributions
+        pango_found = any(shutil.which(lib) for lib in ["libpango-1.0-0.dll", "pango-1.0-0.dll"])
+        if not pango_found:
+            print("[!] WARNING: GTK+ (Pango/Cairo) libraries not found in PATH.")
+            print("    BOM Export (PDF) will fail on Windows.")
+            print("    Fix: Install GTK from https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases")
+
+    # Docker & Postgres Check
     if shutil.which("docker"):
         print("[*] Docker found. Checking PostgreSQL container...")
         try:
@@ -62,8 +87,18 @@ def check_requirements() -> bool:
                 ])
             else:
                 _docker(["start", "cloud-reaper-db"])
-        except Exception:
-            print("[!] Could not interact with Docker. Proceeding without auto-db...")
+            
+            # Wait for Postgres to be actually ready (pg_isready)
+            print("[*] Waiting for PostgreSQL to be ready...")
+            for _ in range(10):
+                ready = _docker(["exec", "cloud-reaper-db", "pg_isready", "-U", "postgres"])
+                if ready.returncode == 0:
+                    print("[+] PostgreSQL is ready.")
+                    break
+                import time
+                time.sleep(1)
+        except Exception as e:
+            print(f"[!] Could not interact with Docker: {e}. Proceeding without auto-db...")
     else:
         print("[!] Docker not found. Start PostgreSQL manually if needed.")
 
@@ -92,25 +127,30 @@ def setup_venv() -> str:
         str(pip_path), "install",
         "-r", "requirements.txt",
         "-r", "requirements-dev.txt",
+        "gevent", # Gevent Injection for high-performance Flask serving
     ])
 
     return str(python_path)
 
 
 def build_go_engine() -> bool:
-    """Compile the Go performance engine binary."""
+    """Compile the Go performance engine binary and place it in bin/."""
     print("[*] Building Go engine...")
-    go_bin = shutil.which("go") or "go"  # Fixes S607 via absolute path
+    go_bin = shutil.which("go") or "go"
     is_windows = platform.system() == "Windows"
     binary_name = "reaper-engine.exe" if is_windows else "reaper-engine"
 
     engine_dir = Path("src/engine-go")
+    bin_dir = Path("bin")
+    bin_dir.mkdir(exist_ok=True)
+
     if not engine_dir.exists():
         print("[!] src/engine-go not found!")
         return False
 
-    output_path = engine_dir / binary_name
-    if run_command([go_bin, "build", "-o", binary_name, "main.go"], cwd=str(engine_dir)):
+    output_path = bin_dir / binary_name
+    # Compile directly into the root /bin directory
+    if run_command([go_bin, "build", "-o", str(output_path.absolute()), "main.go"], cwd=str(engine_dir)):
         print(f"[+] Go engine built: {output_path}")
         return True
     return False

@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import platform
 import subprocess
 from pathlib import Path
 
@@ -467,8 +468,10 @@ class AzureCollector:
         """
         Executes the Go Performance Core to fetch real-time Azure pricing data.
         """
-        # Path to the Go binary
-        go_binary = Path(__file__).resolve().parent.parent.parent / "engine-go" / "reaper-engine"
+        # Path to the Go binary in the root bin/ directory
+        is_windows = platform.system() == "Windows"
+        binary_name = "reaper-engine.exe" if is_windows else "reaper-engine"
+        go_binary = Path(__file__).resolve().parents[3] / "bin" / binary_name
 
         if not go_binary.exists():
             print(f"[-] Error: Go binary not found at {go_binary}. Run ./reap.sh to build.")
