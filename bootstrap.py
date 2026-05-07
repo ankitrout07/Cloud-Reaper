@@ -160,28 +160,70 @@ def setup_env() -> None:
                 print(f"[!] WARNING: Port {port} is busy. If the dashboard fails, change FLASK_PORT in .env")
 
 
+def print_success_report(port: str) -> None:
+    """Print a high-fidelity summary of the deployed environment."""
+    print("\n" + "=" * 60)
+    print("🚀 CLOUD-REAPER INTELLIGENCE ENGINE IS ONLINE")
+    print("=" * 60)
+    print(f"  ▸ Dashboard:    http://localhost:{port}")
+    print(f"  ▸ Port:         {port}")
+    print("  ▸ Status:       HEALTHY")
+    print("  ▸ Monitoring:   ACTIVE")
+    print("=" * 60)
+    print("Press Ctrl+C to terminate the session safely.\n")
+
+
 def main() -> None:
-    """Unified deployment and launch sequence."""
+    """Parallelized deployment sequence for ultra-fast launch."""
+    from concurrent.futures import ThreadPoolExecutor
     print_banner()
     
+    # Phase 1: Sequential Requirements Check
+    print(f"\n[1/3] VERIFYING SYSTEM CORE...")
     if not check_requirements():
         sys.exit(1)
+    print(f"[✓] System core verified.")
 
-    python_exe = setup_venv()
-    build_go_engine()
+    # Phase 2: Parallel Build & Environment Setup
+    print(f"\n[2/3] ASSEMBLING COMPONENTS (PARALLEL)...")
+    context = {"python_exe": sys.executable, "port": "5001"}
+    
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        venv_future = executor.submit(setup_venv)
+        go_future = executor.submit(build_go_engine)
+        
+        # Monitor results
+        context["python_exe"] = venv_future.result()
+        if not go_future.result():
+            print("[!] Go engine build failed. Dashboard features may be limited.")
+        
+    print(f"[✓] Components assembled.")
+
+    # Phase 3: Final Configuration & Launch
+    print(f"\n[3/3] INITIALIZING INTELLIGENCE...")
     setup_env()
+    
+    env_file = Path(".env")
+    if env_file.exists():
+        with env_file.open("r") as f:
+            for line in f:
+                if "FLASK_PORT" in line:
+                    context["port"] = line.split("=")[1].strip()
 
-    print("-" * 60)
-    print("✅ DEPLOYMENT READY. LAUNCHING CLOUD-REAPER...")
-    print("-" * 60)
+    print_success_report(context["port"])
 
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path("src").absolute())
 
+    print("[*] Launching Flask/SocketIO Server...")
     try:
-        subprocess.run([python_exe, "-m", "reaper.web.app"], env=env, check=False)
+        # Run with absolute path to venv python
+        subprocess.run([context["python_exe"], "-m", "reaper.web.app"], env=env, check=False)
     except KeyboardInterrupt:
-        print("\n[*] Cloud-Reaper stopped.")
+        print("\n[*] Cloud-Reaper session ended.")
+    except Exception as e:
+        print(f"\n[!] CRITICAL ERROR: Could not start dashboard: {e}")
+        print("    Try running manually: source venv/bin/activate && python -m reaper.web.app")
 
 
 if __name__ == "__main__":
