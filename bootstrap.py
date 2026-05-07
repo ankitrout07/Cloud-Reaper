@@ -115,6 +115,29 @@ def setup_venv() -> str:
     return str(python_path)
 
 
+def build_go_engine() -> bool:
+    """Compile the Go performance engine binary and place it in bin/."""
+    print("[*] Building Go engine...")
+    go_bin = shutil.which("go") or "go"
+    is_windows = platform.system() == "Windows"
+    binary_name = "reaper-engine.exe" if is_windows else "reaper-engine"
+
+    engine_dir = Path("src/engine-go")
+    bin_dir = Path("bin")
+    bin_dir.mkdir(exist_ok=True)
+
+    if not engine_dir.exists():
+        print("[!] src/engine-go not found!")
+        return False
+
+    output_path = bin_dir / binary_name
+    # Compile directly into the root /bin directory
+    success = run_command([go_bin, "build", "-o", str(output_path.absolute()), "main.go"], cwd=str(engine_dir))
+    if success:
+        print(f"[+] Go engine built: {output_path}")
+    return success
+
+
 def setup_env() -> None:
     """Sync .env file and check for port conflicts."""
     env_file = Path(".env")
