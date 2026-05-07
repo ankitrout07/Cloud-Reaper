@@ -100,7 +100,7 @@ pip install -r requirements.txt -r requirements-dev.txt
 ### Step 3 — Build the Go Engine
 ```bash
 cd src/engine-go
-go build -o reaper-engine main.go
+go build -o reaper-engine .
 cd ../..
 ```
 

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.subscription import SubscriptionClient
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 from reaper.collectors.auth_check import check_azure_status
@@ -49,6 +49,26 @@ settings_state = {
     "budget_threshold": 1000.0,
     "auto_flag_compliance": True,
 }
+
+ENV_PATH = os.path.join(os.getcwd(), ".env")
+
+
+@app.route("/api/settings/sync", methods=["POST"])
+def sync_settings():
+    data = request.json
+    try:
+        # 1. Update the .env file physically
+        set_key(ENV_PATH, "AZURE_SUBSCRIPTION_ID", data.get("subscriptionId"))
+        set_key(ENV_PATH, "AZURE_TENANT_ID", data.get("tenantId"))
+        set_key(ENV_PATH, "AZURE_CLIENT_ID", data.get("clientId"))
+        set_key(ENV_PATH, "AZURE_CLIENT_SECRET", data.get("clientSecret"))
+
+        # 2. Reload the environment variables for the current running process
+        load_dotenv(ENV_PATH, override=True)
+
+        return jsonify({"status": "success", "message": "Credentials Sync Complete"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.before_request

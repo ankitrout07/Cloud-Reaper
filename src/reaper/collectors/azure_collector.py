@@ -417,13 +417,13 @@ class AzureCollector:
             from azure.mgmt.resourcegraph.models import QueryRequest
 
             client = ResourceGraphClient(self.credentials)
-            query = \"\"\"
+            query = """
                 Resources 
                 | where type =~ 'Microsoft.Compute/virtualMachines' 
                 | where isnull(tags.owner) or isnull(tags.project)
                 | project name, type, resourceGroup, tags
                 | take 5
-            \"\"\"
+            """
             request = QueryRequest(
                 subscriptions=[self.subscription_id],
                 query=query
