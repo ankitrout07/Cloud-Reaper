@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Helvetica', sans-serif;
+            color: #333;
+            margin: 0;
+            padding: 40px;
+        }
+        .header {
+            border-bottom: 2px solid #00f2ff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: 900;
+            color: #00f2ff;
+            text-transform: uppercase;
+        }
+        .title {
+            font-size: 32px;
+            font-weight: 900;
+            margin: 10px 0;
+            text-transform: uppercase;
+        }
+        .meta {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 30px;
+        }
+        th {
+            background-color: #f8f9fa;
+            text-align: left;
+            padding: 12px;
+            font-size: 10px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #eee;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 11px;
+        }
+        .sku {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+            font-size: 9px;
+            color: #999;
+        }
+        .totals {
+            margin-top: 30px;
+            float: right;
+            width: 300px;
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .total-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .total-value {
+            font-size: 14px;
+            font-weight: 900;
+        }
+        .grand-total {
+            color: #00f2ff;
+            background: #0d1117;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .grand-total .total-value {
+            font-size: 20px;
+        }
+        .grand-total .total-label {
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Cloud Reaper</div>
+        <div class="title">Bill of Materials</div>
+        <div class="meta">Generated: {{ date }} | FinOps Architect Engine</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Resource SKU</th>
+                <th>Service Family</th>
+                <th>Qty</th>
+                <th>Hourly Rate</th>
+                <th>Monthly Est.</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td class="sku">{{ item.sku }}</td>
+                <td>{{ item.service }}</td>
+                <td>{{ item.count }}</td>
+                <td>${{ "{:.4f}".format(item.hourly) }}</td>
+                <td>${{ "{:.2f}".format(item.hourly * 730 * item.count) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals">
+        <div class="total-row">
+            <span class="total-label">Total Hourly Rate</span>
+            <span class="total-value">${{ "{:.4f}".format(totalHourly) }}</span>
+        </div>
+        <div class="total-row grand-total">
+            <span class="total-label">Estimated Monthly Spend</span>
+            <span class="total-value">${{ "{:.2f}".format(totalMonthly) }}</span>
+        </div>
+    </div>
+
+    <div style="clear: both;"></div>
+
+    <div class="footer">
+        Cloud Reaper FinOps Intelligence | Built for Optimized Azure Infrastructure<br>
+        This is an estimate based on current Retail Price Catalog data.
+    </div>
+</body>
+</html>

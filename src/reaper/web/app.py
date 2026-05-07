@@ -9,7 +9,10 @@ from pathlib import Path
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.subscription import SubscriptionClient
 from dotenv import load_dotenv, set_key
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import Flask, jsonify, redirect, render_template, request, url_for, send_file
+import io
+import datetime
+from weasyprint import HTML
 
 from reaper.collectors.auth_check import check_azure_status
 from reaper.collectors.azure_collector import AzureCollector
@@ -414,6 +417,38 @@ def format_scan_results(raw):
 def get_prices():
     try:
         return jsonify({"status": "success", "prices": AzureCollector().get_live_prices()})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/export/bom", methods=["POST"])
+def export_bom():
+    try:
+        data = request.json
+        items = data.get("resources", [])
+        total_hourly = data.get("totalHourly", 0.0)
+        total_monthly = data.get("totalMonthly", 0.0)
+
+        # Render the HTML template
+        rendered_html = render_template(
+            "bom_pdf_template.html",
+            items=items,
+            totalHourly=total_hourly,
+            totalMonthly=total_monthly,
+            date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
+        # Generate PDF in memory
+        pdf_out = io.BytesIO()
+        HTML(string=rendered_html).write_pdf(pdf_out)
+        pdf_out.seek(0)
+
+        return send_file(
+            pdf_out,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name="Cloud_Reaper_BOM.pdf",
+        )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
