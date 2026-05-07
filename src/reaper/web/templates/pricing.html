@@ -514,6 +514,24 @@
             }
         }
 
+        async function fetchPrices() {
+            try {
+                const response = await fetch('/api/prices');
+                const data = await response.json();
+                if (data.status === 'success') {
+                    // The Go engine returns ScanResult with a 'prices' field
+                    const priceData = data.prices.prices || [];
+                    renderTable(priceData);
+                } else {
+                    document.getElementById('priceTableBody').innerHTML = 
+                        `<tr><td colspan="5" class="p-8 text-center text-rose-400 font-bold">ENGINE ERROR: ${data.message}</td></tr>`;
+                }
+            } catch (err) {
+                document.getElementById('priceTableBody').innerHTML = 
+                    '<tr><td colspan="5" class="p-8 text-center text-rose-400 font-bold">CONNECTION REFUSED: GO ENGINE OFFLINE</td></tr>';
+            }
+        }
+
         // Initial fetch
         fetchPrices();
     </script>
