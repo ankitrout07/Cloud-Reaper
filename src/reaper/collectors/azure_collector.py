@@ -131,7 +131,29 @@ class AzureCollector:
         snapshots = self.get_snapshots()
         return {"disks": orphaned_disks, "snapshots": snapshots}
 
-    def get_unassociated_ips(self):
+    def get_vm_metrics(self, resource_id):
+        """
+        Fetches real-time Percentage CPU metrics from Azure Monitor for a specific resource.
+        """
+        try:
+            client = MonitorManagementClient(self.credentials, self.subscription_id)
+            metrics = client.metrics.list(
+                resource_id,
+                timespan='PT1H',
+                interval='PT1M',
+                metricnames='Percentage CPU',
+                aggregation='Average'
+            )
+            # Extract the most recent value from the timeseries
+            if metrics.value and metrics.value[0].timeseries and metrics.value[0].timeseries[0].data:
+                latest_data = metrics.value[0].timeseries[0].data[-1]
+                return latest_data.average if latest_data.average is not None else 0.0
+            return 0.0
+        except Exception as e:
+            print(f"[-] Error fetching metrics for {resource_id}: {e}")
+            return 0.0
+
+    def get_unassociated_public_ips(self):
         """Finds Public IPs not attached to any NIC/Resource"""
         ips = self.network.public_ip_addresses.list_all()
         unassociated = []

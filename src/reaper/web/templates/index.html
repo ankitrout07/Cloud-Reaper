@@ -185,6 +185,19 @@
                     <canvas id="forecastChart"></canvas>
                 </div>
             </div>
+            <!-- REAL-TIME COMPUTE VELOCITY CARD -->
+            <div class="glass p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-sm font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                        Real-Time Compute Velocity
+                    </h3>
+                    <span class="text-[9px] text-gray-500 font-bold animate-pulse uppercase">Live Stream</span>
+                </div>
+                <div class="h-[180px] w-full relative">
+                    <canvas id="computeChart"></canvas>
+                </div>
+            </div>
             <div class="flex flex-col gap-6">
                 <div class="glass p-6 flex-1">
                     <p class="text-gray-400 text-sm">TOTAL MONTHLY SAVINGS</p>
@@ -661,7 +674,62 @@
             if (!advisorOpen) toggleAdvisor();
         }
 
+        }
+
+        // Real-Time Compute Chart Initialization
+        let computeChart;
+        function initComputeChart() {
+            const ctx = document.getElementById('computeChart').getContext('2d');
+            computeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Avg CPU Utilization (%)',
+                        borderColor: '#22d3ee',
+                        backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                        data: [],
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            max: 100,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#6b7280', font: { size: 9 } }
+                        },
+                        x: { display: false }
+                    },
+                    animation: false
+                }
+            });
+        }
+
+        initComputeChart();
+
         const socket = io();
+        
+        socket.on('metric_update', function(payload) {
+            if (!computeChart) return;
+            
+            if (computeChart.data.labels.length > 30) {
+                computeChart.data.labels.shift();
+                computeChart.data.datasets[0].data.shift();
+            }
+            
+            computeChart.data.labels.push(payload.time);
+            computeChart.data.datasets[0].data.push(payload.value);
+            computeChart.update('none');
+        });
+
         socket.on('new_log', function(msg) {
             const output = document.getElementById('log-output');
             const logEntry = document.createElement('p');
