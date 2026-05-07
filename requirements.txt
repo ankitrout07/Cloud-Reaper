@@ -31,3 +31,5 @@ flask-socketio
 azure-monitor-query
 eventlet
 azure-mgmt-resourcegraph
+gevent
+weasyprint

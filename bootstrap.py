@@ -42,13 +42,29 @@ def _docker(args: list[str]) -> subprocess.CompletedProcess:
 
 
 def check_requirements() -> bool:
-    """Verify Go, Docker, and critical PDF libraries are present."""
+    """Verify Go, Docker, and Azure CLI status."""
     print("[*] Checking system requirements...")
 
     # Go Check
     if not shutil.which("go"):
         print("[!] Go not found. Please install Go 1.24+")
         return False
+
+    # Azure CLI Check
+    if not shutil.which("az"):
+        print("[!] Azure CLI not found. Please install it to continue.")
+        return False
+
+    # Check Azure Login Status
+    print("[*] Verifying Azure authentication...")
+    try:
+        az_check = subprocess.run(["az", "account", "show"], capture_output=True, text=True, check=False)
+        if az_check.returncode != 0:
+            print("[!] Not logged into Azure. Please run 'az login' first.")
+            return False
+        print("[+] Azure session active.")
+    except Exception:
+        print("[!] Could not verify Azure session. Proceeding with caution...")
 
     # PDF Library Check (Linux)
     if platform.system() == "Linux":
@@ -58,148 +74,91 @@ def check_requirements() -> bool:
             if ldconfig:
                 pango_check = subprocess.run([ldconfig, "-p"], capture_output=True, text=True, check=False)
                 if "libpango-1.0" not in pango_check.stdout or "libpangocairo-1.0" not in pango_check.stdout:
-                    print("[!] WARNING: libpango-1.0 or libpangocairo-1.0 not found.")
-                    print("    BOM Export (PDF) will fail. Install with: sudo apt install libpango-1.0-0")
+                    print("[!] WARNING: PDF libraries missing. Install with: sudo apt install libpango-1.0-0")
         except Exception:
-            print("[!] Could not verify PDF libraries. Proceeding...")
-
-    # PDF Library Check (Windows)
-    if platform.system() == "Windows":
-        print("[*] Checking PDF guardrails (GTK/Pango)...")
-        # Common names for the Pango DLL in Windows GTK distributions
-        pango_found = any(shutil.which(lib) for lib in ["libpango-1.0-0.dll", "pango-1.0-0.dll"])
-        if not pango_found:
-            print("[!] WARNING: GTK+ (Pango/Cairo) libraries not found in PATH.")
-            print("    BOM Export (PDF) will fail on Windows.")
-            print("    Fix: Install GTK from https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases")
+            pass
 
     # Docker & Postgres Check
     if shutil.which("docker"):
-        print("[*] Docker found. Checking PostgreSQL container...")
+        print("[*] Docker found. Ensuring PostgreSQL is running...")
         try:
-            result = _docker(["ps", "-a"])
+            _docker(["start", "cloud-reaper-db"])
+            result = _docker(["ps"])
             if "cloud-reaper-db" not in result.stdout:
-                print("[*] Starting PostgreSQL container...")
+                print("[*] Creating fresh PostgreSQL container...")
                 _docker([
                     "run", "--name", "cloud-reaper-db",
                     "-e", "POSTGRES_PASSWORD=postgres",
                     "-p", "5432:5432", "-d", "postgres",
                 ])
-            else:
-                _docker(["start", "cloud-reaper-db"])
-            
-            # Wait for Postgres to be actually ready (pg_isready)
-            print("[*] Waiting for PostgreSQL to be ready...")
-            for _ in range(10):
-                ready = _docker(["exec", "cloud-reaper-db", "pg_isready", "-U", "postgres"])
-                if ready.returncode == 0:
-                    print("[+] PostgreSQL is ready.")
-                    break
-                import time
-                time.sleep(1)
         except Exception as e:
-            print(f"[!] Could not interact with Docker: {e}. Proceeding without auto-db...")
-    else:
-        print("[!] Docker not found. Start PostgreSQL manually if needed.")
-
+            print(f"[!] Docker error: {e}. Start Postgres manually if needed.")
+    
     return True
 
 
 def setup_venv() -> str:
-    """Create the virtual environment and install all dependencies."""
+    """Create the virtual environment and install dependencies."""
     print("[*] Setting up virtual environment...")
-
     venv_dir = Path("venv")
-    if not venv_dir.exists():  # Fixes PTH110
+    if not venv_dir.exists():
         run_command([sys.executable, "-m", "venv", str(venv_dir)])
 
     is_windows = platform.system() == "Windows"
-    if is_windows:
-        pip_path = venv_dir / "Scripts" / "pip.exe"    # Fixes PTH118
-        python_path = venv_dir / "Scripts" / "python.exe"
-    else:
-        pip_path = venv_dir / "bin" / "pip"             # Fixes PTH118
-        python_path = venv_dir / "bin" / "python"
+    python_path = venv_dir / ("Scripts" if is_windows else "bin") / ("python.exe" if is_windows else "python")
+    pip_path = venv_dir / ("Scripts" if is_windows else "bin") / ("pip.exe" if is_windows else "pip")
 
-    print("[*] Installing dependencies...")
-    run_command([str(pip_path), "install", "--upgrade", "pip"])
-    run_command([
-        str(pip_path), "install",
-        "-r", "requirements.txt",
-        "-r", "requirements-dev.txt",
-        "gevent", # Gevent Injection for high-performance Flask serving
-    ])
+    print("[*] Synchronizing dependencies...")
+    run_command([str(pip_path), "install", "--upgrade", "pip", "--quiet"])
+    run_command([str(pip_path), "install", "-r", "requirements.txt", "--quiet"])
 
     return str(python_path)
 
 
-def build_go_engine() -> bool:
-    """Compile the Go performance engine binary and place it in bin/."""
-    print("[*] Building Go engine...")
-    go_bin = shutil.which("go") or "go"
-    is_windows = platform.system() == "Windows"
-    binary_name = "reaper-engine.exe" if is_windows else "reaper-engine"
-
-    engine_dir = Path("src/engine-go")
-    bin_dir = Path("bin")
-    bin_dir.mkdir(exist_ok=True)
-
-    if not engine_dir.exists():
-        print("[!] src/engine-go not found!")
-        return False
-
-    output_path = bin_dir / binary_name
-    # Compile directly into the root /bin directory
-    if run_command([go_bin, "build", "-o", str(output_path.absolute()), "main.go"], cwd=str(engine_dir)):
-        print(f"[+] Go engine built: {output_path}")
-        return True
-    return False
-
-
 def setup_env() -> None:
-    """Create a default .env file if one does not exist."""
+    """Sync .env file and check for port conflicts."""
     env_file = Path(".env")
-    if not env_file.exists():  # Fixes PTH110
-        print("[*] Creating .env file from template...")
-        with env_file.open("w") as f:  # Fixes PTH123
-            f.write("# Cloud-Reaper Configuration\n")
-            f.write("APP_ENV=development\n")
-            f.write("FLASK_PORT=5001\n")
-            f.write("FLASK_DEBUG=True\n")
-            f.write("AZURE_SUBSCRIPTION_ID=your_subscription_id\n")
+    default_port = "5001"
+    
+    if not env_file.exists():
+        print("[*] Creating .env from template...")
+        with env_file.open("w") as f:
+            f.write(f"FLASK_PORT={default_port}\nFLASK_DEBUG=True\nAPP_ENV=development\n")
             f.write("DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres\n")
-        print("[+] .env created. Defaulting to port 5001 to avoid macOS conflicts.")
+    else:
+        # Port Conflict Check
+        import socket
+        with env_file.open("r") as f:
+            lines = f.readlines()
+            port = next((line.split("=")[1].strip() for line in lines if "FLASK_PORT" in line), default_port)
+        
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex(('127.0.0.1', int(port))) == 0:
+                print(f"[!] WARNING: Port {port} is busy. If the dashboard fails, change FLASK_PORT in .env")
 
 
 def main() -> None:
-    """Entry point: orchestrate the full bootstrap sequence."""
+    """Unified deployment and launch sequence."""
     print_banner()
-
+    
     if not check_requirements():
         sys.exit(1)
 
-    if not build_go_engine():
-        print("[!] Failed to build Go engine. Proceeding anyway...")
-
     python_exe = setup_venv()
+    build_go_engine()
     setup_env()
 
     print("-" * 60)
-    print("✅ SYSTEM READY. STARTING CLOUD-REAPER...")
-    print("   Dashboard: http://localhost:5001")
+    print("✅ DEPLOYMENT READY. LAUNCHING CLOUD-REAPER...")
     print("-" * 60)
 
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path("src").absolute())
 
     try:
-        subprocess.run(  # noqa: S603
-            [python_exe, "-m", "reaper.web.app"],
-            env=env,
-            check=False,
-        )
+        subprocess.run([python_exe, "-m", "reaper.web.app"], env=env, check=False)
     except KeyboardInterrupt:
-        print("\n[*] Stopping Cloud-Reaper...")
+        print("\n[*] Cloud-Reaper stopped.")
 
 
 if __name__ == "__main__":
