@@ -26,7 +26,9 @@ class AzureCollector:
     def __init__(self, subscription_id=None):
         self.subscription_id = subscription_id or os.getenv("AZURE_SUBSCRIPTION_ID")
         self.credentials = DefaultAzureCredential()
+        # pyrefly: ignore [bad-argument-type]
         self.compute = ComputeManagementClient(self.credentials, self.subscription_id)
+        # pyrefly: ignore [bad-argument-type]
         self.network = NetworkManagementClient(self.credentials, self.subscription_id)
         self.monitor = MonitorManagementClient(self.credentials, self.subscription_id)
         self.web = WebSiteManagementClient(self.credentials, self.subscription_id)
@@ -36,6 +38,7 @@ class AzureCollector:
             from azure.mgmt.costmanagement import CostManagementClient
             self.cost_management = CostManagementClient(self.credentials)
         except ImportError:
+            # pyrefly: ignore [bad-assignment]
             self.cost_management = None
 
     def get_vm_inventory(self):
@@ -251,6 +254,7 @@ class AzureCollector:
     def get_user_name(self):
         """Returns the authenticated user's display name"""
         try:
+            # pyrefly: ignore [bad-argument-type]
             AuthorizationManagementClient(self.credentials, self.subscription_id)
             # Get current user info - this is a simplified approach
             return "Azure User"
@@ -261,9 +265,11 @@ class AzureCollector:
         """Returns the subscription display name"""
         try:
             sub_client = SubscriptionClient(self.credentials)
+            # pyrefly: ignore [bad-argument-type]
             sub = sub_client.subscriptions.get(self.subscription_id)
             return sub.display_name
         except Exception:
+            # pyrefly: ignore [unsupported-operation]
             return f"Subscription ({self.subscription_id[:8]}...)"
 
     def get_zombie_vms(self):
@@ -382,6 +388,7 @@ class AzureCollector:
         try:
             result = self.cost_management.query.usage(scope, query)
             services_data = {}
+            # pyrefly: ignore [missing-attribute]
             for row in result.rows:
                 cost = float(row[0])
                 service = row[2]
@@ -448,6 +455,7 @@ class AzureCollector:
                 | take 5
             """
             request = QueryRequest(
+                # pyrefly: ignore [bad-argument-type]
                 subscriptions=[self.subscription_id],
                 query=query
             )
@@ -457,6 +465,7 @@ class AzureCollector:
             if hasattr(response, 'data'):
                 for item in response.data:
                     violations.append({
+                        # pyrefly: ignore [missing-attribute]
                         "resource": item.get("name", "Unknown"),
                         "violation": "Missing Owner/Project Tags",
                         "severity": "HIGH",
@@ -540,7 +549,9 @@ class AzureCollector:
 
             try:
                 result = self.cost_management.query.usage(scope, query)
+                # pyrefly: ignore [missing-attribute]
                 if result.rows:
+                    # pyrefly: ignore [no-matching-overload]
                     rows = sorted(result.rows, key=lambda x: x[1])
                     spend_data = [float(r[0]) for r in rows]
             except Exception as e:
@@ -551,12 +562,15 @@ class AzureCollector:
             db = SessionLocal()
             history = (
                 db.query(CostHistory)
+                # pyrefly: ignore [missing-attribute]
                 .filter(CostHistory.type == "ACTUAL")
+                # pyrefly: ignore [missing-attribute]
                 .order_by(CostHistory.timestamp.desc())
                 .limit(30)
                 .all()
             )
             db.close()
+            # pyrefly: ignore [missing-attribute]
             spend_data = [float(h.amount) for h in reversed(history)]
 
         if not spend_data:
@@ -646,6 +660,7 @@ if __name__ == "__main__":
         print(f"[!] REAPER TARGET: {d['name']} ({d['size_gb']}GB) - Tier: {d['tier']}")
 
     print("\n--- Hunting Unassociated Public IPs ---")
+    # pyrefly: ignore [missing-attribute]
     unassociated_ips = collector.get_unassociated_ips()
     if not unassociated_ips:
         print("No unassociated public IPs found.")

@@ -17,6 +17,7 @@ import io
 import datetime
 from weasyprint import HTML
 
+from sqlalchemy import func
 from reaper.collectors.auth_check import check_azure_status
 from reaper.collectors.azure_collector import AzureCollector
 from reaper.collectors.config_manager import save_config
@@ -285,6 +286,11 @@ def finops():
     return render_template("finops.html")
 
 
+@app.route("/monitor")
+def monitor():
+    return render_template("monitor.html")
+
+
 @app.route("/api/auth/status")
 def auth_status():
     return jsonify(check_azure_status())
@@ -536,17 +542,15 @@ def unit_economics():
             session.query(BusinessMetric).order_by(BusinessMetric.date.desc()).limit(10).all()
         )
         actual = (
-            # pyrefly: ignore [missing-attribute]
-            session.query(CostHistory)
+            session.query(func.sum(CostHistory.cost))
             .filter(CostHistory.cost_type == "ACTUAL")
-            .sum(CostHistory.cost)
+            .scalar()
             or 10000.0
         )
         amortized = (
-            # pyrefly: ignore [missing-attribute]
-            session.query(CostHistory)
+            session.query(func.sum(CostHistory.cost))
             .filter(CostHistory.cost_type == "AMORTIZED")
-            .sum(CostHistory.cost)
+            .scalar()
             or 7500.0
         )
         session.close()
@@ -784,11 +788,20 @@ def handle_start_log_stream():
 
 if __name__ == "__main__":
     # use_reloader=False stops the 'after_fork_in_child' assertion error
-    socketio.run(
-        app,
-        host=os.getenv("FLASK_HOST", "127.0.0.1"),
-        port=int(os.getenv("FLASK_PORT", "5001")),
-        debug=True,
-        use_reloader=False,
-        allow_unsafe_werkzeug=True
-    )
+    port = int(os.getenv("FLASK_PORT", "5001"))
+    host = os.getenv("FLASK_HOST", "127.0.0.1")
+    
+    print(f"\n[+] Cloud-Reaper Dashboard Active at http://{host}:{port}")
+    print("[*] Engine: gevent | Real-Time Monitoring: ENABLED\n")
+    
+    try:
+        socketio.run(
+            app,
+            host=host,
+            port=port,
+            debug=True,
+            use_reloader=False,
+            allow_unsafe_werkzeug=True
+        )
+    except KeyboardInterrupt:
+        print("\n[!] Dashboard server stopped by user.")
