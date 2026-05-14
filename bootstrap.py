@@ -4,6 +4,8 @@ Sets up the virtual environment, builds the Go engine, and launches the dashboar
 Run directly with: python bootstrap.py
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import platform
