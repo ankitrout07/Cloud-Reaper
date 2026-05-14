@@ -1,7 +1,10 @@
 """Cloud-Reaper cross-platform bootstrapper.
 
-Sets up the virtual environment, builds the Go engine, and launches the dashboard.
-Run directly with: python bootstrap.py
+Creates the project ``venv/``, applies the same environment changes as ``activate``
+(``VIRTUAL_ENV`` + ``PATH``), installs dependencies with that venv's ``pip``, builds
+the Go engine, and launches the Flask/SocketIO app with the venv interpreter.
+
+Run directly with: python3 bootstrap.py
 """
 
 from __future__ import annotations
@@ -20,6 +23,27 @@ logger = logging.getLogger(__name__)
 
 # Repository root (directory containing this file). All paths are resolved from here.
 REPO_ROOT = Path(__file__).resolve().parent
+
+
+def _venv_bin_dir(venv_dir: Path) -> Path:
+    """``venv/bin`` on Unix, ``venv\\Scripts`` on Windows."""
+    is_windows = platform.system() == "Windows"
+    return venv_dir / ("Scripts" if is_windows else "bin")
+
+
+def merge_venv_into_environ(venv_dir: Path, base: dict | None = None) -> dict:
+    """
+    Mimic ``source venv/bin/activate``: set ``VIRTUAL_ENV`` and prepend the venv
+    executables directory to ``PATH`` (so ``python``/``pip`` in subprocesses resolve
+    to the venv without relying on absolute paths alone).
+    """
+    out = dict(base if base is not None else os.environ)
+    bindir = _venv_bin_dir(venv_dir)
+    out["VIRTUAL_ENV"] = str(venv_dir.resolve())
+    out["PATH"] = str(bindir) + os.pathsep + out.get("PATH", "")
+    # Avoid interfering with venv interpreter discovery
+    out.pop("PYTHONHOME", None)
+    return out
 
 
 def print_banner() -> None:
@@ -147,39 +171,61 @@ def check_requirements() -> bool:  # noqa: PLR0912
     return True
 
 
-def setup_venv() -> str:
-    """Create the virtual environment and install dependencies."""
-    print("[*] Setting up virtual environment...")
+def setup_venv() -> tuple[str, Path]:
+    """
+    Create ``venv/`` if needed, activate it for child processes (env), install
+    ``requirements.txt``, and return ``(python_executable, venv_dir)``.
+    """
+    is_windows = platform.system() == "Windows"
     venv_dir = REPO_ROOT / "venv"
+    bindir = _venv_bin_dir(venv_dir)
+    py_name = "python.exe" if is_windows else "python"
+    pip_name = "pip.exe" if is_windows else "pip"
+    python_path = bindir / py_name
+    pip_path = bindir / pip_name
+
+    print("\n--- Python virtual environment ---")
+    print(f"[*] Target venv: {venv_dir}")
+
     if not venv_dir.exists():
+        print("[*] [1/3] Creating virtual environment (python -m venv venv)...")
         if not run_command([sys.executable, "-m", "venv", str(venv_dir)]):
             print("[!] Failed to create virtual environment.")
             sys.exit(1)
-
-    is_windows = platform.system() == "Windows"
-    bin_subdir = "Scripts" if is_windows else "bin"
-    py_name = "python.exe" if is_windows else "python"
-    pip_name = "pip.exe" if is_windows else "pip"
-    python_path = venv_dir / bin_subdir / py_name
-    pip_path = venv_dir / bin_subdir / pip_name
+    else:
+        print("[*] [1/3] Virtual environment folder already exists — reusing.")
 
     if not python_path.is_file():
         print(f"[!] Expected venv python at {python_path} but it is missing.")
         sys.exit(1)
 
-    print("[*] Synchronizing dependencies...")
+    venv_env = merge_venv_into_environ(venv_dir)
+    activate_hint = "venv\\Scripts\\activate" if is_windows else "source venv/bin/activate"
+    print(
+        "[*] [2/3] Activating for installs (VIRTUAL_ENV + PATH → "
+        f"{bindir.name}) — same effect as: {activate_hint}"
+    )
+
     req = REPO_ROOT / "requirements.txt"
     if not req.is_file():
         print(f"[!] requirements.txt not found at {req}")
         sys.exit(1)
 
-    if not run_command([str(pip_path), "install", "--upgrade", "pip", "--quiet"]):
+    print("[*] [3/3] Installing / upgrading dependencies into the venv...")
+    if not run_command(
+        [str(pip_path), "install", "--upgrade", "pip", "--quiet"],
+        env=venv_env,
+    ):
         print("[!] pip upgrade failed — continuing with existing pip.")
-    if not run_command([str(pip_path), "install", "-r", str(req), "--quiet"]):
+    if not run_command(
+        [str(pip_path), "install", "-r", str(req), "--quiet"],
+        env=venv_env,
+    ):
         print("[!] pip install -r requirements.txt failed.")
         sys.exit(1)
 
-    return str(python_path)
+    print(f"[+] Dependencies installed. Interpreter: {python_path}")
+    return str(python_path), venv_dir
 
 
 def build_go_engine() -> bool:
@@ -278,7 +324,8 @@ def main() -> None:
         venv_future = executor.submit(setup_venv)
         go_future = executor.submit(build_go_engine)
 
-        context["python_exe"] = venv_future.result()
+        py_exe, venv_dir = venv_future.result()
+        context["python_exe"] = py_exe
         if not go_future.result():
             print("[!] Go engine build failed. Dashboard features may be limited.")
 
@@ -298,10 +345,10 @@ def main() -> None:
 
     print_success_report(context["port"])
 
-    env = os.environ.copy()
+    env = merge_venv_into_environ(venv_dir)
     env["PYTHONPATH"] = str((REPO_ROOT / "src").resolve())
 
-    print("[*] Launching Flask/SocketIO Server...")
+    print("[*] Launching Flask/SocketIO Server (venv activated in process environment)...")
     try:
         subprocess.run(
             [context["python_exe"], "-m", "reaper.web.app"],  # noqa: S603
