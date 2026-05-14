@@ -1,0 +1,60 @@
+The Metric Pipeline ArchitectureFor real-time charts, you don't want to poll the database constantly. You want a stream:Scraper (Go): Uses the Azure Monitor SDK to pull CPU/RAM/Disk metrics.Pusher (Python): Receives the Go output and broadcasts it via WebSockets.Frontend (JS): Updates the chart data points in real-time.Shutterstock Explore 2. Frontend: Chart.js IntegrationIn your src/reaper/web/templates/dashboard.html, we will add a dedicated monitoring section.HTML Canvas:HTML<div class="monitor-card glass-morph">
+    <div class="card-header">
+        <i class="fas fa-chart-line"></i>
+        <h3>REAL-TIME COMPUTE VELOCITY</h3>
+    </div>
+    <canvas id="computeChart"></canvas>
+</div>
+JavaScript (static/js/theme.js):JavaScriptconst ctx = document.getElementById('computeChart').getContext('2d');
+const computeChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [], // Time stamps
+        datasets: [{
+            label: 'Avg CPU Utilization (%)',
+            borderColor: '#00f2ff', // Your signature cyan
+            backgroundColor: 'rgba(0, 242, 255, 0.1)',
+            data: [],
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
+            x: { grid: { display: false } }
+        }
+    }
+});
+
+// Update chart when Socket.io receives new metrics
+socket.on('metric_update', function(payload) {
+    if (computeChart.data.labels.length > 20) {
+        computeChart.data.labels.shift();
+        computeChart.data.datasets[0].data.shift();
+    }
+    computeChart.data.labels.push(payload.time);
+    computeChart.data.datasets[0].data.push(payload.value);
+    computeChart.update('none'); // Update without animation for performance
+});
+3. Backend: Real-Time Scraper (src/reaper/collectors/azure_collector.py)Instead of just fetching prices, we now fetch Metrics.Pythonfrom azure.mgmt.monitor import MonitorManagementClient
+
+def get_vm_metrics(resource_id):
+    client = MonitorManagementClient(credential, subscription_id)
+    metrics = client.metrics.list(
+        resource_id,
+        timespan='PT1H',
+        interval='PT1M',
+        metricnames='Percentage CPU',
+        aggregation='Average'
+    )
+    # Extract the most recent value
+    latest_val = metrics.value[0].timeseries[0].data[-1].average
+    return latest_val
+4. Recommended Metrics for FinOps DashboardTo provide "High-Intelligence" value, your panel should feature these specific charts:Chart TypeMetricFinOps PurposeArea ChartAggregate Cost vs. BudgetVisualizes the "Burn Rate" against your limit.Bar ChartService DistributionShows if you're spending more on Compute, Storage, or Networking.Stacked LineCPU/RAM per Instance FamilyIdentifies "Idle" instances that need to be "Reaped."HeatmapUsage by HourShows if you should implement "Auto-Shutdown" policies at night.
+
+
+
+5. Performance Optimization (DevOps Tip)
+Running real-time charts can be heavy on the browser. Since you are using Ubuntu 24.04 and gevent, ensure you set a throttle on your socket emissions. Don't push metrics faster than once every 5–10 seconds for Azure services, as the Azure Monitor API itself doesn't update faster than that for standard metrics.

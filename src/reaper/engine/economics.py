@@ -21,7 +21,7 @@ class BusinessCorrelation:
         df["cpu"] = df["cost"] / df["users"]
 
         # Simple Linear Regression to find the cost function C(u)
-        z = np.polyfit(df["users"], df["cost"], 1)
+        z = np.polyfit(df["users"].to_numpy(dtype=float), df["cost"].to_numpy(dtype=float), 1)
 
         marginal_cost = z[0]  # The derivative dC/du is constant 'm' in linear fit
 
