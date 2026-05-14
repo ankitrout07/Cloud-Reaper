@@ -4,6 +4,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 from stable_baselines3 import PPO
+from reaper.engine.workload import PredictiveScalingEngine
 
 # Constants
 DEFAULT_NODE_COUNT = 5
@@ -84,6 +85,13 @@ class ReaperAgent:
         obs = np.array([current_nodes, pending_jobs, avg_wait], dtype=np.float32)
         action, _states = self.model.predict(obs, deterministic=True)
         return action  # 0, 1, or 2
+
+    def get_predictive_action(self, usage_history):
+        """
+        Uses ARIMA forecasting to suggest pre-emptive scaling.
+        """
+        scaler = PredictiveScalingEngine()
+        return scaler.predict_load(usage_history)
 
 
 def suggest_k8s_consolidation(node_metrics):

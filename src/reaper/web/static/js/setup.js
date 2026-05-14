@@ -62,3 +62,32 @@ async function connectInfrastructure() {
         }
     }
 }
+
+// Sidebar dynamic highlighting
+function initializeSidebarHighlighting() {
+    const currentPath = window.location.pathname;
+    const navLinks = document.querySelectorAll('#sidebar a');
+    
+    navLinks.forEach(link => {
+        const href = link.getAttribute('href');
+        const isActive = (href === currentPath) || (currentPath === '/' && href === '/');
+        
+        if (isActive) {
+            // Apply active styles
+            link.classList.remove('text-gray-400', 'hover:bg-white/10');
+            link.classList.add('bg-cyan-500/10', 'text-cyan-400', 'border-l-2', 'border-cyan-400');
+            
+            // Highlight the icon specifically if needed
+            const icon = link.querySelector('.sidebar-icon');
+            if (icon) {
+                icon.classList.add('text-cyan-400');
+            }
+        } else {
+            // Ensure non-active styles
+            link.classList.add('text-gray-400', 'hover:bg-white/10');
+            link.classList.remove('bg-cyan-500/10', 'text-cyan-400', 'border-l-2', 'border-cyan-400', 'bg-white/10');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initializeSidebarHighlighting);

@@ -8,6 +8,7 @@ from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 from reaper.engine.notifier import send_discord_alert
+from reaper.engine.workload import WorkloadPersonality
 
 
 class ZombieScorer:
@@ -155,6 +156,15 @@ class RightSizer:
             if recommended_size != vm["size"]:
                 potential_saving = 25.0  # Mock $25/mo saving
 
+            # Personality Analysis (Pattern-Aware Scaling)
+            personality_analyzer = WorkloadPersonality()
+            personality = personality_analyzer.analyze(usage)
+            
+            if personality.get("personality") == "Cyclic/Periodic":
+                reason = f"Periodic pattern detected. {personality['recommendation']}"
+            else:
+                reason = f"Peak CPU at {max_usage:.1f}% indicates over-provisioning."
+
             recommendations.append(
                 {
                     "vm_name": vm["name"],
@@ -162,7 +172,8 @@ class RightSizer:
                     "recommended_size": recommended_size,
                     "confidence": 0.85,
                     "monthly_saving": potential_saving,
-                    "reason": f"Peak CPU at {max_usage:.1f}% indicates over-provisioning.",
+                    "reason": reason,
+                    "personality": personality.get("personality", "Unknown"),
                 }
             )
 
