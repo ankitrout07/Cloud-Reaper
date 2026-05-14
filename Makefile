@@ -17,7 +17,8 @@ install:
 	cd src/engine-go && go mod download
 
 build:
-	cd src/engine-go && go build -o reaper-engine main.go
+	mkdir -p bin
+	cd src/engine-go && go build -o ../../bin/reaper-engine main.go
 
 test: test-python test-go
 
@@ -40,6 +41,6 @@ run: build
 	./scripts/reap.sh
 
 clean:
-	rm -f src/engine-go/reaper-engine
+	rm -rf bin/
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	rm -rf .pytest_cache .ruff_cache .mypy_cache

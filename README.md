@@ -65,6 +65,7 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 
 ```text
 Cloud-Reaper/
+├── bin/                    # Compiled Go binaries (reaper-engine)
 ├── bootstrap.py            # Universal cross-platform setup script
 ├── main.py                 # CLI entry point
 ├── Makefile                # Developer shortcuts (install, build, test, lint)

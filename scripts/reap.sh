@@ -54,8 +54,9 @@ fi
 # 1. Build Go Core (Performance Engine)
 if [ -d "src/engine-go" ]; then
     echo "[*] Building Go Core..."
-    (cd src/engine-go && go build -o reaper-engine main.go)
-    echo "[+] Go engine built successfully"
+    mkdir -p bin
+    (cd src/engine-go && go build -o ../../bin/reaper-engine main.go)
+    echo "[+] Go engine built successfully: bin/reaper-engine"
 else
     echo "[!] src/engine-go directory not found!"
     exit 1
@@ -134,7 +135,7 @@ echo "[*] Running resource scan..."
 # 6. Start Dashboard (in background)
 echo "------------------------------------------------"
 echo "[+] Starting Dashboard..."
-echo "    Access at: http://localhost:5000"
+echo "    Access at: http://localhost:5001"
 echo "    Press Ctrl+C to stop"
 echo "------------------------------------------------"
 ./venv/bin/python3 -m reaper.web.app
