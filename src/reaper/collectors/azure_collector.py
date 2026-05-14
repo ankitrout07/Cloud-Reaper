@@ -16,11 +16,24 @@ from azure.mgmt.subscription import SubscriptionClient
 from azure.mgmt.web import WebSiteManagementClient
 from dotenv import load_dotenv
 
+from collections import defaultdict
+
 from reaper.collectors.azure_prices import AzurePriceClient
 from reaper.engine.logic import BudgetForecaster
 from reaper.engine.models import CostHistory, RegionPriceCache, SessionLocal
 
 load_dotenv()
+
+
+def _vm_series_family(vm_size: str) -> str:
+    """Azure SKU prefix for grouping (e.g. Standard_D4s_v5 -> D)."""
+    if not vm_size:
+        return "Unknown"
+    s = vm_size.replace("Basic_", "").replace("Standard_", "")
+    i = 0
+    while i < len(s) and not s[i].isdigit():
+        i += 1
+    return s[:i] if i > 0 else s[:4]
 
 
 class AzureCollector:
@@ -139,22 +152,256 @@ class AzureCollector:
         Fetches real-time Percentage CPU metrics from Azure Monitor for a specific resource.
         """
         try:
-            client = MonitorManagementClient(self.credentials, self.subscription_id)
-            metrics = client.metrics.list(
+            metrics = self.monitor.metrics.list(
                 resource_id,
-                timespan='PT1H',
-                interval='PT1M',
-                metricnames='Percentage CPU',
-                aggregation='Average'
+                timespan="PT1H",
+                interval="PT1M",
+                metricnames="Percentage CPU",
+                aggregation="Average",
             )
-            # Extract the most recent value from the timeseries
-            if metrics.value and metrics.value[0].timeseries and metrics.value[0].timeseries[0].data:  # noqa: E501
+            if metrics.value and metrics.value[0].timeseries and metrics.value[0].timeseries[0].data:
                 latest_data = metrics.value[0].timeseries[0].data[-1]
                 return latest_data.average if latest_data.average is not None else 0.0
             return 0.0
         except Exception as e:
             print(f"[-] Error fetching metrics for {resource_id}: {e}")
             return 0.0
+
+    def get_vm_metric_latest(
+        self, resource_id: str, metric_name: str, timespan: str = "PT1H", interval: str = "PT1M"
+    ) -> float | None:
+        """Latest datapoint for an arbitrary VM host metric (may be None if unavailable)."""
+        try:
+            metrics = self.monitor.metrics.list(
+                resource_id,
+                timespan=timespan,
+                interval=interval,
+                metricnames=metric_name,
+                aggregation="Average",
+            )
+            if not metrics.value or not metrics.value[0].timeseries:
+                return None
+            series = metrics.value[0].timeseries[0].data
+            if not series:
+                return None
+            for point in reversed(series):
+                if point.average is not None:
+                    return float(point.average)
+            return None
+        except Exception as e:
+            print(f"[-] Error fetching {metric_name} for {resource_id}: {e}")
+            return None
+
+    def get_live_subscription_cpu_average(self, max_vms: int = 6) -> float | None:
+        """
+        Average of latest Percentage CPU across up to ``max_vms`` VMs (Azure Monitor cadence).
+        Returns None when there are no VMs or all metric calls fail.
+        """
+        if not self.subscription_id:
+            return None
+        values: list[float] = []
+        for i, vm in enumerate(self.compute.virtual_machines.list_all()):
+            if i >= max_vms:
+                break
+            resource_group = vm.id.split("/")[4]
+            resource_id = (
+                f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
+                f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
+            )
+            cpu = self.get_vm_metrics(resource_id)
+            values.append(float(cpu))
+        if not values:
+            return None
+        return sum(values) / len(values)
+
+    def get_cost_vs_budget_series(self, monthly_budget: float = 5000.0) -> dict:
+        """Cumulative daily spend vs linear budget pace (FinOps burn view)."""
+        burn = self.get_burn_rate_forecast()
+        daily = burn.get("daily_history") or []
+        if len(daily) > 30:
+            daily = daily[-30:]
+        cumulative: list[float] = []
+        total = 0.0
+        for d in daily:
+            total += float(d)
+            cumulative.append(round(total, 2))
+        n = len(cumulative)
+        pace = [round(monthly_budget * (i + 1) / 30.0, 2) for i in range(n)]
+        labels = [f"Day {i + 1}" for i in range(n)]
+        return {
+            "labels": labels,
+            "cumulative_spend": cumulative,
+            "budget_pace": pace,
+            "budget_cap": monthly_budget,
+        }
+
+    def get_service_bucket_spend(self) -> dict:
+        """Aggregate last-30-day cost into Compute / Storage / Networking / Other."""
+        default = {"labels": ["Compute", "Storage", "Networking", "Other"], "data": [0.0, 0.0, 0.0, 0.0]}
+        if not self.cost_management or not self.subscription_id:
+            return default
+
+        scope = f"/subscriptions/{self.subscription_id}"
+        end_date = datetime.datetime.now(datetime.UTC)
+        start_date = end_date - datetime.timedelta(days=30)
+
+        from azure.mgmt.costmanagement.models import (
+            QueryAggregation,
+            QueryDataset,
+            QueryDefinition,
+            QueryGrouping,
+            QueryTimePeriod,
+        )
+
+        query = QueryDefinition(
+            type="Usage",
+            timeframe="Custom",
+            time_period=QueryTimePeriod(from_property=start_date, to=end_date),
+            dataset=QueryDataset(
+                granularity="Daily",
+                aggregation={"totalCost": QueryAggregation(name="PreTaxCost", function="Sum")},
+                grouping=[QueryGrouping(type="Dimension", name="ServiceName")],
+            ),
+        )
+
+        by_service: dict[str, float] = defaultdict(float)
+        try:
+            result = self.cost_management.query.usage(scope, query)
+            for row in result.rows or []:
+                if len(row) < 3:
+                    continue
+                by_service[str(row[2])] += float(row[0])
+        except Exception as e:
+            print(f"[-] Service bucket spend query failed: {e}")
+            return default
+
+        buckets = {"Compute": 0.0, "Storage": 0.0, "Networking": 0.0, "Other": 0.0}
+        for service, cost in by_service.items():
+            sl = service.lower()
+            if any(k in sl for k in ("storage", "disk", "blob", "files", "backup")):
+                buckets["Storage"] += cost
+            elif any(
+                k in sl
+                for k in (
+                    "network",
+                    "traffic",
+                    "bandwidth",
+                    "load balancer",
+                    "vpn",
+                    "cdn",
+                    "expressroute",
+                )
+            ):
+                buckets["Networking"] += cost
+            elif any(
+                k in sl
+                for k in (
+                    "virtual machines",
+                    "compute",
+                    "kubernetes",
+                    "container",
+                    "functions",
+                    "batch",
+                )
+            ):
+                buckets["Compute"] += cost
+            else:
+                buckets["Other"] += cost
+
+        return {
+            "labels": list(buckets.keys()),
+            "data": [round(v, 2) for v in buckets.values()],
+        }
+
+    def get_instance_family_cpu_ram(self) -> dict:
+        """
+        Per VM-series: average 24h CPU and optional ``Available Memory Bytes`` (GiB) from host metrics.
+        """
+        inv = {v["name"]: v["size"] for v in self.get_vm_inventory()}
+        report = self.get_utilization_report()
+        by_fam: dict[str, dict[str, list[float]]] = defaultdict(lambda: {"cpu": [], "mem_gib": []})
+
+        for row in report[:24]:
+            name = row.get("name")
+            size = inv.get(name)
+            if not size:
+                continue
+            fam = _vm_series_family(size)
+            by_fam[fam]["cpu"].append(float(row.get("usage", 0)))
+
+        for row in report[:8]:
+            name = row.get("name")
+            size = inv.get(name)
+            rg = row.get("rg")
+            if not name or not rg or not size:
+                continue
+            fam = _vm_series_family(size)
+            rid = (
+                f"/subscriptions/{self.subscription_id}/resourceGroups/{rg}/"
+                f"providers/Microsoft.Compute/virtualMachines/{name}"
+            )
+            avail = self.get_vm_metric_latest(rid, "Available Memory Bytes", "PT1H", "PT5M")
+            if avail is not None and avail > 0:
+                by_fam[fam]["mem_gib"].append(avail / (1024.0**3))
+
+        labels = sorted(by_fam.keys())[:10]
+        cpu_avgs: list[float] = []
+        mem_gib_avgs: list[float] = []
+        for fam in labels:
+            cpus = by_fam[fam]["cpu"]
+            mems = by_fam[fam]["mem_gib"]
+            cpu_avgs.append(round(sum(cpus) / len(cpus), 1) if cpus else 0.0)
+            mem_gib_avgs.append(round(sum(mems) / len(mems), 2) if mems else 0.0)
+
+        return {"labels": labels, "cpu": cpu_avgs, "memory_gib": mem_gib_avgs}
+
+    def get_hourly_cpu_profile(self) -> dict:
+        """Last ~24h hourly Percentage CPU for the first VM (auto-shutdown / heatmap signal)."""
+        empty = {"labels": [f"{h:02d}:00" for h in range(24)], "values": [0.0] * 24}
+        vms = list(self.compute.virtual_machines.list_all())
+        if not vms or not self.subscription_id:
+            return empty
+
+        vm = vms[0]
+        resource_group = vm.id.split("/")[4]
+        rid = (
+            f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
+            f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
+        )
+        end_time = datetime.datetime.now(datetime.UTC)
+        start_time = end_time - datetime.timedelta(hours=24)
+        span = f"{start_time.isoformat().replace('+00:00', 'Z')}/{end_time.isoformat().replace('+00:00', 'Z')}"
+        try:
+            metrics = self.monitor.metrics.list(
+                rid,
+                timespan=span,
+                interval="PT1H",
+                metricnames="Percentage CPU",
+                aggregation="Average",
+            )
+            labels: list[str] = []
+            values: list[float] = []
+            for item in metrics.value or []:
+                for ts in item.timeseries or []:
+                    for pt in ts.data or []:
+                        if pt.time_stamp is not None and pt.average is not None:
+                            labels.append(pt.time_stamp.strftime("%H:%M"))
+                            values.append(round(float(pt.average), 2))
+            if not values:
+                return empty
+            return {"labels": labels[-24:], "values": values[-24:]}
+        except Exception as e:
+            print(f"[-] Hourly CPU profile failed: {e}")
+            return empty
+
+    def get_finops_dashboard_snapshot(self, monthly_budget: float) -> dict:
+        """Single JSON payload for FinOps dashboard charts (HTTP refresh, not WebSocket)."""
+        return {
+            "cost_vs_budget": self.get_cost_vs_budget_series(monthly_budget),
+            "services": self.get_service_bucket_spend(),
+            "families": self.get_instance_family_cpu_ram(),
+            "hourly_cpu": self.get_hourly_cpu_profile(),
+        }
 
     def get_unassociated_public_ips(self):
         """Finds Public IPs not attached to any NIC/Resource"""

@@ -47,6 +47,10 @@
                 <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                 <span class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Cloud Monitor</span>
             </a>
+            <a href="/dashboard" class="flex items-center gap-4 p-3 rounded-xl transition nav-link text-gray-400">
+                <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                <span class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Metrics Command</span>
+            </a>
         </div>
 
         <div class="flex-1"></div>
@@ -136,47 +140,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
     <script>
-        const socket = io();
-        let monitorChart;
-
-        function initMonitorChart() {
-            const ctx = document.getElementById('bigMonitorChart').getContext('2d');
-            monitorChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'CPU Usage %',
-                        borderColor: '#22d3ee',
-                        backgroundColor: 'rgba(34, 211, 238, 0.1)',
-                        data: [],
-                        fill: true,
-                        tension: 0.4,
-                        borderWidth: 3,
-                        pointRadius: 2,
-                        pointBackgroundColor: '#22d3ee'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { 
-                            beginAtZero: true, 
-                            max: 100,
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#6b7280', font: { size: 10 } }
-                        },
-                        x: { 
-                            grid: { display: false },
-                            ticks: { color: '#6b7280', font: { size: 10 } }
-                        }
-                    },
-                    animation: { duration: 0 }
-                }
-            });
-        }
+        window.__reaperSocket = window.__reaperSocket || io();
 
         const distCtx = document.getElementById('distributionChart').getContext('2d');
         new Chart(distCtx, {
@@ -195,23 +159,6 @@
                 plugins: { legend: { display: false } },
                 cutout: '70%'
             }
-        });
-
-        initMonitorChart();
-
-        socket.on('metric_update', function(payload) {
-            document.getElementById('live-cpu').innerText = payload.value + '%';
-            document.getElementById('live-threads').innerText = Math.floor(payload.value * 2.5);
-            document.getElementById('live-net').innerText = (payload.value / 4).toFixed(1);
-
-            if (monitorChart.data.labels.length > 20) {
-                monitorChart.data.labels.shift();
-                monitorChart.data.datasets[0].data.shift();
-            }
-            
-            monitorChart.data.labels.push(payload.time);
-            monitorChart.data.datasets[0].data.push(payload.value);
-            monitorChart.update();
         });
     </script>
 </body>

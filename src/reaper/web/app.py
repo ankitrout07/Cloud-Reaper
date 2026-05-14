@@ -82,20 +82,36 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 thread = None
 thread_lock = threading.Lock()
 
+# Azure standard metrics rarely refresh faster than ~1 minute; 5–10s is a safe UI throttle.
+SOCKET_METRICS_INTERVAL_SEC = int(os.getenv("REAPER_METRICS_EMIT_SEC", "8"))
+
+
 def background_metrics_worker():
-    """Fetches real-time Azure metrics and pushes to the Monitoring Panel."""
+    """Fetches Azure Monitor CPU samples and pushes over WebSocket (throttled)."""
     import random
 
     while True:
+        socketio.sleep(SOCKET_METRICS_INTERVAL_SEC)
+        now = datetime.datetime.now(datetime.UTC).strftime("%H:%M:%S")
+        cpu_usage = None
         try:
-            cpu_usage = round(20.0 + random.uniform(-5.0, 5.0), 2)  # noqa: S311
-            socketio.emit("metric_update", {
-                "time": datetime.datetime.now(datetime.UTC).strftime("%H:%M:%S"),
-                "value": cpu_usage,
-            })
+            if not is_first_run():
+                az = AzureCollector()
+                cpu_usage = az.get_live_subscription_cpu_average(max_vms=6)
         except Exception as e:
             print(f"[!] Metrics Worker Error: {e}")
-        socketio.sleep(10)  # Wait 10 seconds (standard Azure Monitor frequency)
+        if cpu_usage is None:
+            cpu_usage = round(20.0 + random.uniform(-5.0, 5.0), 2)  # noqa: S311
+        else:
+            cpu_usage = round(float(cpu_usage), 2)
+        try:
+            socketio.emit(
+                "metric_update",
+                {"time": now, "value": cpu_usage},
+            )
+        except Exception as e:
+            print(f"[!] Metrics emit error: {e}")
+
 
 # Start the worker after the app is ready
 socketio.start_background_task(background_metrics_worker)
@@ -321,6 +337,33 @@ def finops():
 @app.route("/monitor")
 def monitor():
     return render_template("monitor.html")
+
+
+@app.route("/dashboard")
+def dashboard():
+    az = AzureCollector()
+    user_name = az.get_user_name()
+    sub_name = az.get_subscription_name()
+    return render_template(
+        "dashboard.html",
+        user_name=user_name,
+        sub_name=sub_name,
+        metrics_emit_sec=SOCKET_METRICS_INTERVAL_SEC,
+    )
+
+
+@app.route("/api/dashboard/finops-charts")
+def api_dashboard_finops_charts():
+    """HTTP snapshot for heavier FinOps charts (refreshed periodically from the client)."""
+    if is_first_run():
+        return jsonify({"status": "unconfigured", "charts": None}), 200
+    try:
+        az = AzureCollector()
+        budget = float(settings_state.get("budget_threshold", 1000.0))
+        charts = az.get_finops_dashboard_snapshot(monthly_budget=budget)
+        return jsonify({"status": "ok", "charts": charts})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "charts": None}), 500
 
 
 @app.route("/api/auth/status")

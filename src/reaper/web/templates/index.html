@@ -124,6 +124,16 @@
                     class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Cloud
                     Monitor</span>
             </a>
+            <a href="/dashboard"
+                class="flex items-center gap-4 p-3 rounded-xl transition text-gray-400 nav-link">
+                <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <span
+                    class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Metrics
+                    Command</span>
+            </a>
         </div>
 
         <div class="flex-1"></div>
@@ -766,59 +776,9 @@
             }, 450);
         }
 
-        // Real-Time Compute Chart Initialization
-        let computeChart;
-        function initComputeChart() {
-            const ctx = document.getElementById('computeChart').getContext('2d');
-            computeChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Avg CPU Utilization (%)',
-                        borderColor: '#22d3ee',
-                        backgroundColor: 'rgba(34, 211, 238, 0.1)',
-                        data: [],
-                        fill: true,
-                        tension: 0.4,
-                        borderWidth: 2,
-                        pointRadius: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#6b7280', font: { size: 9 } }
-                        },
-                        x: { display: false }
-                    },
-                    animation: false
-                }
-            });
-        }
+        // Real-time CPU chart + Socket.IO: static/js/theme.js (window.__reaperSocket, metric_update)
 
-        initComputeChart();
-
-        const socket = io();
-
-        socket.on('metric_update', function (payload) {
-            if (!computeChart) return;
-
-            if (computeChart.data.labels.length > 30) {
-                computeChart.data.labels.shift();
-                computeChart.data.datasets[0].data.shift();
-            }
-
-            computeChart.data.labels.push(payload.time);
-            computeChart.data.datasets[0].data.push(payload.value);
-            computeChart.update('none');
-        });
+        const socket = window.__reaperSocket || (window.__reaperSocket = io());
 
         socket.on('new_log', function (msg) {
             const output = document.getElementById('log-output');
