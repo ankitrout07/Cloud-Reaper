@@ -16,6 +16,9 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
+# Repository root (directory containing this file). All paths are resolved from here.
+REPO_ROOT = Path(__file__).resolve().parent
+
 
 def print_banner() -> None:
     """Print the Cloud-Reaper startup banner."""
@@ -24,11 +27,16 @@ def print_banner() -> None:
     print("=" * 60)
 
 
-def run_command(cmd: list[str], cwd: str | None = None, env: dict | None = None) -> bool:
-    """Run a subprocess command with full path safety and fail-fast semantics."""
-    print(f"[*] Running: {' '.join(cmd)}")
+def run_command(
+    cmd: list[str],
+    cwd: str | Path | None = None,
+    env: dict | None = None,
+) -> bool:
+    """Run a subprocess command with fail-fast semantics."""
+    workdir = str(cwd) if cwd is not None else str(REPO_ROOT)
+    print(f"[*] Running: {' '.join(cmd)}  (cwd={workdir})")
     try:
-        subprocess.run(cmd, cwd=cwd, env=env, check=True)  # noqa: S603
+        subprocess.run(cmd, cwd=workdir, env=env, check=True)  # noqa: S603
         return True
     except subprocess.CalledProcessError as e:
         print(f"[!] Error: {e}")
@@ -47,35 +55,39 @@ def _docker(args: list[str]) -> subprocess.CompletedProcess:
 
 
 def check_requirements() -> bool:  # noqa: PLR0912
-    """Verify Go, Docker, and Azure CLI status."""
+    """Verify Go, Docker, and optional Azure CLI status."""
     print("[*] Checking system requirements...")
 
     # Go Check
     if not shutil.which("go"):
-        print("[!] Go not found. Please install Go 1.24+")
+        print("[!] Go not found. Please install Go 1.24+ (see src/engine-go/go.mod).")
         return False
 
-    # Azure CLI Check
+    # Azure CLI — optional: the app can use DefaultAzureCredential from .env / VS Code / MSI.
     az_bin = shutil.which("az")
     if not az_bin:
-        print("[!] Azure CLI not found. Please install it to continue.")
-        return False
-
-    # Check Azure Login Status using the resolved absolute path
-    print("[*] Verifying Azure authentication...")
-    try:
-        az_check = subprocess.run(
-            [az_bin, "account", "show"],  # noqa: S603
-            capture_output=True,
-            text=True,
-            check=False,
+        print(
+            "[*] Azure CLI not on PATH. Skipping `az login` check — configure "
+            "credentials in .env or your environment if the dashboard cannot reach Azure."
         )
-        if az_check.returncode != 0:
-            print("[!] Not logged into Azure. Please run 'az login' first.")
-            return False
-        print("[+] Azure session active.")
-    except Exception:
-        print("[!] Could not verify Azure session. Proceeding with caution...")
+    else:
+        print("[*] Verifying Azure authentication (optional)...")
+        try:
+            az_check = subprocess.run(
+                [az_bin, "account", "show"],  # noqa: S603
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if az_check.returncode != 0:
+                print(
+                    "[*] `az account show` failed (not logged in or no subscription). "
+                    "You can still run the app with service principal / env-based auth."
+                )
+            else:
+                print("[+] Azure CLI session active.")
+        except Exception:
+            print("[!] Could not verify Azure CLI session. Proceeding with caution...")
 
     # PDF Library Check (Linux)
     if platform.system() == "Linux":
@@ -109,11 +121,24 @@ def check_requirements() -> bool:  # noqa: PLR0912
             result = _docker(["ps"])
             if "cloud-reaper-db" not in result.stdout:
                 print("[*] Creating fresh PostgreSQL container...")
-                _docker([
-                    "run", "--name", "cloud-reaper-db",
-                    "-e", "POSTGRES_PASSWORD=postgres",
-                    "-p", "5432:5432", "-d", "postgres",
-                ])
+                run_result = _docker(
+                    [
+                        "run",
+                        "--name",
+                        "cloud-reaper-db",
+                        "-e",
+                        "POSTGRES_PASSWORD=postgres",
+                        "-p",
+                        "5432:5432",
+                        "-d",
+                        "postgres",
+                    ]
+                )
+                if run_result.returncode != 0:
+                    print(
+                        f"[!] Could not start Postgres container: "
+                        f"{(run_result.stderr or run_result.stdout or '').strip()}"
+                    )
         except Exception as e:
             print(f"[!] Docker error: {e}. Start Postgres manually if needed.")
 
@@ -123,9 +148,11 @@ def check_requirements() -> bool:  # noqa: PLR0912
 def setup_venv() -> str:
     """Create the virtual environment and install dependencies."""
     print("[*] Setting up virtual environment...")
-    venv_dir = Path("venv")
+    venv_dir = REPO_ROOT / "venv"
     if not venv_dir.exists():
-        run_command([sys.executable, "-m", "venv", str(venv_dir)])
+        if not run_command([sys.executable, "-m", "venv", str(venv_dir)]):
+            print("[!] Failed to create virtual environment.")
+            sys.exit(1)
 
     is_windows = platform.system() == "Windows"
     bin_subdir = "Scripts" if is_windows else "bin"
@@ -134,9 +161,21 @@ def setup_venv() -> str:
     python_path = venv_dir / bin_subdir / py_name
     pip_path = venv_dir / bin_subdir / pip_name
 
+    if not python_path.is_file():
+        print(f"[!] Expected venv python at {python_path} but it is missing.")
+        sys.exit(1)
+
     print("[*] Synchronizing dependencies...")
-    run_command([str(pip_path), "install", "--upgrade", "pip", "--quiet"])
-    run_command([str(pip_path), "install", "-r", "requirements.txt", "--quiet"])
+    req = REPO_ROOT / "requirements.txt"
+    if not req.is_file():
+        print(f"[!] requirements.txt not found at {req}")
+        sys.exit(1)
+
+    if not run_command([str(pip_path), "install", "--upgrade", "pip", "--quiet"]):
+        print("[!] pip upgrade failed — continuing with existing pip.")
+    if not run_command([str(pip_path), "install", "-r", str(req), "--quiet"]):
+        print("[!] pip install -r requirements.txt failed.")
+        sys.exit(1)
 
     return str(python_path)
 
@@ -148,18 +187,18 @@ def build_go_engine() -> bool:
     is_windows = platform.system() == "Windows"
     binary_name = "reaper-engine.exe" if is_windows else "reaper-engine"
 
-    engine_dir = Path("src/engine-go")
-    bin_dir = Path("bin")
+    engine_dir = REPO_ROOT / "src" / "engine-go"
+    bin_dir = REPO_ROOT / "bin"
     bin_dir.mkdir(exist_ok=True)
 
-    if not engine_dir.exists():
-        print("[!] src/engine-go not found!")
+    if not engine_dir.is_dir():
+        print(f"[!] Go engine directory not found: {engine_dir}")
         return False
 
-    output_path = bin_dir / binary_name
+    output_path = (bin_dir / binary_name).resolve()
     success = run_command(
-        [go_bin, "build", "-o", str(output_path.absolute()), "main.go"],
-        cwd=str(engine_dir),
+        [go_bin, "build", "-o", str(output_path), "main.go"],
+        cwd=engine_dir,
     )
     if success:
         print(f"[+] Go engine built: {output_path}")
@@ -168,27 +207,36 @@ def build_go_engine() -> bool:
 
 def setup_env() -> None:
     """Sync .env file and check for port conflicts."""
-    env_file = Path(".env")
+    env_file = REPO_ROOT / ".env"
     default_port = "5001"
 
     if not env_file.exists():
         print("[*] Creating .env from template...")
-        with env_file.open("w") as f:
+        with env_file.open("w", encoding="utf-8") as f:
             f.write(f"FLASK_PORT={default_port}\nFLASK_DEBUG=True\nAPP_ENV=development\n")
             f.write("DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres\n")
     else:
         # Port Conflict Check
-        with env_file.open("r") as f:
+        with env_file.open("r", encoding="utf-8") as f:
             lines = f.readlines()
         port = next(
-            (line.split("=")[1].strip() for line in lines if "FLASK_PORT" in line),
+            (
+                line.split("=", 1)[1].strip().strip('"').strip("'")
+                for line in lines
+                if line.strip().startswith("FLASK_PORT=")
+            ),
             default_port,
         )
 
+        try:
+            port_int = int(port)
+        except ValueError:
+            port_int = int(default_port)
+
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", int(port))) == 0:
+            if s.connect_ex(("127.0.0.1", port_int)) == 0:
                 print(
-                    f"[!] WARNING: Port {port} is busy. "
+                    f"[!] WARNING: Port {port_int} is busy. "
                     "If the dashboard fails, change FLASK_PORT in .env"
                 )
 
@@ -210,6 +258,8 @@ def main() -> None:
     """Parallelized deployment sequence for ultra-fast launch."""
     from concurrent.futures import ThreadPoolExecutor
 
+    os.chdir(REPO_ROOT)
+
     print_banner()
 
     # Phase 1: Sequential Requirements Check
@@ -220,7 +270,7 @@ def main() -> None:
 
     # Phase 2: Parallel Build & Environment Setup
     print("\n[2/3] ASSEMBLING COMPONENTS (PARALLEL)...")
-    context = {"python_exe": sys.executable, "port": "5001"}
+    context: dict[str, str] = {"python_exe": sys.executable, "port": "5001"}
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         venv_future = executor.submit(setup_venv)
@@ -236,22 +286,24 @@ def main() -> None:
     print("\n[3/3] INITIALIZING INTELLIGENCE...")
     setup_env()
 
-    env_file = Path(".env")
+    env_file = REPO_ROOT / ".env"
     if env_file.exists():
-        with env_file.open("r") as f:
+        with env_file.open("r", encoding="utf-8") as f:
             for line in f:
-                if "FLASK_PORT" in line:
-                    context["port"] = line.split("=")[1].strip()
+                stripped = line.strip()
+                if stripped.startswith("FLASK_PORT="):
+                    context["port"] = stripped.split("=", 1)[1].strip().strip('"').strip("'")
 
     print_success_report(context["port"])
 
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(Path("src").absolute())
+    env["PYTHONPATH"] = str((REPO_ROOT / "src").resolve())
 
     print("[*] Launching Flask/SocketIO Server...")
     try:
         subprocess.run(
             [context["python_exe"], "-m", "reaper.web.app"],  # noqa: S603
+            cwd=str(REPO_ROOT),
             env=env,
             check=False,
         )
@@ -259,7 +311,14 @@ def main() -> None:
         print("\n[*] Cloud-Reaper session ended.")
     except Exception as e:
         print(f"\n[!] CRITICAL ERROR: Could not start dashboard: {e}")
-        print("    Try running manually: source venv/bin/activate && python -m reaper.web.app")
+        is_win = platform.system() == "Windows"
+        activate = "venv\\Scripts\\activate" if is_win else "source venv/bin/activate"
+        print(
+            "    Try running manually:\n"
+            f"      cd {REPO_ROOT}\n"
+            f"      {activate}\n"
+            "      PYTHONPATH=src python -m reaper.web.app"
+        )
 
 
 if __name__ == "__main__":
