@@ -107,5 +107,16 @@ class BusinessMetric(Base):
     date = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
+class RegionPriceCache(Base):
+    __tablename__ = "region_price_cache"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    sku_id = Column(String, index=True)
+    region_name = Column(String, index=True)
+    price = Column(Numeric(15, 6))
+    currency = Column(String, default="USD")
+    last_updated = Column(DateTime, default=lambda: datetime.now(UTC))
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)

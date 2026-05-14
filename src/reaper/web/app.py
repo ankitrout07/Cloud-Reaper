@@ -23,6 +23,7 @@ from reaper.collectors.azure_collector import AzureCollector
 from reaper.collectors.config_manager import save_config
 from reaper.engine.calculator import CostCalculator
 from reaper.engine.logic import RightSizer
+from reaper.engine.economics import RegionalArbitrage
 from reaper.engine.models import (
     ActionLog,
     BusinessMetric,
@@ -707,6 +708,40 @@ def approve_reap():
         if not res_id:
             return jsonify({"status": "error", "message": "Missing resource_id"}), 400
         return jsonify(AzureCollector().execute_reap(res_id, res_type))
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/prices/regional")
+def get_regional_prices():
+    try:
+        sku = request.args.get("sku")
+        region = request.args.get("region")
+        if not sku or not region:
+            return jsonify({"status": "error", "message": "Missing sku or region parameter"}), 400
+            
+        az = AzureCollector()
+        prices = az.fetch_regional_prices(sku, region)
+        if prices:
+            return jsonify({"status": "success", "price": prices[0]})
+        return jsonify({"status": "error", "message": "Price not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/finops/arbitrage")
+def get_arbitrage():
+    try:
+        sku = request.args.get("sku")
+        region = request.args.get("region")
+        price = float(request.args.get("price", 0.0))
+        
+        if not sku or not region or not price:
+            return jsonify({"status": "error", "message": "Missing parameters"}), 400
+            
+        arb = RegionalArbitrage()
+        result = arb.analyze_arbitrage(sku, region, price)
+        return jsonify({"status": "success", "recommendation": result})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

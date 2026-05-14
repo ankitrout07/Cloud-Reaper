@@ -17,7 +17,8 @@ from azure.mgmt.web import WebSiteManagementClient
 from dotenv import load_dotenv
 
 from reaper.engine.logic import BudgetForecaster
-from reaper.engine.models import CostHistory, SessionLocal
+from reaper.engine.models import CostHistory, RegionPriceCache, SessionLocal
+from reaper.collectors.azure_prices import AzurePriceClient
 
 load_dotenv()
 
@@ -628,6 +629,45 @@ class AzureCollector:
             "status": "success",
             "message": f"Successfully authorized reap for {resource_id} ({resource_type})",
         }
+
+    def fetch_regional_prices(self, sku_id, region_name):
+        """Fetches price for a specific SKU in a selected Azure region with DB caching."""
+        db = SessionLocal()
+        try:
+            # Check cache first
+            cached = (
+                db.query(RegionPriceCache)
+                .filter_by(sku_id=sku_id, region_name=region_name)
+                .first()
+            )
+            if cached:
+                # Basic cache invalidation (e.g., if older than 24h, you could add logic here)
+                return [{"retailPrice": float(cached.price), "currencyCode": cached.currency}]
+
+            # Not in cache, call API
+            pricing_client = AzurePriceClient()
+            query = f"armSkuName eq '{sku_id}' and armRegionName eq '{region_name}' and priceType eq 'Consumption'"
+            results = pricing_client.get_prices(filter_query=query)
+
+            if results:
+                # We usually want the first hit that makes sense (e.g., standard consumption)
+                best_price = next((r for r in results if not r.get("reservationTerm")), results[0])
+                
+                # Save to cache
+                new_cache = RegionPriceCache(
+                    sku_id=sku_id,
+                    region_name=region_name,
+                    price=best_price.get("retailPrice", 0),
+                    currency=best_price.get("currencyCode", "USD")
+                )
+                db.add(new_cache)
+                db.commit()
+
+                return [best_price]
+            
+            return []
+        finally:
+            db.close()
 
 
 if __name__ == "__main__":
