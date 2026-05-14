@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from reaper.collectors import azure_collector as _ac_module
+
 
 class BusinessCorrelation:
     def __init__(self, db_connection=None):
@@ -66,16 +68,16 @@ class ProportionalAllocator:
 class RegionalArbitrage:
     def __init__(self):
         # Top regions to compare against
-        self.target_regions = ["eastus", "westeurope", "southindia", "brazilsouth", "westus2", "northeurope"]
+        self.target_regions = [
+            "eastus", "westeurope", "southindia",
+            "brazilsouth", "westus2", "northeurope",
+        ]
 
     def analyze_arbitrage(self, sku_id, current_region, current_price_hourly):
         """
         Scans other regions to find a cheaper deployment option.
         """
-        # We need the AzureCollector to fetch regional prices
-        from reaper.collectors.azure_collector import AzureCollector
-        
-        collector = AzureCollector()
+        collector = _ac_module.AzureCollector()
         cheapest_region = current_region
         cheapest_price = current_price_hourly
         
@@ -102,10 +104,17 @@ class RegionalArbitrage:
                 "cheaper_region": cheapest_region,
                 "savings_monthly": round(savings, 2),
                 "pct_reduction": round(pct_reduction, 1),
-                "message": f"Deploying this {sku_id} in {cheapest_region} instead of {current_region} would save you ${round(savings, 2)}/month ({round(pct_reduction, 1)}% reduction)."
+                "message": (
+                    f"Deploying this {sku_id} in {cheapest_region} instead of "
+                    f"{current_region} would save you "
+                    f"${round(savings, 2)}/month ({round(pct_reduction, 1)}% reduction)."
+                )
             }
             
         return {
             "found_cheaper": False,
-            "message": f"Your current region {current_region} is already the most cost-effective among targets."
+            "message": (
+                f"Your current region {current_region} is already"
+                " the most cost-effective among targets."
+            ),
         }

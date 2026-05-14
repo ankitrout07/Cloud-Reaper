@@ -149,6 +149,10 @@ h1, h2, h3, h4, p, span, div {
     color: #00f2ff;
 }
 
+.input-group {
+    position: relative;
+}
+
 .terminal-container {
     position: fixed;
     bottom: 0;

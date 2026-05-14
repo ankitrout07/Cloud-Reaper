@@ -24,7 +24,7 @@ def check_azure_status():
         # In professional deployments, use absolute paths for executables or ensure PATH is trusted.
         # Here we use 'az' as it is the standard CLI tool name.
         result = subprocess.run(
-            ["az", "account", "get-access-token", "--output", "json"],  # noqa: S607
+            ["az", "account", "get-access-token", "--output", "json"],  # noqa: S603, S607
             capture_output=True,
             text=True,
             check=True,

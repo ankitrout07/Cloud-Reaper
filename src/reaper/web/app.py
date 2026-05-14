@@ -1,30 +1,42 @@
-# MUST BE THE FIRST TWO LINES
+# gevent monkey-patching MUST happen before all other imports.
 from gevent import monkey
+
 monkey.patch_all()
-import contextlib
-import json
-import os
-import subprocess
-import time
-import traceback
-from pathlib import Path
 
-from azure.identity import DefaultAzureCredential
-from azure.mgmt.subscription import SubscriptionClient
-from dotenv import load_dotenv, set_key
-from flask import Flask, jsonify, redirect, render_template, request, url_for, send_file
-import io
-import datetime
-from weasyprint import HTML
+import contextlib  # noqa: E402
+import datetime  # noqa: E402
+import io  # noqa: E402
+import json  # noqa: E402
+import os  # noqa: E402
+import subprocess  # noqa: E402
+import threading  # noqa: E402
+import time  # noqa: E402
+import traceback  # noqa: E402
+from pathlib import Path  # noqa: E402
 
-from sqlalchemy import func
-from reaper.collectors.auth_check import check_azure_status
-from reaper.collectors.azure_collector import AzureCollector
-from reaper.collectors.config_manager import save_config
-from reaper.engine.calculator import CostCalculator
-from reaper.engine.logic import RightSizer
-from reaper.engine.economics import RegionalArbitrage
-from reaper.engine.models import (
+from azure.identity import DefaultAzureCredential  # noqa: E402
+from azure.mgmt.subscription import SubscriptionClient  # noqa: E402
+from dotenv import load_dotenv, set_key  # noqa: E402
+from flask import (  # noqa: E402
+    Flask,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
+from flask_socketio import SocketIO  # noqa: E402
+from sqlalchemy import func  # noqa: E402
+from weasyprint import HTML  # noqa: E402
+
+from reaper.collectors.auth_check import check_azure_status  # noqa: E402
+from reaper.collectors.azure_collector import AzureCollector  # noqa: E402
+from reaper.collectors.config_manager import save_config  # noqa: E402
+from reaper.engine.calculator import CostCalculator  # noqa: E402
+from reaper.engine.economics import RegionalArbitrage  # noqa: E402
+from reaper.engine.logic import RightSizer  # noqa: E402
+from reaper.engine.models import (  # noqa: E402
     ActionLog,
     BusinessMetric,
     CostHistory,
@@ -36,35 +48,54 @@ from reaper.engine.models import (
 load_dotenv()
 
 
+def _repo_root() -> Path:
+    """Repository root (``.../Cloud-Reaper``), derived from this package path."""
+    return Path(__file__).resolve().parent.parent.parent.parent
+
+
+def _reaper_engine_binary() -> Path | None:
+    """Resolve the Go engine binary (bootstrap builds to repo ``bin/``)."""
+    repo_root = _repo_root()
+    name = "reaper-engine.exe" if os.name == "nt" else "reaper-engine"
+    candidates = (
+        repo_root / "bin" / name,
+        repo_root / "src" / "engine-go" / name,
+    )
+    for p in candidates:
+        if p.is_file():
+            return p
+    return None
+
+
 def is_first_run():
     sub_id = os.getenv("AZURE_SUBSCRIPTION_ID")
     return bool(not sub_id or "your_" in sub_id or len(sub_id) < 5)
 
 
-from flask_socketio import SocketIO
-import threading
-
-app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
+_web_dir = Path(__file__).resolve().parent
+app = Flask(
+    __name__,
+    template_folder=str(_web_dir / "templates"),
+    static_folder=str(_web_dir / "static"),
+)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 thread = None
 thread_lock = threading.Lock()
 
 def background_metrics_worker():
     """Fetches real-time Azure metrics and pushes to the Monitoring Panel."""
+    import random
+
     while True:
         try:
-            # Simulate or fetch real metric from your Go engine
-            # In production, this would call AzureCollector().get_vm_metrics()
-            import random
-            cpu_usage = round(20.0 + random.uniform(-5.0, 5.0), 2) 
-            
-            socketio.emit('metric_update', {
-                'time': datetime.datetime.now().strftime('%H:%M:%S'),
-                'value': cpu_usage
+            cpu_usage = round(20.0 + random.uniform(-5.0, 5.0), 2)  # noqa: S311
+            socketio.emit("metric_update", {
+                "time": datetime.datetime.now(datetime.UTC).strftime("%H:%M:%S"),
+                "value": cpu_usage,
             })
         except Exception as e:
             print(f"[!] Metrics Worker Error: {e}")
-        socketio.sleep(10) # Wait 10 seconds (standard Azure Monitor frequency)
+        socketio.sleep(10)  # Wait 10 seconds (standard Azure Monitor frequency)
 
 # Start the worker after the app is ready
 socketio.start_background_task(background_metrics_worker)
@@ -82,7 +113,7 @@ settings_state = {
     "auto_flag_compliance": True,
 }
 
-ENV_PATH = os.path.join(os.getcwd(), ".env")
+ENV_PATH = str(_repo_root() / ".env")
 
 
 @app.route("/api/settings/sync", methods=["POST"])
@@ -243,7 +274,7 @@ def check_auth():
     try:
         # Use full path for az if possible, or suppress if safe.
         # For simplicity in this dev tool, we use the command name.
-        subprocess.run(["az", "account", "show"], capture_output=True, check=True)  # noqa: S607
+        subprocess.run(["az", "account", "show"], capture_output=True, check=True)  # noqa: S603, S607
         return jsonify(
             {"status": "success", "message": "Connected: Azure CLI (Active Subscription)"}
         )
@@ -254,8 +285,8 @@ def check_auth():
 @app.route("/api/settings/subscriptions")
 def list_subscriptions():
     try:
-        binary_path = Path(__file__).resolve().parent.parent.parent / "engine-go" / "reaper-engine"
-        if not binary_path.exists():
+        binary_path = _reaper_engine_binary()
+        if not binary_path:
             return jsonify(
                 [
                     {"id": "sub-123-abc", "name": "Production-Internal (Mock)"},
@@ -264,8 +295,8 @@ def list_subscriptions():
                 ]
             )
 
-        result = subprocess.run(  # noqa: S603
-            [str(binary_path), "--list-subs"],
+        result = subprocess.run(
+            [str(binary_path), "--list-subs"],  # noqa: S603
             capture_output=True,
             text=True,
             check=False,
@@ -300,14 +331,14 @@ def auth_status():
 @app.route("/api/rightsizing")
 def get_rightsizing():
     az = AzureCollector()
-    go_binary = Path(__file__).resolve().parent.parent.parent / "engine-go" / "reaper-engine"
-    if not go_binary.exists():
+    go_binary = _reaper_engine_binary()
+    if not go_binary:
         return jsonify({"status": "error", "message": "Go Engine binary not found"}), 500
 
     try:
-        # pyrefly: ignore [no-matching-overload]
-        result = subprocess.run(  # noqa: S603
-            [str(go_binary), "--subscription", az.subscription_id],
+        # pyrefly: ignore [no-matching-overload]  # noqa: ERA001
+        result = subprocess.run(
+            [str(go_binary), "--subscription", az.subscription_id],  # noqa: S603
             capture_output=True,
             text=True,
             check=False,
@@ -336,7 +367,7 @@ def scan():
         target_subs = settings_state.get("selected_subscriptions", []) or [
             os.getenv("AZURE_SUBSCRIPTION_ID")
         ]
-        # pyrefly: ignore [bad-index, unsupported-operation]
+        # pyrefly: ignore [bad-index, unsupported-operation]  # noqa: ERA001
         if not target_subs[0]:
             return jsonify({"status": "error", "message": "No subscription ID configured."}), 400
 
@@ -369,7 +400,7 @@ def perform_subscription_scan(target_subs, events):
     for sub_id in target_subs:
         events.append({"msg": f"Scanning subscription: {sub_id[:8]}...", "type": "info"})
         az.subscription_id = sub_id
-        # pyrefly: ignore [missing-attribute]
+        # pyrefly: ignore [missing-attribute]  # noqa: ERA001
         az._scan_cache = None
 
         vms = az.get_vm_inventory()
@@ -390,13 +421,39 @@ def perform_subscription_scan(target_subs, events):
 
 def format_scan_results(raw):
     total_savings = 0.0
+    util_rows = []
+    for item in raw["utilization"]:
+        usage_pct = float(item.get("usage") or 0.0)
+        waste = max(0.0, 1.0 - (usage_pct / 100.0)) if usage_pct < 100 else 0.0
+        if waste > 0.85:
+            status, color = "CRITICAL", "text-red-400"
+        elif waste > 0.5:
+            status, color = "LOW_UTIL", "text-yellow-400"
+        else:
+            status, color = "NORMAL", "text-green-400"
+        util_rows.append(
+            {
+                "name": item.get("name", "Unknown"),
+                "rg": item.get("rg", "N/A"),
+                "current_sku": "Compute / VM",
+                "metrics": f"Avg CPU (24h): {usage_pct}%",
+                "status": status,
+                "color": color,
+                "recommendation": (
+                    "Consider rightsizing or deallocating"
+                    if waste > 0.5
+                    else "Utilization within nominal range"
+                ),
+            }
+        )
+
     formatted = {
         "vm_count": raw["vms_count"],
         "orphans": [],
         "snapshots": [],
         "zombies": [],
         "idle_vms": [],
-        "utilization_report": raw["utilization"],
+        "utilization_report": util_rows,
     }
 
     # Idle VMs
@@ -472,7 +529,7 @@ def export_bom():
             items=items,
             totalHourly=total_hourly,
             totalMonthly=total_monthly,
-            date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            date=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
         # Generate PDF in memory
@@ -567,7 +624,7 @@ def unit_economics():
                     "unit": m.unit,
                     "count": m.value,
                     "total_spend": round(metric_spend, 2),
-                    # pyrefly: ignore [no-matching-overload]
+                    # pyrefly: ignore [no-matching-overload]  # noqa: ERA001
                     "cost_per_unit": round(metric_spend / max(unit_count, 1), 4),
                     "trend": 8.5,
                 }
@@ -817,7 +874,7 @@ def handle_start_log_stream():
     logs = fetch_azure_logs()
     for log in logs:
         socketio.emit('new_log', {'data': log})
-        # pyrefly: ignore [bad-argument-type]
+        # pyrefly: ignore [bad-argument-type]  # noqa: ERA001
         socketio.sleep(0.5)
 
 

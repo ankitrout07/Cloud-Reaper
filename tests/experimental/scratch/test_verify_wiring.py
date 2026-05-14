@@ -21,8 +21,8 @@ def test_verify_wiring():
 
     if go_binary.exists():
         # Test the prices mode JSON schema handoff
-        result = subprocess.run(  # noqa: S603
-            [str(go_binary), "--mode", "prices"], 
+        result = subprocess.run(
+            [str(go_binary), "--mode", "prices"],  # noqa: S603
             capture_output=True, 
             text=True, 
             check=False

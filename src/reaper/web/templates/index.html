@@ -285,22 +285,27 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Reap Targets -->
-                <div class="glass overflow-hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 px-1">
+                <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Reap targets</p>
+                <div class="relative w-full sm:max-w-md">
+                    <input type="text" id="resourceSearch" placeholder="Filter resources…" oninput="filterTable()"
+                        class="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-9 pr-3 text-xs text-gray-200 placeholder:text-gray-600 focus:outline-none focus:border-cyan-500/50" />
+                    <svg class="absolute left-3 top-2.5 h-4 w-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
                 </div>
             </div>
 
             <!-- Category Tabs -->
             <div class="flex gap-4 px-6 py-2 bg-white/5 border-b border-white/5 overflow-x-auto">
-                <button onclick="filterType('ALL')"
+                <button type="button" data-filter="ALL" onclick="filterType('ALL')"
                     class="type-tab px-4 py-2 text-[10px] font-black uppercase tracking-widest text-cyan-400 border-b-2 border-cyan-400 transition">All
                     Resources</button>
-                <button onclick="filterType('VM')"
+                <button type="button" data-filter="VM" onclick="filterType('VM')"
                     class="type-tab px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition">Compute</button>
-                <button onclick="filterType('DISK')"
+                <button type="button" data-filter="DISK" onclick="filterType('DISK')"
                     class="type-tab px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition">Storage</button>
-                <button onclick="filterType('NETWORK')"
+                <button type="button" data-filter="NETWORK" onclick="filterType('NETWORK')"
                     class="type-tab px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition">Networking</button>
             </div>
             <table class="w-full text-left text-xs" id="reapTable">
@@ -315,10 +320,9 @@
                 <tbody id="target-list" class="divide-y divide-white/5">
                 </tbody>
             </table>
-        </div>
 
         <!-- Zombie Kill-List -->
-        <div class="glass overflow-hidden border-l-4 border-purple-500">
+        <div class="glass overflow-hidden border-l-4 border-purple-500 mt-10">
             <div class="px-6 py-4 border-b border-white/10 bg-purple-500/5 flex items-center justify-between">
                 <div>
                     <h3 class="font-black text-purple-400 uppercase tracking-widest text-xs">Zombie Kill-List</h3>
@@ -338,7 +342,6 @@
                 <tbody id="zombie-list" class="divide-y divide-white/5">
                 </tbody>
             </table>
-        </div>
         </div>
 
         <!-- Recent Activity Feed -->
@@ -506,7 +509,8 @@
                     body: JSON.stringify({ resource_id: resourceName, resource_type: 'Unknown' })
                 });
                 const data = await res.json();
-                notify(data.message, data.status === 'success' ? 'success' : 'danger');
+                const msg = data.message || data.msg || 'Request completed';
+                notify(msg, data.status === 'success' ? 'success' : 'danger');
                 runScan();
                 fetchActivity();
             } catch (e) { notify("Action failed", "danger"); }
@@ -515,13 +519,12 @@
         let currentFilterType = 'ALL';
         function filterType(type) {
             currentFilterType = type;
-            // Update Tab Styles
             document.querySelectorAll('.type-tab').forEach(tab => {
-                const isMatch = tab.innerText.includes(type) || (type === 'ALL' && tab.innerText.includes('ALL'));
-                tab.classList.toggle('text-cyan-400', isMatch);
-                tab.classList.toggle('border-b-2', isMatch);
-                tab.classList.toggle('border-cyan-400', isMatch);
-                tab.classList.toggle('text-gray-500', !isMatch);
+                const match = tab.dataset.filter === type;
+                tab.classList.toggle('text-cyan-400', match);
+                tab.classList.toggle('border-b-2', match);
+                tab.classList.toggle('border-cyan-400', match);
+                tab.classList.toggle('text-gray-500', !match);
             });
             filterTable();
         }
@@ -531,7 +534,8 @@
                 const res = await fetch('/api/activity');
                 const data = await res.json();
                 const log = document.getElementById('activity-log');
-                log.innerHTML = data.activity.map(a => `
+                const rows = Array.isArray(data.activity) ? data.activity : [];
+                log.innerHTML = rows.map(a => `
                     <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 animate-fade-in">
                         <div class="flex items-center gap-4">
                             <div class="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">
@@ -550,8 +554,9 @@
 
         function filterTable() {
             const input = document.getElementById("resourceSearch");
-            const filter = input.value.toUpperCase();
+            const filter = (input && input.value ? input.value : "").toUpperCase();
             const table = document.getElementById("reapTable");
+            if (!table) return;
             const tr = table.getElementsByTagName("tr");
 
             for (let i = 1; i < tr.length; i++) {
@@ -561,14 +566,10 @@
                     const nameText = nameCol.textContent || nameCol.innerText;
                     const typeText = typeCol.textContent || typeCol.innerText;
 
-                    const matchesSearch = nameText.toUpperCase().indexOf(filter) > -1;
+                    const matchesSearch = !filter || nameText.toUpperCase().indexOf(filter) > -1;
                     const matchesType = currentFilterType === 'ALL' || typeText.toUpperCase().includes(currentFilterType);
 
-                    if (matchesSearch && matchesType) {
-                        tr[i].style.display = "";
-                    } else {
-                        tr[i].style.display = "none";
-                    }
+                    tr[i].style.display = (matchesSearch && matchesType) ? "" : "none";
                 }
             }
         }
@@ -576,8 +577,9 @@
         async function runScan() {
             const btn = document.getElementById('scanBtn');
             const icon = document.getElementById('refreshIcon');
+            let data = null;
 
-            btn.innerText = "SCANNING...";
+            btn.innerText = "Scanning…";
             btn.disabled = true;
             icon.classList.add('animate-spin');
 
@@ -585,30 +587,28 @@
 
             try {
                 const response = await fetch('/api/scan');
-                const data = await response.json();
+                data = await response.json();
 
                 if (data.status === "error") {
                     throw new Error(data.message || "Internal Server Error");
                 }
 
-                // Show backend events
                 if (data.events) {
                     data.events.forEach(ev => notify(ev.msg, ev.type));
                 }
 
                 document.getElementById('savings-val').innerText = data.total_savings || "$0.00";
-                document.getElementById('vm-count').innerText = data.vm_count || 0;
+                document.getElementById('vm-count').innerText = data.vm_count ?? 0;
 
-                const diskCount = (data.orphans ? data.orphans.length : 0) + (data.snapshots ? data.snapshots.length : 0);
-                document.getElementById('disk-count').innerText = diskCount;
+                const orphans = data.orphans || [];
+                const snapshots = data.snapshots || [];
+                document.getElementById('disk-count').innerText = orphans.length + snapshots.length;
 
-                // Update Forecast Chart
-                const monthlySavings = parseFloat(data.total_savings.replace(/[^\d.]/g, ''));
-
+                const monthlySavings = parseFloat(String(data.total_savings || '0').replace(/[^\d.]/g, '')) || 0;
                 const forecastData = [
                     monthlySavings,
                     monthlySavings * 2,
-                    monthlySavings * 3.2, // Factoring in velocity/growth
+                    monthlySavings * 3.2,
                     monthlySavings * 4.5,
                     monthlySavings * 5.8,
                     monthlySavings * 7.2
@@ -618,7 +618,8 @@
                 const list = document.getElementById('target-list');
                 list.innerHTML = '';
 
-                data.orphans.forEach(item => {
+                orphans.forEach(item => {
+                    const nm = JSON.stringify(item.name);
                     list.innerHTML += `
                         <tr class="hover:bg-white/5 border-l-4 border-red-500 transition">
                             <td class="px-4 py-4 font-mono">
@@ -631,12 +632,13 @@
                             </td>
                             <td class="px-4 py-4 text-red-400 font-bold">${item.savings}/mo</td>
                             <td class="px-4 py-4 text-right">
-                                <button onclick="reapResource('${item.name}')" class="bg-red-600/20 border border-red-600 text-red-400 px-3 py-1 rounded text-[10px] hover:bg-red-600 hover:text-white transition-all">REAP</button>
+                                <button onclick="reapResource(${nm})" class="bg-red-600/20 border border-red-600 text-red-400 px-3 py-1 rounded text-[10px] hover:bg-red-600 hover:text-white transition-all">REAP</button>
                             </td>
                         </tr>`;
                 });
 
-                data.snapshots.forEach(item => {
+                snapshots.forEach(item => {
+                    const nm = JSON.stringify(item.name);
                     list.innerHTML += `
                         <tr class="hover:bg-white/5 border-l-4 border-orange-500 transition">
                             <td class="px-4 py-4 font-mono">
@@ -649,44 +651,62 @@
                             </td>
                             <td class="px-4 py-4 text-orange-400 font-bold">${item.savings}/mo</td>
                             <td class="px-4 py-4 text-right">
-                                <button onclick="reapResource('${item.name}')" class="bg-orange-600/20 border border-orange-600 text-orange-400 px-3 py-1 rounded text-[10px] hover:bg-orange-600 hover:text-white transition-all">REAP</button>
+                                <button onclick="reapResource(${nm})" class="bg-orange-600/20 border border-orange-600 text-orange-400 px-3 py-1 rounded text-[10px] hover:bg-orange-600 hover:text-white transition-all">REAP</button>
+                            </td>
+                        </tr>`;
+                });
+
+                (data.idle_vms || []).forEach(item => {
+                    const nm = JSON.stringify(item.name);
+                    list.innerHTML += `
+                        <tr class="hover:bg-white/5 border-l-4 border-yellow-500 transition">
+                            <td class="px-4 py-4 font-mono">
+                                <span class="text-gray-300">${item.name}</span>
+                            </td>
+                            <td class="px-4 py-4">
+                                <span class="text-[10px] bg-yellow-500/10 text-yellow-200 border border-yellow-500/20 px-2 py-0.5 rounded">
+                                    VM
+                                </span>
+                            </td>
+                            <td class="px-4 py-4 text-yellow-400 font-bold">${item.savings}/mo <span class="text-[10px] text-gray-500">(${item.usage})</span></td>
+                            <td class="px-4 py-4 text-right">
+                                <button onclick="reapResource(${nm})" class="bg-yellow-600/20 border border-yellow-500 text-yellow-300 px-3 py-1 rounded text-[10px] hover:bg-yellow-600 hover:text-black transition-all">REAP</button>
                             </td>
                         </tr>`;
                 });
 
                 const zombieList = document.getElementById('zombie-list');
                 zombieList.innerHTML = '';
-                data.zombies.forEach(vm => {
+                (data.zombies || []).forEach(vm => {
+                    const nm = JSON.stringify(vm.name);
                     zombieList.innerHTML += `
                         <tr class="hover:bg-white/5 border-l-4 border-purple-500 transition">
                             <td class="px-4 py-4 font-mono text-gray-300">${vm.name}</td>
                             <td class="px-4 py-4 text-[10px] text-gray-400">${vm.usage}</td>
                             <td class="px-4 py-4 text-purple-400 font-bold">${vm.savings}/mo</td>
                             <td class="px-4 py-4 text-right">
-                                <button onclick="reapResource('${vm.name}')" class="bg-purple-600 text-white px-3 py-1 rounded text-[10px] font-black hover:bg-purple-500 hover:scale-110 active:scale-95 transition-all">KILL</button>
+                                <button onclick="reapResource(${nm})" class="bg-purple-600 text-white px-3 py-1 rounded text-[10px] font-black hover:bg-purple-500 hover:scale-110 active:scale-95 transition-all">KILL</button>
                             </td>
                         </tr>`;
                 });
 
                 const efficiencyList = document.getElementById('efficiency-list');
                 efficiencyList.innerHTML = '';
-                if (data.utilization_report) {
-                    data.utilization_report.forEach(item => {
-                        efficiencyList.innerHTML += `
-                            <tr class="hover:bg-white/5 border-b border-white/5 transition">
-                                <td class="py-4 px-4 font-mono text-sm">${item.name}</td>
-                                <td class="py-4 px-4 text-blue-300">${item.current_sku}</td>
-                                <td class="py-4 px-4 text-gray-400 text-xs">${item.metrics}</td>
-                                <td class="py-4 px-4">
-                                    <span class="px-2 py-1 rounded text-[10px] font-bold bg-white/10 ${item.color}">
-                                        ${item.status}
-                                    </span>
-                                </td>
-                                <td class="py-4 px-4 text-sm text-gray-300">${item.recommendation}</td>
-                            </tr>
-                        `;
-                    });
-                }
+                (data.utilization_report || []).forEach(item => {
+                    efficiencyList.innerHTML += `
+                        <tr class="hover:bg-white/5 border-b border-white/5 transition">
+                            <td class="py-4 px-4 font-mono text-sm">${item.name}</td>
+                            <td class="py-4 px-4 text-blue-300">${item.current_sku}</td>
+                            <td class="py-4 px-4 text-gray-400 text-xs">${item.metrics}</td>
+                            <td class="py-4 px-4">
+                                <span class="px-2 py-1 rounded text-[10px] font-bold bg-white/10 ${item.color}">
+                                    ${item.status}
+                                </span>
+                            </td>
+                            <td class="py-4 px-4 text-sm text-gray-300">${item.recommendation}</td>
+                        </tr>
+                    `;
+                });
 
                 document.getElementById('health-pulse').className = 'w-3 h-3 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e] animate-pulse';
                 notify("Scan complete. Targets identified.", "success");
@@ -694,21 +714,25 @@
                 filterTable();
                 fetchActivity();
 
+            } catch (e) {
+                notify(e.message || "Scan failed", "danger");
+                data = null;
             } finally {
-                btn.innerText = "INITIATE SCAN";
+                btn.innerText = "Initiate Global Scan";
                 btn.disabled = false;
                 icon.classList.remove('animate-spin');
 
-                // Update Burn Ticker
-                updateBurnTicker(data.total_savings);
-
-                // Trigger AI Advice
-                provideAdvice(data);
+                const savings = data && data.total_savings ? data.total_savings : "$0.00";
+                updateBurnTicker(savings);
+                if (data && data.status === "success") {
+                    provideAdvice(data);
+                }
             }
         }
 
         function updateBurnTicker(savings) {
-            const val = parseFloat(savings.replace(/[^\d.]/g, '')) / 730;
+            const raw = String(savings || '$0.00').replace(/[^\d.]/g, '');
+            const val = (parseFloat(raw) || 0) / 730;
             document.getElementById('burn-ticker-val').innerText = `$${val.toFixed(2)}`;
         }
 
@@ -722,40 +746,23 @@
 
         function provideAdvice(data) {
             const content = document.getElementById('advice-content');
-            const totalSavings = parseFloat(data.total_savings.replace(/[^\d.]/g, ''));
+            if (!content || !data) return;
 
+            const totalSavings = parseFloat(String(data.total_savings || '0').replace(/[^\d.]/g, '')) || 0;
             let advice = "";
             if (totalSavings > 1000) {
-                advice = `<span class="text-cyan-400 font-black tracking-widest">[CRITICAL WASTE]</span><br>My algorithms have identified significant orphaned resources in your scope. Execute REAP immediately to recover $${totalSavings} monthly.`;
+                advice = `<span class="text-cyan-400 font-black tracking-widest">[CRITICAL WASTE]</span><br>Significant reclaimable spend detected. Review REAP targets and validate before execution — estimated <span class="text-white font-bold">$${totalSavings.toFixed(0)}/mo</span> impact.`;
             } else if (data.zombies && data.zombies.length > 0) {
-                advice = `<span class="text-purple-400 font-black tracking-widest">[ZOMBIE DETECTED]</span><br>Found ${data.zombies.length} instances with near-zero CPU. Transitioning to Reserved Instances could save 40% on top of termination.`;
+                advice = `<span class="text-purple-400 font-black tracking-widest">[ZOMBIE DETECTED]</span><br>Found ${data.zombies.length} low-telemetry instances. Consider deallocation or Reserved Instances where appropriate.`;
             } else {
-                advice = `<span class="text-green-400 font-black tracking-widest">[OPTIMIZED]</span><br>Minimal waste detected. I recommend enabling 'Aggressive Scanning' in Settings to find micro-savings in your storage accounts.`;
+                advice = `<span class="text-green-400 font-black tracking-widest">[OPTIMIZED]</span><br>Minimal waste in this pass. Tune scanning sensitivity under Settings for deeper idle detection.`;
             }
 
-            // Typing effect
-            content.innerHTML = '<p class="text-cyan-500 animate-pulse">ANALYZING TELEMETRY...</p>';
+            content.innerHTML = '<p class="text-cyan-500 animate-pulse">Analyzing telemetry…</p>';
             setTimeout(() => {
-                content.innerHTML = '';
-                let i = 0;
-                const typeWriter = () => {
-                    if (i < advice.length) {
-                        if (advice.charAt(i) === '<') {
-                            const end = advice.indexOf('>', i);
-                            content.innerHTML += advice.substring(i, end + 1);
-                            i = end + 1;
-                        } else {
-                            content.innerHTML += advice.charAt(i);
-                            i++;
-                        }
-                        setTimeout(typeWriter, 15);
-                    }
-                };
-                typeWriter();
-            }, 1000);
-
-            content.innerHTML = advice;
-            if (!advisorOpen) toggleAdvisor();
+                content.innerHTML = advice;
+                if (!advisorOpen) toggleAdvisor();
+            }, 450);
         }
 
         // Real-Time Compute Chart Initialization
@@ -849,17 +856,10 @@
         runScan = async function () {
             logToConsole("INITIATING GLOBAL SCAN SEQUENCE...", "success");
             logToConsole("Mapping subscriptions from Azure Resource Manager...");
-
-            // Show console if it was a manual trigger
-            if (document.getElementById('reaper-console').classList.contains('hidden')) {
-                // optional: automatically show? maybe too intrusive.
-            }
-
             await originalRunScan();
-
             logToConsole("Scan sequence complete. Telemetry ingested.", "success");
-            logToConsole(`Efficiency optimized at 94.2%. Reaper standby.`, "info");
-        }
+            logToConsole("Reaper standby.", "info");
+        };
 
 
 
