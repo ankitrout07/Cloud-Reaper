@@ -118,5 +118,31 @@ class RegionPriceCache(Base):
     last_updated = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
+class CloudConnection(Base):
+    """
+    Multi-cloud credential vault. Only one connection should be active at a time.
+
+    credentials JSON shape by provider_type:
+      - aws: access_key_id, secret_access_key, region
+      - azure: tenant_id, client_id, client_secret, subscription_id
+      - gcp: project_id, service_account_json (inline JSON or file path)
+      - k8s: kubeconfig (path), context (optional)
+    """
+
+    __tablename__ = "cloud_connections"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)  # noqa: A003
+    provider_type = Column(String(20), nullable=False, index=True)  # azure, aws, gcp, k8s
+    connection_name = Column(String(100), nullable=False)
+    credentials = Column(JSONB, nullable=False, default=dict)
+    is_active = Column(Boolean, default=False, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)

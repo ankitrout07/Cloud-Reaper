@@ -1,8 +1,9 @@
 """Cloud-Reaper cross-platform bootstrapper.
 
 Creates the project ``venv/``, applies the same environment changes as ``activate``
-(``VIRTUAL_ENV`` + ``PATH``), installs dependencies with that venv's ``pip``, builds
-the Go engine, and launches the Flask/SocketIO app with the venv interpreter.
+(``VIRTUAL_ENV`` + ``PATH``), installs runtime and developer dependencies with
+that venv's ``pip``, builds the Go engine, and launches the Flask/SocketIO app
+with the venv interpreter.
 
 Run directly with: python3 bootstrap.py
 """
@@ -223,6 +224,16 @@ def setup_venv() -> tuple[str, Path]:
     ):
         print("[!] pip install -r requirements.txt failed.")
         sys.exit(1)
+
+    dev_req = REPO_ROOT / "requirements-dev.txt"
+    if dev_req.is_file():
+        print("[*] Installing development dependencies into the venv...")
+        if not run_command(
+            [str(pip_path), "install", "-r", str(dev_req), "--quiet"],
+            env=venv_env,
+        ):
+            print("[!] pip install -r requirements-dev.txt failed.")
+            sys.exit(1)
 
     print(f"[+] Dependencies installed. Interpreter: {python_path}")
     return str(python_path), venv_dir

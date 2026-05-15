@@ -20,6 +20,41 @@ function toggleFieldVisibility(inputId, iconId) {
     }
 }
 
+async function switchGlobalProvider(provider) {
+    try {
+        const response = await fetch(`/api/context/switch?provider=${encodeURIComponent(provider)}`);
+        const data = await response.json();
+
+        if (data.status === "redirect" && data.url) {
+            window.location.href = data.url;
+            return;
+        }
+
+        if (data.status === "success") {
+            if (typeof showToast === "function") {
+                showToast(data.message || `Switched to ${provider.toUpperCase()} context.`, "success");
+            } else {
+                notify(data.message || `Switched to ${provider.toUpperCase()} context.`, "success");
+            }
+            window.location.reload();
+            return;
+        }
+
+        const message = data.message || "Failed to switch provider context.";
+        if (typeof showToast === "function") {
+            showToast(message, "error");
+        } else {
+            notify(message, "danger");
+        }
+    } catch (error) {
+        if (typeof showToast === "function") {
+            showToast("Unable to switch provider context.", "error");
+        } else {
+            notify("Unable to switch provider context.", "danger");
+        }
+    }
+}
+
 async function connectInfrastructure() {
     const payload = {
         subscriptionId: document.getElementById("subId").value,

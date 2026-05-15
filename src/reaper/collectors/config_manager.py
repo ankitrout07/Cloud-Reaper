@@ -57,3 +57,78 @@ def _update_os_environ(keys_to_update):
     """Updates the current process environment variables."""
     for key, value in keys_to_update.items():
         os.environ[key] = value
+
+
+def normalize_resource(provider: str, resource: dict) -> dict:
+    """Maps provider native objects into a unified Reaper schema."""
+    provider = provider.lower()
+    if provider == "aws":
+        return _normalize_aws_resource(resource)
+    if provider == "azure":
+        return _normalize_azure_resource(resource)
+    if provider == "gcp":
+        return _normalize_gcp_resource(resource)
+    if provider == "k8s":
+        return _normalize_k8s_resource(resource)
+    return _normalize_generic_resource(resource)
+
+
+def _normalize_aws_resource(resource: dict) -> dict:
+    tags = {item.get('Key'): item.get('Value') for item in resource.get('tags', []) if isinstance(resource.get('tags', []), list)}
+    return {
+        "id": resource.get("InstanceId") or resource.get("VolumeId") or resource.get("ResourceId"),
+        "name": tags.get("Name") or resource.get("InstanceType") or resource.get("id"),
+        "type": "ComputeResource" if resource.get("InstanceId") else "StorageResource",
+        "region": resource.get("region") or resource.get("AvailabilityZone") or resource.get("aws_region") or "unknown",
+        "hourly_cost": float(resource.get("hourly_cost") or resource.get("cost") or 0.0),
+        "provider": "aws",
+        "metadata": {"raw": resource, "tags": tags},
+    }
+
+
+def _normalize_azure_resource(resource: dict) -> dict:
+    return {
+        "id": resource.get("id") or resource.get("resource_id") or resource.get("instance_id"),
+        "name": resource.get("name") or resource.get("vm_name") or resource.get("instance_name"),
+        "type": "ComputeResource" if "vm" in (resource.get("type", "").lower()) else "StorageResource",
+        "region": resource.get("region") or resource.get("location") or "unknown",
+        "hourly_cost": float(resource.get("hourly_cost") or resource.get("cost") or 0.0),
+        "provider": "azure",
+        "metadata": resource,
+    }
+
+
+def _normalize_gcp_resource(resource: dict) -> dict:
+    return {
+        "id": resource.get("id") or resource.get("instance_id") or resource.get("resource_id"),
+        "name": resource.get("name") or resource.get("display_name") or resource.get("instance_name"),
+        "type": "ComputeResource" if resource.get("machine_type") or resource.get("resource_type") == "compute" else "StorageResource",
+        "region": resource.get("zone") or resource.get("region") or "unknown",
+        "hourly_cost": float(resource.get("hourly_cost") or resource.get("cost") or 0.0),
+        "provider": "gcp",
+        "metadata": resource,
+    }
+
+
+def _normalize_k8s_resource(resource: dict) -> dict:
+    return {
+        "id": resource.get("metadata", {}).get("uid") or resource.get("name") or resource.get("id"),
+        "name": resource.get("metadata", {}).get("name") or resource.get("name"),
+        "type": resource.get("kind") or resource.get("type") or "KubernetesResource",
+        "region": resource.get("metadata", {}).get("namespace") or "cluster",
+        "hourly_cost": float(resource.get("hourly_cost") or resource.get("cost") or 0.0),
+        "provider": "k8s",
+        "metadata": resource,
+    }
+
+
+def _normalize_generic_resource(resource: dict) -> dict:
+    return {
+        "id": resource.get("id") or resource.get("resource_id") or "unknown",
+        "name": resource.get("name") or resource.get("display_name") or "unnamed",
+        "type": resource.get("type") or "Resource",
+        "region": resource.get("region") or resource.get("location") or "unknown",
+        "hourly_cost": float(resource.get("hourly_cost") or resource.get("cost") or 0.0),
+        "provider": resource.get("provider") or "unknown",
+        "metadata": resource,
+    }

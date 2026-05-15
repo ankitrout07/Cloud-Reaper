@@ -1,7 +1,11 @@
-# gevent monkey-patching MUST happen before all other imports.
-from gevent import monkey
+# gevent monkey-patching is optional; use threading fallback if unavailable.
+try:
+    from gevent import monkey
 
-monkey.patch_all()
+    monkey.patch_all()
+    async_mode = "gevent"
+except ImportError:
+    async_mode = "threading"
 
 import contextlib  # noqa: E402
 import datetime  # noqa: E402
@@ -9,6 +13,7 @@ import io  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
 import subprocess  # noqa: E402
+import tempfile  # noqa: E402
 import threading  # noqa: E402
 import time  # noqa: E402
 import traceback  # noqa: E402
@@ -39,6 +44,7 @@ from reaper.engine.logic import RightSizer  # noqa: E402
 from reaper.engine.models import (  # noqa: E402
     ActionLog,
     BusinessMetric,
+    CloudConnection,
     CostHistory,
     Resource,
     SessionLocal,
@@ -78,7 +84,7 @@ app = Flask(
     template_folder=str(_web_dir / "templates"),
     static_folder=str(_web_dir / "static"),
 )
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
 thread = None
 thread_lock = threading.Lock()
 
@@ -285,17 +291,158 @@ def connect_azure():
         return jsonify({"status": "error", "message": f"Connection Failed: {e!s}"}), 500
 
 
+def _write_gcp_service_account_file(service_json: str) -> str:
+    target = Path(tempfile.gettempdir()) / "cloud_reaper_gcp_credentials.json"
+    target.write_text(service_json)
+    return str(target)
+
+
+def _write_kubeconfig_file(kubeconfig: str) -> str:
+    target = Path(tempfile.gettempdir()) / "cloud_reaper_kubeconfig.yaml"
+    target.write_text(kubeconfig)
+    return str(target)
+
+
+def _set_cloud_env(provider: str, credentials: dict) -> None:
+    provider = provider.lower()
+    if provider == "aws":
+        os.environ["AWS_ACCESS_KEY_ID"] = credentials.get("access_key_id", "")
+        os.environ["AWS_SECRET_ACCESS_KEY"] = credentials.get("secret_access_key", "")
+        os.environ["AWS_REGION"] = credentials.get("region", "us-east-1")
+    elif provider == "azure":
+        os.environ["AZURE_SUBSCRIPTION_ID"] = credentials.get("subscription_id", "")
+        os.environ["AZURE_TENANT_ID"] = credentials.get("tenant_id", "")
+        os.environ["AZURE_CLIENT_ID"] = credentials.get("client_id", "")
+        os.environ["AZURE_CLIENT_SECRET"] = credentials.get("client_secret", "")
+    elif provider == "gcp":
+        os.environ["GOOGLE_CLOUD_PROJECT"] = credentials.get("project_id", "")
+        if credentials.get("service_account_json"):
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _write_gcp_service_account_file(
+                credentials["service_account_json"]
+            )
+    elif provider == "k8s":
+        kubeconfig = credentials.get("kubeconfig")
+        if kubeconfig:
+            kubeconfig_path = Path(kubeconfig)
+            if kubeconfig_path.exists():
+                os.environ["KUBECONFIG"] = str(kubeconfig_path)
+            else:
+                os.environ["KUBECONFIG"] = _write_kubeconfig_file(kubeconfig)
+        if credentials.get("service_account_token"):
+            os.environ["K8S_SERVICE_ACCOUNT_TOKEN"] = credentials.get("service_account_token")
+        if credentials.get("context"):
+            os.environ["K8S_CONTEXT"] = credentials.get("context")
+    os.environ["REAPER_ACTIVE_PROVIDER"] = provider.upper()
+
+
+@app.route("/api/context/switch")
+def switch_context():
+    provider = (request.args.get("provider") or "").lower()
+    if provider not in {"aws", "azure", "gcp", "k8s"}:
+        return jsonify({"status": "error", "message": "Unsupported provider."}), 400
+
+    session = SessionLocal()
+    try:
+        conn = (
+            session.query(CloudConnection)
+            .filter_by(provider_type=provider)
+            .order_by(CloudConnection.updated_at.desc())
+            .first()
+        )
+        if not conn:
+            return jsonify(
+                {
+                    "status": "redirect",
+                    "url": url_for("settings", mode="onboarding", provider=provider),
+                }
+            )
+
+        session.query(CloudConnection).filter_by(provider_type=provider).update({"is_active": False})
+        conn.is_active = True
+        session.commit()
+        _set_cloud_env(provider, conn.credentials)
+
+        return jsonify(
+            {
+                "status": "success",
+                "provider": provider,
+                "message": f"{provider.upper()} context activated.",
+            }
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route("/api/settings/connect-cloud", methods=["POST"])
+def connect_cloud():
+    data = request.json or {}
+    provider = (data.get("provider") or "").lower()
+    credentials = data.get("credentials") or {}
+    connection_name = data.get("connection_name") or f"{provider.capitalize()} Connection"
+
+    required_fields = {
+        "aws": ["access_key_id", "secret_access_key", "region"],
+        "azure": ["subscription_id", "tenant_id", "client_id", "client_secret"],
+        "gcp": ["project_id"],
+        "k8s": [],
+    }
+
+    if provider not in required_fields:
+        return jsonify({"status": "error", "message": "Unsupported provider."}), 400
+
+    missing = [f for f in required_fields[provider] if not credentials.get(f)]
+    if provider == "gcp" and not credentials.get("service_account_json"):
+        missing.append("service_account_json")
+    if provider == "k8s" and not (credentials.get("kubeconfig") or credentials.get("service_account_token")):
+        missing.append("kubeconfig or service_account_token")
+
+    if missing:
+        return jsonify(
+            {
+                "status": "error",
+                "message": f"Missing required credential fields: {', '.join(missing)}",
+            }
+        ), 400
+
+    try:
+        _set_cloud_env(provider, credentials)
+        session = SessionLocal()
+        session.query(CloudConnection).filter_by(provider_type=provider).update({"is_active": False})
+
+        conn = CloudConnection(
+            provider_type=provider,
+            connection_name=connection_name,
+            credentials=credentials,
+            is_active=True,
+        )
+        session.add(conn)
+        session.commit()
+        return jsonify(
+            {
+                "status": "success",
+                "message": f"{provider.capitalize()} credentials saved and activated.",
+            }
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        try:
+            session.close()
+        except Exception:
+            pass
+
+
 @app.route("/api/settings/auth")
 def check_auth():
     try:
-        # Use full path for az if possible, or suppress if safe.
-        # For simplicity in this dev tool, we use the command name.
         subprocess.run(["az", "account", "show"], capture_output=True, check=True)  # noqa: S603, S607
         return jsonify(
-            {"status": "success", "message": "Connected: Azure CLI (Active Subscription)"}
+            {"status": "healthy", "message": "Connected: Azure CLI (Active Subscription)"}
         )
     except Exception:
-        return jsonify({"status": "error", "message": "Disconnected: Please run 'az login'"})
+        return jsonify({"status": "expired", "message": "Disconnected: Please run 'az login'"})
 
 
 @app.route("/api/settings/subscriptions")
