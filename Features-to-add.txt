@@ -1,0 +1,5 @@
+i want to add a logo for cloud reaper rather than just cr which is being written on top left of our project, tell me what should i do?
+
+i want the section which is azure resource catalouge to be cloud resource catalouge, which would have a selector for prices to display for azure, gcp, aws.
+so user can select the cloud provider and the prices of the resources of that cloud provider will be displayed.
+we can also add a toggle section in the same page for list to display for azure, gcp, aws
