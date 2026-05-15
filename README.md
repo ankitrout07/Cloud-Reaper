@@ -127,6 +127,7 @@ python bootstrap.py
 `bootstrap.py` handles everything automatically — Go build, venv, dependencies, `.env`, and dashboard launch. Dashboard available at **http://localhost:5001**.
 
 > Full setup guide → **[HOW_TO_RUN.md](HOW_TO_RUN.md)**
+> Portability & Docker guide → **[PORTABILITY.md](PORTABILITY.md)**
 
 ### Manual Setup (if needed)
 
