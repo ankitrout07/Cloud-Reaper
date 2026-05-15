@@ -47,6 +47,23 @@ func (a *AzureScraper) ScanResources() ([]models.Resource, error) {
 	}
 
 	ctx := context.Background()
+	var resources []models.Resource
+
+	vms, err := a.scanVMs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resources = append(resources, vms...)
+
+	disks, err := a.scanDisks(ctx)
+	if err == nil {
+		resources = append(resources, disks...)
+	}
+
+	return resources, nil
+}
+
+func (a *AzureScraper) scanVMs(ctx context.Context) ([]models.Resource, error) {
 	vmClient, err := armcompute.NewVirtualMachinesClient(a.subscriptionID, a.cred, nil)
 	if err != nil {
 		return nil, err
@@ -91,38 +108,43 @@ func (a *AzureScraper) ScanResources() ([]models.Resource, error) {
 			})
 		}
 	}
+	return resources, nil
+}
 
+func (a *AzureScraper) scanDisks(ctx context.Context) ([]models.Resource, error) {
 	diskClient, err := armcompute.NewDisksClient(a.subscriptionID, a.cred, nil)
-	if err == nil {
-		diskPager := diskClient.NewListPager(nil)
-		for diskPager.More() {
-			_ = a.limiter.Wait(ctx)
-			page, err := diskPager.NextPage(ctx)
-			if err != nil {
-				break
-			}
-			for _, disk := range page.Value {
-				if disk == nil || disk.ManagedBy != nil || disk.ID == nil || disk.Name == nil {
-					continue
-				}
-				tags := azureTagsToMap(disk.Tags)
-				resources = append(resources, models.Resource{
-					ID:            *disk.ID,
-					Name:          *disk.Name,
-					Type:          "OrphanedDisk",
-					Region:        stringValue(disk.Location),
-					Tags:          tags,
-					Active:        true,
-					IsProtected:   isAzureProtected(tags),
-					IsUnallocated: true,
-					LastSeen:      time.Now().UTC(),
-					Provider:      "azure",
-					SKU:           diskSKU(disk),
-				})
-			}
-		}
+	if err != nil {
+		return nil, err
 	}
 
+	var resources []models.Resource
+	diskPager := diskClient.NewListPager(nil)
+	for diskPager.More() {
+		_ = a.limiter.Wait(ctx)
+		page, err := diskPager.NextPage(ctx)
+		if err != nil {
+			break
+		}
+		for _, disk := range page.Value {
+			if disk == nil || disk.ManagedBy != nil || disk.ID == nil || disk.Name == nil {
+				continue
+			}
+			tags := azureTagsToMap(disk.Tags)
+			resources = append(resources, models.Resource{
+				ID:            *disk.ID,
+				Name:          *disk.Name,
+				Type:          "OrphanedDisk",
+				Region:        stringValue(disk.Location),
+				Tags:          tags,
+				Active:        true,
+				IsProtected:   isAzureProtected(tags),
+				IsUnallocated: true,
+				LastSeen:      time.Now().UTC(),
+				Provider:      "azure",
+				SKU:           diskSKU(disk),
+			})
+		}
+	}
 	return resources, nil
 }
 
@@ -182,7 +204,7 @@ func isAzureProtected(tags map[string]string) bool {
 	for k, v := range tags {
 		key := strings.ToLower(k)
 		val := strings.ToLower(v)
-		if (key == "reaper-ignore" && val == "true") || (key == "environment" && val == "production") {
+		if (key == KeyReaperIgnore && val == ValueTrue) || (key == KeyEnvironment && val == ValueProduction) {
 			return true
 		}
 	}
@@ -210,19 +232,19 @@ func vmLocation(vm *armcompute.VirtualMachine) string {
 	if vm.Location != nil {
 		return *vm.Location
 	}
-	return "unknown"
+	return Unknown
 }
 
 func diskSKU(disk *armcompute.Disk) string {
 	if disk.SKU != nil && disk.SKU.Name != nil {
 		return string(*disk.SKU.Name)
 	}
-	return "unknown"
+	return Unknown
 }
 
 func stringValue(s *string) string {
 	if s == nil {
-		return "unknown"
+		return Unknown
 	}
 	return *s
 }

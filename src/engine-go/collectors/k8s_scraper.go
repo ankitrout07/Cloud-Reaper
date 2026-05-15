@@ -33,7 +33,8 @@ func (s *K8sScraper) Authenticate(creds map[string]string) error {
 
 	switch {
 	case kubeconfig != "":
-		path, err := expandHome(kubeconfig)
+		var path string
+		path, err = expandHome(kubeconfig)
 		if err != nil {
 			return fmt.Errorf("k8s: kubeconfig path: %w", err)
 		}
@@ -160,7 +161,7 @@ func isK8sProtected(tags map[string]string) bool {
 	for k, v := range tags {
 		key := strings.ToLower(k)
 		val := strings.ToLower(v)
-		if (key == "reaper-ignore" && val == "true") || (key == "environment" && val == "production") {
+		if (key == KeyReaperIgnore && val == ValueTrue) || (key == KeyEnvironment && val == ValueProduction) {
 			return true
 		}
 	}

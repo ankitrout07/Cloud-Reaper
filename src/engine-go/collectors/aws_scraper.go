@@ -147,7 +147,7 @@ func isAWSProtected(tags map[string]string) bool {
 	for k, v := range tags {
 		key := strings.ToLower(k)
 		val := strings.ToLower(v)
-		if (key == "reaper-ignore" && val == "true") || (key == "environment" && val == "production") {
+		if (key == KeyReaperIgnore && val == ValueTrue) || (key == KeyEnvironment && val == ValueProduction) {
 			return true
 		}
 	}
