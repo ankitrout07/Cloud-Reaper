@@ -52,7 +52,9 @@
                                 <option value="price-asc">Price: Low to High</option>
                                 <option value="price-desc">Price: High to Low</option>
                                 <option value="sku-asc">SKU: A-Z</option>
+                                <option value="sku-desc">SKU: Z-A</option>
                                 <option value="region-asc">Region: A-Z</option>
+                                <option value="region-desc">Region: Z-A</option>
                             </select>
                             <div class="absolute right-3 top-2.5 pointer-events-none text-cyan-400">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
@@ -597,8 +599,12 @@
                 filteredPriceData.sort((a, b) => b.retailPrice - a.retailPrice);
             } else if (sortBy === "sku-asc") {
                 filteredPriceData.sort((a, b) => (a.armResourceName || a.skuName).localeCompare(b.armResourceName || b.skuName));
+            } else if (sortBy === "sku-desc") {
+                filteredPriceData.sort((a, b) => (b.armResourceName || b.skuName).localeCompare(a.armResourceName || a.skuName));
             } else if (sortBy === "region-asc") {
                 filteredPriceData.sort((a, b) => (a.armRegionName || "").localeCompare(b.armRegionName || ""));
+            } else if (sortBy === "region-desc") {
+                filteredPriceData.sort((a, b) => (b.armRegionName || "").localeCompare(a.armRegionName || ""));
             }
 
             currentPage = 1;
