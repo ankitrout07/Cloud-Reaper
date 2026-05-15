@@ -86,7 +86,7 @@ class AzureCollector:
 
             metrics = self.monitor.metrics.list(
                 resource_id,
-                timespan=f"{start_time.isoformat()}/{end_time.isoformat()}",
+                timespan=f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}",
                 interval="PT12H",
                 metricnames="Percentage CPU",
                 aggregation="Average",
@@ -370,7 +370,7 @@ class AzureCollector:
         )
         end_time = datetime.datetime.now(datetime.UTC)
         start_time = end_time - datetime.timedelta(hours=24)
-        span = f"{start_time.isoformat().replace('+00:00', 'Z')}/{end_time.isoformat().replace('+00:00', 'Z')}"
+        span = f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
         try:
             metrics = self.monitor.metrics.list(
                 rid,
@@ -535,7 +535,7 @@ class AzureCollector:
             try:
                 metrics = self.monitor.metrics.list(
                     resource_id,
-                    timespan=f"{start_time.isoformat()}/{end_time.isoformat()}",
+                    timespan=f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}",
                     interval="PT12H",
                     metricnames="Percentage CPU",
                     aggregation="Average",
@@ -578,7 +578,7 @@ class AzureCollector:
             try:
                 metrics = self.monitor.metrics.list(
                     resource_id,
-                    timespan=f"{start_time.isoformat()}/{end_time.isoformat()}",
+                    timespan=f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}",
                     interval="PT1H",
                     metricnames="Percentage CPU",
                     aggregation="Average",
