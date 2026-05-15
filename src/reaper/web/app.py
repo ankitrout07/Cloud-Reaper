@@ -879,22 +879,85 @@ def perform_subscription_scan(target_subs, events):
     for sub_id in target_subs:
         events.append({"msg": f"Scanning subscription: {sub_id[:8]}...", "type": "info"})
         az.subscription_id = sub_id
-        # pyrefly: ignore [missing-attribute]  # noqa: ERA001
-        az._scan_cache = None
+        
+        go_data = az.get_go_scan_results()
+        if go_data:
+            reports = go_data.get("vm_reports", [])
+            active_vms = go_data.get("active_vms", [])
+            results["vms_count"] += len(active_vms)
+            
+            for d in go_data.get("orphaned_disks", []):
+                d["rg"] = "Unknown"
+                results["orphans"].append(d)
+                
+            for s in go_data.get("orphaned_snapshots", []):
+                s["rg"] = "Unknown"
+                results["snapshots"].append(s)
 
-        vms = az.get_vm_inventory()
-        results["vms_count"] += len(vms)
+            threshold = 2.0 if settings_state.get("idle_strategy") == "aggressive" else 10.0
+            
+            reported_vms = set()
+            for r in reports:
+                name = r.get("name")
+                reported_vms.add(name)
+                avg_usage = r.get("usage", 0.0)
+                rid = r.get("id", "")
+                rg = rid.split("/")[4] if "/" in rid else "Unknown"
+                
+                results["utilization"].append({
+                    "name": name,
+                    "usage": round(avg_usage, 1),
+                    "rg": rg
+                })
+                
+                if avg_usage < 1.0:
+                    results["zombies"].append({
+                        "name": name,
+                        "usage": f"{round(avg_usage, 2)}%",
+                        "rg": rg
+                    })
+                elif avg_usage < threshold:
+                    results["idle_vms"].append({
+                        "name": name,
+                        "usage": f"{round(avg_usage, 2)}%",
+                        "rg": rg
+                    })
+                    
+            for name in active_vms:
+                if name not in reported_vms:
+                    results["utilization"].append({
+                        "name": name,
+                        "usage": 0.0,
+                        "rg": "Unknown"
+                    })
+        else:
+            # pyrefly: ignore [missing-attribute]  # noqa: ERA001
+            az._scan_cache = None
 
-        reap_data = az.get_orphaned_disks()
-        results["orphans"].extend(reap_data["disks"])
-        results["snapshots"].extend(reap_data["snapshots"])
-        results["zombies"].extend(az.get_zombie_vms())
+            vms = az.get_vm_inventory()
+            results["vms_count"] += len(vms)
 
-        threshold = 2.0 if settings_state["idle_strategy"] == "aggressive" else 10.0
-        results["idle_vms"].extend(az.get_idle_vms(cpu_threshold=threshold))
+            reap_data = az.get_orphaned_disks()
+            results["orphans"].extend(reap_data["disks"])
+            results["snapshots"].extend(reap_data["snapshots"])
+            results["zombies"].extend(az.get_zombie_vms())
 
-        with contextlib.suppress(Exception):
-            results["utilization"].extend(az.get_utilization_report())
+            threshold = 2.0 if settings_state["idle_strategy"] == "aggressive" else 10.0
+            results["idle_vms"].extend(az.get_idle_vms(cpu_threshold=threshold))
+
+            with contextlib.suppress(Exception):
+                results["utilization"].extend(az.get_utilization_report())
+
+            reported_python = {u["name"] for u in results["utilization"]}
+            for vm in vms:
+                if vm["name"] not in reported_python:
+                    results["utilization"].append({
+                        "name": vm["name"],
+                        "usage": 0.0,
+                        "rg": vm.get("location", "Unknown")
+                    })
+    
+    results["utilization"].sort(key=lambda x: x["usage"], reverse=True)
     return results
 
 

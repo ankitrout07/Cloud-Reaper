@@ -773,6 +773,33 @@ class AzureCollector:
             print(f"[-] Failed to execute Go Scraper: {e}")
             return {}
 
+    def get_go_scan_results(self):
+        """
+        Executes the Go Performance Core to fetch real-time Azure scan data.
+        """
+        is_windows = platform.system() == "Windows"
+        binary_name = "reaper-engine.exe" if is_windows else "reaper-engine"
+        go_binary = Path(__file__).resolve().parents[3] / "bin" / binary_name
+
+        if not go_binary.exists():
+            print(f"[-] Error: Go binary not found at {go_binary}. Run ./reap.sh to build.")
+            return {}
+
+        try:
+            result = subprocess.run(
+                [str(go_binary), "--subscription", self.subscription_id],  # noqa: S603
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                return json.loads(result.stdout)
+            print(f"[-] Go Engine Error: {result.stderr}")
+            return {}
+        except Exception as e:
+            print(f"[-] Failed to execute Go Scraper: {e}")
+            return {}
+
     def get_burn_rate_forecast(self):
         """Calculates burn rate and EOM forecast using real Azure Cost data and ARIMA."""
         spend_data = []
