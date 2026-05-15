@@ -10,22 +10,21 @@ def test_verify_wiring():
     az = AzureCollector()
 
     # Basic API check
-    assert hasattr(az, 'get_live_prices')
-    assert hasattr(az, 'fast_scan')
+    assert hasattr(az, "get_live_prices")
+    assert hasattr(az, "fast_scan")
 
     # Deep schema verification of the Go-Python bridge
     go_binary = (
-        Path(__file__).resolve().parent.parent.parent.parent
-        / "src" / "engine-go" / "reaper-engine"
+        Path(__file__).resolve().parent.parent.parent.parent / "src" / "engine-go" / "reaper-engine"
     )
 
     if go_binary.exists():
         # Test the prices mode JSON schema handoff
         result = subprocess.run(
             [str(go_binary), "--mode", "prices"],  # noqa: S603
-            capture_output=True, 
-            text=True, 
-            check=False
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if result.returncode == 0:
             data = json.loads(result.stdout)

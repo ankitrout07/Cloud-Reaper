@@ -58,9 +58,7 @@ class CostCalculator:
             frequency = item.get("frequency", "hourly")
 
             if frequency == "monthly":
-                total += (
-                    self.calculate_monthly_cost(provider, resource_type, sku, quantity) / 730
-                )
+                total += self.calculate_monthly_cost(provider, resource_type, sku, quantity) / 730
             else:
                 total += self.calculate_hourly_cost(provider, resource_type, sku, quantity)
 
@@ -75,9 +73,7 @@ class CostCalculator:
             return
 
         # Extract items if wrapped in 'prices' key
-        items = (
-            price_data.get("prices", []) if isinstance(price_data, dict) else price_data
-        )
+        items = price_data.get("prices", []) if isinstance(price_data, dict) else price_data
 
         if not isinstance(items, list):
             logger.warning("Invalid price data format received.")

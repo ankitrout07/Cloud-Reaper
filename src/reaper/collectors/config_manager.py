@@ -74,12 +74,19 @@ def normalize_resource(provider: str, resource: dict) -> dict:
 
 
 def _normalize_aws_resource(resource: dict) -> dict:
-    tags = {item.get('Key'): item.get('Value') for item in resource.get('tags', []) if isinstance(resource.get('tags', []), list)}
+    tags = {
+        item.get("Key"): item.get("Value")
+        for item in resource.get("tags", [])
+        if isinstance(resource.get("tags", []), list)
+    }
     return {
         "id": resource.get("InstanceId") or resource.get("VolumeId") or resource.get("ResourceId"),
         "name": tags.get("Name") or resource.get("InstanceType") or resource.get("id"),
         "type": "ComputeResource" if resource.get("InstanceId") else "StorageResource",
-        "region": resource.get("region") or resource.get("AvailabilityZone") or resource.get("aws_region") or "unknown",
+        "region": resource.get("region")
+        or resource.get("AvailabilityZone")
+        or resource.get("aws_region")
+        or "unknown",
         "hourly_cost": float(resource.get("hourly_cost") or resource.get("cost") or 0.0),
         "provider": "aws",
         "metadata": {"raw": resource, "tags": tags},
@@ -90,7 +97,9 @@ def _normalize_azure_resource(resource: dict) -> dict:
     return {
         "id": resource.get("id") or resource.get("resource_id") or resource.get("instance_id"),
         "name": resource.get("name") or resource.get("vm_name") or resource.get("instance_name"),
-        "type": "ComputeResource" if "vm" in (resource.get("type", "").lower()) else "StorageResource",
+        "type": "ComputeResource"
+        if "vm" in (resource.get("type", "").lower())
+        else "StorageResource",
         "region": resource.get("region") or resource.get("location") or "unknown",
         "hourly_cost": float(resource.get("hourly_cost") or resource.get("cost") or 0.0),
         "provider": "azure",
@@ -101,8 +110,12 @@ def _normalize_azure_resource(resource: dict) -> dict:
 def _normalize_gcp_resource(resource: dict) -> dict:
     return {
         "id": resource.get("id") or resource.get("instance_id") or resource.get("resource_id"),
-        "name": resource.get("name") or resource.get("display_name") or resource.get("instance_name"),
-        "type": "ComputeResource" if resource.get("machine_type") or resource.get("resource_type") == "compute" else "StorageResource",
+        "name": resource.get("name")
+        or resource.get("display_name")
+        or resource.get("instance_name"),
+        "type": "ComputeResource"
+        if resource.get("machine_type") or resource.get("resource_type") == "compute"
+        else "StorageResource",
         "region": resource.get("zone") or resource.get("region") or "unknown",
         "hourly_cost": float(resource.get("hourly_cost") or resource.get("cost") or 0.0),
         "provider": "gcp",

@@ -1,7 +1,7 @@
 """
 Formalized JSON schemas for the Go-Python data handoff.
 
-This ensures the Python intelligence layer knows exactly what structure 
+This ensures the Python intelligence layer knows exactly what structure
 to expect from the Go Performance Engine's JSON output.
 """
 
@@ -31,6 +31,7 @@ class GoEngineScanResult(TypedDict, total=False):
     Schema representing the JSON structure returned by the Go engine.
     This corresponds directly to the ScanResult struct in src/engine-go/main.go.
     """
+
     user_name: str
     subscription_name: str
     orphaned_disks: list[OrphanedResource]
@@ -50,13 +51,13 @@ def validate_scan_result(data: dict[str, Any]) -> bool:
         "orphaned_disks",
         "orphaned_snapshots",
         "active_vms",
-        "vm_reports"
+        "vm_reports",
     ]
-    
+
     # In prices mode, the Go engine may omit everything except prices,
-    # but based on main.go, it always serializes the empty arrays 
+    # but based on main.go, it always serializes the empty arrays
     # unless it only outputs Prices. Let's make it flexible.
     if "prices" in data and len(data.keys()) == 1:
         return True
-        
+
     return all(key in data or "prices" in data for key in required_keys)

@@ -12,6 +12,13 @@ ignore = [
     "T201",    # Allow print for now (it's a CLI tool)
     "PLR2004", # Allow magic values (common in pricing logic)
     "COM812",  # Trailing comma (conflict with formatter sometimes)
+    "E501",    # Line too long
+    "A003",    # Class attribute `id` is shadowing a Python builtin
+    "ERA001",  # Commented-out code
+    "S311",    # Pseudo-random generators (used for testing)
+    "RUF003",  # Ambiguous en-dash in comments
+    "SIM105",  # contextlib.suppress
+    "S110",    # try-except-pass
 ]
 
 [tool.ruff.lint.isort]

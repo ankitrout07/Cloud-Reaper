@@ -69,8 +69,12 @@ class RegionalArbitrage:
     def __init__(self):
         # Top regions to compare against
         self.target_regions = [
-            "eastus", "westeurope", "southindia",
-            "brazilsouth", "westus2", "northeurope",
+            "eastus",
+            "westeurope",
+            "southindia",
+            "brazilsouth",
+            "westus2",
+            "northeurope",
         ]
 
     def analyze_arbitrage(self, sku_id, current_region, current_price_hourly):
@@ -80,24 +84,24 @@ class RegionalArbitrage:
         collector = _ac_module.AzureCollector()
         cheapest_region = current_region
         cheapest_price = current_price_hourly
-        
+
         for region in self.target_regions:
             if region == current_region:
                 continue
-                
+
             prices = collector.fetch_regional_prices(sku_id, region)
             if prices:
                 price_hourly = prices[0].get("retailPrice", 0)
                 if price_hourly > 0 and price_hourly < cheapest_price:
                     cheapest_price = price_hourly
                     cheapest_region = region
-                    
+
         if cheapest_region != current_region and cheapest_price < current_price_hourly:
             monthly_current = current_price_hourly * 730
             monthly_cheapest = cheapest_price * 730
             savings = monthly_current - monthly_cheapest
             pct_reduction = (savings / monthly_current) * 100
-            
+
             return {
                 "found_cheaper": True,
                 "current_region": current_region,
@@ -108,9 +112,9 @@ class RegionalArbitrage:
                     f"Deploying this {sku_id} in {cheapest_region} instead of "
                     f"{current_region} would save you "
                     f"${round(savings, 2)}/month ({round(pct_reduction, 1)}% reduction)."
-                )
+                ),
             }
-            
+
         return {
             "found_cheaper": False,
             "message": (

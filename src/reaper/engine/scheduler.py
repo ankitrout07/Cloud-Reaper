@@ -4,6 +4,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 from stable_baselines3 import PPO
+
 from reaper.engine.workload import PredictiveScalingEngine
 
 # Constants

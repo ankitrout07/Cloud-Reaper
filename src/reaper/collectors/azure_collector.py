@@ -3,6 +3,7 @@ import json
 import os
 import platform
 import subprocess
+from collections import defaultdict
 from pathlib import Path
 
 from azure.identity import DefaultAzureCredential
@@ -15,8 +16,6 @@ from azure.mgmt.sql import SqlManagementClient
 from azure.mgmt.subscription import SubscriptionClient
 from azure.mgmt.web import WebSiteManagementClient
 from dotenv import load_dotenv
-
-from collections import defaultdict
 
 from reaper.collectors.azure_prices import AzurePriceClient
 from reaper.engine.logic import BudgetForecaster
@@ -40,9 +39,9 @@ class AzureCollector:
     def __init__(self, subscription_id=None):
         self.subscription_id = subscription_id or os.getenv("AZURE_SUBSCRIPTION_ID")
         self.credentials = DefaultAzureCredential()
-        # pyrefly: ignore [bad-argument-type]  # noqa: ERA001
+        # pyrefly: ignore [bad-argument-type]
         self.compute = ComputeManagementClient(self.credentials, self.subscription_id)
-        # pyrefly: ignore [bad-argument-type]  # noqa: ERA001
+        # pyrefly: ignore [bad-argument-type]
         self.network = NetworkManagementClient(self.credentials, self.subscription_id)
         self.monitor = MonitorManagementClient(self.credentials, self.subscription_id)
         self.web = WebSiteManagementClient(self.credentials, self.subscription_id)
@@ -50,6 +49,7 @@ class AzureCollector:
         self.recovery = RecoveryServicesClient(self.credentials, self.subscription_id)
         try:
             from azure.mgmt.costmanagement import CostManagementClient
+
             self.cost_management = CostManagementClient(self.credentials)
         except ImportError:
             self.cost_management = None  # pyrefly: ignore [bad-assignment]
@@ -159,7 +159,11 @@ class AzureCollector:
                 metricnames="Percentage CPU",
                 aggregation="Average",
             )
-            if metrics.value and metrics.value[0].timeseries and metrics.value[0].timeseries[0].data:
+            if (
+                metrics.value
+                and metrics.value[0].timeseries
+                and metrics.value[0].timeseries[0].data
+            ):
                 latest_data = metrics.value[0].timeseries[0].data[-1]
                 return latest_data.average if latest_data.average is not None else 0.0
             return 0.0
@@ -237,7 +241,10 @@ class AzureCollector:
 
     def get_service_bucket_spend(self) -> dict:
         """Aggregate last-30-day cost into Compute / Storage / Networking / Other."""
-        default = {"labels": ["Compute", "Storage", "Networking", "Other"], "data": [0.0, 0.0, 0.0, 0.0]}
+        default = {
+            "labels": ["Compute", "Storage", "Networking", "Other"],
+            "data": [0.0, 0.0, 0.0, 0.0],
+        }
         if not self.cost_management or not self.subscription_id:
             return default
 
@@ -370,7 +377,9 @@ class AzureCollector:
         )
         end_time = datetime.datetime.now(datetime.UTC)
         start_time = end_time - datetime.timedelta(hours=24)
-        span = f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+        span = (
+            f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+        )
         try:
             metrics = self.monitor.metrics.list(
                 rid,
@@ -501,7 +510,7 @@ class AzureCollector:
     def get_user_name(self):
         """Returns the authenticated user's display name"""
         try:
-            # pyrefly: ignore [bad-argument-type]  # noqa: ERA001
+            # pyrefly: ignore [bad-argument-type]
             AuthorizationManagementClient(self.credentials, self.subscription_id)
             # Get current user info - this is a simplified approach
             return "Azure User"
@@ -512,11 +521,11 @@ class AzureCollector:
         """Returns the subscription display name"""
         try:
             sub_client = SubscriptionClient(self.credentials)
-            # pyrefly: ignore [bad-argument-type]  # noqa: ERA001
+            # pyrefly: ignore [bad-argument-type]
             sub = sub_client.subscriptions.get(self.subscription_id)
             return sub.display_name
         except Exception:
-            # pyrefly: ignore [unsupported-operation]  # noqa: ERA001
+            # pyrefly: ignore [unsupported-operation]
             return f"Subscription ({self.subscription_id[:8]}...)"
 
     def get_zombie_vms(self):
@@ -544,19 +553,19 @@ class AzureCollector:
                 has_data = False
                 for item in metrics.value:
                     for timeseries in item.timeseries:
-                        data_points = [
-                            p.average for p in timeseries.data if p.average is not None
-                        ]
+                        data_points = [p.average for p in timeseries.data if p.average is not None]
                         if data_points:
                             avg_usage = sum(data_points) / len(data_points)
                             has_data = True
 
                 if has_data and avg_usage < 1.0:
-                    zombies.append({
-                        "name": vm.name,
-                        "usage": f"{round(avg_usage, 2)}%",
-                        "rg": resource_group,
-                    })
+                    zombies.append(
+                        {
+                            "name": vm.name,
+                            "usage": f"{round(avg_usage, 2)}%",
+                            "rg": resource_group,
+                        }
+                    )
             except Exception:  # noqa: S112
                 continue
 
@@ -586,17 +595,17 @@ class AzureCollector:
                 avg_usage = 0.0
                 for item in metrics.value:
                     for timeseries in item.timeseries:
-                        data_points = [
-                            p.average for p in timeseries.data if p.average is not None
-                        ]
+                        data_points = [p.average for p in timeseries.data if p.average is not None]
                         if data_points:
                             avg_usage = sum(data_points) / len(data_points)
 
-                report.append({
-                    "name": vm.name,
-                    "usage": round(avg_usage, 1),
-                    "rg": resource_group,
-                })
+                report.append(
+                    {
+                        "name": vm.name,
+                        "usage": round(avg_usage, 1),
+                        "rg": resource_group,
+                    }
+                )
             except Exception:  # noqa: S112
                 continue
 
@@ -635,7 +644,7 @@ class AzureCollector:
         try:
             result = self.cost_management.query.usage(scope, query)
             services_data = {}
-            # pyrefly: ignore [missing-attribute]  # noqa: ERA001
+            # pyrefly: ignore [missing-attribute]
             for row in result.rows:
                 cost = float(row[0])
                 service = row[2]
@@ -653,12 +662,14 @@ class AzureCollector:
                 dev = ((recent_avg - hist_avg) / hist_avg) * 100 if hist_avg > 0 else 0
                 is_anomaly = dev > 20 and recent_avg > 10
 
-                anomalies.append({
-                    "service": service,
-                    "cost": round(sum(costs), 2),
-                    "is_anomaly": is_anomaly,
-                    "deviation": f"{'+' if dev > 0 else ''}{round(dev)}%",
-                })
+                anomalies.append(
+                    {
+                        "service": service,
+                        "cost": round(sum(costs), 2),
+                        "is_anomaly": is_anomaly,
+                        "deviation": f"{'+' if dev > 0 else ''}{round(dev)}%",
+                    }
+                )
 
             anomalies.sort(key=lambda x: x["cost"], reverse=True)
             return anomalies[:5]
@@ -702,27 +713,29 @@ class AzureCollector:
                 | take 5
             """
             request = QueryRequest(
-                # pyrefly: ignore [bad-argument-type]  # noqa: ERA001
+                # pyrefly: ignore [bad-argument-type]
                 subscriptions=[self.subscription_id],
-                query=query
+                query=query,
             )
             response = client.resources(request)
-            
+
             violations = []
-            if hasattr(response, 'data'):
+            if hasattr(response, "data"):
                 for item in response.data:
-                    violations.append({
-                        # pyrefly: ignore [missing-attribute]  # noqa: ERA001
-                        "resource": item.get("name", "Unknown"),
-                        "violation": "Missing Owner/Project Tags",
-                        "severity": "HIGH",
-                        "rule": "Tagging Compliance",
-                        "action": "FLAGGED",
-                        "detected_at": datetime.datetime.now(datetime.UTC).strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        ),
-                    })
-            
+                    violations.append(
+                        {
+                            # pyrefly: ignore [missing-attribute]
+                            "resource": item.get("name", "Unknown"),
+                            "violation": "Missing Owner/Project Tags",
+                            "severity": "HIGH",
+                            "rule": "Tagging Compliance",
+                            "action": "FLAGGED",
+                            "detected_at": datetime.datetime.now(datetime.UTC).strftime(
+                                "%Y-%m-%d %H:%M:%S"
+                            ),
+                        }
+                    )
+
             return violations
         except Exception as e:
             print(f"Resource Graph API Error: {e}")
@@ -741,7 +754,7 @@ class AzureCollector:
             "vms": self.get_vm_inventory(),
             "orphans": self.get_orphaned_disks(),
             "zombies": self.get_zombie_vms(),
-            "recommendations": self.get_ri_sp_candidates()
+            "recommendations": self.get_ri_sp_candidates(),
         }
 
     def get_live_prices(self):
@@ -828,9 +841,9 @@ class AzureCollector:
 
             try:
                 result = self.cost_management.query.usage(scope, query)
-                # pyrefly: ignore [missing-attribute]  # noqa: ERA001
+                # pyrefly: ignore [missing-attribute]
                 if result.rows:
-                    # pyrefly: ignore [no-matching-overload]  # noqa: ERA001
+                    # pyrefly: ignore [no-matching-overload]
                     rows = sorted(result.rows, key=lambda x: x[1])
                     spend_data = [float(r[0]) for r in rows]
             except Exception as e:
@@ -841,15 +854,15 @@ class AzureCollector:
             db = SessionLocal()
             history = (
                 db.query(CostHistory)
-                # pyrefly: ignore [missing-attribute]  # noqa: ERA001
+                # pyrefly: ignore [missing-attribute]
                 .filter(CostHistory.type == "ACTUAL")
-                # pyrefly: ignore [missing-attribute]  # noqa: ERA001
+                # pyrefly: ignore [missing-attribute]
                 .order_by(CostHistory.timestamp.desc())
                 .limit(30)
                 .all()
             )
             db.close()
-            # pyrefly: ignore [missing-attribute]  # noqa: ERA001
+            # pyrefly: ignore [missing-attribute]
             spend_data = [float(h.amount) for h in reversed(history)]
 
         if not spend_data:
@@ -914,9 +927,7 @@ class AzureCollector:
         try:
             # Check cache first
             cached = (
-                db.query(RegionPriceCache)
-                .filter_by(sku_id=sku_id, region_name=region_name)
-                .first()
+                db.query(RegionPriceCache).filter_by(sku_id=sku_id, region_name=region_name).first()
             )
             if cached:
                 # Basic cache invalidation (e.g., if older than 24h, you could add logic here)
@@ -934,19 +945,19 @@ class AzureCollector:
             if results:
                 # We usually want the first hit that makes sense (e.g., standard consumption)
                 best_price = next((r for r in results if not r.get("reservationTerm")), results[0])
-                
+
                 # Save to cache
                 new_cache = RegionPriceCache(
                     sku_id=sku_id,
                     region_name=region_name,
                     price=best_price.get("retailPrice", 0),
-                    currency=best_price.get("currencyCode", "USD")
+                    currency=best_price.get("currencyCode", "USD"),
                 )
                 db.add(new_cache)
                 db.commit()
 
                 return [best_price]
-            
+
             return []
         finally:
             db.close()

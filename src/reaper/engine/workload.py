@@ -1,4 +1,3 @@
-import datetime
 import json
 import random
 
@@ -49,15 +48,17 @@ class WorkloadPersonality:
                 personality = "Erratic/Bursty"
 
             # Detect "Monday Morning" type peaks
-            # In a real app, we'd map timestamps to indices. 
+            # In a real app, we'd map timestamps to indices.
             # Here we just look for high-magnitude seasonal components.
             peak_indices = np.where(seasonal == np.max(seasonal))[0]
-            
+
             recommendation = "Maintain current tier."
             if personality == "Cyclic/Periodic":
                 recommendation = "Recommend Burstable (B-Series) for cost-efficient burst handling."
             elif personality == "Erratic/Bursty":
-                recommendation = "Recommend Compute-Optimized (F-Series) to handle unpredictable spikes."
+                recommendation = (
+                    "Recommend Compute-Optimized (F-Series) to handle unpredictable spikes."
+                )
 
             return {
                 "personality": personality,
@@ -90,10 +91,10 @@ class PredictiveScalingEngine:
             model = ARIMA(metric_history, order=(1, 1, 0))
             model_fit = model.fit()
             forecast = model_fit.forecast(steps=self.forecast_steps)
-            
+
             latest_val = metric_history[-1]
             peak_forecast = max(forecast)
-            
+
             action = "STAY"
             if peak_forecast > 85:
                 action = "PRE_WARM"
@@ -105,7 +106,9 @@ class PredictiveScalingEngine:
                 "predicted_peak": round(float(peak_forecast), 1),
                 "forecast_window_min": self.forecast_steps,
                 "action": action,
-                "reason": f"Forecasted peak of {peak_forecast:.1f}% exceeds threshold." if action == "PRE_WARM" else "Load within safe bounds."
+                "reason": f"Forecasted peak of {peak_forecast:.1f}% exceeds threshold."
+                if action == "PRE_WARM"
+                else "Load within safe bounds.",
             }
         except Exception:
             return {"action": "ERROR", "reason": "Forecasting failed"}
@@ -131,13 +134,13 @@ class SpotAdvisor:
         """
         region = region.lower().replace(" ", "")
         sku_family = sku_id.split("_")[1][0].upper() if "_" in sku_id else "D"
-        
+
         base_risk = self.volatility_map.get(region, {}).get(sku_family, 0.2)
-        
+
         # Add random "market noise"
         noise = random.uniform(-0.05, 0.05)
         final_risk = min(max(base_risk + noise, 0.05), 0.95)
-        
+
         status = "LOW"
         if final_risk > 0.4:
             status = "CRITICAL"
@@ -149,32 +152,34 @@ class SpotAdvisor:
             "region": region,
             "interruption_probability": f"{round(final_risk * 100)}%",
             "risk_status": status,
-            "recommendation": "Safe for Dev/Test" if status == "LOW" else "Move to Pay-As-You-Go or more stable region (e.g., eastus)"
+            "recommendation": "Safe for Dev/Test"
+            if status == "LOW"
+            else "Move to Pay-As-You-Go or more stable region (e.g., eastus)",
         }
 
 
 if __name__ == "__main__":
     # Demo/Verification
     print("--- 🧠 CLOUD-REAPER INTELLIGENT WORKLOAD ANALYSIS ---")
-    
+
     # 1. Pattern-Aware Scaling Demo
     print("\n[1] Testing Workload Personality...")
     # Synthetic daily pattern with a spike
     base = [10] * 24
     base[8:11] = [80, 85, 75]  # Morning burst
     history = base * 7  # 1 week of data
-    
+
     analyzer = WorkloadPersonality(period=24)
     personality = analyzer.analyze(history)
     print(json.dumps(personality, indent=2))
-    
+
     # 2. Predictive Scaling Demo
     print("\n[2] Testing Predictive Scaling...")
-    linear_trend = [20, 22, 25, 30, 38, 45, 55, 68, 75, 82] # Rapidly increasing load
+    linear_trend = [20, 22, 25, 30, 38, 45, 55, 68, 75, 82]  # Rapidly increasing load
     scaler = PredictiveScalingEngine(forecast_steps=10)
     prediction = scaler.predict_load(linear_trend)
     print(json.dumps(prediction, indent=2))
-    
+
     # 3. Spot Advisor Demo
     print("\n[3] Testing Spot Advisor...")
     advisor = SpotAdvisor()

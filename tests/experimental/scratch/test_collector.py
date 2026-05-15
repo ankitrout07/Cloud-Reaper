@@ -9,4 +9,4 @@ def test_azure_collector_init():
 
     az = AzureCollector()
     assert az.subscription_id == "7ef42162-83d2-4247-8010-38bf34dd1453"
-    assert hasattr(az, 'get_vm_inventory')
+    assert hasattr(az, "get_vm_inventory")

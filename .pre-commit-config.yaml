@@ -1,0 +1,12 @@
+repos:
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.4.4
+  hooks:
+    - id: ruff
+      args: [ --fix ]
+    - id: ruff-format
+
+- repo: https://github.com/golangci/golangci-lint
+  rev: v1.64.5 # Updated to a version compatible with Go 1.24
+  hooks:
+    - id: golangci-lint

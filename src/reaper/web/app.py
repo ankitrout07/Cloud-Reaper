@@ -7,25 +7,25 @@ try:
 except ImportError:
     async_mode = "threading"
 
-import base64  # noqa: E402
-import contextlib  # noqa: E402
-import datetime  # noqa: E402
-import io  # noqa: E402
-import json  # noqa: E402
-import os  # noqa: E402
-import secrets  # noqa: E402
-import subprocess  # noqa: E402
-import tempfile  # noqa: E402
-import threading  # noqa: E402
-import time  # noqa: E402
-import traceback  # noqa: E402
-from pathlib import Path  # noqa: E402
+import base64
+import contextlib
+import datetime
+import io
+import json
+import os
+import secrets
+import subprocess
+import tempfile
+import threading
+import time
+import traceback
+from pathlib import Path
 
-from azure.identity import DefaultAzureCredential  # noqa: E402
-from azure.mgmt.subscription import SubscriptionClient  # noqa: E402
-from dotenv import load_dotenv, set_key  # noqa: E402
-from cryptography.fernet import Fernet  # noqa: E402
-from flask import (  # noqa: E402
+from azure.identity import DefaultAzureCredential
+from azure.mgmt.subscription import SubscriptionClient
+from cryptography.fernet import Fernet
+from dotenv import load_dotenv, set_key
+from flask import (
     Flask,
     jsonify,
     redirect,
@@ -35,17 +35,17 @@ from flask import (  # noqa: E402
     session,
     url_for,
 )
-from flask_socketio import SocketIO  # noqa: E402
-from sqlalchemy import func  # noqa: E402
-from weasyprint import HTML  # noqa: E402
+from flask_socketio import SocketIO
+from sqlalchemy import func
+from weasyprint import HTML
 
-from reaper.collectors.auth_check import check_azure_status  # noqa: E402
-from reaper.collectors.azure_collector import AzureCollector  # noqa: E402
-from reaper.collectors.config_manager import save_config  # noqa: E402
-from reaper.engine.calculator import CostCalculator  # noqa: E402
-from reaper.engine.economics import RegionalArbitrage  # noqa: E402
-from reaper.engine.logic import RightSizer  # noqa: E402
-from reaper.engine.models import (  # noqa: E402
+from reaper.collectors.auth_check import check_azure_status
+from reaper.collectors.azure_collector import AzureCollector
+from reaper.collectors.config_manager import save_config
+from reaper.engine.calculator import CostCalculator
+from reaper.engine.economics import RegionalArbitrage
+from reaper.engine.logic import RightSizer
+from reaper.engine.models import (
     ActionLog,
     BusinessMetric,
     CloudConnection,
@@ -56,7 +56,7 @@ from reaper.engine.models import (  # noqa: E402
     VaultSettings,
     init_db,
 )
-from reaper.web.vault_crypto import (  # noqa: E402
+from reaper.web.vault_crypto import (
     derive_fernet_key,
     generate_salt,
     hash_passcode,
@@ -122,7 +122,7 @@ def background_metrics_worker():
         except Exception as e:
             print(f"[!] Metrics Worker Error: {e}")
         if cpu_usage is None:
-            cpu_usage = round(20.0 + random.uniform(-5.0, 5.0), 2)  # noqa: S311
+            cpu_usage = round(20.0 + random.uniform(-5.0, 5.0), 2)
         else:
             cpu_usage = round(float(cpu_usage), 2)
         try:
@@ -449,7 +449,9 @@ def switch_context():
                 }
             )
 
-        session.query(CloudConnection).filter_by(provider_type=provider).update({"is_active": False})
+        session.query(CloudConnection).filter_by(provider_type=provider).update(
+            {"is_active": False}
+        )
         conn.is_active = True
         session.commit()
         _set_cloud_env(provider, conn.credentials)
@@ -487,7 +489,9 @@ def connect_cloud():
     missing = [f for f in required_fields[provider] if not credentials.get(f)]
     if provider == "gcp" and not credentials.get("service_account_json"):
         missing.append("service_account_json")
-    if provider == "k8s" and not (credentials.get("kubeconfig") or credentials.get("service_account_token")):
+    if provider == "k8s" and not (
+        credentials.get("kubeconfig") or credentials.get("service_account_token")
+    ):
         missing.append("kubeconfig or service_account_token")
 
     if missing:
@@ -501,7 +505,9 @@ def connect_cloud():
     try:
         _set_cloud_env(provider, credentials)
         session = SessionLocal()
-        session.query(CloudConnection).filter_by(provider_type=provider).update({"is_active": False})
+        session.query(CloudConnection).filter_by(provider_type=provider).update(
+            {"is_active": False}
+        )
 
         conn = CloudConnection(
             provider_type=provider,
@@ -520,10 +526,8 @@ def connect_cloud():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
-        try:
+        with contextlib.suppress(Exception):
             session.close()
-        except Exception:
-            pass
 
 
 @app.route("/api/settings/cloud-connections")
@@ -557,7 +561,9 @@ def vault_setup():
     confirm = (data.get("confirm") or "").strip()
 
     if len(passcode) < 8:
-        return jsonify({"status": "error", "message": "Passcode must be at least 8 characters."}), 400
+        return jsonify(
+            {"status": "error", "message": "Passcode must be at least 8 characters."}
+        ), 400
     if passcode != confirm:
         return jsonify({"status": "error", "message": "Passcodes do not match."}), 400
 
@@ -683,7 +689,9 @@ def vault_get_entry(entry_id: int):
         if not row:
             return jsonify({"status": "error", "message": "Entry not found."}), 404
         try:
-            payload = json.loads(fernet.decrypt(row.encrypted_payload.encode("utf-8")).decode("utf-8"))
+            payload = json.loads(
+                fernet.decrypt(row.encrypted_payload.encode("utf-8")).decode("utf-8")
+            )
         except Exception:
             return jsonify({"status": "error", "message": "Unable to decrypt entry."}), 500
         return jsonify(
@@ -815,7 +823,7 @@ def get_rightsizing():
         return jsonify({"status": "error", "message": "Go Engine binary not found"}), 500
 
     try:
-        # pyrefly: ignore [no-matching-overload]  # noqa: ERA001
+        # pyrefly: ignore [no-matching-overload]
         result = subprocess.run(
             [str(go_binary), "--subscription", az.subscription_id],  # noqa: S603
             capture_output=True,
@@ -846,7 +854,7 @@ def scan():
         target_subs = settings_state.get("selected_subscriptions", []) or [
             os.getenv("AZURE_SUBSCRIPTION_ID")
         ]
-        # pyrefly: ignore [bad-index, unsupported-operation]  # noqa: ERA001
+        # pyrefly: ignore [bad-index, unsupported-operation]
         if not target_subs[0]:
             return jsonify({"status": "error", "message": "No subscription ID configured."}), 400
 
@@ -879,23 +887,23 @@ def perform_subscription_scan(target_subs, events):
     for sub_id in target_subs:
         events.append({"msg": f"Scanning subscription: {sub_id[:8]}...", "type": "info"})
         az.subscription_id = sub_id
-        
+
         go_data = az.get_go_scan_results()
         if go_data:
             reports = go_data.get("vm_reports", [])
             active_vms = go_data.get("active_vms", [])
             results["vms_count"] += len(active_vms)
-            
+
             for d in go_data.get("orphaned_disks", []):
                 d["rg"] = "Unknown"
                 results["orphans"].append(d)
-                
+
             for s in go_data.get("orphaned_snapshots", []):
                 s["rg"] = "Unknown"
                 results["snapshots"].append(s)
 
             threshold = 2.0 if settings_state.get("idle_strategy") == "aggressive" else 10.0
-            
+
             reported_vms = set()
             for r in reports:
                 name = r.get("name")
@@ -903,35 +911,25 @@ def perform_subscription_scan(target_subs, events):
                 avg_usage = r.get("usage", 0.0)
                 rid = r.get("id", "")
                 rg = rid.split("/")[4] if "/" in rid else "Unknown"
-                
-                results["utilization"].append({
-                    "name": name,
-                    "usage": round(avg_usage, 1),
-                    "rg": rg
-                })
-                
+
+                results["utilization"].append(
+                    {"name": name, "usage": round(avg_usage, 1), "rg": rg}
+                )
+
                 if avg_usage < 1.0:
-                    results["zombies"].append({
-                        "name": name,
-                        "usage": f"{round(avg_usage, 2)}%",
-                        "rg": rg
-                    })
+                    results["zombies"].append(
+                        {"name": name, "usage": f"{round(avg_usage, 2)}%", "rg": rg}
+                    )
                 elif avg_usage < threshold:
-                    results["idle_vms"].append({
-                        "name": name,
-                        "usage": f"{round(avg_usage, 2)}%",
-                        "rg": rg
-                    })
-                    
+                    results["idle_vms"].append(
+                        {"name": name, "usage": f"{round(avg_usage, 2)}%", "rg": rg}
+                    )
+
             for name in active_vms:
                 if name not in reported_vms:
-                    results["utilization"].append({
-                        "name": name,
-                        "usage": 0.0,
-                        "rg": "Unknown"
-                    })
+                    results["utilization"].append({"name": name, "usage": 0.0, "rg": "Unknown"})
         else:
-            # pyrefly: ignore [missing-attribute]  # noqa: ERA001
+            # pyrefly: ignore [missing-attribute]
             az._scan_cache = None
 
             vms = az.get_vm_inventory()
@@ -951,12 +949,10 @@ def perform_subscription_scan(target_subs, events):
             reported_python = {u["name"] for u in results["utilization"]}
             for vm in vms:
                 if vm["name"] not in reported_python:
-                    results["utilization"].append({
-                        "name": vm["name"],
-                        "usage": 0.0,
-                        "rg": vm.get("location", "Unknown")
-                    })
-    
+                    results["utilization"].append(
+                        {"name": vm["name"], "usage": 0.0, "rg": vm.get("location", "Unknown")}
+                    )
+
     results["utilization"].sort(key=lambda x: x["usage"], reverse=True)
     return results
 
@@ -1166,7 +1162,7 @@ def unit_economics():
                     "unit": m.unit,
                     "count": m.value,
                     "total_spend": round(metric_spend, 2),
-                    # pyrefly: ignore [no-matching-overload]  # noqa: ERA001
+                    # pyrefly: ignore [no-matching-overload]
                     "cost_per_unit": round(metric_spend / max(unit_count, 1), 4),
                     "trend": 8.5,
                 }
@@ -1318,7 +1314,7 @@ def get_regional_prices():
         region = request.args.get("region")
         if not sku or not region:
             return jsonify({"status": "error", "message": "Missing sku or region parameter"}), 400
-            
+
         az = AzureCollector()
         prices = az.fetch_regional_prices(sku, region)
         if prices:
@@ -1334,10 +1330,10 @@ def get_arbitrage():
         sku = request.args.get("sku")
         region = request.args.get("region")
         price = float(request.args.get("price", 0.0))
-        
+
         if not sku or not region or not price:
             return jsonify({"status": "error", "message": "Missing parameters"}), 400
-            
+
         arb = RegionalArbitrage()
         result = arb.analyze_arbitrage(sku, region, price)
         return jsonify({"status": "success", "recommendation": result})
@@ -1387,36 +1383,37 @@ def utilization():
         formatted_report = []
         for vm in report:
             waste = 1.0 - (vm["usage"] / 100.0) if vm["usage"] < 100 else 0
-            formatted_report.append({
-                "name": vm["name"],
-                "rg": vm["rg"],
-                "waste_coefficient": waste,
-                "monthly_cost": 150.0,
-                "is_protected": False,
-                "status": "CRITICAL" if waste > 0.9 else "NORMAL"
-            })
+            formatted_report.append(
+                {
+                    "name": vm["name"],
+                    "rg": vm["rg"],
+                    "waste_coefficient": waste,
+                    "monthly_cost": 150.0,
+                    "is_protected": False,
+                    "status": "CRITICAL" if waste > 0.9 else "NORMAL",
+                }
+            )
         return jsonify({"status": "success", "report": formatted_report})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-
-
-@socketio.on('connect')
+@socketio.on("connect")
 def handle_connect():
     print("[+] Client Connected to Cloud-Reaper Engine")
 
 
-@socketio.on('start_log_stream')
+@socketio.on("start_log_stream")
 def handle_start_log_stream():
     from reaper.services.log_streamer import fetch_azure_logs
-    socketio.emit('new_log', {'data': 'Initializing Cloud-Reaper Log Stream...'})
-    socketio.emit('new_log', {'data': 'Connected to Azure Monitor via OIDC...'})
-    
+
+    socketio.emit("new_log", {"data": "Initializing Cloud-Reaper Log Stream..."})
+    socketio.emit("new_log", {"data": "Connected to Azure Monitor via OIDC..."})
+
     logs = fetch_azure_logs()
     for log in logs:
-        socketio.emit('new_log', {'data': log})
-        # pyrefly: ignore [bad-argument-type]  # noqa: ERA001
+        socketio.emit("new_log", {"data": log})
+        # pyrefly: ignore [bad-argument-type]
         socketio.sleep(0.5)
 
 
@@ -1424,18 +1421,13 @@ if __name__ == "__main__":
     # use_reloader=False stops the 'after_fork_in_child' assertion error
     port = int(os.getenv("FLASK_PORT", "5001"))
     host = os.getenv("FLASK_HOST", "127.0.0.1")
-    
+
     print(f"\n[+] Cloud-Reaper Dashboard Active at http://{host}:{port}")
     print("[*] Engine: gevent | Real-Time Monitoring: ENABLED\n")
-    
+
     try:
         socketio.run(
-            app,
-            host=host,
-            port=port,
-            debug=True,
-            use_reloader=False,
-            allow_unsafe_werkzeug=True
+            app, host=host, port=port, debug=True, use_reloader=False, allow_unsafe_werkzeug=True
         )
     except KeyboardInterrupt:
         print("\n[!] Dashboard server stopped by user.")

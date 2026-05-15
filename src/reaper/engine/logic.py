@@ -159,7 +159,7 @@ class RightSizer:
             # Personality Analysis (Pattern-Aware Scaling)
             personality_analyzer = WorkloadPersonality()
             personality = personality_analyzer.analyze(usage)
-            
+
             if personality.get("personality") == "Cyclic/Periodic":
                 reason = f"Periodic pattern detected. {personality['recommendation']}"
             else:

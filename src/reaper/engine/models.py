@@ -31,9 +31,9 @@ class Base(DeclarativeBase):
 class Resource(Base):
     __tablename__ = "resources"
 
-    id = Column(String, primary_key=True, index=True)  # noqa: A003
+    id = Column(String, primary_key=True, index=True)
     name = Column(String, index=True)
-    type = Column(String, index=True)  # noqa: A003
+    type = Column(String, index=True)
     region = Column(String)
     tags = Column(JSONB, default={})
     active = Column(Boolean, default=True)
@@ -50,7 +50,7 @@ class Resource(Base):
 class CostHistory(Base):
     __tablename__ = "cost_history"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)  # noqa: A003
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     resource_id = Column(String, ForeignKey("resources.id"))
     date = Column(DateTime, default=lambda: datetime.now(UTC))
     cost = Column(Numeric(15, 4))
@@ -63,7 +63,7 @@ class CostHistory(Base):
 class ReapAction(Base):
     __tablename__ = "reap_actions"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)  # noqa: A003
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     resource_id = Column(String, ForeignKey("resources.id"))
     action = Column(String)  # e.g. DEALLOCATE, DELETE
     authorized_by = Column(String)
@@ -75,7 +75,7 @@ class ReapAction(Base):
 class Recommendation(Base):
     __tablename__ = "recommendations"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)  # noqa: A003
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     resource_id = Column(String, ForeignKey("resources.id"))
     recommendation_type = Column(String)  # e.g. RIGHTSIZE, GREENOPS
     savings = Column(Numeric(15, 4))
@@ -87,7 +87,7 @@ class Recommendation(Base):
 class ActionLog(Base):
     __tablename__ = "action_logs"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)  # noqa: A003
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     resource_id = Column(String, ForeignKey("resources.id"))
     action_type = Column(String)  # REAP, KILL, PROTECTION_ADD
     status = Column(String)  # SUCCESS, FAILED
@@ -100,7 +100,7 @@ class ActionLog(Base):
 class BusinessMetric(Base):
     __tablename__ = "business_metrics"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)  # noqa: A003
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     metric_name = Column(String, index=True)  # e.g. ACTIVE_USERS, API_REQUESTS
     value = Column(Float)
     unit = Column(String)
@@ -110,7 +110,7 @@ class BusinessMetric(Base):
 class RegionPriceCache(Base):
     __tablename__ = "region_price_cache"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)  # noqa: A003
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     sku_id = Column(String, index=True)
     region_name = Column(String, index=True)
     price = Column(Numeric(15, 6))
@@ -139,9 +139,11 @@ class VaultEntry(Base):
 
     __tablename__ = "vault_entries"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)  # noqa: A003
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     label = Column(String(200), nullable=False)
-    entry_type = Column(String(40), nullable=False, default="credential")  # credential, passcode, note
+    entry_type = Column(
+        String(40), nullable=False, default="credential"
+    )  # credential, passcode, note
     encrypted_payload = Column(String, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     updated_at = Column(
@@ -164,7 +166,7 @@ class CloudConnection(Base):
 
     __tablename__ = "cloud_connections"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)  # noqa: A003
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     provider_type = Column(String(20), nullable=False, index=True)  # azure, aws, gcp, k8s
     connection_name = Column(String(100), nullable=False)
     credentials = Column(JSONB, nullable=False, default=dict)
