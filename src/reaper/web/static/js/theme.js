@@ -26,8 +26,12 @@ function toggleAppTheme() {
  * Emissions are throttled server-side (see REAPER_METRICS_EMIT_SEC / Azure Monitor cadence).
  */
 (function () {
-    const GRID = 'rgba(255, 255, 255, 0.1)';
+    const GRID = 'rgba(255, 255, 255, 0.06)';
     const TICK = '#6b7280';
+    const CHART_PRIMARY = '#5b8def';
+    const CHART_PRIMARY_FILL = 'rgba(91, 141, 239, 0.15)';
+    const CHART_SECONDARY = '#6b7f9e';
+    const CHART_WARNING = '#c9a227';
 
     window.__reaperEnsureSocket = function () {
         if (typeof io === 'undefined') {
@@ -52,8 +56,8 @@ function toggleAppTheme() {
             return null;
         }
         const maxPts = options.maxPoints || 20;
-        const border = options.borderColor || '#22d3ee';
-        const fill = options.backgroundColor || 'rgba(34, 211, 238, 0.1)';
+        const border = options.borderColor || CHART_PRIMARY;
+        const fill = options.backgroundColor || CHART_PRIMARY_FILL;
         const showX = options.showXLabels !== false;
         return new Chart(el.getContext('2d'), {
             type: 'line',
@@ -134,10 +138,10 @@ function toggleAppTheme() {
         const mx = Math.max.apply(null, values.concat([1]));
         return values.map(function (x) {
             const a = Math.min(1, x / mx);
-            const r = Math.round(20 + a * 200);
-            const g = Math.round(40 + a * 180);
-            const b = Math.round(80 + a * 175);
-            return 'rgba(' + r + ',' + g + ',' + b + ',0.85)';
+            const r = Math.round(40 + a * 50);
+            const g = Math.round(70 + a * 70);
+            const b = Math.round(120 + a * 115);
+            return 'rgba(' + r + ',' + g + ',' + b + ',0.75)';
         });
     }
 
@@ -155,8 +159,8 @@ function toggleAppTheme() {
                     {
                         label: 'Cumulative spend',
                         data: [],
-                        borderColor: '#22d3ee',
-                        backgroundColor: 'rgba(34, 211, 238, 0.25)',
+                        borderColor: CHART_PRIMARY,
+                        backgroundColor: CHART_PRIMARY_FILL,
                         fill: true,
                         tension: 0.3,
                         pointRadius: 0,
@@ -164,7 +168,7 @@ function toggleAppTheme() {
                     {
                         label: 'Budget pace',
                         data: [],
-                        borderColor: '#f97316',
+                        borderColor: CHART_WARNING,
                         backgroundColor: 'transparent',
                         fill: false,
                         tension: 0,
@@ -193,7 +197,7 @@ function toggleAppTheme() {
                     {
                         label: 'Spend (30d)',
                         data: [],
-                        backgroundColor: ['#22d3ee', '#3b82f6', '#8b5cf6', '#64748b'],
+                        backgroundColor: [CHART_PRIMARY, '#4a6fa8', CHART_SECONDARY, '#3d4550'],
                     },
                 ],
             },
@@ -217,13 +221,13 @@ function toggleAppTheme() {
                     {
                         label: 'CPU %',
                         data: [],
-                        backgroundColor: 'rgba(34, 211, 238, 0.75)',
+                        backgroundColor: 'rgba(91, 141, 239, 0.65)',
                         yAxisID: 'y',
                     },
                     {
                         label: 'Memory GiB (avail.)',
                         data: [],
-                        backgroundColor: 'rgba(139, 92, 246, 0.75)',
+                        backgroundColor: 'rgba(107, 127, 158, 0.55)',
                         yAxisID: 'y1',
                     },
                 ],
@@ -336,8 +340,8 @@ function toggleAppTheme() {
         if (document.getElementById('computeChart')) {
             const dash = !!document.getElementById('burnAreaChart');
             state.computeChart = createCpuLineChart('computeChart', {
-                borderColor: dash ? '#00f2ff' : '#22d3ee',
-                backgroundColor: dash ? 'rgba(0, 242, 255, 0.1)' : 'rgba(34, 211, 238, 0.1)',
+                borderColor: CHART_PRIMARY,
+                backgroundColor: CHART_PRIMARY_FILL,
                 maxPoints: dash ? 20 : 30,
                 showXLabels: dash,
                 label: 'Avg CPU Utilization (%)',

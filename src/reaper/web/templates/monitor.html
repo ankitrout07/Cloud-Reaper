@@ -10,61 +10,16 @@
     <script src="/static/js/setup.js"></script>
     <style>
         body {
-            background: #0d1117;
-            color: white;
             font-family: 'Inter', sans-serif;
-        }
-        .glass {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 20px;
-        }
-        .glow-text-cyan {
-            text-shadow: 0 0 20px rgba(34, 211, 238, 0.4);
         }
     </style>
 </head>
-<body class="min-h-screen flex bg-[#0d1117]">
+<body class="min-h-screen flex">
     <!-- Sidebar -->
-    <nav id="sidebar" class="fixed left-0 top-0 h-screen w-20 hover:w-64 transition-all duration-300 z-50 overflow-hidden flex flex-col items-center py-8 group bg-[#090c10] border-r-2 border-cyan-500/10">
-        <div class="mb-10 text-cyan-400 font-black text-2xl tracking-tighter">CR</div>
-        
-        <div class="flex flex-col gap-6 w-full px-4">
-            <a href="/" class="flex items-center gap-4 p-3 rounded-xl transition nav-link">
-                <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                <span class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Dashboard</span>
-            </a>
-            <a href="/pricing" class="flex items-center gap-4 p-3 rounded-xl transition nav-link">
-                <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3zM12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"/></svg>
-                <span class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Azure Prices</span>
-            </a>
-            <a href="/finops" class="flex items-center gap-4 p-3 rounded-xl transition nav-link">
-                <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                <span class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">FinOps Intelligence</span>
-            </a>
-            <a href="/monitor" class="flex items-center gap-4 p-3 rounded-xl transition nav-link">
-                <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                <span class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Cloud Monitor</span>
-            </a>
-            <a href="/dashboard" class="flex items-center gap-4 p-3 rounded-xl transition nav-link text-gray-400">
-                <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                <span class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Metrics Command</span>
-            </a>
-        </div>
-
-        <div class="flex-1"></div>
-
-        <div class="flex flex-col items-center gap-4 w-full">
-            <a href="/settings" class="p-3 rounded-xl transition group-hover:w-[90%] flex items-center gap-4 nav-link">
-                <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <span class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Settings</span>
-            </a>
-        </div>
-    </nav>
+    {% include "_sidebar.html" %}
 
     <!-- Main Content -->
-    <main class="flex-1 ml-20 p-12 transition-all">
+    <main class="app-main flex-1 p-8 lg:p-12">
         <div class="max-w-6xl mx-auto">
             <header class="mb-12">
                 <h1 class="text-4xl font-black tracking-tighter glow-text-cyan uppercase">Real-Time <span class="text-cyan-400">Monitoring</span></h1>
@@ -149,7 +104,7 @@
                 labels: ['VMs', 'Storage', 'Net', 'SQL'],
                 datasets: [{
                     data: [45, 25, 15, 15],
-                    backgroundColor: ['#22d3ee', '#3b82f6', '#8b5cf6', '#06b6d4'],
+                    backgroundColor: ['#5b8def', '#4a6fa8', '#6b7f9e', '#3d4550'],
                     borderWidth: 0
                 }]
             },

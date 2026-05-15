@@ -12,28 +12,14 @@
     <script src="/static/js/theme.js"></script>
     <style>
         body {
-            background: #0d1117;
-            color: white;
             font-family: 'Inter', sans-serif;
         }
 
-        .glass {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 20px;
-        }
-
         .glass-morph {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
-            backdrop-filter: blur(18px);
-            border: 1px solid rgba(0, 242, 255, 0.12);
+            background: #12151a;
+            border: 1px solid rgba(255, 255, 255, 0.07);
             border-radius: 20px;
-            box-shadow: 0 0 40px rgba(0, 242, 255, 0.06);
-        }
-
-        .glow-text-cyan {
-            text-shadow: 0 0 20px rgba(34, 211, 238, 0.4);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
         }
 
         .card-header {
@@ -47,7 +33,7 @@
             font-size: 0.7rem;
             font-weight: 900;
             letter-spacing: 0.15em;
-            color: #22d3ee;
+            color: #8baef5;
         }
 
         .chart-tile {
@@ -56,58 +42,10 @@
     </style>
 </head>
 
-<body class="min-h-screen flex bg-[#0d1117]">
-    <nav id="sidebar"
-        class="fixed left-0 top-0 h-screen w-20 hover:w-64 transition-all duration-300 z-50 overflow-hidden flex flex-col items-center py-8 group bg-[#090c10] border-r-2 border-cyan-500/10">
-        <div class="mb-10 text-cyan-400 font-black text-2xl tracking-tighter">CR</div>
-        <div class="flex flex-col gap-6 w-full px-4">
-            <a href="/" class="flex items-center gap-4 p-3 rounded-xl transition nav-link text-gray-400">
-                <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-                <span
-                    class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Home</span>
-            </a>
-            <a href="/dashboard" class="flex items-center gap-4 p-3 rounded-xl transition nav-link text-cyan-400">
-                <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-                <span
-                    class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Metrics
-                    Command</span>
-            </a>
-            <a href="/monitor" class="flex items-center gap-4 p-3 rounded-xl transition nav-link text-gray-400">
-                <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <span
-                    class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Cloud
-                    Monitor</span>
-            </a>
-            <a href="/finops" class="flex items-center gap-4 p-3 rounded-xl transition nav-link text-gray-400">
-                <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <span
-                    class="text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">FinOps</span>
-            </a>
-        </div>
-        <div class="flex-1"></div>
-        <a href="/settings" class="p-3 rounded-xl transition nav-link text-gray-400">
-            <svg class="sidebar-icon w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-        </a>
-    </nav>
+<body class="min-h-screen flex">
+    {% include "_sidebar.html" %}
 
-    <main class="flex-1 ml-20 p-10 transition-all">
+    <main class="app-main flex-1 p-8 lg:p-10">
         <div class="max-w-7xl mx-auto">
             <header class="mb-10">
                 <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Subscription • {{
@@ -177,6 +115,7 @@
         </div>
     </main>
 
+    <script src="/static/js/setup.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
 </body>

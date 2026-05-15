@@ -118,6 +118,39 @@ class RegionPriceCache(Base):
     last_updated = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
+class VaultSettings(Base):
+    """Single-row vault configuration (passcode verifier + encryption salt)."""
+
+    __tablename__ = "vault_settings"
+
+    id = Column(Integer, primary_key=True, default=1)
+    salt = Column(String(64), nullable=False)
+    passcode_verifier = Column(String(128), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+
+class VaultEntry(Base):
+    """Encrypted secret entry (payload decrypted only while vault is unlocked)."""
+
+    __tablename__ = "vault_entries"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)  # noqa: A003
+    label = Column(String(200), nullable=False)
+    entry_type = Column(String(40), nullable=False, default="credential")  # credential, passcode, note
+    encrypted_payload = Column(String, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+
 class CloudConnection(Base):
     """
     Multi-cloud credential vault. Only one connection should be active at a time.

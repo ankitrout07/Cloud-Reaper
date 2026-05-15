@@ -7,11 +7,13 @@ try:
 except ImportError:
     async_mode = "threading"
 
+import base64  # noqa: E402
 import contextlib  # noqa: E402
 import datetime  # noqa: E402
 import io  # noqa: E402
 import json  # noqa: E402
 import os  # noqa: E402
+import secrets  # noqa: E402
 import subprocess  # noqa: E402
 import tempfile  # noqa: E402
 import threading  # noqa: E402
@@ -22,6 +24,7 @@ from pathlib import Path  # noqa: E402
 from azure.identity import DefaultAzureCredential  # noqa: E402
 from azure.mgmt.subscription import SubscriptionClient  # noqa: E402
 from dotenv import load_dotenv, set_key  # noqa: E402
+from cryptography.fernet import Fernet  # noqa: E402
 from flask import (  # noqa: E402
     Flask,
     jsonify,
@@ -29,6 +32,7 @@ from flask import (  # noqa: E402
     render_template,
     request,
     send_file,
+    session,
     url_for,
 )
 from flask_socketio import SocketIO  # noqa: E402
@@ -48,7 +52,15 @@ from reaper.engine.models import (  # noqa: E402
     CostHistory,
     Resource,
     SessionLocal,
+    VaultEntry,
+    VaultSettings,
     init_db,
+)
+from reaper.web.vault_crypto import (  # noqa: E402
+    derive_fernet_key,
+    generate_salt,
+    hash_passcode,
+    verify_passcode,
 )
 
 load_dotenv()
@@ -84,7 +96,10 @@ app = Flask(
     template_folder=str(_web_dir / "templates"),
     static_folder=str(_web_dir / "static"),
 )
+app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
+
+VAULT_UNLOCK_TTL_SEC = int(os.getenv("VAULT_UNLOCK_TTL_SEC", "3600"))
 thread = None
 thread_lock = threading.Lock()
 
@@ -161,7 +176,7 @@ def check_setup():
     if request.path.startswith("/static") or request.path.startswith("/api/"):
         return None
     if is_first_run() and request.endpoint != "settings":
-        return redirect(url_for("settings", mode="onboarding"))
+        return redirect(url_for("settings", tab="cloud"))
     return None
 
 
@@ -173,9 +188,86 @@ def index():
     return render_template("index.html", user_name=user_name, sub_name=sub_name)
 
 
+def _cloud_connections_summary() -> tuple[dict, str]:
+    """Latest connection per provider and active provider label for settings UI."""
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(CloudConnection)
+            .order_by(CloudConnection.provider_type, CloudConnection.updated_at.desc())
+            .all()
+        )
+        summary: dict[str, dict] = {}
+        for row in rows:
+            if row.provider_type in summary:
+                continue
+            summary[row.provider_type] = {
+                "connection_name": row.connection_name,
+                "is_active": bool(row.is_active),
+                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            }
+        active = (os.getenv("REAPER_ACTIVE_PROVIDER") or "").lower()
+        if not active:
+            for provider, info in summary.items():
+                if info.get("is_active"):
+                    active = provider
+                    break
+        return summary, active
+    finally:
+        db.close()
+
+
+def _vault_settings_row() -> VaultSettings | None:
+    db = SessionLocal()
+    try:
+        return db.query(VaultSettings).first()
+    finally:
+        db.close()
+
+
+def _vault_salt_bytes(settings: VaultSettings) -> bytes:
+    return base64.b64decode(settings.salt.encode("utf-8"))
+
+
+def _is_vault_unlocked() -> bool:
+    if not session.get("vault_unlocked"):
+        return False
+    expires = session.get("vault_unlock_expires", 0)
+    if time.time() > float(expires):
+        session.pop("vault_unlocked", None)
+        session.pop("vault_unlock_expires", None)
+        session.pop("vault_fernet_key", None)
+        return False
+    return bool(session.get("vault_fernet_key"))
+
+
+def _session_fernet() -> Fernet | None:
+    key = session.get("vault_fernet_key")
+    if not key or not _is_vault_unlocked():
+        return None
+    return Fernet(key.encode("utf-8"))
+
+
+def _unlock_vault_session(passcode: str, settings: VaultSettings) -> bool:
+    salt = _vault_salt_bytes(settings)
+    if not verify_passcode(passcode, salt, settings.passcode_verifier):
+        return False
+    session["vault_fernet_key"] = derive_fernet_key(passcode, salt).decode("utf-8")
+    session["vault_unlocked"] = True
+    session["vault_unlock_expires"] = time.time() + VAULT_UNLOCK_TTL_SEC
+    return True
+
+
 @app.route("/settings")
 def settings():
-    return render_template("settings.html")
+    cloud_summary, active_provider = _cloud_connections_summary()
+    vault_configured = _vault_settings_row() is not None
+    return render_template(
+        "settings.html",
+        cloud_connections=cloud_summary,
+        active_provider=active_provider,
+        vault_configured=vault_configured,
+    )
 
 
 @app.route("/api/settings/update", methods=["POST"])
@@ -353,7 +445,7 @@ def switch_context():
             return jsonify(
                 {
                     "status": "redirect",
-                    "url": url_for("settings", mode="onboarding", provider=provider),
+                    "url": url_for("settings", tab="cloud", provider=provider),
                 }
             )
 
@@ -432,6 +524,203 @@ def connect_cloud():
             session.close()
         except Exception:
             pass
+
+
+@app.route("/api/settings/cloud-connections")
+def list_cloud_connections():
+    summary, active_provider = _cloud_connections_summary()
+    return jsonify(
+        {
+            "status": "success",
+            "connections": summary,
+            "active_provider": active_provider,
+        }
+    )
+
+
+@app.route("/api/vault/status")
+def vault_status():
+    configured = _vault_settings_row() is not None
+    return jsonify(
+        {
+            "status": "success",
+            "configured": configured,
+            "unlocked": _is_vault_unlocked(),
+        }
+    )
+
+
+@app.route("/api/vault/setup", methods=["POST"])
+def vault_setup():
+    data = request.json or {}
+    passcode = (data.get("passcode") or "").strip()
+    confirm = (data.get("confirm") or "").strip()
+
+    if len(passcode) < 8:
+        return jsonify({"status": "error", "message": "Passcode must be at least 8 characters."}), 400
+    if passcode != confirm:
+        return jsonify({"status": "error", "message": "Passcodes do not match."}), 400
+
+    db = SessionLocal()
+    try:
+        if db.query(VaultSettings).first():
+            return jsonify({"status": "error", "message": "Vault is already configured."}), 400
+
+        salt = generate_salt()
+        settings = VaultSettings(
+            salt=base64.b64encode(salt).decode("utf-8"),
+            passcode_verifier=hash_passcode(passcode, salt),
+        )
+        db.add(settings)
+        db.commit()
+        _unlock_vault_session(passcode, settings)
+        return jsonify({"status": "success", "message": "Vault created and unlocked."})
+    except Exception as e:
+        db.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/vault/unlock", methods=["POST"])
+def vault_unlock():
+    data = request.json or {}
+    passcode = (data.get("passcode") or "").strip()
+    settings = _vault_settings_row()
+    if not settings:
+        return jsonify({"status": "error", "message": "Vault is not configured yet."}), 400
+    if not _unlock_vault_session(passcode, settings):
+        return jsonify({"status": "error", "message": "Incorrect passcode."}), 401
+    return jsonify({"status": "success", "message": "Vault unlocked."})
+
+
+@app.route("/api/vault/lock", methods=["POST"])
+def vault_lock():
+    session.pop("vault_unlocked", None)
+    session.pop("vault_unlock_expires", None)
+    session.pop("vault_fernet_key", None)
+    return jsonify({"status": "success", "message": "Vault locked."})
+
+
+@app.route("/api/vault/entries", methods=["GET"])
+def vault_list_entries():
+    if not _is_vault_unlocked():
+        return jsonify({"status": "error", "message": "Vault is locked."}), 403
+
+    db = SessionLocal()
+    try:
+        rows = db.query(VaultEntry).order_by(VaultEntry.updated_at.desc()).all()
+        entries = [
+            {
+                "id": row.id,
+                "label": row.label,
+                "entry_type": row.entry_type,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            }
+            for row in rows
+        ]
+        return jsonify({"status": "success", "entries": entries})
+    finally:
+        db.close()
+
+
+@app.route("/api/vault/entries", methods=["POST"])
+def vault_create_entry():
+    if not _is_vault_unlocked():
+        return jsonify({"status": "error", "message": "Vault is locked."}), 403
+
+    fernet = _session_fernet()
+    if not fernet:
+        return jsonify({"status": "error", "message": "Vault session expired."}), 403
+
+    data = request.json or {}
+    label = (data.get("label") or "").strip()
+    entry_type = (data.get("entry_type") or "credential").strip().lower()
+    value = (data.get("value") or "").strip()
+    username = (data.get("username") or "").strip()
+    notes = (data.get("notes") or "").strip()
+
+    if not label or not value:
+        return jsonify({"status": "error", "message": "Label and secret value are required."}), 400
+    if entry_type not in {"credential", "passcode", "note"}:
+        return jsonify({"status": "error", "message": "Invalid entry type."}), 400
+
+    payload = {"value": value, "username": username, "notes": notes}
+    token = fernet.encrypt(json.dumps(payload).encode("utf-8")).decode("utf-8")
+
+    db = SessionLocal()
+    try:
+        entry = VaultEntry(label=label, entry_type=entry_type, encrypted_payload=token)
+        db.add(entry)
+        db.commit()
+        return jsonify(
+            {
+                "status": "success",
+                "message": "Entry saved.",
+                "entry": {"id": entry.id, "label": entry.label, "entry_type": entry.entry_type},
+            }
+        )
+    except Exception as e:
+        db.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/vault/entries/<int:entry_id>", methods=["GET"])
+def vault_get_entry(entry_id: int):
+    if not _is_vault_unlocked():
+        return jsonify({"status": "error", "message": "Vault is locked."}), 403
+
+    fernet = _session_fernet()
+    if not fernet:
+        return jsonify({"status": "error", "message": "Vault session expired."}), 403
+
+    db = SessionLocal()
+    try:
+        row = db.query(VaultEntry).filter_by(id=entry_id).first()
+        if not row:
+            return jsonify({"status": "error", "message": "Entry not found."}), 404
+        try:
+            payload = json.loads(fernet.decrypt(row.encrypted_payload.encode("utf-8")).decode("utf-8"))
+        except Exception:
+            return jsonify({"status": "error", "message": "Unable to decrypt entry."}), 500
+        return jsonify(
+            {
+                "status": "success",
+                "entry": {
+                    "id": row.id,
+                    "label": row.label,
+                    "entry_type": row.entry_type,
+                    "username": payload.get("username", ""),
+                    "value": payload.get("value", ""),
+                    "notes": payload.get("notes", ""),
+                },
+            }
+        )
+    finally:
+        db.close()
+
+
+@app.route("/api/vault/entries/<int:entry_id>", methods=["DELETE"])
+def vault_delete_entry(entry_id: int):
+    if not _is_vault_unlocked():
+        return jsonify({"status": "error", "message": "Vault is locked."}), 403
+
+    db = SessionLocal()
+    try:
+        row = db.query(VaultEntry).filter_by(id=entry_id).first()
+        if not row:
+            return jsonify({"status": "error", "message": "Entry not found."}), 404
+        db.delete(row)
+        db.commit()
+        return jsonify({"status": "success", "message": "Entry deleted."})
+    except Exception as e:
+        db.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        db.close()
 
 
 @app.route("/api/settings/auth")

@@ -1,0 +1,294 @@
+/**
+ * Cloud Reaper — professional dark theme
+ * Single accent, muted surfaces, restrained semantic colors.
+ */
+
+:root,
+[data-theme="dark"] {
+    --bg-main: #0b0d10;
+    --bg-elevated: #12151a;
+    --bg-raised: #181c24;
+    --sidebar-bg: #0e1116;
+    --card-bg: #12151a;
+    --card-bg-hover: #161b22;
+
+    --text-main: #e4e7ec;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+
+    --border-color: rgba(255, 255, 255, 0.07);
+    --border-strong: rgba(255, 255, 255, 0.11);
+
+    --accent: #5b8def;
+    --accent-muted: #8baef5;
+    --accent-subtle: rgba(91, 141, 239, 0.1);
+    --accent-border: rgba(91, 141, 239, 0.28);
+    --accent-hover: #7aa3f3;
+
+    --success: #3d9a6a;
+    --success-subtle: rgba(61, 154, 106, 0.12);
+    --warning: #c9a227;
+    --warning-subtle: rgba(201, 162, 39, 0.12);
+    --danger: #c96b6b;
+    --danger-subtle: rgba(201, 107, 107, 0.12);
+
+    --cyan-primary: var(--accent);
+    --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Surfaces */
+body,
+.bg-\[#0d1117\],
+.bg-\[#0a0a0b\],
+.bg-\[#070d1a\] {
+    background-color: var(--bg-main) !important;
+    color: var(--text-main) !important;
+}
+
+.glass,
+.glass-card {
+    background: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--shadow-soft) !important;
+}
+
+.glass-card:hover {
+    border-color: var(--border-strong) !important;
+    box-shadow: var(--shadow-soft) !important;
+    transform: translateY(-2px);
+}
+
+/* Remove neon glows */
+.glow-text-cyan,
+.glow-text-primary {
+    text-shadow: none !important;
+}
+
+.glow-text-cyan span,
+h1 .text-cyan-400,
+h1 span.text-cyan-400 {
+    color: var(--accent-muted) !important;
+}
+
+.glow-border-cyan,
+.glow-border-primary {
+    border-color: var(--accent-border) !important;
+    box-shadow: none !important;
+    animation: none !important;
+}
+
+.cyber-scan::after {
+    background: linear-gradient(to bottom, transparent, var(--accent), transparent) !important;
+    opacity: 0.35;
+}
+
+/* Unified accent (replaces cyan / blue / purple marketing colors) */
+.text-cyan-300,
+.text-cyan-400,
+.text-cyan-500,
+.text-blue-300,
+.text-blue-400,
+.text-blue-500,
+.text-purple-300,
+.text-purple-400,
+.text-purple-500 {
+    color: var(--accent-muted) !important;
+}
+
+.border-cyan-400,
+.border-cyan-500,
+.border-cyan-500\/20,
+.border-cyan-500\/30,
+.border-cyan-500\/50,
+.border-blue-400,
+.border-blue-500,
+.border-blue-500\/30,
+.border-blue-500\/50,
+.border-purple-400,
+.border-purple-500,
+.border-purple-500\/20,
+.border-purple-500\/30,
+.border-l-cyan-400,
+.border-l-cyan-500,
+.border-l-cyan-500\/50,
+.border-l-blue-500,
+.border-l-blue-500\/30,
+.border-l-blue-500\/50,
+.border-l-purple-500 {
+    border-color: var(--accent-border) !important;
+}
+
+.bg-cyan-400,
+.bg-cyan-500,
+.bg-blue-500,
+.bg-blue-600 {
+    background-color: var(--accent) !important;
+}
+
+.bg-cyan-500\/5,
+.bg-cyan-500\/10,
+.bg-cyan-500\/20,
+.bg-cyan-400\/10,
+.bg-cyan-400\/20,
+.bg-blue-500\/5,
+.bg-blue-500\/10,
+.bg-blue-600\/10,
+.bg-purple-500\/5,
+.bg-purple-500\/10,
+.bg-purple-500\/20,
+.bg-purple-400\/10,
+.bg-purple-400\/20 {
+    background-color: var(--accent-subtle) !important;
+}
+
+.hover\:bg-cyan-400:hover,
+.hover\:bg-cyan-500:hover {
+    background-color: var(--accent-hover) !important;
+}
+
+.text-green-400,
+.text-green-500,
+.text-emerald-400,
+.text-emerald-500 {
+    color: var(--success) !important;
+}
+
+.bg-green-500,
+.bg-emerald-500 {
+    background-color: var(--success) !important;
+}
+
+.text-amber-400,
+.text-amber-500,
+.text-yellow-400,
+.text-yellow-500 {
+    color: var(--warning) !important;
+}
+
+.bg-amber-500\/20,
+.bg-yellow-500\/10 {
+    background-color: var(--warning-subtle) !important;
+}
+
+.text-rose-400,
+.text-rose-500,
+.text-red-400,
+.text-red-500 {
+    color: var(--danger) !important;
+}
+
+.bg-rose-500,
+.bg-rose-500\/10,
+.bg-rose-500\/20 {
+    background-color: var(--danger-subtle) !important;
+}
+
+.border-rose-500,
+.border-rose-500\/20,
+.border-rose-500\/30 {
+    border-color: rgba(201, 107, 107, 0.35) !important;
+}
+
+/* Flatten decorative card gradients (keep progress bars) */
+.glass-card.bg-gradient-to-br,
+.glass.bg-gradient-to-br {
+    background-image: none !important;
+    background-color: var(--card-bg) !important;
+}
+
+#tag-health-bar.bg-gradient-to-r {
+    background-image: linear-gradient(to right, var(--accent), var(--accent-hover)) !important;
+}
+
+/* Sidebar */
+.sidebar-brand-mark {
+    color: var(--accent-muted) !important;
+}
+
+.sidebar-link.nav-link-active {
+    background: var(--accent-subtle) !important;
+    color: var(--accent-muted) !important;
+    border-left-color: var(--accent) !important;
+}
+
+.sidebar-section-title {
+    color: var(--text-muted) !important;
+}
+
+.sidebar-link-vault .sidebar-icon {
+    color: var(--accent-muted) !important;
+}
+
+.sidebar-status-dot {
+    background: var(--success) !important;
+    box-shadow: 0 0 6px rgba(61, 154, 106, 0.45) !important;
+}
+
+/* Cards & inputs */
+.v-badge {
+    background: var(--accent-subtle) !important;
+    color: var(--accent-muted) !important;
+    border-color: var(--accent-border) !important;
+}
+
+input,
+textarea,
+select {
+    color: var(--text-main);
+}
+
+.font-mono.text-cyan-300,
+.text-cyan-300.font-mono {
+    color: var(--text-secondary) !important;
+}
+
+/* Toasts */
+#toast-container {
+    border-color: var(--accent-border) !important;
+    box-shadow: var(--shadow-soft) !important;
+}
+
+#toast-title.text-cyan-400 {
+    color: var(--accent-muted) !important;
+}
+
+/* Terminal / legacy neon */
+.card-header i,
+.toggle-password:hover,
+.log-stream,
+.terminal-container {
+    color: var(--accent-muted) !important;
+    border-color: var(--border-strong) !important;
+}
+
+.terminal-container {
+    border-top-color: var(--border-strong) !important;
+}
+
+.log-line {
+    border-left-color: var(--accent-border) !important;
+}
+
+/* Tab active state in settings */
+#tab-general.border-blue-500,
+#tab-cloud.border-blue-500,
+#tab-vault.border-blue-500,
+#tab-advanced.border-blue-500 {
+    border-color: var(--accent) !important;
+    color: var(--text-main) !important;
+}
+
+/* Remove harsh neon box-shadows from Tailwind arbitrary utilities */
+[class*="shadow-[0_0"] {
+    box-shadow: var(--shadow-soft) !important;
+}
+
+/* Chart-friendly (referenced from JS) */
+:root {
+    --chart-primary: #5b8def;
+    --chart-primary-fill: rgba(91, 141, 239, 0.15);
+    --chart-secondary: #6b7f9e;
+    --chart-warning: #c9a227;
+    --chart-grid: rgba(255, 255, 255, 0.06);
+    --chart-tick: #6b7280;
+}
