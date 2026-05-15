@@ -35,16 +35,27 @@
             <div class="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-8">
                 <a href="/" class="hover:text-blue-400 transition">Home</a>
                 <span>/</span>
-                <span class="text-gray-300">Azure Price Catalog</span>
+                <span class="text-gray-300">Cloud Price Catalog</span>
             </div>
 
             <div class="glass p-8 animate-slide-in">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
                     <div>
-                        <h2 class="text-3xl font-black text-white glow-text-cyan uppercase tracking-tighter">Azure <span class="text-cyan-400">Resource</span> Catalog</h2>
-                        <p class="text-slate-500 text-xs mt-1 font-bold uppercase tracking-widest">Real-time reference for cloud resource cost projection</p>
+                        <h2 class="text-3xl font-black text-white glow-text-cyan uppercase tracking-tighter"><span id="active-provider-label">Azure</span> <span class="text-cyan-400">Resource</span> Catalog</h2>
+                        <p class="text-slate-500 text-xs mt-1 font-bold uppercase tracking-widest">Real-time reference for multi-cloud resource cost projection</p>
                     </div>
                     <div class="flex gap-4 items-center">
+                        <div class="relative group">
+                            <select id="cloudProvider" onchange="switchProvider(this.value)" 
+                                class="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest text-cyan-400 focus:outline-none focus:border-cyan-500 transition-all appearance-none cursor-pointer pr-10">
+                                <option value="azure">Cloud: Azure</option>
+                                <option value="aws">Cloud: AWS</option>
+                                <option value="gcp">Cloud: GCP</option>
+                            </select>
+                            <div class="absolute right-3 top-2.5 pointer-events-none text-cyan-400">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                            </div>
+                        </div>
                         <div class="relative group">
                             <select id="priceSort" onchange="sortPrices()" 
                                 class="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest text-cyan-400 focus:outline-none focus:border-cyan-500 transition-all appearance-none cursor-pointer pr-10">
@@ -69,6 +80,10 @@
                             </button>
                         </div>
                     </div>
+                <div class="flex gap-2 bg-white/5 p-1 rounded-xl border border-white/5 mb-8 w-fit">
+                    <button id="prov-azure" onclick="switchProvider('azure')" class="prov-btn px-6 py-2 bg-cyan-500 rounded-lg text-[#0d1117] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 transition-all">Azure</button>
+                    <button id="prov-aws" onclick="switchProvider('aws')" class="prov-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all">AWS</button>
+                    <button id="prov-gcp" onclick="switchProvider('gcp')" class="prov-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all">GCP</button>
                 </div>
 
                 <div class="mb-6 relative">
@@ -208,6 +223,7 @@
     <script>
         let allPriceData = [];
         let filteredPriceData = [];
+        let currentProvider = 'azure';
         let currentPage = 1;
         const itemsPerPage = 100;
 
@@ -395,6 +411,28 @@
                 hBtn.className = "toggle-btn px-6 py-2 bg-cyan-500 rounded-lg text-[#0d1117] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 transition-all";
                 mBtn.className = "toggle-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all";
             }
+        }
+
+        function switchProvider(provider) {
+            currentProvider = provider;
+            
+            // Update dropdown
+            document.getElementById('cloudProvider').value = provider;
+            
+            // Update labels
+            document.getElementById('active-provider-label').innerText = provider.toUpperCase();
+            
+            // Update toggle buttons
+            document.querySelectorAll('.prov-btn').forEach(btn => {
+                btn.className = "prov-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all";
+            });
+            const activeBtn = document.getElementById(`prov-${provider}`);
+            if (activeBtn) {
+                activeBtn.className = "prov-btn px-6 py-2 bg-cyan-500 rounded-lg text-[#0d1117] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 transition-all";
+            }
+            
+            // Refresh prices
+            fetchPrices();
         }
 
         // Comparison Engine Logic
@@ -663,7 +701,19 @@
 
         async function fetchPrices() {
             try {
-                const response = await fetch('/api/prices');
+                // Show loading state
+                document.getElementById('priceTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="5" class="p-12 text-center">
+                            <div class="flex flex-col items-center gap-4">
+                                <div class="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                <p class="text-gray-500 font-bold animate-pulse">FETCHING ${currentProvider.toUpperCase()} PRICES...</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+
+                const response = await fetch(`/api/prices?provider=${currentProvider}`);
                 const data = await response.json();
                 if (data.status === 'success') {
                     // The Go engine returns ScanResult with a 'prices' field

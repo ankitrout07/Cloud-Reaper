@@ -1040,10 +1040,140 @@ def format_scan_results(raw):
     return formatted
 
 
+def _get_mock_prices(provider: str) -> dict:
+    """Mock pricing data for demonstration of multi-cloud catalogue."""
+    if provider == "aws":
+        return {
+            "prices": [
+                {
+                    "armResourceName": "t3.medium",
+                    "skuName": "t3.medium",
+                    "serviceName": "EC2",
+                    "armRegionName": "us-east-1",
+                    "retailPrice": 0.0416,
+                    "unitOfMeasure": "1 Hour",
+                },
+                {
+                    "armResourceName": "m5.large",
+                    "skuName": "m5.large",
+                    "serviceName": "EC2",
+                    "armRegionName": "us-west-2",
+                    "retailPrice": 0.096,
+                    "unitOfMeasure": "1 Hour",
+                },
+                {
+                    "armResourceName": "r5.xlarge",
+                    "skuName": "r5.xlarge",
+                    "serviceName": "EC2",
+                    "armRegionName": "eu-west-1",
+                    "retailPrice": 0.252,
+                    "unitOfMeasure": "1 Hour",
+                },
+                {
+                    "armResourceName": "gp3-storage",
+                    "skuName": "gp3-storage",
+                    "serviceName": "EBS",
+                    "armRegionName": "us-east-1",
+                    "retailPrice": 0.08,
+                    "unitOfMeasure": "1 GB-Month",
+                },
+                {
+                    "armResourceName": "db.t3.small",
+                    "skuName": "db.t3.small",
+                    "serviceName": "RDS",
+                    "armRegionName": "ap-southeast-1",
+                    "retailPrice": 0.034,
+                    "unitOfMeasure": "1 Hour",
+                },
+                {
+                    "armResourceName": "c5.2xlarge",
+                    "skuName": "c5.2xlarge",
+                    "serviceName": "EC2",
+                    "armRegionName": "us-east-1",
+                    "retailPrice": 0.34,
+                    "unitOfMeasure": "1 Hour",
+                },
+                {
+                    "armResourceName": "s3-standard",
+                    "skuName": "s3-standard",
+                    "serviceName": "S3",
+                    "armRegionName": "us-east-1",
+                    "retailPrice": 0.023,
+                    "unitOfMeasure": "1 GB-Month",
+                },
+            ]
+        }
+    if provider == "gcp":
+        return {
+            "prices": [
+                {
+                    "armResourceName": "n1-standard-1",
+                    "skuName": "n1-standard-1",
+                    "serviceName": "Compute Engine",
+                    "armRegionName": "us-central1",
+                    "retailPrice": 0.0475,
+                    "unitOfMeasure": "1 Hour",
+                },
+                {
+                    "armResourceName": "n2-highmem-4",
+                    "skuName": "n2-highmem-4",
+                    "serviceName": "Compute Engine",
+                    "armRegionName": "europe-west1",
+                    "retailPrice": 0.384,
+                    "unitOfMeasure": "1 Hour",
+                },
+                {
+                    "armResourceName": "e2-medium",
+                    "skuName": "e2-medium",
+                    "serviceName": "Compute Engine",
+                    "armRegionName": "asia-east1",
+                    "retailPrice": 0.0335,
+                    "unitOfMeasure": "1 Hour",
+                },
+                {
+                    "armResourceName": "pd-standard",
+                    "skuName": "pd-standard",
+                    "serviceName": "Persistent Disk",
+                    "armRegionName": "us-central1",
+                    "retailPrice": 0.04,
+                    "unitOfMeasure": "1 GB-Month",
+                },
+                {
+                    "armResourceName": "cloud-sql-instance",
+                    "skuName": "cloud-sql-instance",
+                    "serviceName": "Cloud SQL",
+                    "armRegionName": "us-east1",
+                    "retailPrice": 0.15,
+                    "unitOfMeasure": "1 Hour",
+                },
+                {
+                    "armResourceName": "gke-cluster",
+                    "skuName": "gke-cluster",
+                    "serviceName": "GKE",
+                    "armRegionName": "us-central1",
+                    "retailPrice": 0.10,
+                    "unitOfMeasure": "1 Hour",
+                },
+                {
+                    "armResourceName": "bigquery-storage",
+                    "skuName": "bigquery-storage",
+                    "serviceName": "BigQuery",
+                    "armRegionName": "us",
+                    "retailPrice": 0.02,
+                    "unitOfMeasure": "1 GB-Month",
+                },
+            ]
+        }
+    return {"prices": []}
+
+
 @app.route("/api/prices")
 def get_prices():
+    provider = request.args.get("provider", "azure").lower()
     try:
-        return jsonify({"status": "success", "prices": AzureCollector().get_live_prices()})
+        if provider == "azure":
+            return jsonify({"status": "success", "prices": AzureCollector().get_live_prices()})
+        return jsonify({"status": "success", "prices": _get_mock_prices(provider)})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
