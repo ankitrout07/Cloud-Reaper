@@ -7,6 +7,8 @@ repos:
     - id: ruff-format
 
 - repo: https://github.com/golangci/golangci-lint
-  rev: v1.64.5 # Updated to a version compatible with Go 1.24
+  rev: v1.64.5
   hooks:
     - id: golangci-lint
+      entry: bash -c 'cd src/engine-go && golangci-lint run ./...'
+      pass_filenames: false
