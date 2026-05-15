@@ -93,19 +93,19 @@ def run_reaper():
             "name": vm_name,
             "type": "VirtualMachine",
             "is_unattached": False,
-            "iops_history": [5, 4, 6, 3, 2, 5, 4],  # Simulate low IOPS
+            "iops_history": [],  # Real metrics would be fetched here or in Scorer
         }
         res = scorer.score_resource(vm_data)
         if res["is_zombie"]:
             print(f"      [🚨] ZOMBIE DETECTED: {vm_name} (Score: {res['score']})")
 
     # Check Disks
-    for disk in disks:
+    for disk in disks.get("disks", []):
         disk_data = {
             "name": disk["name"],
             "type": "Disk",
             "is_unattached": True,
-            "iops_history": [0, 0, 0, 0, 0, 0, 0],
+            "iops_history": [],
         }
         res = scorer.score_resource(disk_data)
         if res["is_zombie"]:

@@ -143,13 +143,11 @@ func fetchPriceData(resource string, result *ScanResult, mu *sync.Mutex, wg *syn
 	for _, item := range priceResult.Items {
 		retailPrice, _ := item["retailPrice"].(float64)
 		minUnits, _ := item["minimumNumberOfUnits"].(float64)
-		serviceFamily, _ := item["serviceFamily"].(string)
 		meterName, _ := item["meterName"].(string)
 		unitOfMeasure, _ := item["unitOfMeasure"].(string)
 
-		if (serviceFamily != "Compute" && serviceFamily != "Storage") ||
-			strings.Contains(meterName, "Support") ||
-			strings.Contains(meterName, "Savings Plan") {
+		// Relaxed family filter to include all architectural components, while still excluding support/savings plans
+		if strings.Contains(meterName, "Support") || strings.Contains(meterName, "Savings Plan") {
 			continue
 		}
 
@@ -169,7 +167,31 @@ func runPriceMode() {
 	result := &ScanResult{Prices: []map[string]interface{}{}}
 	var wg sync.WaitGroup
 
-	myResources := []string{"Virtual Machines", "Storage"}
+	myResources := []string{
+		"Virtual Machines",
+		"Storage",
+		"Networking",
+		"SQL Database",
+		"Azure App Service",
+		"Container Registry",
+		"Bandwidth",
+		"Azure Cosmos DB",
+		"Azure Kubernetes Service",
+		"Azure Cache for Redis",
+		"Load Balancer",
+		"Application Gateway",
+		"VPN Gateway",
+		"Key Vault",
+		"Log Analytics",
+		"Service Bus",
+		"Event Hubs",
+		"Azure Functions",
+		"Container Apps",
+		"API Management",
+		"Azure SQL Database",
+		"Azure Database for PostgreSQL",
+		"Azure Database for MySQL",
+	}
 	for _, resource := range myResources {
 		wg.Add(1)
 		go fetchPriceData(resource, result, mu, &wg)

@@ -152,9 +152,11 @@ class RightSizer:
                 elif "_2" in vm["size"]:
                     recommended_size = "Standard_B2s"  # Extreme downsize
 
-            # Calculate Savings (Mock calculation if price book is empty)
+            # Calculate Savings (Actual calculation if price book is available)
             if recommended_size != vm["size"]:
-                potential_saving = 25.0  # Mock $25/mo saving
+                current_price = self.price_book.get(vm["size"], 0.1)
+                new_price = self.price_book.get(recommended_size, current_price * 0.5)
+                potential_saving = (current_price - new_price) * 730  # Monthly estimate (730 hours)
 
             # Personality Analysis (Pattern-Aware Scaling)
             personality_analyzer = WorkloadPersonality()

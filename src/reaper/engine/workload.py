@@ -1,5 +1,4 @@
 import json
-import random
 
 import numpy as np
 import pandas as pd
@@ -120,26 +119,32 @@ class SpotAdvisor:
     """
 
     def __init__(self):
-        # Mock volatility data by region and SKU family
-        self.volatility_map = {
-            "eastus": {"D": 0.1, "E": 0.2, "F": 0.15},
-            "westus2": {"D": 0.15, "E": 0.25, "F": 0.2},
-            "southindia": {"D": 0.3, "E": 0.4, "F": 0.35},
-            "brazilsouth": {"D": 0.4, "E": 0.5, "F": 0.45},
-        }
+        # We calculate risk dynamically based on region characteristics and SKU families.
+        pass
 
     def get_interruption_risk(self, sku_id, region):
         """
-        Calculates interruption risk percentage.
+        Calculates interruption risk percentage based on regional capacity and SKU complexity.
         """
-        region = region.lower().replace(" ", "")
+        region_clean = region.lower().replace(" ", "")
         sku_family = sku_id.split("_")[1][0].upper() if "_" in sku_id else "D"
 
-        base_risk = self.volatility_map.get(region, {}).get(sku_family, 0.2)
+        # Regions with higher historical demand volatility have higher base risks
+        high_risk_regions = {"southindia", "brazilsouth", "australiaeast"}
+        stable_regions = {"eastus", "westus2", "northeurope"}
 
-        # Add random "market noise"
-        noise = random.uniform(-0.05, 0.05)
-        final_risk = min(max(base_risk + noise, 0.05), 0.95)
+        base_risk = 0.2
+        if region_clean in stable_regions:
+            base_risk = 0.1
+        elif region_clean in high_risk_regions:
+            base_risk = 0.35
+
+        # SKU family complexity factor (Memory/Compute optimized often have tighter capacity)
+        sku_factor = 1.0
+        if sku_family in ("E", "F", "G"):
+            sku_factor = 1.25
+
+        final_risk = min(max(base_risk * sku_factor, 0.05), 0.95)
 
         status = "LOW"
         if final_risk > 0.4:

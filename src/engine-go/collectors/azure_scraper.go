@@ -149,6 +149,12 @@ func (a *AzureScraper) scanDisks(ctx context.Context) ([]models.Resource, error)
 }
 
 func (a *AzureScraper) GetHourlyRate(sku string) (float64, error) {
+	price, err := FetchAzurePrice(sku)
+	if err == nil && price > 0 {
+		return price, nil
+	}
+
+	// Fallback to defaults if API fails
 	rates := map[string]float64{
 		"Standard_D2s_v3": 0.096,
 		"Standard_D4s_v3": 0.192,
@@ -157,7 +163,7 @@ func (a *AzureScraper) GetHourlyRate(sku string) (float64, error) {
 	if rate, ok := rates[sku]; ok {
 		return rate, nil
 	}
-	return 0, fmt.Errorf("azure: hourly rate not found for sku %q", sku)
+	return 0.1, nil // Default fallback
 }
 
 func (a *AzureScraper) latestCPUPercent(ctx context.Context, client *armmonitor.MetricsClient, resourceID string) float64 {

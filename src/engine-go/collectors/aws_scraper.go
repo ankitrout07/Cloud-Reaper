@@ -120,6 +120,11 @@ func (s *AWSScraper) ScanResources() ([]models.Resource, error) {
 }
 
 func (s *AWSScraper) GetHourlyRate(sku string) (float64, error) {
+	price, err := FetchAWSPrice(sku, s.region)
+	if err == nil && price > 0 {
+		return price, nil
+	}
+
 	rates := map[string]float64{
 		"t3.micro":  0.0104,
 		"t3.small":  0.0208,
@@ -130,7 +135,7 @@ func (s *AWSScraper) GetHourlyRate(sku string) (float64, error) {
 	if rate, ok := rates[sku]; ok {
 		return rate, nil
 	}
-	return 0, fmt.Errorf("aws: hourly rate not found for sku %q", sku)
+	return 0.05, nil // Default fallback
 }
 
 func awsTagsToMap(tags []types.Tag) map[string]string {

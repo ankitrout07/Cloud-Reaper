@@ -110,7 +110,6 @@ SOCKET_METRICS_INTERVAL_SEC = int(os.getenv("REAPER_METRICS_EMIT_SEC", "8"))
 
 def background_metrics_worker():
     """Fetches Azure Monitor CPU samples and pushes over WebSocket (throttled)."""
-    import random
 
     while True:
         socketio.sleep(SOCKET_METRICS_INTERVAL_SEC)
@@ -122,17 +121,15 @@ def background_metrics_worker():
                 cpu_usage = az.get_live_subscription_cpu_average(max_vms=6)
         except Exception as e:
             print(f"[!] Metrics Worker Error: {e}")
-        if cpu_usage is None:
-            cpu_usage = round(20.0 + random.uniform(-5.0, 5.0), 2)
-        else:
+        if cpu_usage is not None:
             cpu_usage = round(float(cpu_usage), 2)
-        try:
-            socketio.emit(
-                "metric_update",
-                {"time": now, "value": cpu_usage},
-            )
-        except Exception as e:
-            print(f"[!] Metrics emit error: {e}")
+            try:
+                socketio.emit(
+                    "metric_update",
+                    {"time": now, "value": cpu_usage},
+                )
+            except Exception as e:
+                print(f"[!] Metrics emit error: {e}")
 
 
 # Start the worker after the app is ready
@@ -751,13 +748,7 @@ def list_subscriptions():
     try:
         binary_path = _reaper_engine_binary()
         if not binary_path:
-            return jsonify(
-                [
-                    {"id": "sub-123-abc", "name": "Production-Internal (Mock)"},
-                    {"id": "sub-456-def", "name": "Staging-Sandbox (Mock)"},
-                    {"id": "sub-789-ghi", "name": "Legacy-Shared-Services (Mock)"},
-                ]
-            )
+            return jsonify([])
 
         result = subprocess.run(
             [str(binary_path), "--list-subs"],  # noqa: S603
@@ -1108,10 +1099,10 @@ def tag_health():
                 "compliant_count": total - count,
                 "unallocated_count": count,
                 "compliance_rate": round(rate, 1),
-                "unallocated_spend": round(count * 45.0, 2),
+                "unallocated_spend": 0.0,
                 "missing_tags_summary": [
                     {"resource": r.name, "type": r.type, "missing": "Owner, Project"}
-                    for r in unallocated[:5]
+                    for r in unallocated
                 ],
             }
         )
@@ -1261,9 +1252,9 @@ def budget_killswitch():
         return jsonify(
             {
                 "status": "success",
-                "message": f"Kill-switch activated for {sub_name}.",
-                "vms_stopped": ["sandbox-test-01", "sandbox-test-02", "dev-worker-temp"],
-                "estimated_savings": "$14.20/day",
+                "message": f"Kill-switch initiated for {sub_name}. Checking policy compliance...",
+                "vms_stopped": [],
+                "estimated_savings": "$0.00/day",
             }
         )
     except Exception as e:
@@ -1360,21 +1351,6 @@ def get_activity():
             for log in logs
         ]
         session.close()
-        if not result:
-            result = [
-                {
-                    "resource": "Global Scan",
-                    "action": "SCAN",
-                    "status": "SUCCESS",
-                    "time": "Just now",
-                },
-                {
-                    "resource": "vm-prod-01",
-                    "action": "PROTECT",
-                    "status": "SUCCESS",
-                    "time": "1h ago",
-                },
-            ]
         return jsonify({"status": "success", "activity": result})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
