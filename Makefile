@@ -1,20 +1,29 @@
-.PHONY: help install build test lint run clean
+.PHONY: help install venv build test test-python test-go lint lint-python lint-go run clean
 
 export PYTHONPATH := $(shell pwd)/src
+
+VENV_PYTHON := ./venv/bin/python
+VENV_PIP := ./venv/bin/pip
+GO_LINT := ./bin/golangci-lint
 
 # Default target
 help:
 	@echo "Cloud-Reaper Development Commands:"
-	@echo "  install    Install dependencies (Python & Go)"
+	@echo "  install    Install dependencies (Python & Go) into venv"
 	@echo "  build      Build Go engine"
 	@echo "  test       Run all tests"
 	@echo "  lint       Run all linters"
 	@echo "  run        Run the application locally"
 	@echo "  clean      Clean build artifacts"
 
-install:
-	pip install -r requirements.txt -r requirements-dev.txt
+install: venv
+	$(VENV_PIP) install -r requirements.txt -r requirements-dev.txt
 	cd src/engine-go && go mod download
+	GOBIN=$(shell pwd)/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+venv:
+	@if [ ! -d "venv" ]; then python3 -m venv venv; fi
+	$(VENV_PYTHON) -m pip install --upgrade pip
 
 build:
 	mkdir -p bin
@@ -22,22 +31,22 @@ build:
 
 test: test-python test-go
 
-test-python:
-	pytest
+test-python: install
+	$(VENV_PYTHON) -m pytest
 
 test-go:
 	cd src/engine-go && go test -v ./...
 
 lint: lint-python lint-go
 
-lint-python:
-	ruff check src/reaper
-	mypy src/reaper --ignore-missing-imports
+lint-python: install
+	$(VENV_PYTHON) -m ruff check src/reaper
+	$(VENV_PYTHON) -m mypy src/reaper --ignore-missing-imports
 
-lint-go:
-	cd src/engine-go && golangci-lint run ./...
+lint-go: install
+	cd src/engine-go && ../../bin/golangci-lint run ./...
 
-run: build
+run: install build
 	./scripts/reap.sh
 
 clean:

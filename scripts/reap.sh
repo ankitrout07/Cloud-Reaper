@@ -69,8 +69,8 @@ if [ ! -d "venv" ]; then
 fi
 
 echo "[*] Activating virtual environment and installing/updating dependencies..."
-./venv/bin/pip install --upgrade pip --quiet
-./venv/bin/pip install -r requirements.txt -r requirements-dev.txt --quiet
+./venv/bin/python -m pip install --upgrade pip --quiet
+./venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt --quiet
 
 # 3. Environment Configuration
 if [ ! -f .env ]; then
@@ -130,7 +130,7 @@ echo "------------------------------------------------"
 
 # 5. Run CLI Scan
 echo "[*] Running resource scan..."
-./venv/bin/python3 -m reaper.cli
+./venv/bin/python -m reaper.cli
 
 # 6. Start Dashboard (in background)
 echo "------------------------------------------------"
@@ -138,4 +138,4 @@ echo "[+] Starting Dashboard..."
 echo "    Access at: http://localhost:5001"
 echo "    Press Ctrl+C to stop"
 echo "------------------------------------------------"
-./venv/bin/python3 -m reaper.web.app
+./venv/bin/python -m reaper.web.app

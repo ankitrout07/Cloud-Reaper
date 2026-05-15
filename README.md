@@ -133,7 +133,7 @@ python bootstrap.py
 ```bash
 python -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env              # Edit with your Azure credentials
 PYTHONPATH=src python -m reaper.web.app
 ```

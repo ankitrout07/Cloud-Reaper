@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from typing import Any
+from typing import Any, cast
 
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
@@ -45,4 +45,4 @@ def decrypt_payload(passcode: str, salt: bytes, token: str) -> dict[str, Any]:
         raw = fernet.decrypt(token.encode("utf-8"))
     except InvalidToken as exc:
         raise ValueError("Unable to decrypt vault entry.") from exc
-    return json.loads(raw.decode("utf-8"))
+    return cast(dict[str, Any], json.loads(raw.decode("utf-8")))

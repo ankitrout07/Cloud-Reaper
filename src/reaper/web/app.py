@@ -20,6 +20,7 @@ import threading
 import time
 import traceback
 from pathlib import Path
+from typing import Any, cast
 
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.subscription import SubscriptionClient
@@ -188,7 +189,7 @@ def index():
     return render_template("index.html", user_name=user_name, sub_name=sub_name)
 
 
-def _cloud_connections_summary() -> tuple[dict, str]:
+def _cloud_connections_summary() -> tuple[dict[str, dict[str, Any]], str]:
     """Latest connection per provider and active provider label for settings UI."""
     db = SessionLocal()
     try:
@@ -197,11 +198,12 @@ def _cloud_connections_summary() -> tuple[dict, str]:
             .order_by(CloudConnection.provider_type, CloudConnection.updated_at.desc())
             .all()
         )
-        summary: dict[str, dict] = {}
+        summary: dict[str, dict[str, Any]] = {}
         for row in rows:
-            if row.provider_type in summary:
+            provider_type = cast(str, row.provider_type)
+            if provider_type in summary:
                 continue
-            summary[row.provider_type] = {
+            summary[provider_type] = {
                 "connection_name": row.connection_name,
                 "is_active": bool(row.is_active),
                 "updated_at": row.updated_at.isoformat() if row.updated_at else None,
@@ -250,7 +252,7 @@ def _session_fernet() -> Fernet | None:
 
 def _unlock_vault_session(passcode: str, settings: VaultSettings) -> bool:
     salt = _vault_salt_bytes(settings)
-    if not verify_passcode(passcode, salt, settings.passcode_verifier):
+    if not verify_passcode(passcode, salt, cast(str, settings.passcode_verifier)):
         return False
     session["vault_fernet_key"] = derive_fernet_key(passcode, salt).decode("utf-8")
     session["vault_unlocked"] = True
@@ -395,35 +397,37 @@ def _write_kubeconfig_file(kubeconfig: str) -> str:
     return str(target)
 
 
-def _set_cloud_env(provider: str, credentials: dict) -> None:
+def _set_cloud_env(provider: str, credentials: dict[str, Any]) -> None:
     provider = provider.lower()
     if provider == "aws":
-        os.environ["AWS_ACCESS_KEY_ID"] = credentials.get("access_key_id", "")
-        os.environ["AWS_SECRET_ACCESS_KEY"] = credentials.get("secret_access_key", "")
-        os.environ["AWS_REGION"] = credentials.get("region", "us-east-1")
+        os.environ["AWS_ACCESS_KEY_ID"] = str(credentials.get("access_key_id", ""))
+        os.environ["AWS_SECRET_ACCESS_KEY"] = str(credentials.get("secret_access_key", ""))
+        os.environ["AWS_REGION"] = str(credentials.get("region", "us-east-1"))
     elif provider == "azure":
-        os.environ["AZURE_SUBSCRIPTION_ID"] = credentials.get("subscription_id", "")
-        os.environ["AZURE_TENANT_ID"] = credentials.get("tenant_id", "")
-        os.environ["AZURE_CLIENT_ID"] = credentials.get("client_id", "")
-        os.environ["AZURE_CLIENT_SECRET"] = credentials.get("client_secret", "")
+        os.environ["AZURE_SUBSCRIPTION_ID"] = str(credentials.get("subscription_id", ""))
+        os.environ["AZURE_TENANT_ID"] = str(credentials.get("tenant_id", ""))
+        os.environ["AZURE_CLIENT_ID"] = str(credentials.get("client_id", ""))
+        os.environ["AZURE_CLIENT_SECRET"] = str(credentials.get("client_secret", ""))
     elif provider == "gcp":
-        os.environ["GOOGLE_CLOUD_PROJECT"] = credentials.get("project_id", "")
+        os.environ["GOOGLE_CLOUD_PROJECT"] = str(credentials.get("project_id", ""))
         if credentials.get("service_account_json"):
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _write_gcp_service_account_file(
-                credentials["service_account_json"]
+                str(credentials["service_account_json"])
             )
     elif provider == "k8s":
         kubeconfig = credentials.get("kubeconfig")
         if kubeconfig:
-            kubeconfig_path = Path(kubeconfig)
+            kubeconfig_path = Path(str(kubeconfig))
             if kubeconfig_path.exists():
                 os.environ["KUBECONFIG"] = str(kubeconfig_path)
             else:
-                os.environ["KUBECONFIG"] = _write_kubeconfig_file(kubeconfig)
+                os.environ["KUBECONFIG"] = _write_kubeconfig_file(str(kubeconfig))
         if credentials.get("service_account_token"):
-            os.environ["K8S_SERVICE_ACCOUNT_TOKEN"] = credentials.get("service_account_token")
+            os.environ["K8S_SERVICE_ACCOUNT_TOKEN"] = str(
+                credentials.get("service_account_token", "")
+            )
         if credentials.get("context"):
-            os.environ["K8S_CONTEXT"] = credentials.get("context")
+            os.environ["K8S_CONTEXT"] = str(credentials.get("context", ""))
     os.environ["REAPER_ACTIVE_PROVIDER"] = provider.upper()
 
 
