@@ -99,6 +99,17 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Pagination Controls -->
+                <div id="pagination-controls" class="mt-8 flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5 hidden">
+                    <div class="text-[10px] text-gray-500 font-black uppercase tracking-widest">
+                        Showing <span id="page-start" class="text-white">0</span> - <span id="page-end" class="text-white">0</span> of <span id="total-items" class="text-white">0</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="prevPage()" id="prev-btn" class="px-6 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-cyan-400 text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-20 disabled:cursor-not-allowed">Previous</button>
+                        <button onclick="nextPage()" id="next-btn" class="px-6 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-cyan-400 text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-20 disabled:cursor-not-allowed">Next</button>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
@@ -193,6 +204,11 @@
     </div>
 
     <script>
+        let allPriceData = [];
+        let filteredPriceData = [];
+        let currentPage = 1;
+        const itemsPerPage = 100;
+
         let architectEstimate = {
             resources: [],
             totalHourly: 0.0,
@@ -465,14 +481,23 @@
 
         function renderTable(dataList) {
             const tbody = document.getElementById('priceTableBody');
+            const controls = document.getElementById('pagination-controls');
             tbody.innerHTML = '';
 
             if (dataList.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-500">No live prices found. Ensure the Go engine is running.</td></tr>';
+                controls.classList.add('hidden');
                 return;
             }
 
-            dataList.forEach(item => {
+            controls.classList.remove('hidden');
+            
+            // Slice data for current page
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const pageData = dataList.slice(start, end);
+
+            pageData.forEach(item => {
                 const rawPrice = item.retailPrice;
                 let hourly, monthly;
 
@@ -529,20 +554,73 @@
                 `;
                 tbody.appendChild(row);
             });
+
+            updatePaginationUI(dataList.length);
             updateCompareTray(); // Ensure highlights are consistent
+        }
+
+        function updatePaginationUI(total) {
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = Math.min(start + itemsPerPage, total);
+            
+            document.getElementById('page-start').innerText = total > 0 ? start + 1 : 0;
+            document.getElementById('page-end').innerText = end;
+            document.getElementById('total-items').innerText = total;
+
+            document.getElementById('prev-btn').disabled = currentPage === 1;
+            document.getElementById('next-btn').disabled = end >= total;
+        }
+
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                renderTable(filteredPriceData);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function nextPage() {
+            const maxPage = Math.ceil(filteredPriceData.length / itemsPerPage);
+            if (currentPage < maxPage) {
+                currentPage++;
+                renderTable(filteredPriceData);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function sortPrices() {
+            const sortBy = document.getElementById("priceSort").value;
+            
+            if (sortBy === "price-asc") {
+                filteredPriceData.sort((a, b) => a.retailPrice - b.retailPrice);
+            } else if (sortBy === "price-desc") {
+                filteredPriceData.sort((a, b) => b.retailPrice - a.retailPrice);
+            } else if (sortBy === "sku-asc") {
+                filteredPriceData.sort((a, b) => (a.armResourceName || a.skuName).localeCompare(b.armResourceName || b.skuName));
+            } else if (sortBy === "region-asc") {
+                filteredPriceData.sort((a, b) => (a.armRegionName || "").localeCompare(b.armRegionName || ""));
+            }
+
+            currentPage = 1;
+            renderTable(filteredPriceData);
         }
 
 
         function searchPrices() {
             const input = document.getElementById("priceSearch");
             const filter = input.value.toUpperCase();
-            const table = document.getElementById("priceTable");
-            const tr = table.getElementsByTagName("tr");
-
-            for (let i = 1; i < tr.length; i++) {
-                const text = tr[i].textContent || tr[i].innerText;
-                tr[i].style.display = text.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+            
+            if (filter === "") {
+                filteredPriceData = [...allPriceData];
+            } else {
+                filteredPriceData = allPriceData.filter(item => {
+                    const text = (item.armResourceName || item.skuName || "") + " " + (item.serviceName || "") + " " + (item.armRegionName || "");
+                    return text.toUpperCase().includes(filter);
+                });
             }
+            
+            currentPage = 1;
+            renderTable(filteredPriceData);
         }
 
         async function downloadBOM() {
@@ -583,8 +661,10 @@
                 const data = await response.json();
                 if (data.status === 'success') {
                     // The Go engine returns ScanResult with a 'prices' field
-                    const priceData = data.prices.prices || [];
-                    renderTable(priceData);
+                    allPriceData = data.prices.prices || [];
+                    filteredPriceData = [...allPriceData];
+                    currentPage = 1;
+                    renderTable(filteredPriceData);
                 } else {
                     document.getElementById('priceTableBody').innerHTML = 
                         `<tr><td colspan="5" class="p-8 text-center text-rose-400 font-bold">ENGINE ERROR: ${data.message}</td></tr>`;
