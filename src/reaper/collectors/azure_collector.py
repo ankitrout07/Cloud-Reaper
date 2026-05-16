@@ -904,6 +904,32 @@ class AzureCollector:
             print(f"[-] Failed to execute Go Scraper: {e}")
             return {}
 
+    def get_arbitrage_data(self, sku: str, regions: list[str]):
+        """
+        Calls the Go engine in arbitrage mode to fetch prices in parallel across regions.
+        """
+        is_windows = platform.system() == "Windows"
+        binary_name = "reaper-engine.exe" if is_windows else "reaper-engine"
+        go_binary = Path(__file__).resolve().parents[3] / "bin" / binary_name
+
+        if not go_binary.exists():
+            return {"error": "Go binary not found"}
+
+        try:
+            regions_str = ",".join(regions)
+            result = subprocess.run(
+                [str(go_binary), "--mode", "arbitrage", "--sku", sku, "--regions", regions_str],  # noqa: S603
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                return json.loads(result.stdout)
+            return {"error": result.stderr}
+        except Exception as e:
+            return {"error": str(e)}
+
+
     def get_burn_rate_forecast(self):
         """Calculates burn rate and EOM forecast using real Azure Cost data and ARIMA."""
         spend_data = []

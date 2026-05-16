@@ -136,8 +136,35 @@ func (s *GCPScraper) ScanResources() ([]models.Resource, error) {
 		}
 	}
 
+	snapshots, err := s.service.Snapshots.List(s.projectID).Do()
+	if err == nil {
+		for _, snap := range snapshots.Items {
+			createTime, _ := time.Parse(time.RFC3339, snap.CreationTimestamp)
+			if !createTime.IsZero() && time.Since(createTime) > 30*24*time.Hour {
+				tags := snap.Labels
+				if tags == nil {
+					tags = map[string]string{}
+				}
+				resources = append(resources, models.Resource{
+					ID:            snap.SelfLink,
+					Name:          snap.Name,
+					Type:          "OrphanedGCPSnapshot",
+					Region:        "global",
+					Tags:          tags,
+					Active:        true,
+					IsProtected:   isGCPProtected(tags),
+					IsUnallocated: true,
+					LastSeen:      now,
+					Provider:      "gcp",
+					SKU:           "snapshot",
+				})
+			}
+		}
+	}
+
 	return resources, nil
 }
+
 
 func (s *GCPScraper) GetHourlyRate(sku string) (float64, error) {
 	rates := map[string]float64{

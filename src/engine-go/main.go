@@ -360,25 +360,35 @@ func processVMMetrics(vm *armcompute.VirtualMachine, res armmonitor.MetricsClien
 	}
 }
 
-func parseArgs() (string, string, bool) {
-	var subID, mode string
+func parseArgs() (string, string, string, string, string, bool) {
+	var subID, mode, provider, sku, regions string
 	var listSubs bool
-	for i := 0; i < len(os.Args); i++ {
-		if os.Args[i] == "--list-subs" {
+	for i := 1; i < len(os.Args); i++ {
+		arg := os.Args[i]
+		if arg == "--list-subs" {
 			listSubs = true
-		}
-		if os.Args[i] == "--subscription" && i+1 < len(os.Args) {
+		} else if arg == "--subscription" && i+1 < len(os.Args) {
 			subID = os.Args[i+1]
-		}
-		if os.Args[i] == "--mode" && i+1 < len(os.Args) {
+			i++
+		} else if arg == "--mode" && i+1 < len(os.Args) {
 			mode = os.Args[i+1]
+			i++
+		} else if arg == "--provider" && i+1 < len(os.Args) {
+			provider = os.Args[i+1]
+			i++
+		} else if arg == "--sku" && i+1 < len(os.Args) {
+			sku = os.Args[i+1]
+			i++
+		} else if arg == "--regions" && i+1 < len(os.Args) {
+			regions = os.Args[i+1]
+			i++
 		}
 	}
-	return subID, mode, listSubs
+	return subID, mode, provider, sku, regions, listSubs
 }
 
 func main() {
-	subscriptionID, mode, listSubs := parseArgs()
+	subID, mode, provider, sku, regionsStr, listSubs := parseArgs()
 
 	if listSubs {
 		subs, err := GetSubscriptions()
@@ -391,19 +401,66 @@ func main() {
 		return
 	}
 
+	if mode == "arbitrage" {
+		if sku == "" || regionsStr == "" {
+			log.Fatal("--sku and --regions are required for arbitrage mode")
+		}
+		regions := strings.Split(regionsStr, ",")
+		RunArbitrageScan(sku, regions)
+		return
+	}
+
 	if mode == "prices" {
 		runPriceMode()
 		return
 	}
 
-	if subscriptionID == "" {
-		subscriptionID = os.Getenv("AZURE_SUBSCRIPTION_ID")
+	if provider != "" && provider != "azure" {
+		runProviderScan(provider)
+		return
 	}
-	if subscriptionID == "" {
+
+	if subID == "" {
+		subID = os.Getenv("AZURE_SUBSCRIPTION_ID")
+	}
+	if subID == "" {
 		log.Fatal("AZURE_SUBSCRIPTION_ID not set. Use --subscription [ID] or set environment variable.")
 	}
 
-	runScan(subscriptionID)
+	runScan(subID)
+}
+
+func runProviderScan(providerType string) {
+	p, err := collectors.NewProvider(providerType)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Basic credential mapping from environment
+	creds := map[string]string{
+		"access_key_id":        os.Getenv("AWS_ACCESS_KEY_ID"),
+		"secret_access_key":    os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		"region":               os.Getenv("AWS_REGION"),
+		"project_id":           os.Getenv("GCP_PROJECT_ID"),
+		"service_account_json": os.Getenv("GCP_SERVICE_ACCOUNT_JSON"),
+	}
+
+	if err := p.Authenticate(creds); err != nil {
+		log.Fatal(fmt.Errorf("failed to authenticate %s: %w", providerType, err))
+	}
+
+	resources, err := p.ScanResources()
+	if err != nil {
+		log.Fatal(fmt.Errorf("failed to scan %s: %w", providerType, err))
+	}
+
+	output, _ := json.Marshal(map[string]interface{}{
+		"provider":  providerType,
+		"resources": resources,
+		"count":     len(resources),
+		"timestamp": time.Now().UTC(),
+	})
+	fmt.Println(string(output))
 }
 
 func runScan(subscriptionID string) {
@@ -478,3 +535,4 @@ func pushToDB(result *ScanResult) {
 func ptr[T any](v T) *T {
 	return &v
 }
+

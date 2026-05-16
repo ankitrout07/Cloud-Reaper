@@ -523,77 +523,86 @@
                 const list = document.getElementById('target-list');
                 list.innerHTML = '';
 
-                orphans.forEach(item => {
-                    const nm = JSON.stringify(item.name);
-                    list.innerHTML += `
-                        <tr class="hover:bg-white/5 border-l-4 border-red-500 transition">
-                            <td class="px-4 py-4 font-mono">
-                                <span class="text-gray-300">${item.name}</span>
-                            </td>
-                            <td class="px-4 py-4">
-                                <span class="text-[10px] bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-0.5 rounded">
-                                    DISK
-                                </span>
-                            </td>
-                            <td class="px-4 py-4 text-red-400 font-bold">${item.savings}/mo</td>
-                            <td class="px-4 py-4 text-right">
-                                <button onclick="reapResource(${nm})" class="bg-red-600/20 border border-red-600 text-red-400 px-3 py-1 rounded text-[10px] hover:bg-red-600 hover:text-white transition-all">REAP</button>
-                            </td>
-                        </tr>`;
-                });
+                if (orphans.length === 0 && snapshots.length === 0 && (data.idle_vms || []).length === 0) {
+                    list.innerHTML = `<tr><td colspan="4"><div class="empty-state">No reclamation targets found in this scan. Environment is optimized.</div></td></tr>`;
+                } else {
+                    orphans.forEach(item => {
+                        const nm = JSON.stringify(item.name);
+                        list.innerHTML += `
+                            <tr class="hover:bg-white/5 border-l-4 border-red-500 transition">
+                                <td class="px-4 py-4 font-mono">
+                                    <span class="text-gray-300">${item.name}</span>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <span class="text-[10px] bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-0.5 rounded">
+                                        DISK
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4 text-red-400 font-bold">${item.savings}/mo</td>
+                                <td class="px-4 py-4 text-right">
+                                    <button onclick="reapResource(${nm})" class="bg-red-600/20 border border-red-600 text-red-400 px-3 py-1 rounded text-[10px] hover:bg-red-600 hover:text-white transition-all">REAP</button>
+                                </td>
+                            </tr>`;
+                    });
 
-                snapshots.forEach(item => {
-                    const nm = JSON.stringify(item.name);
-                    list.innerHTML += `
-                        <tr class="hover:bg-white/5 border-l-4 border-orange-500 transition">
-                            <td class="px-4 py-4 font-mono">
-                                <span class="text-gray-300">${item.name}</span>
-                            </td>
-                            <td class="px-4 py-4">
-                                <span class="text-[10px] bg-orange-500/10 text-orange-300 border border-orange-500/20 px-2 py-0.5 rounded">
-                                    SNAP
-                                </span>
-                            </td>
-                            <td class="px-4 py-4 text-orange-400 font-bold">${item.savings}/mo</td>
-                            <td class="px-4 py-4 text-right">
-                                <button onclick="reapResource(${nm})" class="bg-orange-600/20 border border-orange-600 text-orange-400 px-3 py-1 rounded text-[10px] hover:bg-orange-600 hover:text-white transition-all">REAP</button>
-                            </td>
-                        </tr>`;
-                });
+                    snapshots.forEach(item => {
+                        const nm = JSON.stringify(item.name);
+                        list.innerHTML += `
+                            <tr class="hover:bg-white/5 border-l-4 border-orange-500 transition">
+                                <td class="px-4 py-4 font-mono">
+                                    <span class="text-gray-300">${item.name}</span>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <span class="text-[10px] bg-orange-500/10 text-orange-300 border border-orange-500/20 px-2 py-0.5 rounded">
+                                        SNAP
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4 text-orange-400 font-bold">${item.savings}/mo</td>
+                                <td class="px-4 py-4 text-right">
+                                    <button onclick="reapResource(${nm})" class="bg-orange-600/20 border border-orange-600 text-orange-400 px-3 py-1 rounded text-[10px] hover:bg-orange-600 hover:text-white transition-all">REAP</button>
+                                </td>
+                            </tr>`;
+                    });
 
-                (data.idle_vms || []).forEach(item => {
-                    const nm = JSON.stringify(item.name);
-                    list.innerHTML += `
-                        <tr class="hover:bg-white/5 border-l-4 border-yellow-500 transition">
-                            <td class="px-4 py-4 font-mono">
-                                <span class="text-gray-300">${item.name}</span>
-                            </td>
-                            <td class="px-4 py-4">
-                                <span class="text-[10px] bg-yellow-500/10 text-yellow-200 border border-yellow-500/20 px-2 py-0.5 rounded">
-                                    VM
-                                </span>
-                            </td>
-                            <td class="px-4 py-4 text-yellow-400 font-bold">${item.savings}/mo <span class="text-[10px] text-gray-500">(${item.usage})</span></td>
-                            <td class="px-4 py-4 text-right">
-                                <button onclick="reapResource(${nm})" class="bg-yellow-600/20 border border-yellow-500 text-yellow-300 px-3 py-1 rounded text-[10px] hover:bg-yellow-600 hover:text-black transition-all">REAP</button>
-                            </td>
-                        </tr>`;
-                });
+                    (data.idle_vms || []).forEach(item => {
+                        const nm = JSON.stringify(item.name);
+                        list.innerHTML += `
+                            <tr class="hover:bg-white/5 border-l-4 border-yellow-500 transition">
+                                <td class="px-4 py-4 font-mono">
+                                    <span class="text-gray-300">${item.name}</span>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <span class="text-[10px] bg-yellow-500/10 text-yellow-200 border border-yellow-500/20 px-2 py-0.5 rounded">
+                                        VM
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4 text-yellow-400 font-bold">${item.savings}/mo <span class="text-[10px] text-gray-500">(${item.usage})</span></td>
+                                <td class="px-4 py-4 text-right">
+                                    <button onclick="reapResource(${nm})" class="bg-yellow-600/20 border border-yellow-500 text-yellow-300 px-3 py-1 rounded text-[10px] hover:bg-yellow-600 hover:text-black transition-all">REAP</button>
+                                </td>
+                            </tr>`;
+                    });
+                }
 
                 const zombieList = document.getElementById('zombie-list');
                 zombieList.innerHTML = '';
-                (data.zombies || []).forEach(vm => {
-                    const nm = JSON.stringify(vm.name);
-                    zombieList.innerHTML += `
-                        <tr class="hover:bg-white/5 border-l-4 border-purple-500 transition">
-                            <td class="px-4 py-4 font-mono text-gray-300">${vm.name}</td>
-                            <td class="px-4 py-4 text-[10px] text-gray-400">${vm.usage}</td>
-                            <td class="px-4 py-4 text-purple-400 font-bold">${vm.savings}/mo</td>
-                            <td class="px-4 py-4 text-right">
-                                <button onclick="reapResource(${nm})" class="bg-purple-600 text-white px-3 py-1 rounded text-[10px] font-black hover:bg-purple-500 hover:scale-110 active:scale-95 transition-all">KILL</button>
-                            </td>
-                        </tr>`;
-                });
+                if ((data.zombies || []).length === 0) {
+                    zombieList.innerHTML = `<tr><td colspan="4"><div class="empty-state p-4 text-[10px]">No zombies detected.</div></td></tr>`;
+                } else {
+                    (data.zombies || []).forEach(vm => {
+                        const nm = JSON.stringify(vm.name);
+                        zombieList.innerHTML += `
+                            <tr class="hover:bg-white/5 border-l-4 border-purple-500 transition">
+                                <td class="px-4 py-4 font-mono text-gray-300">${vm.name}</td>
+                                <td class="px-4 py-4 text-[10px] text-gray-400">${vm.usage}</td>
+                                <td class="px-4 py-4 text-purple-400 font-bold">${vm.savings}/mo</td>
+                                <td class="px-4 py-4 text-right">
+                                    <button onclick="reapResource(${nm})" class="bg-purple-600 text-white px-3 py-1 rounded text-[10px] font-black hover:bg-purple-500 hover:scale-110 active:scale-95 transition-all">KILL</button>
+                                </td>
+                            </tr>`;
+                    });
+                }
+
 
                 const efficiencyList = document.getElementById('efficiency-list');
                 efficiencyList.innerHTML = '';

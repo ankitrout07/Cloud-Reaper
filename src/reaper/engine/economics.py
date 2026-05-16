@@ -79,22 +79,25 @@ class RegionalArbitrage:
 
     def analyze_arbitrage(self, sku_id, current_region, current_price_hourly):
         """
-        Scans other regions to find a cheaper deployment option.
+        Scans other regions to find a cheaper deployment option using the high-performance Go engine.
         """
         collector = _ac_module.AzureCollector()
+        
+        # Use the Go engine for parallel fetching across all target regions
+        arbitrage_data = collector.get_arbitrage_data(sku_id, self.target_regions)
+        
+        if "error" in arbitrage_data:
+            return {"found_cheaper": False, "message": f"Arbitrage scan failed: {arbitrage_data['error']}"}
+
         cheapest_region = current_region
         cheapest_price = current_price_hourly
 
-        for region in self.target_regions:
-            if region == current_region:
-                continue
-
-            prices = collector.fetch_regional_prices(sku_id, region)
-            if prices:
-                price_hourly = prices[0].get("retailPrice", 0)
-                if price_hourly > 0 and price_hourly < cheapest_price:
-                    cheapest_price = price_hourly
-                    cheapest_region = region
+        for res in arbitrage_data.get("results", []):
+            region = res.get("region")
+            price = res.get("price", 0)
+            if price > 0 and price < cheapest_price:
+                cheapest_price = price
+                cheapest_region = region
 
         if cheapest_region != current_region and cheapest_price < current_price_hourly:
             monthly_current = current_price_hourly * 730
@@ -122,3 +125,4 @@ class RegionalArbitrage:
                 " the most cost-effective among targets."
             ),
         }
+

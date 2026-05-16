@@ -116,8 +116,33 @@ func (s *AWSScraper) ScanResources() ([]models.Resource, error) {
 		})
 	}
 
+	snapshots, err := s.client.DescribeSnapshots(ctx, &ec2.DescribeSnapshotsInput{
+		OwnerIds: []string{"self"},
+	})
+	if err == nil {
+		for _, snap := range snapshots.Snapshots {
+			if snap.StartTime != nil && time.Since(*snap.StartTime) > 30*24*time.Hour {
+				tags := awsTagsToMap(snap.Tags)
+				resources = append(resources, models.Resource{
+					ID:            *snap.SnapshotId,
+					Name:          *snap.SnapshotId,
+					Type:          "OrphanedEBSSnapshot",
+					Region:        s.region,
+					Tags:          tags,
+					Active:        true,
+					IsProtected:   isAWSProtected(tags),
+					IsUnallocated: true,
+					LastSeen:      now,
+					Provider:      "aws",
+					SKU:           "snapshot",
+				})
+			}
+		}
+	}
+
 	return resources, nil
 }
+
 
 func (s *AWSScraper) GetHourlyRate(sku string) (float64, error) {
 	price, err := FetchAWSPrice(sku, s.region)

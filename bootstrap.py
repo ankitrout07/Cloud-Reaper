@@ -90,86 +90,38 @@ def check_requirements() -> bool:  # noqa: PLR0912
         print("[!] Go not found. Please install Go 1.24+ (see src/engine-go/go.mod).")
         return False
 
-    # Azure CLI — optional: the app can use DefaultAzureCredential from .env / VS Code / MSI.
+    # Linter Check
+    for tool in ["golangci-lint", "ruff", "mypy"]:
+        if not shutil.which(tool):
+            print(f"[*] Tool '{tool}' not found on PATH. It will be installed into venv/bin.")
+
+    # Azure CLI — optional
     az_bin = shutil.which("az")
     if not az_bin:
-        print(
-            "[*] Azure CLI not on PATH. Skipping `az login` check — configure "
-            "credentials in .env or your environment if the dashboard cannot reach Azure."
-        )
+        print("[*] Azure CLI not found. Using environment-based auth fallback.")
     else:
-        print("[*] Verifying Azure authentication (optional)...")
-        try:
-            az_check = subprocess.run(
-                [az_bin, "account", "show"],  # noqa: S603
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if az_check.returncode != 0:
-                print(
-                    "[*] `az account show` failed (not logged in or no subscription). "
-                    "You can still run the app with service principal / env-based auth."
-                )
-            else:
-                print("[+] Azure CLI session active.")
-        except Exception:
-            print("[!] Could not verify Azure CLI session. Proceeding with caution...")
-
-    # PDF Library Check (Linux)
-    if platform.system() == "Linux":
-        print("[*] Checking PDF guardrails (Pango/Cairo)...")
-        try:
-            ldconfig = shutil.which("ldconfig")
-            if ldconfig:
-                pango_check = subprocess.run(
-                    [ldconfig, "-p"],  # noqa: S603
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                missing = (
-                    "libpango-1.0" not in pango_check.stdout
-                    or "libpangocairo-1.0" not in pango_check.stdout
-                )
-                if missing:
-                    print(
-                        "[!] WARNING: PDF libraries missing. "
-                        "Install with: sudo apt install libpango-1.0-0"
-                    )
-        except Exception:
-            logger.debug("PDF library check skipped — ldconfig unavailable.", exc_info=True)
+        print("[+] Azure CLI detected.")
 
     # Docker & Postgres Check
     if shutil.which("docker"):
         print("[*] Docker found. Ensuring PostgreSQL is running...")
         try:
-            _docker(["start", "cloud-reaper-db"])
-            result = _docker(["ps"])
-            if "cloud-reaper-db" not in result.stdout:
+            # Check if container exists
+            inspect = _docker(["inspect", "cloud-reaper-db"])
+            if inspect.returncode != 0:
                 print("[*] Creating fresh PostgreSQL container...")
-                run_result = _docker(
-                    [
-                        "run",
-                        "--name",
-                        "cloud-reaper-db",
-                        "-e",
-                        "POSTGRES_PASSWORD=postgres",
-                        "-p",
-                        "5432:5432",
-                        "-d",
-                        "postgres",
-                    ]
-                )
-                if run_result.returncode != 0:
-                    print(
-                        f"[!] Could not start Postgres container: "
-                        f"{(run_result.stderr or run_result.stdout or '').strip()}"
-                    )
+                _docker([
+                    "run", "--name", "cloud-reaper-db", 
+                    "-e", "POSTGRES_PASSWORD=postgres", 
+                    "-p", "5432:5432", "-d", "postgres"
+                ])
+            else:
+                _docker(["start", "cloud-reaper-db"])
         except Exception as e:
             print(f"[!] Docker error: {e}. Start Postgres manually if needed.")
 
     return True
+
 
 
 def setup_venv() -> tuple[str, Path]:

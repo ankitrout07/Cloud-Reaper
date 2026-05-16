@@ -12,8 +12,11 @@ type AzurePriceResult struct {
 	Items []map[string]interface{} `json:"Items"`
 }
 
-func FetchAzurePrice(sku string) (float64, error) {
+func FetchAzurePrice(sku string, region string) (float64, error) {
 	filter := fmt.Sprintf("armSkuName eq '%s' and priceType eq 'Consumption'", sku)
+	if region != "" {
+		filter = fmt.Sprintf("%s and armRegionName eq '%s'", filter, region)
+	}
 	baseURL := fmt.Sprintf("https://prices.azure.com/api/retail/prices?currencyCode=USD&$filter=%s", url.QueryEscape(filter))
 
 	resp, err := http.Get(baseURL)
@@ -40,8 +43,9 @@ func FetchAzurePrice(sku string) (float64, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("price not found for sku %s", sku)
+	return 0, fmt.Errorf("price not found for sku %s in region %s", sku, region)
 }
+
 
 func FetchAWSPrice(sku string, region string) (float64, error) {
 	// AWS Price List API is complex, using a simplified heuristic for now
