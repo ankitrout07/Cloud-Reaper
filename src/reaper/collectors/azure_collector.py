@@ -26,7 +26,7 @@ from reaper.engine.models import CostHistory, RegionPriceCache, SessionLocal
 load_dotenv()
 
 _COST_FORECAST_CACHE = {}  # subscription_id -> (timestamp, spend_data)
-_CPU_AVERAGE_CACHE = {}    # subscription_id -> (timestamp, cpu_average)
+_CPU_AVERAGE_CACHE = {}  # subscription_id -> (timestamp, cpu_average)
 
 
 def _vm_series_family(vm_size: str) -> str:
@@ -88,9 +88,12 @@ class AzureCollector:
 
         end_time = datetime.datetime.now(datetime.UTC)
         start_time = end_time - datetime.timedelta(days=7)
-        timespan = f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+        timespan = (
+            f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+        )
 
         from concurrent.futures import ThreadPoolExecutor
+
         idle_vms = []
 
         def _check_idle_vm(vm):
@@ -230,6 +233,7 @@ class AzureCollector:
             return None
 
         import time
+
         now = time.time()
         cache_entry = _CPU_AVERAGE_CACHE.get(self.subscription_id)
         if cache_entry and (now - cache_entry[0] < 60.0):
