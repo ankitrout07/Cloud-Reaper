@@ -14,8 +14,8 @@ require (
 	github.com/jackc/pgx/v5 v5.5.3
 	github.com/microsoftgraph/msgraph-sdk-go v1.97.0
 	golang.org/x/oauth2 v0.36.0
-	golang.org/x/time v0.15.0
-	google.golang.org/api v0.200.0
+	golang.org/x/time v0.5.0
+	google.golang.org/api v0.190.0
 	k8s.io/api v0.31.0
 	k8s.io/apimachinery v0.31.0
 	k8s.io/client-go v0.31.0

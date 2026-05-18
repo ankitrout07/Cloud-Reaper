@@ -17,6 +17,7 @@ import shutil
 import socket
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -63,7 +64,7 @@ def run_command(
     workdir = str(cwd) if cwd is not None else str(REPO_ROOT)
     print(f"[*] Running: {' '.join(cmd)}  (cwd={workdir})")
     try:
-        subprocess.run(cmd, cwd=workdir, env=env, check=True)  # noqa: S603
+        subprocess.run(cmd, cwd=workdir, env=env, check=True)
         return True
     except subprocess.CalledProcessError as e:
         print(f"[!] Error: {e}")
@@ -74,7 +75,7 @@ def _docker(args: list[str]) -> subprocess.CompletedProcess:
     """Run a docker sub-command using its absolute path (Fixes S607, PLW1510)."""
     docker_bin = shutil.which("docker") or "docker"
     return subprocess.run(
-        [docker_bin, *args],  # noqa: S603
+        [docker_bin, *args],
         capture_output=True,
         text=True,
         check=False,
@@ -274,8 +275,6 @@ def print_success_report(port: str) -> None:
 
 def main() -> None:
     """Parallelized deployment sequence for ultra-fast launch."""
-    from concurrent.futures import ThreadPoolExecutor
-
     os.chdir(REPO_ROOT)
 
     print_banner()
@@ -321,7 +320,7 @@ def main() -> None:
     print("[*] Launching Flask/SocketIO Server (venv activated in process environment)...")
     try:
         subprocess.run(
-            [context["python_exe"], "-m", "reaper.web.app"],  # noqa: S603
+            [context["python_exe"], "-m", "reaper.web.app"],
             cwd=str(REPO_ROOT),
             env=env,
             check=False,

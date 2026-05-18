@@ -865,7 +865,7 @@ class AzureCollector:
         try:
             # Run the Go scraper and capture JSON output
             result = subprocess.run(
-                [str(go_binary), "--mode", "prices"],  # noqa: S603
+                [str(go_binary), "--mode", "prices"],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -892,7 +892,7 @@ class AzureCollector:
 
         try:
             result = subprocess.run(
-                [str(go_binary), "--subscription", self.subscription_id],  # noqa: S603
+                [str(go_binary), "--subscription", self.subscription_id],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -919,7 +919,7 @@ class AzureCollector:
         try:
             regions_str = ",".join(regions)
             result = subprocess.run(
-                [str(go_binary), "--mode", "arbitrage", "--sku", sku, "--regions", regions_str],  # noqa: S603
+                [str(go_binary), "--mode", "arbitrage", "--sku", sku, "--regions", regions_str],
                 capture_output=True,
                 text=True,
                 check=False,

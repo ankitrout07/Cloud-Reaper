@@ -19,6 +19,9 @@ ignore = [
     "RUF003",  # Ambiguous en-dash in comments
     "SIM105",  # contextlib.suppress
     "S110",    # try-except-pass
+    "PLC0415", # Allow local imports within functions
+    "S603",    # Allow subprocess call check for execution of untrusted input
+    "S607",    # Allow starting a process with a partial executable path
 ]
 
 [tool.ruff.lint.isort]

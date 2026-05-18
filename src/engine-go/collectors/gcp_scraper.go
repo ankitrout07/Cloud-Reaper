@@ -66,8 +66,31 @@ func (s *GCPScraper) ScanResources() ([]models.Resource, error) {
 	var resources []models.Resource
 	now := time.Now().UTC()
 
+	insts, err := s.scanInstances(ctx, now)
+	if err != nil {
+		return nil, err
+	}
+	resources = append(resources, insts...)
+
+	disks, err := s.scanDisks(now)
+	if err != nil {
+		return resources, err
+	}
+	resources = append(resources, disks...)
+
+	snaps, err := s.scanSnapshots(now)
+	if err != nil {
+		return resources, err
+	}
+	resources = append(resources, snaps...)
+
+	return resources, nil
+}
+
+func (s *GCPScraper) scanInstances(ctx context.Context, now time.Time) ([]models.Resource, error) {
+	var resources []models.Resource
 	req := s.service.Instances.AggregatedList(s.projectID)
-	if err := req.Pages(ctx, func(page *compute.InstanceAggregatedList) error {
+	err := req.Pages(ctx, func(page *compute.InstanceAggregatedList) error {
 		for zone, scoped := range page.Items {
 			region := gcpZoneToRegion(zone)
 			for _, inst := range scoped.Instances {
@@ -102,13 +125,18 @@ func (s *GCPScraper) ScanResources() ([]models.Resource, error) {
 			}
 		}
 		return nil
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, fmt.Errorf("gcp: list instances: %w", err)
 	}
+	return resources, nil
+}
 
+func (s *GCPScraper) scanDisks(now time.Time) ([]models.Resource, error) {
+	var resources []models.Resource
 	disks, err := s.service.Disks.AggregatedList(s.projectID).Do()
 	if err != nil {
-		return resources, fmt.Errorf("gcp: list disks: %w", err)
+		return nil, fmt.Errorf("gcp: list disks: %w", err)
 	}
 	for zone, scoped := range disks.Items {
 		region := gcpZoneToRegion(zone)
@@ -135,33 +163,37 @@ func (s *GCPScraper) ScanResources() ([]models.Resource, error) {
 			})
 		}
 	}
+	return resources, nil
+}
 
+func (s *GCPScraper) scanSnapshots(now time.Time) ([]models.Resource, error) {
+	var resources []models.Resource
 	snapshots, err := s.service.Snapshots.List(s.projectID).Do()
-	if err == nil {
-		for _, snap := range snapshots.Items {
-			createTime, _ := time.Parse(time.RFC3339, snap.CreationTimestamp)
-			if !createTime.IsZero() && time.Since(createTime) > 30*24*time.Hour {
-				tags := snap.Labels
-				if tags == nil {
-					tags = map[string]string{}
-				}
-				resources = append(resources, models.Resource{
-					ID:            snap.SelfLink,
-					Name:          snap.Name,
-					Type:          "OrphanedGCPSnapshot",
-					Region:        "global",
-					Tags:          tags,
-					Active:        true,
-					IsProtected:   isGCPProtected(tags),
-					IsUnallocated: true,
-					LastSeen:      now,
-					Provider:      ProviderGCP,
-					SKU:           "snapshot",
-				})
+	if err != nil {
+		return nil, fmt.Errorf("gcp: list snapshots: %w", err)
+	}
+	for _, snap := range snapshots.Items {
+		createTime, _ := time.Parse(time.RFC3339, snap.CreationTimestamp)
+		if !createTime.IsZero() && time.Since(createTime) > 30*24*time.Hour {
+			tags := snap.Labels
+			if tags == nil {
+				tags = map[string]string{}
 			}
+			resources = append(resources, models.Resource{
+				ID:            snap.SelfLink,
+				Name:          snap.Name,
+				Type:          "OrphanedGCPSnapshot",
+				Region:        "global",
+				Tags:          tags,
+				Active:        true,
+				IsProtected:   isGCPProtected(tags),
+				IsUnallocated: true,
+				LastSeen:      now,
+				Provider:      ProviderGCP,
+				SKU:           "snapshot",
+			})
 		}
 	}
-
 	return resources, nil
 }
 

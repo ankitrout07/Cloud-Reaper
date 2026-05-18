@@ -737,7 +737,7 @@ def vault_delete_entry(entry_id: int):
 @app.route("/api/settings/auth")
 def check_auth():
     try:
-        subprocess.run(["az", "account", "show"], capture_output=True, check=True)  # noqa: S603, S607
+        subprocess.run(["az", "account", "show"], capture_output=True, check=True)
         return jsonify(
             {"status": "healthy", "message": "Connected: Azure CLI (Active Subscription)"}
         )
@@ -753,7 +753,7 @@ def list_subscriptions():
             return jsonify([])
 
         result = subprocess.run(
-            [str(binary_path), "--list-subs"],  # noqa: S603
+            [str(binary_path), "--list-subs"],
             capture_output=True,
             text=True,
             check=False,
@@ -822,7 +822,7 @@ def get_rightsizing():
     try:
         # pyrefly: ignore [no-matching-overload]
         result = subprocess.run(
-            [str(go_binary), "--subscription", az.subscription_id],  # noqa: S603
+            [str(go_binary), "--subscription", az.subscription_id],
             capture_output=True,
             text=True,
             check=False,

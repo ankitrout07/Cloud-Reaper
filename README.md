@@ -180,7 +180,5 @@ To maintain the highest standards of code hygiene and production-ready quality, 
 - **Robust Multi-Cloud Catalog & Fallbacks:** Corrected parsing of real-time Azure price lists from the Go Performance Core JSON outputs. Added a high-fidelity static fallback catalog for Azure pricing when the background Go Performance Core scraper runs in standalone/offline mode, guaranteeing maximum dashboard availability and zero UI rendering breaks.
 
 ---
-
-## 📝 License
-MIT License. Built for state-of-the-art Azure FinOps engineering.
+Built for Cloud-native FinOps engineering.
 
