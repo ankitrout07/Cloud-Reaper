@@ -1172,8 +1172,14 @@ def get_prices():
     provider = request.args.get("provider", "azure").lower()
     try:
         if provider == "azure":
-            return jsonify({"status": "success", "prices": AzureCollector().get_live_prices()})
-        return jsonify({"status": "success", "prices": _get_mock_prices(provider)})
+            prices = AzureCollector().get_live_prices()
+            if not isinstance(prices, list):
+                prices = []
+            return jsonify({"status": "success", "prices": prices})
+
+        mock_data = _get_mock_prices(provider)
+        prices = mock_data.get("prices", [])
+        return jsonify({"status": "success", "prices": prices})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

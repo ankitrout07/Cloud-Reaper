@@ -80,6 +80,8 @@
                             </button>
                         </div>
                     </div>
+                </div>
+
                 <div class="flex gap-2 bg-white/5 p-1 rounded-xl border border-white/5 mb-8 w-fit">
                     <button id="prov-azure" onclick="switchProvider('azure')" class="prov-btn px-6 py-2 bg-cyan-500 rounded-lg text-[#0d1117] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 transition-all">Azure</button>
                     <button id="prov-aws" onclick="switchProvider('aws')" class="prov-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all">AWS</button>
@@ -716,8 +718,8 @@
                 const response = await fetch(`/api/prices?provider=${currentProvider}`);
                 const data = await response.json();
                 if (data.status === 'success') {
-                    // The Go engine returns ScanResult with a 'prices' field
-                    allPriceData = data.prices.prices || [];
+                    // Normalize direct list response or nested prices object
+                    allPriceData = Array.isArray(data.prices) ? data.prices : (data.prices.prices || []);
                     filteredPriceData = [...allPriceData];
                     currentPage = 1;
                     renderTable(filteredPriceData);
