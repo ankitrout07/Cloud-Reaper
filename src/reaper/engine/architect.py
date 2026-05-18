@@ -43,6 +43,25 @@ class AIArchitectManager:
         if self.api_key:
             self.client = OpenAI(api_key=self.api_key)
 
+    def verify_api_status(self) -> str:
+        """
+        Verifies the OpenAI API Key status.
+        Returns:
+            "active" - key is set and valid
+            "invalid" - key is set but invalid/rejected
+            "unconfigured" - key is missing
+        """
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        if not self.api_key or self.api_key == "your_actual_openai_api_key_here":
+            return "unconfigured"
+            
+        try:
+            self.client = OpenAI(api_key=self.api_key)
+            self.client.models.list()
+            return "active"
+        except Exception:
+            return "invalid"
+
     def generate_blueprint(self, user_prompt: str, provider: str) -> ArchitectureBlueprint:
         if not self.client:
             raise ValueError("OPENAI_API_KEY is not set in the environment variables.")

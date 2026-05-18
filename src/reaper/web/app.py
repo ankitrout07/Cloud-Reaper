@@ -783,6 +783,13 @@ def build_with_ai():
     return render_template("build_with_ai.html")
 
 
+@app.route('/api/v1/architect/status', methods=['GET'])
+def api_architect_status():
+    """Returns the validation state of the configured OpenAI API key."""
+    status = architect_manager.verify_api_status()
+    return jsonify({"status": status}), 200
+
+
 @app.route('/api/v1/architect/estimate', methods=['POST'])
 def api_architect_estimate():
     """Asynchronously processes user prompt, extracts architecture requirements and compiles a financial BOM."""
