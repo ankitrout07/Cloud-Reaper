@@ -23,6 +23,8 @@ import (
 	"cloud-reaper/engine-go/db"
 )
 
+const nameKey = "name"
+
 var limiter = rate.NewLimiter(rate.Every(time.Second/10), 10) // 10 requests per second
 
 func isProtected(tags map[string]*string) bool {
@@ -110,8 +112,8 @@ func GetSubscriptions() ([]map[string]string, error) {
 		}
 		for _, sub := range page.Value {
 			subs = append(subs, map[string]string{
-				"id":   *sub.SubscriptionID,
-				"name": *sub.DisplayName,
+				"id":    *sub.SubscriptionID,
+				nameKey: *sub.DisplayName,
 			})
 		}
 	}
@@ -221,8 +223,8 @@ func scanOrphanedDisks(ctx context.Context, subscriptionID string, cred *azident
 			if disk.ManagedBy == nil {
 				mu.Lock()
 				result.OrphanedDisks = append(result.OrphanedDisks, map[string]interface{}{
-					"name": *disk.Name,
-					"tags": disk.Tags,
+					nameKey: *disk.Name,
+					"tags":  disk.Tags,
 				})
 				mu.Unlock()
 			}
@@ -248,8 +250,8 @@ func scanOrphanedSnapshots(ctx context.Context, subscriptionID string, cred *azi
 			if snap.Properties.TimeCreated != nil && time.Since(*snap.Properties.TimeCreated) > 30*24*time.Hour {
 				mu.Lock()
 				result.OrphanedSnapshots = append(result.OrphanedSnapshots, map[string]interface{}{
-					"name": *snap.Name,
-					"tags": snap.Tags,
+					nameKey: *snap.Name,
+					"tags":  snap.Tags,
 				})
 				mu.Unlock()
 			}
@@ -365,21 +367,22 @@ func parseArgs() (string, string, string, string, string, bool) {
 	var listSubs bool
 	for i := 1; i < len(os.Args); i++ {
 		arg := os.Args[i]
-		if arg == "--list-subs" {
+		switch {
+		case arg == "--list-subs":
 			listSubs = true
-		} else if arg == "--subscription" && i+1 < len(os.Args) {
+		case arg == "--subscription" && i+1 < len(os.Args):
 			subID = os.Args[i+1]
 			i++
-		} else if arg == "--mode" && i+1 < len(os.Args) {
+		case arg == "--mode" && i+1 < len(os.Args):
 			mode = os.Args[i+1]
 			i++
-		} else if arg == "--provider" && i+1 < len(os.Args) {
+		case arg == "--provider" && i+1 < len(os.Args):
 			provider = os.Args[i+1]
 			i++
-		} else if arg == "--sku" && i+1 < len(os.Args) {
+		case arg == "--sku" && i+1 < len(os.Args):
 			sku = os.Args[i+1]
 			i++
-		} else if arg == "--regions" && i+1 < len(os.Args) {
+		case arg == "--regions" && i+1 < len(os.Args):
 			regions = os.Args[i+1]
 			i++
 		}
@@ -495,8 +498,8 @@ func runScan(subscriptionID string) {
 	subClient, err := armsubscriptions.NewClient(cred, nil)
 	if err == nil {
 		sub, err := subClient.Get(ctx, subscriptionID, nil)
-		if err == nil && sub.Subscription.DisplayName != nil {
-			result.SubscriptionName = *sub.Subscription.DisplayName
+		if err == nil && sub.DisplayName != nil {
+			result.SubscriptionName = *sub.DisplayName
 		}
 	}
 	if result.SubscriptionName == "" {
@@ -535,4 +538,3 @@ func pushToDB(result *ScanResult) {
 func ptr[T any](v T) *T {
 	return &v
 }
-

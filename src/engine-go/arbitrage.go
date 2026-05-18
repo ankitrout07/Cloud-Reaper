@@ -36,7 +36,7 @@ func RunArbitrageScan(sku string, regions []string) {
 			defer func() { <-sem }()
 
 			price, err := collectors.FetchAzurePrice(sku, r)
-			
+
 			mu.Lock()
 			if err != nil {
 				results[idx] = RegionalPriceResult{Region: r, Error: err.Error()}

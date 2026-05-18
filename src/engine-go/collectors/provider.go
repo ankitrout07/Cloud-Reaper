@@ -7,6 +7,13 @@ import (
 	"cloud-reaper/engine-go/models"
 )
 
+const (
+	ProviderAzure = "azure"
+	ProviderAWS   = "aws"
+	ProviderGCP   = "gcp"
+	ProviderK8s   = "k8s"
+)
+
 // CloudProvider is the contract every cloud scraper must implement so main.go
 // can call ScanResources() without cloud-specific SDK knowledge.
 type CloudProvider interface {
@@ -18,13 +25,13 @@ type CloudProvider interface {
 // NewProvider returns a CloudProvider implementation for the given provider type.
 func NewProvider(providerType string) (CloudProvider, error) {
 	switch strings.ToLower(strings.TrimSpace(providerType)) {
-	case "azure":
+	case ProviderAzure:
 		return &AzureScraper{}, nil
-	case "aws":
+	case ProviderAWS:
 		return &AWSScraper{}, nil
-	case "gcp":
+	case ProviderGCP:
 		return &GCPScraper{}, nil
-	case "k8s", "kubernetes":
+	case ProviderK8s, "kubernetes":
 		return &K8sScraper{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %q", providerType)

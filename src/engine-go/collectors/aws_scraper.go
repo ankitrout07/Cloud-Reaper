@@ -81,7 +81,7 @@ func (s *AWSScraper) ScanResources() ([]models.Resource, error) {
 				IsProtected:   isAWSProtected(tags),
 				IsUnallocated: state == string(types.InstanceStateNameStopped),
 				LastSeen:      now,
-				Provider:      "aws",
+				Provider:      ProviderAWS,
 				SKU:           sku,
 			})
 		}
@@ -111,7 +111,7 @@ func (s *AWSScraper) ScanResources() ([]models.Resource, error) {
 			IsProtected:   isAWSProtected(tags),
 			IsUnallocated: true,
 			LastSeen:      now,
-			Provider:      "aws",
+			Provider:      ProviderAWS,
 			SKU:           string(vol.VolumeType),
 		})
 	}
@@ -133,7 +133,7 @@ func (s *AWSScraper) ScanResources() ([]models.Resource, error) {
 					IsProtected:   isAWSProtected(tags),
 					IsUnallocated: true,
 					LastSeen:      now,
-					Provider:      "aws",
+					Provider:      ProviderAWS,
 					SKU:           "snapshot",
 				})
 			}
@@ -142,7 +142,6 @@ func (s *AWSScraper) ScanResources() ([]models.Resource, error) {
 
 	return resources, nil
 }
-
 
 func (s *AWSScraper) GetHourlyRate(sku string) (float64, error) {
 	price, err := FetchAWSPrice(sku, s.region)

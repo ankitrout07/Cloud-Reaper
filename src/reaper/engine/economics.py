@@ -82,12 +82,15 @@ class RegionalArbitrage:
         Scans other regions to find a cheaper deployment option using the high-performance Go engine.
         """
         collector = _ac_module.AzureCollector()
-        
+
         # Use the Go engine for parallel fetching across all target regions
         arbitrage_data = collector.get_arbitrage_data(sku_id, self.target_regions)
-        
+
         if "error" in arbitrage_data:
-            return {"found_cheaper": False, "message": f"Arbitrage scan failed: {arbitrage_data['error']}"}
+            return {
+                "found_cheaper": False,
+                "message": f"Arbitrage scan failed: {arbitrage_data['error']}",
+            }
 
         cheapest_region = current_region
         cheapest_price = current_price_hourly
@@ -125,4 +128,3 @@ class RegionalArbitrage:
                 " the most cost-effective among targets."
             ),
         }
-

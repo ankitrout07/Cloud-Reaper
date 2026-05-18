@@ -46,7 +46,6 @@ func FetchAzurePrice(sku string, region string) (float64, error) {
 	return 0, fmt.Errorf("price not found for sku %s in region %s", sku, region)
 }
 
-
 func FetchAWSPrice(sku string, region string) (float64, error) {
 	// AWS Price List API is complex, using a simplified heuristic for now
 	// but the intention is to move away from hardcoded maps in the scraper.

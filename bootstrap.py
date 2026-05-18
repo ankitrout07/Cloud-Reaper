@@ -81,7 +81,7 @@ def _docker(args: list[str]) -> subprocess.CompletedProcess:
     )
 
 
-def check_requirements() -> bool:  # noqa: PLR0912
+def check_requirements() -> bool:
     """Verify Go, Docker, and optional Azure CLI status."""
     print("[*] Checking system requirements...")
 
@@ -110,18 +110,25 @@ def check_requirements() -> bool:  # noqa: PLR0912
             inspect = _docker(["inspect", "cloud-reaper-db"])
             if inspect.returncode != 0:
                 print("[*] Creating fresh PostgreSQL container...")
-                _docker([
-                    "run", "--name", "cloud-reaper-db", 
-                    "-e", "POSTGRES_PASSWORD=postgres", 
-                    "-p", "5432:5432", "-d", "postgres"
-                ])
+                _docker(
+                    [
+                        "run",
+                        "--name",
+                        "cloud-reaper-db",
+                        "-e",
+                        "POSTGRES_PASSWORD=postgres",
+                        "-p",
+                        "5432:5432",
+                        "-d",
+                        "postgres",
+                    ]
+                )
             else:
                 _docker(["start", "cloud-reaper-db"])
         except Exception as e:
             print(f"[!] Docker error: {e}. Start Postgres manually if needed.")
 
     return True
-
 
 
 def setup_venv() -> tuple[str, Path]:

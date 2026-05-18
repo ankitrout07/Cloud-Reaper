@@ -103,7 +103,7 @@ func (a *AzureScraper) scanVMs(ctx context.Context) ([]models.Resource, error) {
 				IsProtected:   isAzureProtected(tags),
 				IsUnallocated: !isAzureTagCompliant(tags) || usage < 5.0,
 				LastSeen:      time.Now().UTC(),
-				Provider:      "azure",
+				Provider:      ProviderAzure,
 				SKU:           sku,
 			})
 		}
@@ -140,7 +140,7 @@ func (a *AzureScraper) scanDisks(ctx context.Context) ([]models.Resource, error)
 				IsProtected:   isAzureProtected(tags),
 				IsUnallocated: true,
 				LastSeen:      time.Now().UTC(),
-				Provider:      "azure",
+				Provider:      ProviderAzure,
 				SKU:           diskSKU(disk),
 			})
 		}
@@ -149,7 +149,7 @@ func (a *AzureScraper) scanDisks(ctx context.Context) ([]models.Resource, error)
 }
 
 func (a *AzureScraper) GetHourlyRate(sku string) (float64, error) {
-	price, err := FetchAzurePrice(sku)
+	price, err := FetchAzurePrice(sku, "")
 	if err == nil && price > 0 {
 		return price, nil
 	}

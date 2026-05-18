@@ -95,7 +95,7 @@ func (s *K8sScraper) ScanResources() ([]models.Resource, error) {
 				IsProtected:   false,
 				IsUnallocated: true,
 				LastSeen:      now,
-				Provider:      "k8s",
+				Provider:      ProviderK8s,
 				SKU:           "pod",
 			})
 		}
@@ -143,7 +143,7 @@ func nodeToResource(node corev1.Node, seen time.Time) models.Resource {
 		IsProtected:   isK8sProtected(tags),
 		IsUnallocated: util < 0.20,
 		LastSeen:      seen,
-		Provider:      "k8s",
+		Provider:      ProviderK8s,
 		SKU:           instanceType,
 	}
 }

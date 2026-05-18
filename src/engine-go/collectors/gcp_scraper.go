@@ -96,7 +96,7 @@ func (s *GCPScraper) ScanResources() ([]models.Resource, error) {
 					IsProtected:   isGCPProtected(tags),
 					IsUnallocated: inst.Status == "TERMINATED",
 					LastSeen:      now,
-					Provider:      "gcp",
+					Provider:      ProviderGCP,
 					SKU:           sku,
 				})
 			}
@@ -130,7 +130,7 @@ func (s *GCPScraper) ScanResources() ([]models.Resource, error) {
 				IsProtected:   isGCPProtected(tags),
 				IsUnallocated: true,
 				LastSeen:      now,
-				Provider:      "gcp",
+				Provider:      ProviderGCP,
 				SKU:           disk.Type,
 			})
 		}
@@ -155,7 +155,7 @@ func (s *GCPScraper) ScanResources() ([]models.Resource, error) {
 					IsProtected:   isGCPProtected(tags),
 					IsUnallocated: true,
 					LastSeen:      now,
-					Provider:      "gcp",
+					Provider:      ProviderGCP,
 					SKU:           "snapshot",
 				})
 			}
@@ -164,7 +164,6 @@ func (s *GCPScraper) ScanResources() ([]models.Resource, error) {
 
 	return resources, nil
 }
-
 
 func (s *GCPScraper) GetHourlyRate(sku string) (float64, error) {
 	rates := map[string]float64{
