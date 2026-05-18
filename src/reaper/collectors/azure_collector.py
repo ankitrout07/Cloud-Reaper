@@ -26,6 +26,7 @@ from reaper.engine.models import CostHistory, RegionPriceCache, SessionLocal
 load_dotenv()
 
 _COST_FORECAST_CACHE = {}  # subscription_id -> (timestamp, spend_data)
+_CPU_AVERAGE_CACHE = {}    # subscription_id -> (timestamp, cpu_average)
 
 
 def _vm_series_family(vm_size: str) -> str:
@@ -77,44 +78,62 @@ class AzureCollector:
 
     def get_idle_vms(self, cpu_threshold=5.0):
         """Finds VMs with avg CPU utilization below threshold over last 7 days."""
-        vms = self.compute.virtual_machines.list_all()
-        idle_vms = []
+        try:
+            vms = list(self.compute.virtual_machines.list_all())
+        except Exception:
+            return []
+
+        if not vms:
+            return []
 
         end_time = datetime.datetime.now(datetime.UTC)
         start_time = end_time - datetime.timedelta(days=7)
+        timespan = f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
 
-        for vm in vms:
-            resource_group = vm.id.split("/")[4]
-            resource_id = (
-                f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
-                f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
-            )
+        from concurrent.futures import ThreadPoolExecutor
+        idle_vms = []
 
-            metrics = self.monitor.metrics.list(
-                resource_id,
-                timespan=f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}",
-                interval="PT12H",
-                metricnames="Percentage CPU",
-                aggregation="Average",
-            )
+        def _check_idle_vm(vm):
+            try:
+                resource_group = vm.id.split("/")[4]
+                resource_id = (
+                    f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
+                    f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
+                )
 
-            for item in metrics.value:
-                for timeseries in item.timeseries:
-                    data_points = [
-                        point.average for point in timeseries.data if point.average is not None
-                    ]
-                    if not data_points:
-                        continue
-                    avg_usage = sum(data_points) / len(data_points)
-                    if avg_usage < cpu_threshold:
-                        idle_vms.append(
-                            {
+                metrics = self.monitor.metrics.list(
+                    resource_id,
+                    timespan=timespan,
+                    interval="PT12H",
+                    metricnames="Percentage CPU",
+                    aggregation="Average",
+                )
+
+                for item in metrics.value:
+                    for timeseries in item.timeseries:
+                        data_points = [
+                            point.average for point in timeseries.data if point.average is not None
+                        ]
+                        if not data_points:
+                            continue
+                        avg_usage = sum(data_points) / len(data_points)
+                        if avg_usage < cpu_threshold:
+                            return {
                                 "name": vm.name,
                                 "resource_group": resource_group,
                                 "average_cpu": round(avg_usage, 2),
                             }
-                        )
-                        break
+            except Exception:
+                pass
+            return None
+
+        # Query in parallel to eliminate long loading lag in dashboard
+        with ThreadPoolExecutor(max_workers=min(len(vms), 10)) as executor:
+            results = list(executor.map(_check_idle_vm, vms))
+
+        for res in results:
+            if res:
+                idle_vms.append(res)
         return idle_vms
 
     def get_orphaned_network_resources(self):
@@ -205,24 +224,48 @@ class AzureCollector:
     def get_live_subscription_cpu_average(self, max_vms: int = 6) -> float | None:
         """
         Average of latest Percentage CPU across up to ``max_vms`` VMs (Azure Monitor cadence).
-        Returns None when there are no VMs or all metric calls fail.
+        Includes a 60-second cash-level cache and ThreadPoolExecutor parallel fetches to prevent ARM rate-limiting.
         """
         if not self.subscription_id:
             return None
-        values: list[float] = []
-        for i, vm in enumerate(self.compute.virtual_machines.list_all()):
-            if i >= max_vms:
-                break
-            resource_group = vm.id.split("/")[4]
-            resource_id = (
-                f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
-                f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
-            )
-            cpu = self.get_vm_metrics(resource_id)
-            values.append(float(cpu))
+
+        import time
+        now = time.time()
+        cache_entry = _CPU_AVERAGE_CACHE.get(self.subscription_id)
+        if cache_entry and (now - cache_entry[0] < 60.0):
+            return cache_entry[1]
+
+        try:
+            vms = list(self.compute.virtual_machines.list_all())
+        except Exception:
+            return None
+
+        if not vms:
+            return None
+
+        from concurrent.futures import ThreadPoolExecutor
+
+        def _fetch_cpu(vm):
+            try:
+                resource_group = vm.id.split("/")[4]
+                resource_id = (
+                    f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
+                    f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
+                )
+                return float(self.get_vm_metrics(resource_id))
+            except Exception:
+                return 0.0
+
+        # Execute CPU checks in parallel (up to max_vms threads) to avoid sequential network delays
+        with ThreadPoolExecutor(max_workers=min(len(vms), max_vms)) as executor:
+            values = list(executor.map(_fetch_cpu, vms[:max_vms]))
+
         if not values:
             return None
-        return sum(values) / len(values)
+
+        avg = sum(values) / len(values)
+        _CPU_AVERAGE_CACHE[self.subscription_id] = (now, avg)
+        return avg
 
     def get_cost_vs_budget_series(self, monthly_budget: float = 5000.0) -> dict:
         """Cumulative daily spend vs linear budget pace (FinOps burn view)."""
