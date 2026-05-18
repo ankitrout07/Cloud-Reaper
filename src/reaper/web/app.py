@@ -571,11 +571,10 @@ def vault_setup():
             return jsonify(
                 {"status": "error", "message": "PIN passcode must be exactly 4 digits/characters."}
             ), 400
-    else:
-        if len(passcode) < 8:
-            return jsonify(
-                {"status": "error", "message": "Password passcode must be at least 8 characters."}
-            ), 400
+    elif len(passcode) < 8:
+        return jsonify(
+            {"status": "error", "message": "Password passcode must be at least 8 characters."}
+        ), 400
 
     if passcode != confirm:
         return jsonify({"status": "error", "message": "Passcodes do not match."}), 400
@@ -609,12 +608,14 @@ def vault_reset():
         db.query(VaultEntry).delete()
         db.query(VaultSettings).delete()
         db.commit()
-        
+
         session.pop("vault_unlocked", None)
         session.pop("vault_unlock_expires", None)
         session.pop("vault_fernet_key", None)
-        
-        return jsonify({"status": "success", "message": "Vault successfully reset. All stored secrets erased."})
+
+        return jsonify(
+            {"status": "success", "message": "Vault successfully reset. All stored secrets erased."}
+        )
     except Exception as e:
         db.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
