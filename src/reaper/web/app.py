@@ -775,7 +775,7 @@ def finops():
     return render_template("finops.html")
 
 
-@app.route('/build-with-ai', methods=['GET'])
+@app.route("/build-with-ai", methods=["GET"])
 def build_with_ai():
     """Route controller placeholder for the AI Multi-Cloud Architect Estimator workspace."""
     # Temporarily returning a clear operational status string for initial layout testing
