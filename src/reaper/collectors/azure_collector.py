@@ -683,15 +683,11 @@ class AzureCollector:
 
     def get_ri_sp_candidates(self):
         """Fetches real Reservation Recommendations from Azure Consumption API."""
+        candidates = []
         try:
             # Look for 3-year term recommendations for the subscription
-            recs = self.consumption.reservations_summaries.list_by_reservation_order(
-                "recommender", "3Y"
-            )
-            # Reservations recommendations can also be fetched via another endpoint
-            # but for simplicity, if we have none, we fallback to a derived logic
-            # or return empty. User wants actual data.
-            candidates = []
+            scope = f"/subscriptions/{self.subscription_id}"
+            recs = self.consumption.reservation_recommendations.list(scope)
             for rec in recs:
                 candidates.append(
                     {
@@ -700,14 +696,18 @@ class AzureCollector:
                         "annual_savings": float(getattr(rec, "net_savings", 0)) * 12,
                     }
                 )
+        except Exception as e:
+            print(f"[-] RI Recommendation API Error (Falling back to heuristic): {e}")
 
-            if not candidates:
-                # If no API recommendations, we look at the inventory for high-usage families
+        if not candidates:
+            # If no API recommendations, we look at the inventory for high-usage families
+            try:
                 vms = list(self.compute.virtual_machines.list_all())
                 families = defaultdict(int)
                 for vm in vms:
-                    fam = _vm_series_family(vm.hardware_profile.vm_size)
-                    families[fam] += 1
+                    if vm.hardware_profile and vm.hardware_profile.vm_size:
+                        fam = _vm_series_family(vm.hardware_profile.vm_size)
+                        families[fam] += 1
 
                 for fam, count in families.items():
                     if count >= 2:  # Heuristic: 2+ VMs of same family are RI candidates
@@ -718,10 +718,9 @@ class AzureCollector:
                                 "annual_savings": count * 300.0,  # Estimated
                             }
                         )
-            return candidates[:5]
-        except Exception as e:
-            print(f"[-] RI Recommendation API Error: {e}")
-            return []
+            except Exception as e:
+                print(f"[-] RI Fallback Inventory Scan Error: {e}")
+        return candidates[:5]
 
     def get_cold_storage_candidates(self):
         """Identifies Storage Accounts that could be moved to Cool/Archive tiers."""
@@ -769,13 +768,13 @@ class AzureCollector:
             from azure.mgmt.resourcegraph.models import QueryRequest
 
             client = ResourceGraphClient(self.credentials)
-            query = """
-                Resources 
-                | where type =~ 'Microsoft.Compute/virtualMachines' 
-                | where isnull(tags.owner) or isnull(tags.project)
-                | project name, type, resourceGroup, tags
-                | take 5
-            """
+            query = (
+                "resources\n"
+                "| where type =~ 'Microsoft.Compute/virtualMachines'\n"
+                "| where isnull(tags['owner']) or isnull(tags['project'])\n"
+                "| project name, type, resourceGroup, tags\n"
+                "| limit 5"
+            )
             request = QueryRequest(
                 # pyrefly: ignore [bad-argument-type]
                 subscriptions=[self.subscription_id],
@@ -929,7 +928,6 @@ class AzureCollector:
         except Exception as e:
             return {"error": str(e)}
 
-
     def get_burn_rate_forecast(self):
         """Calculates burn rate and EOM forecast using real Azure Cost data and ARIMA."""
         spend_data = []
@@ -969,18 +967,19 @@ class AzureCollector:
         # Fallback to DB or mocked if API fails
         if not spend_data:
             db = SessionLocal()
-            history = (
-                db.query(CostHistory)
-                # pyrefly: ignore [missing-attribute]
-                .filter(CostHistory.type == "ACTUAL")
-                # pyrefly: ignore [missing-attribute]
-                .order_by(CostHistory.timestamp.desc())
-                .limit(30)
-                .all()
-            )
-            db.close()
-            # pyrefly: ignore [missing-attribute]
-            spend_data = [float(h.amount) for h in reversed(history)]
+            try:
+                history = (
+                    db.query(CostHistory)
+                    .filter(CostHistory.cost_type == "ACTUAL")
+                    .order_by(CostHistory.date.desc())
+                    .limit(30)
+                    .all()
+                )
+                spend_data = [float(h.cost) for h in reversed(history)]
+            except Exception as e:
+                print(f"[-] DB Cost History Fetch Error: {e}")
+            finally:
+                db.close()
 
         if not spend_data:
             spend_data = [120, 125, 118, 140, 135, 150, 145]

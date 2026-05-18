@@ -20,14 +20,14 @@ def test_workload_personality_cyclic():
 
 def test_predictive_scaling_prewarm():
     # Rapidly increasing trend
-    history = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+    history = [10, 20, 30, 40, 50, 60, 70, 80, 90, 95]
     scaler = PredictiveScalingEngine(forecast_steps=5)
     result = scaler.predict_load(history)
     assert result["action"] == "PRE_WARM"
 
 
 def test_predictive_scaling_stay():
-    history = [30, 32, 31, 29, 30, 31]
+    history = [30, 32, 31, 29, 30, 31, 30, 32, 31, 29]
     scaler = PredictiveScalingEngine(forecast_steps=5)
     result = scaler.predict_load(history)
     assert result["action"] == "STAY"
