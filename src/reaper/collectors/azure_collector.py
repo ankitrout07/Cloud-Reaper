@@ -25,6 +25,8 @@ from reaper.engine.models import CostHistory, RegionPriceCache, SessionLocal
 
 load_dotenv()
 
+_COST_FORECAST_CACHE = {}  # subscription_id -> (timestamp, spend_data)
+
 
 def _vm_series_family(vm_size: str) -> str:
     """Azure SKU prefix for grouping (e.g. Standard_D4s_v5 -> D)."""
@@ -930,9 +932,15 @@ class AzureCollector:
 
     def get_burn_rate_forecast(self):
         """Calculates burn rate and EOM forecast using real Azure Cost data and ARIMA."""
+        now = datetime.datetime.now(datetime.UTC)
         spend_data = []
 
-        if self.cost_management:
+        # Check in-memory cache first to avoid rate-limiting (429)
+        cache_entry = _COST_FORECAST_CACHE.get(self.subscription_id)
+        if cache_entry and (now - cache_entry[0] < datetime.timedelta(minutes=15)):
+            spend_data = cache_entry[1]
+
+        if not spend_data and self.cost_management:
             scope = f"/subscriptions/{self.subscription_id}"
             end_date = datetime.datetime.now(datetime.UTC)
             start_date = end_date - datetime.timedelta(days=30)
@@ -961,6 +969,8 @@ class AzureCollector:
                     # pyrefly: ignore [no-matching-overload]
                     rows = sorted(result.rows, key=lambda x: x[1])
                     spend_data = [float(r[0]) for r in rows]
+                    # Update cache
+                    _COST_FORECAST_CACHE[self.subscription_id] = (now, spend_data)
             except Exception as e:
                 print(f"Cost Management API Error: {e}")
 
