@@ -52,7 +52,7 @@ def _generate_local_fallback(user_prompt: str, provider: str) -> ArchitectureBlu
             "storage": "blob_hot",
             "storage_name": "Azure Blob Storage (Hot Tier)",
             "net": "standard_sig_v5",
-            "net_name": "Azure Virtual Network & Gateway"
+            "net_name": "Azure Virtual Network & Gateway",
         },
         "aws": {
             "compute": "t3.medium",
@@ -64,7 +64,7 @@ def _generate_local_fallback(user_prompt: str, provider: str) -> ArchitectureBlu
             "storage": "s3_standard",
             "storage_name": "Amazon S3 Standard Bucket",
             "net": "t3.micro",
-            "net_name": "Amazon VPC & NAT Gateway"
+            "net_name": "Amazon VPC & NAT Gateway",
         },
         "gcp": {
             "compute": "e2-standard-2",
@@ -76,8 +76,8 @@ def _generate_local_fallback(user_prompt: str, provider: str) -> ArchitectureBlu
             "storage": "gcs_standard",
             "storage_name": "Google Cloud Storage Bucket",
             "net": "e2-standard-2",
-            "net_name": "Google Cloud VPC & NAT Gateway"
-        }
+            "net_name": "Google Cloud VPC & NAT Gateway",
+        },
     }
 
     prov = provider.lower()
@@ -87,58 +87,66 @@ def _generate_local_fallback(user_prompt: str, provider: str) -> ArchitectureBlu
 
     # 1. Compute layer
     if any(k in prompt_lower for k in ["kubernetes", "k8s", "cluster", "aks", "eks", "gke"]):
-        components.append(CloudComponent(
-            component_type="compute",
-            generic_name=cfg["k8s_name"],
-            provider_sku_keyword=cfg["k8s"],
-            quantity=3 if any(h in prompt_lower for h in ["ha", "prod", "high"]) else 2,
-            reasoning="Configured highly-available container orchestration cluster node pool matching containerized workload requirements."
-        ))
+        components.append(
+            CloudComponent(
+                component_type="compute",
+                generic_name=cfg["k8s_name"],
+                provider_sku_keyword=cfg["k8s"],
+                quantity=3 if any(h in prompt_lower for h in ["ha", "prod", "high"]) else 2,
+                reasoning="Configured highly-available container orchestration cluster node pool matching containerized workload requirements.",
+            )
+        )
     else:
-        components.append(CloudComponent(
-            component_type="compute",
-            generic_name=cfg["compute_name"],
-            provider_sku_keyword=cfg["compute"],
-            quantity=2 if any(h in prompt_lower for h in ["ha", "prod", "high"]) else 1,
-            reasoning="Provisioned general-purpose virtual machine compute instances to host core application layer."
-        ))
+        components.append(
+            CloudComponent(
+                component_type="compute",
+                generic_name=cfg["compute_name"],
+                provider_sku_keyword=cfg["compute"],
+                quantity=2 if any(h in prompt_lower for h in ["ha", "prod", "high"]) else 1,
+                reasoning="Provisioned general-purpose virtual machine compute instances to host core application layer.",
+            )
+        )
 
     # 2. Database layer
     if any(k in prompt_lower for k in ["db", "database", "sql", "postgres", "mysql", "mongo"]):
-        components.append(CloudComponent(
-            component_type="database",
-            generic_name=cfg["db_name"],
-            provider_sku_keyword=cfg["db"],
-            quantity=2 if any(h in prompt_lower for h in ["ha", "prod", "high"]) else 1,
-            reasoning="Configured managed transactional database instances with point-in-time recovery and warm standby replication."
-        ))
+        components.append(
+            CloudComponent(
+                component_type="database",
+                generic_name=cfg["db_name"],
+                provider_sku_keyword=cfg["db"],
+                quantity=2 if any(h in prompt_lower for h in ["ha", "prod", "high"]) else 1,
+                reasoning="Configured managed transactional database instances with point-in-time recovery and warm standby replication.",
+            )
+        )
 
     # 3. Storage layer
     if any(k in prompt_lower for k in ["storage", "bucket", "s3", "blob", "file"]):
-        components.append(CloudComponent(
-            component_type="storage",
-            generic_name=cfg["storage_name"],
-            provider_sku_keyword=cfg["storage"],
-            quantity=1,
-            reasoning="Assigned decoupled object store storage capacity for static assets, user uploads, and transaction logs."
-        ))
+        components.append(
+            CloudComponent(
+                component_type="storage",
+                generic_name=cfg["storage_name"],
+                provider_sku_keyword=cfg["storage"],
+                quantity=1,
+                reasoning="Assigned decoupled object store storage capacity for static assets, user uploads, and transaction logs.",
+            )
+        )
 
     # 4. Networking layer
-    components.append(CloudComponent(
-        component_type="networking",
-        generic_name=cfg["net_name"],
-        provider_sku_keyword=cfg["net"],
-        quantity=1,
-        reasoning="Established secure network boundary, subnet routes, and gateway firewall to secure traffic."
-    ))
+    components.append(
+        CloudComponent(
+            component_type="networking",
+            generic_name=cfg["net_name"],
+            provider_sku_keyword=cfg["net"],
+            quantity=1,
+            reasoning="Established secure network boundary, subnet routes, and gateway firewall to secure traffic.",
+        )
+    )
 
     summary = f"Synthesized production-grade {provider.upper()} architecture blueprint designed by Cloud-Reaper local offline model. Designed to satisfy workload SLA capacity spec."
     warning = "Notice: Running in Local Offline Synthesizer Fallback Mode due to external AI API rate-limits/quota depletion."
 
     return ArchitectureBlueprint(
-        architecture_summary=summary,
-        components=components,
-        security_warning=warning
+        architecture_summary=summary, components=components, security_warning=warning
     )
 
 
