@@ -153,12 +153,14 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier
 
+
 class RightsizingAgent:
     """
     Reinforcement Learning (Q-learning) Workload Rightsizing Agent.
     State space: CPU, memory, IOPS, and network bandwidth.
     Action space: Stay, Downscale, Upscale, Migrate Family (e.g., D-series to E-series).
     """
+
     def __init__(self, learning_rate=0.1, discount_factor=0.9, exploration_rate=1.0):
         self.lr = learning_rate
         self.gamma = discount_factor
@@ -168,15 +170,18 @@ class RightsizingAgent:
 
     def get_state(self, cpu, mem, iops, net):
         def discretize(val):
-            if val < 30: return 0
-            if val < 70: return 1
+            if val < 30:
+                return 0
+            if val < 70:
+                return 1
             return 2
+
         return (discretize(cpu), discretize(mem), discretize(iops), discretize(net))
 
     def choose_action(self, state):
         if state not in self.q_table:
             self.q_table[state] = np.zeros(len(self.actions))
-        
+
         # Epsilon-greedy for training
         if np.random.uniform(0, 1) < self.epsilon:
             return np.random.choice(len(self.actions))
@@ -187,7 +192,7 @@ class RightsizingAgent:
             self.q_table[state] = np.zeros(len(self.actions))
         if next_state not in self.q_table:
             self.q_table[next_state] = np.zeros(len(self.actions))
-            
+
         predict = self.q_table[state][action]
         target = reward + self.gamma * np.max(self.q_table[next_state])
         self.q_table[state][action] = self.q_table[state][action] + self.lr * (target - predict)
@@ -202,13 +207,13 @@ class RightsizingAgent:
         state = self.get_state(cpu_util, mem_util, iops, net)
         action_idx = self.choose_action(state)
         action = self.actions[action_idx]
-        
+
         risk_profile = "Low"
         if action == "migrate_family" and (mem_util > 80 or cpu_util > 80):
             risk_profile = "High"
         elif action == "downscale" and max(cpu_util, mem_util) > 60:
             risk_profile = "Medium"
-            
+
         return {
             "recommended_action": action,
             "risk_profile": risk_profile,
@@ -216,11 +221,13 @@ class RightsizingAgent:
             "current_sku": current_sku,
         }
 
+
 class SpotEvictionPredictor:
     """
     Spot Instance Interruption and Bidding Predictor using a Gradient-Boosted Tree.
     Predicts the probability of eviction for a Spot instance within the next 1 to 4 hours.
     """
+
     def __init__(self):
         self.is_trained = False
         # Lightweight Gradient Boosted model
@@ -231,27 +238,33 @@ class SpotEvictionPredictor:
         telemetry_data: list of dicts with keys ['price_volatility', 'demand_index', 'region_capacity', 'evicted']
         """
         df = pd.DataFrame(telemetry_data)
-        if df.empty or 'evicted' not in df.columns:
+        if df.empty or "evicted" not in df.columns:
             return
 
-        X = df[['price_volatility', 'demand_index', 'region_capacity']]
-        y = df['evicted']
-        
+        X = df[["price_volatility", "demand_index", "region_capacity"]]
+        y = df["evicted"]
+
         self.model.fit(X, y)
         self.is_trained = True
 
     def predict_eviction_probability(self, price_volatility, demand_index, region_capacity):
         if not self.is_trained:
             # Fallback heuristic if not trained
-            prob = (price_volatility * 0.4) + (demand_index * 0.5) + ((100 - region_capacity) * 0.01)
+            prob = (
+                (price_volatility * 0.4) + (demand_index * 0.5) + ((100 - region_capacity) * 0.01)
+            )
             return min(max(prob, 0.0), 1.0)
 
-        X_test = pd.DataFrame([{
-            'price_volatility': price_volatility,
-            'demand_index': demand_index,
-            'region_capacity': region_capacity
-        }])
-        
+        X_test = pd.DataFrame(
+            [
+                {
+                    "price_volatility": price_volatility,
+                    "demand_index": demand_index,
+                    "region_capacity": region_capacity,
+                }
+            ]
+        )
+
         # Probability of class 1 (evicted)
         prob = self.model.predict_proba(X_test)[0][1]
         return float(prob)
@@ -261,27 +274,31 @@ class SpotEvictionPredictor:
         telemetry: dict with 'price_volatility' (0-1), 'demand_index' (0-1), 'region_capacity' (0-100)
         """
         prob = self.predict_eviction_probability(
-            telemetry.get('price_volatility', 0.5),
-            telemetry.get('demand_index', 0.5),
-            telemetry.get('region_capacity', 50.0)
+            telemetry.get("price_volatility", 0.5),
+            telemetry.get("demand_index", 0.5),
+            telemetry.get("region_capacity", 50.0),
         )
-        
+
         trigger_migration = prob >= 0.90
-        
+
         action = "migrate_gracefully" if trigger_migration else "monitor"
-        msg = f"90% chance of eviction detected! Triggering automated migration for {instance_id} to stable region." if trigger_migration else "Instance is stable."
+        msg = (
+            f"90% chance of eviction detected! Triggering automated migration for {instance_id} to stable region."
+            if trigger_migration
+            else "Instance is stable."
+        )
 
         return {
             "instance_id": instance_id,
             "region": region,
             "eviction_probability": round(prob, 4),
             "action_required": action,
-            "message": msg
+            "message": msg,
         }
+
 
 # Validation block
 if __name__ == "__main__":
     calc = CostCalculator()
     aws_test = calc.calculate_monthly_cost("aws", "ec2", "t3.micro")
     print(f"Projected Monthly Cost for AWS t3.micro: ${aws_test:.2f}")
-
