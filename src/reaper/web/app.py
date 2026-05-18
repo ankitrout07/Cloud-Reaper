@@ -46,6 +46,7 @@ from reaper.collectors.azure_collector import AzureCollector
 from reaper.collectors.config_manager import save_config
 from reaper.collectors.gcp_prices import GCPPriceClient
 from reaper.engine.calculator import CostCalculator, SpotEvictionPredictor
+from reaper.engine.architect import AIArchitectManager, resolve_component_costs
 from reaper.engine.economics import RegionalArbitrage
 from reaper.engine.logic import RightSizer
 from reaper.engine.models import (
@@ -139,6 +140,7 @@ socketio.start_background_task(background_metrics_worker)
 
 init_db()
 calc = CostCalculator()
+architect_manager = AIArchitectManager()
 settings_state = {
     "currency": "USD",
     "idle_strategy": "aggressive",
@@ -777,9 +779,32 @@ def finops():
 
 @app.route("/build-with-ai", methods=["GET"])
 def build_with_ai():
-    """Route controller placeholder for the AI Multi-Cloud Architect Estimator workspace."""
-    # Temporarily returning a clear operational status string for initial layout testing
-    return "<h1>Build with AI Workspace Coming Soon</h1><p>Sidebar navigation link linked successfully.</p>"
+    """Renders the AI Multi-Cloud Architect Estimator workspace dashboard."""
+    return render_template("build_with_ai.html")
+
+
+@app.route('/api/v1/architect/estimate', methods=['POST'])
+def api_architect_estimate():
+    """Asynchronously processes user prompt, extracts architecture requirements and compiles a financial BOM."""
+    data = request.get_json() or {}
+    user_prompt = data.get('prompt')
+    provider = data.get('provider', 'azure')
+    region = data.get('region', 'eastus')
+
+    if not user_prompt:
+        return jsonify({"error": "Infrastructure requirements prompt is required."}), 400
+
+    try:
+        # Step 1: Run Cognitive Extraction Contract
+        blueprint = architect_manager.generate_blueprint(user_prompt, provider)
+        
+        # Step 2: Resolve financial cost metrics against PostgreSQL cache
+        calculated_payload = resolve_component_costs(blueprint, provider, region)
+        
+        return jsonify(calculated_payload), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Failed to compile AI architecture: {str(e)}"}), 500
 
 
 @app.route("/monitor")

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Reaper | Build with AI</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/static/js/theme.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #0b0d10;
+            --bg-card: #12151a;
+            --primary: #00f3ff;
+            --primary-glow: rgba(0, 243, 255, 0.15);
+            --border-glow: rgba(0, 243, 255, 0.2);
+        }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-deep);
+            color: #fff;
+        }
+        .glass-card {
+            background: rgba(18, 21, 26, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            border-radius: 16px;
+        }
+        .glow-border {
+            border: 1px solid var(--border-glow);
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex">
+    {% include "_sidebar.html" %}
+
+    <main class="app-main flex-1 p-8 lg:p-10">
+        <div class="max-w-7xl mx-auto">
+            <header class="mb-10">
+                <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">INTELLIGENT DESIGN SYSTEM</p>
+                <h1 class="text-4xl font-black tracking-tighter glow-text-cyan uppercase">Build <span class="text-cyan-400">with AI</span></h1>
+                <p class="text-gray-500 text-xs mt-2 font-bold uppercase tracking-widest">
+                    AI Multi-Cloud Architect Estimator • OpenAI Structured Synthesis
+                </p>
+            </header>
+
+            <div class="main-workspace-panel animated-fade-in" style="color: #fff;">
+                <div class="row" style="display: flex; gap: 20px;">
+                    <div class="col-md-5" style="flex: 5; background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(0, 243, 255, 0.2); padding: 20px; border-radius: 8px;">
+                        <h4 class="mb-3 text-white font-bold text-lg">System Architecture Specifications</h4>
+                        
+                        <div class="form-group mb-3" style="margin-bottom: 15px;">
+                            <label class="text-muted small-caps mb-1" style="display: block; font-size: 12px; text-transform: uppercase;">Target Cloud Provider</label>
+                            <select id="ai-provider" class="form-control" style="width: 100%; background: #111; color: #fff; border: 1px solid #333; padding: 8px; border-radius: 4px;">
+                                <option value="azure">Microsoft Azure</option>
+                                <option value="aws">Amazon Web Services</option>
+                                <option value="gcp">Google Cloud Platform</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group mb-3" style="margin-bottom: 15px;">
+                            <label class="text-muted small-caps mb-1" style="display: block; font-size: 12px; text-transform: uppercase;">Target Hosting Region</label>
+                            <select id="ai-region" class="form-control" style="width: 100%; background: #111; color: #fff; border: 1px solid #333; padding: 8px; border-radius: 4px;">
+                                <option value="eastus">East US / us-east-1</option>
+                                <option value="westeurope">West Europe / eu-west-1</option>
+                                <option value="centralindia">Central India / ap-south-1</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group mb-4" style="margin-bottom: 20px;">
+                            <label class="text-muted small-caps mb-1" style="display: block; font-size: 12px; text-transform: uppercase;">Describe what you want to build</label>
+                            <textarea id="ai-prompt" class="form-control" rows="8" style="width: 100%; background: #111; color: #fff; border: 1px solid #333; padding: 8px; border-radius: 4px; font-family: inherit;"
+                                placeholder="E.g., A real-time web application with WebSockets handling 10,000 active concurrent connections, utilizing cached state stores and an attached transactional database..."></textarea>
+                        </div>
+
+                        <button id="btn-compile" class="btn btn-primary" style="width: 100%; background: #00f3ff; color: #000; border: none; padding: 10px; font-weight: bold; border-radius: 4px; cursor: pointer;" onclick="triggerArchitectEstimation()">
+                            <i class="fas fa-gears mr-2"></i> Compile Architecture Stack
+                        </button>
+                    </div>
+
+                    <div class="col-md-7" style="flex: 7;">
+                        <div id="loading-spinner" class="glass-card p-5 text-center" style="display: none; background: rgba(255, 255, 255, 0.01); border: 1px solid #222; padding: 40px; text-align: center; border-radius: 8px;">
+                            <p style="color: #00f3ff; font-weight: bold;">Analyzing deployment guidelines and querying active pricing metrics...</p>
+                        </div>
+
+                        <div id="architecture-results-output" class="glass-card p-4" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid #333; padding: 20px; border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 15px;">
+                                <h4 class="text-white m-0 font-bold text-lg" style="margin: 0;">Compiled Bill of Materials (BOM)</h4>
+                                <div>
+                                    <span style="font-size: 12px; color: #aaa;">Est. Monthly Total: </span>
+                                    <span id="lbl-total-cost" style="color: #00f3ff; font-weight: bold; font-size: 20px;">$0.00</span>
+                                </div>
+                            </div>
+
+                            <div style="background: rgba(0, 243, 255, 0.05); border-left: 4px solid #00f3ff; padding: 12px; margin-bottom: 20px; border-radius: 4px;">
+                                <p id="lbl-arch-summary" style="margin: 0; font-size: 13px; line-height: 1.5; color: #ddd;"></p>
+                            </div>
+
+                            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid #444; text-align: left; color: #aaa;">
+                                        <th style="padding: 8px;">Category</th>
+                                        <th style="padding: 8px;">Service SKU Variant</th>
+                                        <th style="padding: 8px; text-align: center;">Qty</th>
+                                        <th style="padding: 8px; text-align: right;">Monthly Cost</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="list-components">
+                                </tbody>
+                            </table>
+
+                            <div id="security-warning-wrapper" style="display: none; margin-top: 20px; background: rgba(255, 174, 0, 0.1); border-left: 4px solid #ffae00; padding: 12px; border-radius: 4px;">
+                                <p style="margin: 0; font-size: 12px; color: #ffae00;"><i class="fas fa-shield-halved mr-2"></i> <span id="lbl-security-warning"></span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/setup.js"></script>
+    <script>
+    function triggerArchitectEstimation() {
+        const prompt = document.getElementById('ai-prompt').value;
+        const provider = document.getElementById('ai-provider').value;
+        const region = document.getElementById('ai-region').value;
+
+        if (!prompt.trim()) {
+            alert("Please state your required infrastructure parameters first.");
+            return;
+        }
+
+        // Adjust state layouts
+        document.getElementById('architecture-results-output').style.display = 'none';
+        document.getElementById('loading-spinner').style.display = 'block';
+
+        fetch('/api/v1/architect/estimate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: prompt, provider: provider, region: region })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Execution pipeline failed.");
+            return res.json();
+        })
+        .then(data => {
+            document.getElementById('loading-spinner').style.display = 'none';
+            document.getElementById('architecture-results-output').style.display = 'block';
+
+            document.getElementById('lbl-total-cost').innerText = `$${data.total_monthly_cost_estimate.toFixed(2)}`;
+            document.getElementById('lbl-arch-summary').innerText = data.summary;
+
+            const tbody = document.getElementById('list-components');
+            tbody.innerHTML = '';
+
+            data.components.forEach(item => {
+                const row = `
+                    <tr style="border-bottom: 1px solid #222;">
+                        <td style="padding: 10px; font-weight: bold; color: #00f3ff;">${item.component_type}</td>
+                        <td style="padding: 10px;">${item.generic_name} <code style="color: #aaa; background: #111; padding: 2px 4px; border-radius: 3px; margin-left: 5px;">${item.provider_sku_keyword}</code></td>
+                        <td style="padding: 10px; text-align: center;">${item.quantity}</td>
+                        <td style="padding: 10px; text-align: right; font-weight: bold;">$${item.calculated_monthly_cost.toFixed(2)}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+
+            const warnWrapper = document.getElementById('security-warning-wrapper');
+            if (data.security_warning) {
+                warnWrapper.style.display = 'block';
+                document.getElementById('lbl-security-warning').innerText = data.security_warning;
+            } else {
+                warnWrapper.style.display = 'none';
+            }
+        })
+        .catch(err => {
+            document.getElementById('loading-spinner').style.display = 'none';
+            alert("Error mapping architecture payload parameters.");
+        });
+    }
+    </script>
+</body>
+</html>
