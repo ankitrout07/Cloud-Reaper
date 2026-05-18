@@ -1,5 +1,7 @@
 import logging
+
 import requests
+
 
 class GCPPriceClient:
     URL = "https://raw.githubusercontent.com/doitintl/gcpinstances.info/master/public/data/pricing.json"
@@ -21,7 +23,7 @@ class GCPPriceClient:
             for inst in instances:
                 name = inst.get("name", "")
                 pricing = inst.get("pricing", {})
-                
+
                 for region, reg_pricing in pricing.items():
                     ondemand = reg_pricing.get("linuxOnDemand")
                     if ondemand is not None:

@@ -1,11 +1,13 @@
 import logging
+
 import requests
+
 
 class AWSPriceClient:
     URLS = {
         "EC2": "https://ec2instances.info/instances.json",
         "RDS": "https://instances.vantage.sh/rds/instances.json",
-        "ElastiCache": "https://instances.vantage.sh/cache/instances.json"
+        "ElastiCache": "https://instances.vantage.sh/cache/instances.json",
     }
 
     def __init__(self):
@@ -16,7 +18,7 @@ class AWSPriceClient:
         Fetches live AWS pricing from the Vantage community datasets for all EC2, RDS, and ElastiCache components.
         """
         prices = []
-        
+
         try:
             # 1. Fetch ALL EC2
             ec2_data = self._fetch_json(self.URLS["EC2"])
@@ -26,7 +28,9 @@ class AWSPriceClient:
                 for region, reg_pricing in pricing.items():
                     ondemand = reg_pricing.get("linux", {}).get("ondemand")
                     if ondemand is not None:
-                        prices.append(self._build_price(inst_type, "Virtual Machines", region, ondemand))
+                        prices.append(
+                            self._build_price(inst_type, "Virtual Machines", region, ondemand)
+                        )
 
             # 2. Fetch ALL RDS
             rds_data = self._fetch_json(self.URLS["RDS"])
@@ -35,9 +39,13 @@ class AWSPriceClient:
                 pricing = item.get("pricing", {})
                 for region, reg_pricing in pricing.items():
                     # Prefer PostgreSQL, fallback to MySQL
-                    ondemand = reg_pricing.get("PostgreSQL", {}).get("ondemand") or reg_pricing.get("MySQL", {}).get("ondemand")
+                    ondemand = reg_pricing.get("PostgreSQL", {}).get("ondemand") or reg_pricing.get(
+                        "MySQL", {}
+                    ).get("ondemand")
                     if ondemand is not None:
-                        prices.append(self._build_price(inst_type, "SQL Database", region, ondemand))
+                        prices.append(
+                            self._build_price(inst_type, "SQL Database", region, ondemand)
+                        )
 
             # 3. Fetch ALL ElastiCache
             cache_data = self._fetch_json(self.URLS["ElastiCache"])
@@ -45,9 +53,13 @@ class AWSPriceClient:
                 inst_type = item.get("instance_type", "")
                 pricing = item.get("pricing", {})
                 for region, reg_pricing in pricing.items():
-                    ondemand = reg_pricing.get("Redis", {}).get("ondemand") or reg_pricing.get("Memcached", {}).get("ondemand")
+                    ondemand = reg_pricing.get("Redis", {}).get("ondemand") or reg_pricing.get(
+                        "Memcached", {}
+                    ).get("ondemand")
                     if ondemand is not None:
-                        prices.append(self._build_price(inst_type, "Azure Cache for Redis", region, ondemand))
+                        prices.append(
+                            self._build_price(inst_type, "Azure Cache for Redis", region, ondemand)
+                        )
 
         except Exception as e:
             self.logger.error(f"Error fetching AWS prices: {e}")
