@@ -45,8 +45,8 @@ from reaper.collectors.aws_prices import AWSPriceClient
 from reaper.collectors.azure_collector import AzureCollector
 from reaper.collectors.config_manager import save_config
 from reaper.collectors.gcp_prices import GCPPriceClient
-from reaper.engine.calculator import CostCalculator, SpotEvictionPredictor
 from reaper.engine.architect import AIArchitectManager, resolve_component_costs
+from reaper.engine.calculator import CostCalculator, SpotEvictionPredictor
 from reaper.engine.economics import RegionalArbitrage
 from reaper.engine.logic import RightSizer
 from reaper.engine.models import (
@@ -783,20 +783,20 @@ def build_with_ai():
     return render_template("build_with_ai.html")
 
 
-@app.route('/api/v1/architect/status', methods=['GET'])
+@app.route("/api/v1/architect/status", methods=["GET"])
 def api_architect_status():
     """Returns the validation state of the configured OpenAI API key."""
     status = architect_manager.verify_api_status()
     return jsonify({"status": status}), 200
 
 
-@app.route('/api/v1/architect/estimate', methods=['POST'])
+@app.route("/api/v1/architect/estimate", methods=["POST"])
 def api_architect_estimate():
     """Asynchronously processes user prompt, extracts architecture requirements and compiles a financial BOM."""
     data = request.get_json() or {}
-    user_prompt = data.get('prompt')
-    provider = data.get('provider', 'azure')
-    region = data.get('region', 'eastus')
+    user_prompt = data.get("prompt")
+    provider = data.get("provider", "azure")
+    region = data.get("region", "eastus")
 
     if not user_prompt:
         return jsonify({"error": "Infrastructure requirements prompt is required."}), 400
@@ -804,14 +804,14 @@ def api_architect_estimate():
     try:
         # Step 1: Run Cognitive Extraction Contract
         blueprint = architect_manager.generate_blueprint(user_prompt, provider)
-        
+
         # Step 2: Resolve financial cost metrics against PostgreSQL cache
         calculated_payload = resolve_component_costs(blueprint, provider, region)
-        
+
         return jsonify(calculated_payload), 200
 
     except Exception as e:
-        return jsonify({"error": f"Failed to compile AI architecture: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to compile AI architecture: {e!s}"}), 500
 
 
 @app.route("/monitor")

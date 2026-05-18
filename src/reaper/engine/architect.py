@@ -54,7 +54,7 @@ class AIArchitectManager:
         self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key or self.api_key == "your_actual_openai_api_key_here":
             return "unconfigured"
-            
+
         try:
             self.client = OpenAI(api_key=self.api_key)
             self.client.models.list()
@@ -92,13 +92,18 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
     """
     total_monthly_cost = 0.0
     calculated_components = []
-    
+
     # High-fidelity static fallback matrix for development/offline parity
     # Keeps your dashboard functional even if the Go core hasn't cached the SKU yet
     price_fallbacks = {
-        "azure": {"standard_sig_v5": 0.096, "standard_d2_v5": 0.096, "standard_e2_v5": 0.130, "blob_hot": 0.020},
+        "azure": {
+            "standard_sig_v5": 0.096,
+            "standard_d2_v5": 0.096,
+            "standard_e2_v5": 0.130,
+            "blob_hot": 0.020,
+        },
         "aws": {"t3.medium": 0.0416, "m5.large": 0.096, "t3.micro": 0.0104, "s3_standard": 0.023},
-        "gcp": {"e2-standard-2": 0.067, "n2-standard-2": 0.097, "gcs_standard": 0.020}
+        "gcp": {"e2-standard-2": 0.067, "n2-standard-2": 0.097, "gcs_standard": 0.020},
     }
 
     provider_fallbacks = price_fallbacks.get(provider.lower(), {})
@@ -123,14 +128,14 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
         # --- FALLBACK CIRCUIT BREAKER ---
         if hourly_rate is None:
             # Match strict keyword or default to a baseline compute tier rate
-            hourly_rate = provider_fallbacks.get(sku, 0.05) 
+            hourly_rate = provider_fallbacks.get(sku, 0.05)
 
         # Calculate standard cloud monthly operational hours (730 hours/month)
         monthly_cost = float(hourly_rate) * 730 * quantity
         total_monthly_cost += monthly_cost
 
         component_payload = item.model_dump()
-        component_payload['calculated_monthly_cost'] = round(monthly_cost, 2)
+        component_payload["calculated_monthly_cost"] = round(monthly_cost, 2)
         calculated_components.append(component_payload)
 
     return {
@@ -139,6 +144,5 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
         "region": region,
         "components": calculated_components,
         "total_monthly_cost_estimate": round(total_monthly_cost, 2),
-        "security_warning": blueprint_data.security_warning
+        "security_warning": blueprint_data.security_warning,
     }
-
