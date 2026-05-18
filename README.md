@@ -37,26 +37,26 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 
 ```
                     ┌─────────────────────────────────┐
-                    │        Azure Subscription         │
+                    │        Azure Subscription       │
                     └────────────┬────────────────────┘
                                  │  Azure SDK / REST API
                ┌─────────────────▼──────────────────┐
-               │   Go Performance Core (engine-go)    │  ← Goroutine-parallel scanner
-               │   - network_scraper, k8s_optimizer  │
-               │   - auth, db bridge                  │
+               │   Go Performance Core (engine-go)  │  ← Goroutine-parallel scanner
+               │   - network_scraper, k8s_optimizer │
+               │   - auth, db bridge                │
                └─────────────────┬──────────────────┘
                                  │  PostgreSQL (results)
                ┌─────────────────▼──────────────────┐
-               │   Python Intelligence Layer          │  ← FinOps logic & anomaly models
-               │   - collectors, engine, services    │
-               │   - ARIMA, economics, arbitrage     │
+               │   Python Intelligence Layer        │  ← FinOps logic & anomaly models
+               │   - collectors, engine, services   │
+               │   - ARIMA, economics, arbitrage    │
                └─────────────────┬──────────────────┘
                                  │
                ┌─────────────────▼──────────────────┐
-               │   Flask/SocketIO Dashboard           │  ← http://localhost:5001
-               │   - Real-time WebSocket metrics     │
-               │   - Glassmorphism + Cyan Glow UI    │
-               └─────────────────────────────────────┘
+               │   Flask/SocketIO Dashboard         │  ← http://localhost:5001
+               │   - Real-time WebSocket metrics    │
+               │   - Glassmorphism + Cyan Glow UI   │
+               └────────────────────────────────────┘
 ```
 
 ---
@@ -169,15 +169,6 @@ The GitHub Actions pipeline runs **parallel quality gates** on every push/PR to 
 | `test-python` | `lint-python` | Pytest + coverage |
 | `test-go` | `lint-go` | Go tests + binary build |
 | `integration` | `test-python` + `test-go` | DB wiring + engine smoke test |
-
----
-
-## 🧹 Clean Repository Architecture
-
-To maintain the highest standards of code hygiene and production-ready quality, the codebase has been thoroughly optimized and pruned of legacy/redundant elements:
-- **Pruned Dead Code & Scratch Scripts:** Removed legacy testing and scratch scripts from the production source tree (including `src/reaper/collectors/scratch.py`, `scratch2.py`, `main.py`, `test_azure.py`, `test_azure2.py`, `test_cost.py`, and `test_anomaly.py`).
-- **Unified Front-End Controls:** Eliminated overlapping controls in the **Cloud Price Catalog** (`pricing.html`) by removing the duplicate dropdown cloud provider selector, leaving a clean, high-fidelity tab-based control interface.
-- **Robust Multi-Cloud Catalog & Fallbacks:** Corrected parsing of real-time Azure price lists from the Go Performance Core JSON outputs. Added a high-fidelity static fallback catalog for Azure pricing when the background Go Performance Core scraper runs in standalone/offline mode, guaranteeing maximum dashboard availability and zero UI rendering breaks.
 
 ---
 Built for Cloud-native FinOps engineering.
