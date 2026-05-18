@@ -1,4 +1,6 @@
 import os
+import json
+import requests
 
 from openai import OpenAI
 from pydantic import BaseModel, Field
@@ -36,35 +38,54 @@ class ArchitectureBlueprint(BaseModel):
 
 class AIArchitectManager:
     def __init__(self):
-        # Gracefully pull the API key from your environment setup
-        self.api_key = os.getenv("OPENAI_API_KEY")
+        # Gracefully pull the API keys from your environment setup
+        self.openai_key = os.getenv("OPENAI_API_KEY")
+        self.gemini_key = os.getenv("GEMINI_API_KEY")
         self.client = None
 
-        if self.api_key:
-            self.client = OpenAI(api_key=self.api_key)
+        if self.openai_key:
+            self.client = OpenAI(api_key=self.openai_key)
 
-    def verify_api_status(self) -> str:
+    def verify_api_status(self) -> dict:
         """
-        Verifies the OpenAI API Key status.
+        Verifies both OpenAI and Gemini API Key statuses.
         Returns:
-            "active" - key is set and valid
-            "invalid" - key is set but invalid/rejected
-            "unconfigured" - key is missing
+            dict containing status of 'openai' and 'gemini' keys: 'active', 'invalid', 'unconfigured'
         """
-        self.api_key = os.getenv("OPENAI_API_KEY")
-        if not self.api_key or self.api_key == "your_actual_openai_api_key_here":
-            return "unconfigured"
+        self.openai_key = os.getenv("OPENAI_API_KEY")
+        self.gemini_key = os.getenv("GEMINI_API_KEY")
 
-        try:
-            self.client = OpenAI(api_key=self.api_key)
-            self.client.models.list()
-            return "active"
-        except Exception:
-            return "invalid"
+        status = {
+            "openai": "unconfigured",
+            "gemini": "unconfigured"
+        }
 
-    def generate_blueprint(self, user_prompt: str, provider: str) -> ArchitectureBlueprint:
-        if not self.client:
-            raise ValueError("OPENAI_API_KEY is not set in the environment variables.")
+        # Verify OpenAI
+        if self.openai_key and self.openai_key != "your_actual_openai_api_key_here":
+            try:
+                self.client = OpenAI(api_key=self.openai_key)
+                self.client.models.list()
+                status["openai"] = "active"
+            except Exception:
+                status["openai"] = "invalid"
+
+        # Verify Gemini
+        if self.gemini_key and self.gemini_key != "your_actual_gemini_api_key_here":
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models?key={self.gemini_key}"
+                res = requests.get(url, timeout=5)
+                if res.status_code == 200:
+                    status["gemini"] = "active"
+                else:
+                    status["gemini"] = "invalid"
+            except Exception:
+                status["gemini"] = "invalid"
+
+        return status
+
+    def generate_blueprint(self, user_prompt: str, provider: str, model_provider: str = "openai") -> ArchitectureBlueprint:
+        self.openai_key = os.getenv("OPENAI_API_KEY")
+        self.gemini_key = os.getenv("GEMINI_API_KEY")
 
         system_instructions = (
             f"You are the Principal Cloud Architect engine for Cloud-Reaper. "
@@ -73,16 +94,72 @@ class AIArchitectManager:
             f"Do not mix providers. Output your response as a pristine structured JSON object matching the schema."
         )
 
-        # Force structured output parsing via the SDK
-        response = self.client.beta.chat.completions.parse(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_instructions},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format=ArchitectureBlueprint,
-        )
-        return response.choices[0].message.parsed
+        if model_provider == "gemini" or (not self.openai_key and self.gemini_key):
+            if not self.gemini_key or self.gemini_key == "your_actual_gemini_api_key_here":
+                raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
+
+            # Call Gemini Structured Output API
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_key}"
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": system_instructions},
+                            {"text": user_prompt}
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "responseSchema": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "architecture_summary": {"type": "STRING"},
+                            "components": {
+                                "type": "ARRAY",
+                                "items": {
+                                    "type": "OBJECT",
+                                    "properties": {
+                                        "component_type": {"type": "STRING"},
+                                        "generic_name": {"type": "STRING"},
+                                        "provider_sku_keyword": {"type": "STRING"},
+                                        "quantity": {"type": "INTEGER"},
+                                        "reasoning": {"type": "STRING"}
+                                    },
+                                    "required": ["component_type", "generic_name", "provider_sku_keyword", "quantity", "reasoning"]
+                                }
+                            },
+                            "security_warning": {"type": "STRING"}
+                        },
+                        "required": ["architecture_summary", "components"]
+                    }
+                }
+            }
+            res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
+            if res.status_code != 200:
+                raise ValueError(f"Gemini API returned error: {res.text}")
+
+            data = res.json()
+            try:
+                text_content = data["candidates"][0]["content"]["parts"][0]["text"]
+                blueprint_dict = json.loads(text_content)
+                return ArchitectureBlueprint(**blueprint_dict)
+            except Exception as e:
+                raise ValueError(f"Failed to parse structured response from Gemini API: {str(e)}")
+        else:
+            if not self.openai_key:
+                raise ValueError("OPENAI_API_KEY is not set in the environment variables.")
+
+            self.client = OpenAI(api_key=self.openai_key)
+            response = self.client.beta.chat.completions.parse(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_instructions},
+                    {"role": "user", "content": user_prompt},
+                ],
+                response_format=ArchitectureBlueprint,
+            )
+            return response.choices[0].message.parsed
 
 
 def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:

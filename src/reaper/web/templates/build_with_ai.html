@@ -58,18 +58,22 @@
 
     <main class="app-main flex-1 p-8 lg:p-10">
         <div class="max-w-7xl mx-auto">
-            <header class="mb-10 flex justify-between items-center">
+            <header class="mb-10 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                 <div>
                     <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">INTELLIGENT DESIGN SYSTEM</p>
                     <h1 class="text-4xl font-black tracking-tighter glow-text-cyan uppercase">Build <span class="text-cyan-400">with AI</span></h1>
                     <p class="text-gray-500 text-xs mt-2 font-bold uppercase tracking-widest">
-                        AI Multi-Cloud Architect Estimator • OpenAI Structured Synthesis
+                        AI Multi-Cloud Architect Estimator • OpenAI / Gemini Dual Synthesis
                     </p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <div id="api-status-badge" class="glass-card px-4 py-2 border border-slate-800 text-slate-400 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500">
-                        <span id="api-status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
-                        API KEY: <span id="api-status-text">CHECKING...</span>
+                <div class="flex flex-wrap items-center gap-3">
+                    <div id="openai-status-badge" class="glass-card px-4 py-2 border border-slate-800 text-slate-400 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500">
+                        <span id="openai-status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                        OPENAI: <span id="openai-status-text">CHECKING...</span>
+                    </div>
+                    <div id="gemini-status-badge" class="glass-card px-4 py-2 border border-slate-800 text-slate-400 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500">
+                        <span id="gemini-status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                        GEMINI: <span id="gemini-status-text">CHECKING...</span>
                     </div>
                     <div class="glass-card px-4 py-2 border border-cyan-500/20 text-cyan-400 font-bold tracking-widest text-xs flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
@@ -88,13 +92,22 @@
                             </h3>
                             
                             <div class="space-y-5">
-                                <div class="form-group">
-                                    <label class="text-slate-400 small-caps mb-2 block font-black text-[10px] tracking-wider uppercase">Target Cloud Provider</label>
-                                    <select id="ai-provider" class="w-full bg-[#0d0f12] text-white border border-slate-800 focus:border-cyan-400 transition-all rounded-lg p-3 text-sm focus:outline-none">
-                                        <option value="azure">Microsoft Azure</option>
-                                        <option value="aws">Amazon Web Services</option>
-                                        <option value="gcp">Google Cloud Platform</option>
-                                    </select>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="form-group">
+                                        <label class="text-slate-400 small-caps mb-2 block font-black text-[10px] tracking-wider uppercase">Target Cloud Provider</label>
+                                        <select id="ai-provider" class="w-full bg-[#0d0f12] text-white border border-slate-800 focus:border-cyan-400 transition-all rounded-lg p-3 text-sm focus:outline-none">
+                                            <option value="azure">Microsoft Azure</option>
+                                            <option value="aws">Amazon Web Services</option>
+                                            <option value="gcp">Google Cloud Platform</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="text-slate-400 small-caps mb-2 block font-black text-[10px] tracking-wider uppercase">AI Synthesizer Core</label>
+                                        <select id="ai-model-provider" class="w-full bg-[#0d0f12] text-white border border-slate-800 focus:border-cyan-400 transition-all rounded-lg p-3 text-sm focus:outline-none">
+                                            <option value="openai">OpenAI GPT-4o-mini</option>
+                                            <option value="gemini">Google Gemini 1.5 Flash</option>
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <div class="form-group">
@@ -268,6 +281,7 @@
         const region = document.getElementById('ai-region').value;
         const redundancy = document.getElementById('ai-redundancy').value;
         const tier = document.getElementById('ai-workload-tier').value;
+        const modelProvider = document.getElementById('ai-model-provider').value;
 
         if (!prompt.trim()) {
             alert("Please state your required infrastructure parameters first.");
@@ -283,7 +297,7 @@
         terminal.innerHTML = '';
         logToTerminal("Initializing cognitive compiler framework...", 'process');
         logToTerminal(`Parsing operational parameters: provider=${provider.toUpperCase()}, region=${region}, HA=${redundancy}, Tier=${tier}`, 'info');
-        logToTerminal("Generating OpenAI structural constraint request payload...", 'info');
+        logToTerminal(`Generating ${modelProvider.toUpperCase()} structural constraint request payload...`, 'info');
 
         // Compile advanced request parameters together
         const fullPrompt = `${prompt} [Parameters: High-Availability Redundancy=${redundancy}, Expected Workload Tier=${tier}]`;
@@ -291,14 +305,14 @@
         fetch('/api/v1/architect/estimate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: fullPrompt, provider: provider, region: region })
+            body: JSON.stringify({ prompt: fullPrompt, provider: provider, region: region, model_provider: modelProvider })
         })
         .then(res => {
             if (!res.ok) throw new Error("Execution pipeline failed.");
             return res.json();
         })
         .then(data => {
-            logToTerminal("Structured response returned from GPT-4o-mini engine!", 'success');
+            logToTerminal(`Structured response returned from ${modelProvider.toUpperCase()} synthesis engine!`, 'success');
             logToTerminal("Resolving hardware SKUs against SQL pricing cache...", 'process');
 
             document.getElementById('loading-spinner').style.display = 'none';
@@ -381,34 +395,58 @@
     }
 
     function checkApiStatus() {
-        const badge = document.getElementById('api-status-badge');
-        const dot = document.getElementById('api-status-dot');
-        const text = document.getElementById('api-status-text');
+        const oBadge = document.getElementById('openai-status-badge');
+        const oDot = document.getElementById('openai-status-dot');
+        const oText = document.getElementById('openai-status-text');
+
+        const gBadge = document.getElementById('gemini-status-badge');
+        const gDot = document.getElementById('gemini-status-dot');
+        const gText = document.getElementById('gemini-status-text');
 
         fetch('/api/v1/architect/status')
         .then(res => res.json())
         .then(data => {
-            if (data.status === 'active') {
-                badge.className = "glass-card px-4 py-2 border border-emerald-500/20 text-emerald-400 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500 shadow-[0_0_15px_rgba(16,185,129,0.15)]";
-                dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
-                text.innerText = "ONLINE";
+            // OpenAI render
+            if (data.openai === 'active') {
+                oBadge.className = "glass-card px-4 py-2 border border-emerald-500/20 text-emerald-400 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500 shadow-[0_0_15px_rgba(16,185,129,0.15)]";
+                oDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+                oText.innerText = "ONLINE";
                 logToTerminal("OpenAI API integration confirmed and fully validated.", "success");
-            } else if (data.status === 'invalid') {
-                badge.className = "glass-card px-4 py-2 border border-rose-500/20 text-rose-500 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500 shadow-[0_0_15px_rgba(239,68,68,0.15)]";
-                dot.className = "w-2 h-2 rounded-full bg-rose-500 animate-ping";
-                text.innerText = "INVALID KEY";
-                logToTerminal("OpenAI API Key rejected by OpenAI gateway. Please verify key credentials inside your root .env file.", "error");
+            } else if (data.openai === 'invalid') {
+                oBadge.className = "glass-card px-4 py-2 border border-rose-500/20 text-rose-500 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500 shadow-[0_0_15px_rgba(239,68,68,0.15)]";
+                oDot.className = "w-2 h-2 rounded-full bg-rose-500 animate-ping";
+                oText.innerText = "INVALID KEY";
+                logToTerminal("OpenAI API Key rejected. Check OPENAI_API_KEY in your .env file.", "error");
             } else {
-                badge.className = "glass-card px-4 py-2 border border-amber-500/20 text-amber-500 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500 shadow-[0_0_15px_rgba(245,158,11,0.15)]";
-                dot.className = "w-2 h-2 rounded-full bg-amber-500";
-                text.innerText = "UNCONFIGURED";
-                logToTerminal("OpenAI API Key is unconfigured. Please update OPENAI_API_KEY inside your .env configuration.", "process");
+                oBadge.className = "glass-card px-4 py-2 border border-slate-800 text-slate-500 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500";
+                oDot.className = "w-2 h-2 rounded-full bg-slate-500";
+                oText.innerText = "UNCONFIGURED";
+            }
+
+            // Gemini render
+            if (data.gemini === 'active') {
+                gBadge.className = "glass-card px-4 py-2 border border-emerald-500/20 text-emerald-400 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500 shadow-[0_0_15px_rgba(16,185,129,0.15)]";
+                gDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+                gText.innerText = "ONLINE";
+                logToTerminal("Gemini API integration confirmed and fully validated.", "success");
+            } else if (data.gemini === 'invalid') {
+                gBadge.className = "glass-card px-4 py-2 border border-rose-500/20 text-rose-500 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500 shadow-[0_0_15px_rgba(239,68,68,0.15)]";
+                gDot.className = "w-2 h-2 rounded-full bg-rose-500 animate-ping";
+                gText.innerText = "INVALID KEY";
+                logToTerminal("Gemini API Key rejected. Check GEMINI_API_KEY in your .env file.", "error");
+            } else {
+                gBadge.className = "glass-card px-4 py-2 border border-slate-800 text-slate-500 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500";
+                gDot.className = "w-2 h-2 rounded-full bg-slate-500";
+                gText.innerText = "UNCONFIGURED";
             }
         })
         .catch(err => {
-            badge.className = "glass-card px-4 py-2 border border-rose-500/20 text-rose-500 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500";
-            dot.className = "w-2 h-2 rounded-full bg-rose-500";
-            text.innerText = "OFFLINE";
+            oBadge.className = "glass-card px-4 py-2 border border-rose-500/20 text-rose-500 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500";
+            oDot.className = "w-2 h-2 rounded-full bg-rose-500";
+            oText.innerText = "OFFLINE";
+            gBadge.className = "glass-card px-4 py-2 border border-rose-500/20 text-rose-500 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500";
+            gDot.className = "w-2 h-2 rounded-full bg-rose-500";
+            gText.innerText = "OFFLINE";
             logToTerminal("Could not establish connection to the local API status gateway.", "error");
         });
     }

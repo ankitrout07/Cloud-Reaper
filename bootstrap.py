@@ -234,6 +234,8 @@ def setup_env() -> None:
         with env_file.open("w", encoding="utf-8") as f:
             f.write(f"FLASK_PORT={default_port}\nFLASK_DEBUG=True\nAPP_ENV=development\n")
             f.write("DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres\n")
+            f.write("OPENAI_API_KEY=your_actual_openai_api_key_here\n")
+            f.write("GEMINI_API_KEY=your_actual_gemini_api_key_here\n")
     else:
         # Port Conflict Check
         with env_file.open("r", encoding="utf-8") as f:
