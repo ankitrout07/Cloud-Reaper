@@ -45,7 +45,7 @@ from reaper.collectors.aws_prices import AWSPriceClient
 from reaper.collectors.azure_collector import AzureCollector
 from reaper.collectors.config_manager import save_config
 from reaper.collectors.gcp_prices import GCPPriceClient
-from reaper.engine.calculator import CostCalculator
+from reaper.engine.calculator import CostCalculator, SpotEvictionPredictor
 from reaper.engine.economics import RegionalArbitrage
 from reaper.engine.logic import RightSizer
 from reaper.engine.models import (
@@ -1393,6 +1393,25 @@ def utilization():
                 }
             )
         return jsonify({"status": "success", "report": formatted_report})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/finops/spot-prediction")
+def spot_prediction():
+    try:
+        instance_id = request.args.get("instance_id", "vm-spot-worker-01")
+        region = request.args.get("region", "eastus")
+        
+        predictor = SpotEvictionPredictor()
+        # Simulated live telemetry for this node (would come from monitoring core)
+        telemetry = {
+            "price_volatility": 0.85,
+            "demand_index": 0.92,
+            "region_capacity": 15.0
+        }
+        result = predictor.monitor_and_trigger(instance_id, region, telemetry)
+        return jsonify({"status": "success", "prediction": result})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

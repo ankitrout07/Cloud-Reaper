@@ -4,6 +4,8 @@ import re
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
+
+from reaper.engine.calculator import RightsizingAgent
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.seasonal import seasonal_decompose
 
@@ -140,32 +142,40 @@ class RightSizer:
             max_usage = max(usage)
             safe_target = max(predicted_mean, max_usage) * 1.2  # 20% buffer
 
-            # Find better SKU
-            # For simplicity, we suggest a smaller version of the same family if usage is low
-            recommended_size = vm["size"]
-            potential_saving = 0
+            # Use Autonomous RL Agent for sizing evaluation
+            rl_agent = RightsizingAgent()
+            # Feed simulated multi-dim metrics from available data (assuming simple proportional proxy)
+            mem_proxy = max_usage * 1.1 if max_usage < 90 else 95
+            iops_proxy = 50
+            net_proxy = 40
+            rl_eval = rl_agent.evaluate_migration(max_usage, mem_proxy, iops_proxy, net_proxy, vm["size"])
 
-            if safe_target < 30:  # Heavily underutilized
-                # Try to find a smaller SKU (e.g., D4 -> D2 -> B2)
+            recommended_size = vm["size"]
+            action = rl_eval["recommended_action"]
+            if action == "downscale":
                 if "_4" in vm["size"]:
                     recommended_size = vm["size"].replace("_4", "_2")
                 elif "_2" in vm["size"]:
-                    recommended_size = "Standard_B2s"  # Extreme downsize
+                    recommended_size = "Standard_B2s"
+            elif action == "migrate_family":
+                recommended_size = "Standard_E2s_v3"  # Migrate to memory-optimized
 
-            # Calculate Savings (Actual calculation if price book is available)
+            potential_saving = 0
             if recommended_size != vm["size"]:
                 current_price = self.price_book.get(vm["size"], 0.1)
                 new_price = self.price_book.get(recommended_size, current_price * 0.5)
-                potential_saving = (current_price - new_price) * 730  # Monthly estimate (730 hours)
+                potential_saving = max(0, (current_price - new_price) * 730)
 
-            # Personality Analysis (Pattern-Aware Scaling)
             personality_analyzer = WorkloadPersonality()
             personality = personality_analyzer.analyze(usage)
 
+            reason = (
+                f"RL Agent Analysis -> Action: {action.upper()} "
+                f"| Risk: {rl_eval['risk_profile']} "
+                f"| SLA Maintainable: {rl_eval['sla_maintained']} "
+            )
             if personality.get("personality") == "Cyclic/Periodic":
-                reason = f"Periodic pattern detected. {personality['recommendation']}"
-            else:
-                reason = f"Peak CPU at {max_usage:.1f}% indicates over-provisioning."
+                reason += f"| Periodic workload detected."
 
             recommendations.append(
                 {
