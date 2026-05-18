@@ -1,7 +1,7 @@
-import os
 import json
-import requests
+import os
 
+import requests
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
@@ -55,10 +55,7 @@ class AIArchitectManager:
         self.openai_key = os.getenv("OPENAI_API_KEY")
         self.gemini_key = os.getenv("GEMINI_API_KEY")
 
-        status = {
-            "openai": "unconfigured",
-            "gemini": "unconfigured"
-        }
+        status = {"openai": "unconfigured", "gemini": "unconfigured"}
 
         # Verify OpenAI
         if self.openai_key and self.openai_key != "your_actual_openai_api_key_here":
@@ -72,7 +69,9 @@ class AIArchitectManager:
         # Verify Gemini
         if self.gemini_key and self.gemini_key != "your_actual_gemini_api_key_here":
             try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models?key={self.gemini_key}"
+                url = (
+                    f"https://generativelanguage.googleapis.com/v1beta/models?key={self.gemini_key}"
+                )
                 res = requests.get(url, timeout=5)
                 if res.status_code == 200:
                     status["gemini"] = "active"
@@ -83,7 +82,9 @@ class AIArchitectManager:
 
         return status
 
-    def generate_blueprint(self, user_prompt: str, provider: str, model_provider: str = "openai") -> ArchitectureBlueprint:
+    def generate_blueprint(
+        self, user_prompt: str, provider: str, model_provider: str = "openai"
+    ) -> ArchitectureBlueprint:
         self.openai_key = os.getenv("OPENAI_API_KEY")
         self.gemini_key = os.getenv("GEMINI_API_KEY")
 
@@ -101,14 +102,7 @@ class AIArchitectManager:
             # Call Gemini Structured Output API
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_key}"
             payload = {
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": system_instructions},
-                            {"text": user_prompt}
-                        ]
-                    }
-                ],
+                "contents": [{"parts": [{"text": system_instructions}, {"text": user_prompt}]}],
                 "generationConfig": {
                     "responseMimeType": "application/json",
                     "responseSchema": {
@@ -124,18 +118,26 @@ class AIArchitectManager:
                                         "generic_name": {"type": "STRING"},
                                         "provider_sku_keyword": {"type": "STRING"},
                                         "quantity": {"type": "INTEGER"},
-                                        "reasoning": {"type": "STRING"}
+                                        "reasoning": {"type": "STRING"},
                                     },
-                                    "required": ["component_type", "generic_name", "provider_sku_keyword", "quantity", "reasoning"]
-                                }
+                                    "required": [
+                                        "component_type",
+                                        "generic_name",
+                                        "provider_sku_keyword",
+                                        "quantity",
+                                        "reasoning",
+                                    ],
+                                },
                             },
-                            "security_warning": {"type": "STRING"}
+                            "security_warning": {"type": "STRING"},
                         },
-                        "required": ["architecture_summary", "components"]
-                    }
-                }
+                        "required": ["architecture_summary", "components"],
+                    },
+                },
             }
-            res = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=30)
+            res = requests.post(
+                url, json=payload, headers={"Content-Type": "application/json"}, timeout=30
+            )
             if res.status_code != 200:
                 raise ValueError(f"Gemini API returned error: {res.text}")
 
@@ -145,7 +147,7 @@ class AIArchitectManager:
                 blueprint_dict = json.loads(text_content)
                 return ArchitectureBlueprint(**blueprint_dict)
             except Exception as e:
-                raise ValueError(f"Failed to parse structured response from Gemini API: {str(e)}")
+                raise ValueError(f"Failed to parse structured response from Gemini API: {e!s}")
         else:
             if not self.openai_key:
                 raise ValueError("OPENAI_API_KEY is not set in the environment variables.")

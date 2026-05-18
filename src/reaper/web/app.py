@@ -817,11 +817,9 @@ def build_with_ai():
 def api_architect_status():
     """Returns the validation state of the configured OpenAI and Gemini API keys."""
     status = architect_manager.verify_api_status()
-    return jsonify({
-        "status": "success",
-        "openai": status["openai"],
-        "gemini": status["gemini"]
-    }), 200
+    return jsonify(
+        {"status": "success", "openai": status["openai"], "gemini": status["gemini"]}
+    ), 200
 
 
 @app.route("/api/v1/architect/estimate", methods=["POST"])
@@ -838,7 +836,9 @@ def api_architect_estimate():
 
     try:
         # Step 1: Run Cognitive Extraction Contract
-        blueprint = architect_manager.generate_blueprint(user_prompt, provider, model_provider=model_provider)
+        blueprint = architect_manager.generate_blueprint(
+            user_prompt, provider, model_provider=model_provider
+        )
 
         # Step 2: Resolve financial cost metrics against PostgreSQL cache
         calculated_payload = resolve_component_costs(blueprint, provider, region)
