@@ -41,8 +41,10 @@ from sqlalchemy import func
 from weasyprint import HTML
 
 from reaper.collectors.auth_check import check_azure_status
+from reaper.collectors.aws_prices import AWSPriceClient
 from reaper.collectors.azure_collector import AzureCollector
 from reaper.collectors.config_manager import save_config
+from reaper.collectors.gcp_prices import GCPPriceClient
 from reaper.engine.calculator import CostCalculator
 from reaper.engine.economics import RegionalArbitrage
 from reaper.engine.logic import RightSizer
@@ -1176,10 +1178,14 @@ def get_prices():
             if not isinstance(prices, list):
                 prices = []
             return jsonify({"status": "success", "prices": prices})
+        if provider == "aws":
+            prices = AWSPriceClient().get_live_prices()
+            return jsonify({"status": "success", "prices": prices})
+        if provider == "gcp":
+            prices = GCPPriceClient().get_live_prices()
+            return jsonify({"status": "success", "prices": prices})
 
-        mock_data = _get_mock_prices(provider)
-        prices = mock_data.get("prices", [])
-        return jsonify({"status": "success", "prices": prices})
+        return jsonify({"status": "success", "prices": []})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
