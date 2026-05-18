@@ -4,11 +4,10 @@ import re
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
-
-from reaper.engine.calculator import RightsizingAgent
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.seasonal import seasonal_decompose
 
+from reaper.engine.calculator import RightsizingAgent
 from reaper.engine.notifier import send_discord_alert
 from reaper.engine.workload import WorkloadPersonality
 
@@ -148,7 +147,9 @@ class RightSizer:
             mem_proxy = max_usage * 1.1 if max_usage < 90 else 95
             iops_proxy = 50
             net_proxy = 40
-            rl_eval = rl_agent.evaluate_migration(max_usage, mem_proxy, iops_proxy, net_proxy, vm["size"])
+            rl_eval = rl_agent.evaluate_migration(
+                max_usage, mem_proxy, iops_proxy, net_proxy, vm["size"]
+            )
 
             recommended_size = vm["size"]
             action = rl_eval["recommended_action"]
@@ -175,7 +176,7 @@ class RightSizer:
                 f"| SLA Maintainable: {rl_eval['sla_maintained']} "
             )
             if personality.get("personality") == "Cyclic/Periodic":
-                reason += f"| Periodic workload detected."
+                reason += "| Periodic workload detected."
 
             recommendations.append(
                 {
