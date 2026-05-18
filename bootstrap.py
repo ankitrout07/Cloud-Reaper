@@ -216,7 +216,7 @@ def build_go_engine() -> bool:
 
     output_path = (bin_dir / binary_name).resolve()
     success = run_command(
-        [go_bin, "build", "-o", str(output_path), "main.go"],
+        [go_bin, "build", "-o", str(output_path), "."],
         cwd=engine_dir,
     )
     if success:
