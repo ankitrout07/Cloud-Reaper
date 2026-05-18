@@ -763,12 +763,20 @@
         }
 
         let simChart;
-        function runSimulation() {
+        function runSimulation(baseMonthly = null, maxSavingsPossible = null) {
             const intensity = document.getElementById('sim-intensity').value;
             document.getElementById('sim-intensity-val').innerText = `${intensity}%`;
             
-            const baseMonthly = 12500; // Mock base spend
-            const maxSavingsPossible = 4500; // Mock total waste
+            // Default to parsed DOM values if not provided by direct invocation
+            if (baseMonthly === null) {
+                const projectedText = document.getElementById('projected-total').innerText.replace(/[^0-9.-]+/g,"");
+                baseMonthly = parseFloat(projectedText) || 0;
+            }
+            if (maxSavingsPossible === null) {
+                const rightSizingText = document.getElementById('rightsizing-total-saving').innerText.replace(/[^0-9.-]+/g,"");
+                maxSavingsPossible = parseFloat(rightSizingText) || 0;
+            }
+
             const actualSavings = (maxSavingsPossible * (intensity / 100));
             
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -965,11 +973,12 @@
                 const badge = document.getElementById('zombie-count-badge');
                 list.innerHTML = '';
                 
-                // Filter for resources with high waste or mock zombie logic
-                const zombies = [
-                    {name: "disk-temp-09", type: "Disk", score: 95, reason: "Unattached + 0 IOPS"},
-                    {name: "dev-vm-orphaned", type: "VM", score: 92, reason: "No Network + 1% CPU"}
-                ];
+                // Map real data from the /api/scan engine report
+                const zombies = (data.report || []).filter(r => r.waste_coefficient >= 0.8).map(r => ({
+                    name: r.name,
+                    score: Math.round(r.waste_coefficient * 100),
+                    reason: `Waste Coeff: ${r.waste_coefficient.toFixed(2)}`
+                }));
                 
                 badge.innerText = zombies.length;
                 

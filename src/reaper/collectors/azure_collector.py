@@ -992,7 +992,12 @@ class AzureCollector:
                 db.close()
 
         if not spend_data:
-            spend_data = [120, 125, 118, 140, 135, 150, 145]
+            return {
+                "projected_total": 0.0,
+                "daily_history": [],
+                "slope": 0,
+                "confidence": "Low",
+            }
 
         forecaster = BudgetForecaster()
         forecast = forecaster.forecast_eom(spend_data)
@@ -1010,13 +1015,10 @@ class AzureCollector:
 
     def get_virtual_tags(self):
         """
-        Returns virtual tagging logic (mocked for demo).
+        Returns virtual tagging logic.
         """
-        return [
-            {"name": "Production Cluster", "virtual_tags": {"Env": "Prod", "Dept": "Eng"}},
-            {"name": "Marketing-Web", "virtual_tags": {"Dept": "Mktg"}},
-            {"name": "Data-Science-Sandbox", "virtual_tags": {"Owner": "DS-Team"}},
-        ]
+        # Feature removed mock data. To be implemented using real Azure API tags.
+        return []
 
     def get_greenops_recommendations(self):
         """

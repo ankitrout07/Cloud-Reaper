@@ -9,7 +9,7 @@ def fetch_azure_logs(resource_id=None):
         client = LogsQueryClient(DefaultAzureCredential())
         workspace_id = os.getenv("AZURE_WORKSPACE_ID")
         if not workspace_id:
-            return ["Workspace ID not configured in .env. Mocking stream..."]
+            return ["Error: Workspace ID not configured in .env. Cannot stream logs."]
 
         if resource_id:
             query = f"AzureActivity | where ResourceId == '{resource_id}' | take 10"

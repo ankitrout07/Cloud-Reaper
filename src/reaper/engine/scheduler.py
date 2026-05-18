@@ -116,7 +116,7 @@ def suggest_k8s_consolidation(node_metrics):
                     "target_node": node["node_name"],
                     "action": "DRAIN",
                     "reason": reason,
-                    "potential_saving": 45.0,  # Mock monthly saving per node
+                    "potential_saving": node.get("cost_monthly", 0.0),
                 }
             )
 
