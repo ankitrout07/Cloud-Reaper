@@ -1,56 +1,74 @@
 import logging
-
 import requests
 
-
 class AWSPriceClient:
-    URL = "https://ec2instances.info/instances.json"
+    URLS = {
+        "EC2": "https://ec2instances.info/instances.json",
+        "RDS": "https://instances.vantage.sh/rds/instances.json",
+        "ElastiCache": "https://instances.vantage.sh/cache/instances.json"
+    }
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
     def get_live_prices(self):
         """
-        Fetches live AWS EC2 pricing from the Vantage community dataset.
+        Fetches live AWS pricing from the Vantage community datasets for all EC2, RDS, and ElastiCache components.
         """
+        prices = []
+        
         try:
-            response = requests.get(self.URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-
-            prices = []
-            # Curated popular regions to avoid rendering tens of thousands of rows
-            target_regions = ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"]
-            # Curated popular instance prefixes
-            target_prefixes = ("t3.", "t2.", "m5.", "m6i.", "c5.", "c6i.", "r5.", "r6i.")
-
-            for item in data:
+            # 1. Fetch ALL EC2
+            ec2_data = self._fetch_json(self.URLS["EC2"])
+            for item in ec2_data:
                 inst_type = item.get("instance_type", "")
-                if not inst_type.startswith(target_prefixes):
-                    continue
-
                 pricing = item.get("pricing", {})
-                for region in target_regions:
-                    reg_pricing = pricing.get(region, {})
-                    linux_pricing = reg_pricing.get("linux", {})
-                    ondemand = linux_pricing.get("ondemand")
+                for region, reg_pricing in pricing.items():
+                    ondemand = reg_pricing.get("linux", {}).get("ondemand")
+                    if ondemand is not None:
+                        prices.append(self._build_price(inst_type, "Virtual Machines", region, ondemand))
 
-                    if ondemand:
-                        try:
-                            price_val = float(ondemand)
-                            prices.append(
-                                {
-                                    "armResourceName": inst_type,
-                                    "skuName": inst_type,
-                                    "serviceName": "EC2",
-                                    "armRegionName": region,
-                                    "retailPrice": price_val,
-                                    "unitOfMeasure": "1 Hour",
-                                }
-                            )
-                        except ValueError:
-                            continue
-            return prices
+            # 2. Fetch ALL RDS
+            rds_data = self._fetch_json(self.URLS["RDS"])
+            for item in rds_data:
+                inst_type = item.get("instance_type", "")
+                pricing = item.get("pricing", {})
+                for region, reg_pricing in pricing.items():
+                    # Prefer PostgreSQL, fallback to MySQL
+                    ondemand = reg_pricing.get("PostgreSQL", {}).get("ondemand") or reg_pricing.get("MySQL", {}).get("ondemand")
+                    if ondemand is not None:
+                        prices.append(self._build_price(inst_type, "SQL Database", region, ondemand))
+
+            # 3. Fetch ALL ElastiCache
+            cache_data = self._fetch_json(self.URLS["ElastiCache"])
+            for item in cache_data:
+                inst_type = item.get("instance_type", "")
+                pricing = item.get("pricing", {})
+                for region, reg_pricing in pricing.items():
+                    ondemand = reg_pricing.get("Redis", {}).get("ondemand") or reg_pricing.get("Memcached", {}).get("ondemand")
+                    if ondemand is not None:
+                        prices.append(self._build_price(inst_type, "Azure Cache for Redis", region, ondemand))
+
         except Exception as e:
             self.logger.error(f"Error fetching AWS prices: {e}")
-            return []
+
+        return prices
+
+    def _fetch_json(self, url):
+        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        response.raise_for_status()
+        return response.json()
+
+    def _build_price(self, sku, service_name, region, price_val):
+        try:
+            val = float(price_val)
+        except ValueError:
+            val = 0.0
+        return {
+            "armResourceName": sku,
+            "skuName": sku,
+            "serviceName": service_name,
+            "armRegionName": region,
+            "retailPrice": val,
+            "unitOfMeasure": "1 Hour",
+        }

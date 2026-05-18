@@ -1,7 +1,5 @@
 import logging
-
 import requests
-
 
 class GCPPriceClient:
     URL = "https://raw.githubusercontent.com/doitintl/gcpinstances.info/master/public/data/pricing.json"
@@ -11,30 +9,21 @@ class GCPPriceClient:
 
     def get_live_prices(self):
         """
-        Fetches live GCP Compute Engine pricing from the gcpinstances.info dataset.
+        Fetches live GCP Compute Engine pricing from the gcpinstances.info dataset for ALL regions and ALL instances.
         """
         try:
-            response = requests.get(self.URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+            response = requests.get(self.URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
             response.raise_for_status()
             data = response.json()
 
             prices = []
-            # Curated popular regions
-            target_regions = ["us-central1", "us-east1", "europe-west1", "asia-east1"]
-            # Curated popular instance prefixes
-            target_prefixes = ("e2-", "n1-", "n2-", "c2-", "m1-")
-
             instances = data.get("instances", [])
             for inst in instances:
                 name = inst.get("name", "")
-                if not name.startswith(target_prefixes):
-                    continue
-
                 pricing = inst.get("pricing", {})
-                for region in target_regions:
-                    reg_pricing = pricing.get(region, {})
+                
+                for region, reg_pricing in pricing.items():
                     ondemand = reg_pricing.get("linuxOnDemand")
-
                     if ondemand is not None:
                         try:
                             price_val = float(ondemand)
