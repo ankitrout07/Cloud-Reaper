@@ -36,15 +36,33 @@ function renderVaultState(configured, unlocked) {
     }
 }
 
+function toggleVaultSetupPlaceholder() {
+    const type = document.getElementById("vault-setup-type")?.value || "password";
+    const tip = document.getElementById("vault-setup-tip");
+    const passcode = document.getElementById("vault-setup-passcode");
+    const confirm = document.getElementById("vault-setup-confirm");
+
+    if (type === "pin") {
+        if (tip) tip.innerText = "Create your vault passcode (exactly 4 characters/digits).";
+        if (passcode) passcode.placeholder = "4-digit PIN";
+        if (confirm) confirm.placeholder = "Confirm 4-digit PIN";
+    } else {
+        if (tip) tip.innerText = "Create your vault passcode (minimum 8 characters).";
+        if (passcode) passcode.placeholder = "Vault passcode";
+        if (confirm) confirm.placeholder = "Confirm passcode";
+    }
+}
+
 async function setupVault() {
     const passcode = document.getElementById("vault-setup-passcode")?.value || "";
     const confirm = document.getElementById("vault-setup-confirm")?.value || "";
+    const passcodeType = document.getElementById("vault-setup-type")?.value || "password";
 
     try {
         const res = await fetch("/api/vault/setup", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ passcode, confirm }),
+            body: JSON.stringify({ passcode, confirm, passcode_type: passcodeType }),
         });
         const data = await res.json();
         if (data.status !== "success") {
@@ -53,6 +71,39 @@ async function setupVault() {
         if (typeof showToast === "function") {
             showToast(data.message, "success");
         }
+        
+        // Clear setup fields
+        if (document.getElementById("vault-setup-passcode")) document.getElementById("vault-setup-passcode").value = "";
+        if (document.getElementById("vault-setup-confirm")) document.getElementById("vault-setup-confirm").value = "";
+        
+        await refreshVaultStatus();
+    } catch (error) {
+        if (typeof showToast === "function") {
+            showToast(error.message, "error");
+        }
+    }
+}
+
+async function resetVault() {
+    if (!confirm("WARNING: Are you absolutely sure you want to reset the vault?\n\nThis action will PERMANENTLY erase all stored passwords and secrets. This cannot be undone!")) {
+        return;
+    }
+
+    try {
+        const res = await fetch("/api/vault/reset", {
+            method: "POST"
+        });
+        const data = await res.json();
+        if (data.status !== "success") {
+            throw new Error(data.message || "Failed to reset vault");
+        }
+        if (typeof showToast === "function") {
+            showToast(data.message, "success");
+        }
+        
+        // Clear all fields
+        if (document.getElementById("vault-unlock-passcode")) document.getElementById("vault-unlock-passcode").value = "";
+        
         await refreshVaultStatus();
     } catch (error) {
         if (typeof showToast === "function") {
@@ -120,7 +171,7 @@ async function loadVaultEntries() {
             <div class="vault-entry-row flex items-center justify-between p-4 bg-black/30 border border-white/5 rounded-2xl" data-id="${entry.id}">
                 <div>
                     <p class="text-xs font-bold text-white">${entry.label}</p>
-                    <p class="text-[9px] uppercase text-slate-500 mt-1">${entry.entry_type}</p>
+                    <p class="text-[9px] uppercase text-slate-500 mt-1">${entry.entry_type.replace('_', ' ')}</p>
                 </div>
                 <div class="flex gap-2">
                     <button type="button" onclick="revealVaultEntry(${entry.id})" class="px-3 py-2 text-[9px] font-black uppercase bg-cyan-500/10 text-cyan-400 rounded-lg border border-cyan-500/20">Reveal</button>
@@ -181,7 +232,7 @@ async function revealVaultEntry(entryId) {
         ]
             .filter(Boolean)
             .join("\n");
-        alert(`${entry.label}\n\n${details}`);
+        alert(`${entry.label} (${entry.entry_type.replace('_', ' ').toUpperCase()})\n\n${details}`);
     } catch (error) {
         if (typeof showToast === "function") {
             showToast(error.message, "error");
