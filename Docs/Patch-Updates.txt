@@ -7,8 +7,7 @@
 4.
 5. in alert channel add logos of dicord and slack  to add the alert Connection
 
-6. add a section for docs in sidebar. there add documentation for each feature about our cloud reaper project and how to use
-in documentation add section for product docs and changelogs, we will update the changelogs and product docs on every release.
+6.
 
 7. Live Multi-Cloud Regional Arbitrage Swapper
 When the AI designs an infrastructure stack on Azure, give the user a one-click button to swap cloud environments or regions to find immediate hidden discounts.

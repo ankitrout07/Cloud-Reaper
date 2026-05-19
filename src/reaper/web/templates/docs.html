@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <link rel="icon" href="/static/assets/favicon.png" type="image/png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Reaper | Documentation</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/static/js/theme.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glass-morph {
+            background: #12151a;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 20px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+        }
+
+        .doc-section {
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .doc-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 1rem;
+        }
+
+        .doc-header h2 {
+            font-size: 1.25rem;
+            font-weight: 900;
+            letter-spacing: 0.05em;
+            color: #8baef5;
+            text-transform: uppercase;
+        }
+
+        .feature-card {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: rgba(6, 182, 212, 0.4);
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.1);
+        }
+        
+        .feature-card h3 {
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature-card p {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex">
+    {% include "_sidebar.html" %}
+
+    <main class="app-main flex-1 p-8 lg:p-10 overflow-y-auto">
+        <div class="max-w-5xl mx-auto">
+            <header class="mb-10">
+                <h1 class="text-4xl font-black tracking-tighter glow-text-cyan uppercase">System <span
+                        class="text-cyan-400">Documentation</span></h1>
+                <p class="text-gray-500 text-xs mt-2 font-bold uppercase tracking-widest">
+                    Product Docs, Feature Guides, and Changelogs
+                </p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <!-- Navigation Sidebar -->
+                <div class="md:col-span-1 space-y-2">
+                    <a href="#product-docs" class="block p-3 glass-morph text-cyan-400 text-xs font-bold uppercase tracking-wider hover:bg-white/5 transition">Product Docs</a>
+                    <a href="#features" class="block p-3 glass-morph text-gray-400 text-xs font-bold uppercase tracking-wider hover:bg-white/5 hover:text-white transition">Features Guide</a>
+                    <a href="#changelog" class="block p-3 glass-morph text-gray-400 text-xs font-bold uppercase tracking-wider hover:bg-white/5 hover:text-white transition">Changelog</a>
+                </div>
+
+                <!-- Main Content -->
+                <div class="md:col-span-3 space-y-8">
+                    <!-- Product Docs -->
+                    <section id="product-docs" class="glass-morph doc-section">
+                        <div class="doc-header">
+                            <i class="fas fa-book text-cyan-400 text-xl"></i>
+                            <h2>Product Docs</h2>
+                        </div>
+                        <div class="prose prose-invert max-w-none text-sm text-slate-300">
+                            <p class="mb-4">Welcome to the Cloud Reaper intelligence suite. Cloud Reaper is a high-performance multi-cloud FinOps engine designed to bridge the gap between cloud engineering and financial accountability.</p>
+                            <p class="mb-4">With real-time asset tracking, predictive AI resource sizing, and dynamic multi-cloud architecture builders, this engine helps organizations drastically reduce operational waste while optimizing global deployments.</p>
+                            <p><strong>Note:</strong> We update these product docs along with every major release. Keep an eye on this section to understand how to fully utilize the Reaper engine.</p>
+                        </div>
+                    </section>
+
+                    <!-- Features Guide -->
+                    <section id="features" class="glass-morph doc-section">
+                        <div class="doc-header">
+                            <i class="fas fa-layer-group text-purple-400 text-xl"></i>
+                            <h2>Features & How to Use</h2>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="feature-card">
+                                <h3><i class="fas fa-chart-pie text-cyan-400 mr-2"></i> Dashboard</h3>
+                                <p>The central hub for all metrics. Access real-time FinOps charts, burn rate analysis, and a snapshot of your infrastructure's health and budget tracking.</p>
+                            </div>
+                            
+                            <div class="feature-card">
+                                <h3><i class="fas fa-tags text-blue-400 mr-2"></i> Price Catalog</h3>
+                                <p>Browse up-to-date cloud SKUs and costs dynamically. You can build an arbitrary cart of resources to generate a Bill of Materials (BOM) export as a PDF.</p>
+                            </div>
+
+                            <div class="feature-card">
+                                <h3><i class="fas fa-robot text-green-400 mr-2"></i> Build with AI</h3>
+                                <p>Use natural language to describe the application or infrastructure you want to deploy. Our Architect AI Engine will synthesize a cost-optimized, secure BOM across your preferred cloud vendor.</p>
+                            </div>
+
+                            <div class="feature-card">
+                                <h3><i class="fas fa-search-dollar text-orange-400 mr-2"></i> FinOps Intelligence</h3>
+                                <p>Scan connected environments for idle resources, right-size VMs, enforce tagging compliance policies, and identify unattached storage arrays eating up costs.</p>
+                            </div>
+
+                            <div class="feature-card">
+                                <h3><i class="fas fa-server text-indigo-400 mr-2"></i> Cloud Monitor</h3>
+                                <p>Monitor real-time telemetry from your cloud. The real-time Go engine streams CPU and Memory usage down to the second, helping you visualize the heartbeat of your workloads.</p>
+                            </div>
+                            
+                            <div class="feature-card">
+                                <h3><i class="fas fa-cog text-slate-400 mr-2"></i> Settings & Vault</h3>
+                                <p>Securely connect your Azure, AWS, and GCP environments. Update AI strategy and FinOps governance policies. The Vault stores connection secrets safely using high-grade encryption.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Changelog -->
+                    <section id="changelog" class="glass-morph doc-section">
+                        <div class="doc-header">
+                            <i class="fas fa-history text-green-400 text-xl"></i>
+                            <h2>Changelog</h2>
+                        </div>
+                        <div class="space-y-6">
+                            
+                            <!-- Release Item -->
+                            <div class="border-l-2 border-cyan-500 pl-4">
+                                <h3 class="text-white font-bold mb-1">v1.1.0 - The Strategy Update</h3>
+                                <span class="text-[10px] uppercase font-black text-slate-500 tracking-wider bg-black/40 px-2 py-1 rounded inline-block mb-3">May 19, 2026</span>
+                                <ul class="list-disc list-inside text-sm text-slate-400 space-y-1">
+                                    <li>Added System Documentation portal (Product Docs & Changelog).</li>
+                                    <li>Fixed a major bug where generated Bill of Materials incorrectly multiplied flat-rate monthly SKUs by 730 hours.</li>
+                                    <li>Resolved an issue where total costs were improperly exported in the Price Catalog BOM PDF.</li>
+                                    <li>Refactored Settings to include a robust "Switch Directory" module, abandoning the static connection fields.</li>
+                                </ul>
+                            </div>
+
+                            <!-- Release Item -->
+                            <div class="border-l-2 border-slate-700 pl-4 opacity-75">
+                                <h3 class="text-white font-bold mb-1">v1.0.0 - Genesis Release</h3>
+                                <span class="text-[10px] uppercase font-black text-slate-500 tracking-wider bg-black/40 px-2 py-1 rounded inline-block mb-3">May 15, 2026</span>
+                                <ul class="list-disc list-inside text-sm text-slate-400 space-y-1">
+                                    <li>Introduced Cloud Reaper hybrid FinOps engine.</li>
+                                    <li>Launched AI Architect for automated infrastructure design.</li>
+                                    <li>Implemented Go-based resource scraper architecture for maximum efficiency.</li>
+                                    <li>Introduced PostgreSQL caching layer for instantaneous region pricing data.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script>
+        // Simple active link highlighting script
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                
+                document.querySelectorAll('.md\\:col-span-1 a').forEach(a => {
+                    a.classList.remove('text-cyan-400');
+                    a.classList.add('text-gray-400');
+                });
+                this.classList.add('text-cyan-400');
+                this.classList.remove('text-gray-400');
+
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>
