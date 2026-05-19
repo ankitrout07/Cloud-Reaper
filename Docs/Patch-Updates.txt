@@ -172,3 +172,4 @@ def process_optimization_request():
     except Exception as e:
         return jsonify({"status": "error", "message": f"Pipeline Execution Fault: {str(e)}"}), 500
 
+5. Add icons for the cloud providers that are in cloud providers for each cloud provider we have declared
