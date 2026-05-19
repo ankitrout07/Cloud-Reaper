@@ -1478,8 +1478,19 @@ def spot_prediction():
         region = request.args.get("region", "eastus")
 
         predictor = SpotEvictionPredictor()
-        # Simulated live telemetry for this node (would come from monitoring core)
-        telemetry = {"price_volatility": 0.85, "demand_index": 0.92, "region_capacity": 15.0}
+        
+        # Derive stable, dynamic pseudo-telemetry metrics cryptographically from instance properties
+        import hashlib
+        hash_seed = hashlib.sha256(f"{instance_id}-{region}".encode()).hexdigest()
+        val1 = int(hash_seed[0:4], 16) % 100 / 100.0   # price_volatility: 0.0 to 1.0
+        val2 = int(hash_seed[4:8], 16) % 100 / 100.0   # demand_index: 0.0 to 1.0
+        val3 = int(hash_seed[8:12], 16) % 100          # region_capacity: 0 to 100
+        
+        telemetry = {
+            "price_volatility": round(val1, 2),
+            "demand_index": round(val2, 2),
+            "region_capacity": float(val3),
+        }
         result = predictor.monitor_and_trigger(instance_id, region, telemetry)
         return jsonify({"status": "success", "prediction": result})
     except Exception as e:

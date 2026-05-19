@@ -5,9 +5,10 @@ import requests
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-
-_AWS_PRICES_CACHE = None
-_GCP_PRICES_CACHE = None
+PRICES_CACHE = {
+    "aws": None,
+    "gcp": None,
+}
 
 
 # Define the strict structure for each infrastructure component
@@ -268,7 +269,7 @@ class AIArchitectManager:
                     blueprint_dict = json.loads(text_content)
                     return ArchitectureBlueprint(**blueprint_dict)
                 except Exception as e:
-                    raise ValueError(f"Failed to parse structured response from Gemini API: {e!s}")
+                    raise ValueError(f"Failed to parse structured response from Gemini API: {e!s}") from e
             else:
                 if not self.openai_key or self.openai_key == "your_actual_openai_api_key_here":
                     raise ValueError("OPENAI_API_KEY is not set in the environment variables.")
@@ -288,17 +289,176 @@ class AIArchitectManager:
             return _generate_local_fallback(user_prompt, provider)
 
 
+def _resolve_azure_price(sku: str, mapped_region: str, region: str) -> float | None:
+    """Helper to query live Azure pricing API with database caching."""
+    try:
+        from reaper.collectors.azure_prices import AzurePriceClient
+        client = AzurePriceClient()
+        clean_sku = sku
+        if clean_sku.lower().startswith("standard_"):
+            parts = clean_sku.split("_")
+            clean_sku = "Standard_" + "_".join(parts[1:])
+        
+        query = f"armSkuName eq '{clean_sku}' and armRegionName eq '{mapped_region}' and priceType eq 'Consumption'"
+        res = client.get_prices(filter_query=query)
+        if not res:
+            query = f"armSkuName eq '{sku}' and priceType eq 'Consumption'"
+            res = client.get_prices(filter_query=query)
+        
+        if res:
+            best_price = next((r for r in res if not r.get("reservationTerm")), res[0])
+            hourly_rate = float(best_price.get("retailPrice", 0))
+            
+            # Cache in DB
+            try:
+                from reaper.engine.models import RegionPriceCache, SessionLocal
+                db = SessionLocal()
+                db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
+                new_cache = RegionPriceCache(
+                    sku_id=sku,
+                    region_name=region,
+                    price=hourly_rate,
+                    currency="USD",
+                )
+                db.add(new_cache)
+                db.commit()
+                db.close()
+            except Exception:
+                pass
+            return hourly_rate
+    except Exception as e:
+        print(f"[!] Real-time Azure pricing fetch failed: {e}")
+    return None
+
+
+def _resolve_aws_price(sku: str, mapped_region: str, region: str) -> float | None:
+    """Helper to query live AWS pricing with database caching."""
+    try:
+        if PRICES_CACHE["aws"] is None:
+            from reaper.collectors.aws_prices import AWSPriceClient
+            aws_client = AWSPriceClient()
+            PRICES_CACHE["aws"] = aws_client.get_live_prices()
+        
+        match = next((p for p in PRICES_CACHE["aws"] if p["skuName"].lower() == sku.lower() and p["armRegionName"] == mapped_region), None)
+        if match:
+            hourly_rate = float(match["retailPrice"])
+            
+            # Cache in DB
+            try:
+                from reaper.engine.models import RegionPriceCache, SessionLocal
+                db = SessionLocal()
+                db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
+                new_cache = RegionPriceCache(
+                    sku_id=sku,
+                    region_name=region,
+                    price=hourly_rate,
+                    currency="USD",
+                )
+                db.add(new_cache)
+                db.commit()
+                db.close()
+            except Exception:
+                pass
+            return hourly_rate
+    except Exception as e:
+        print(f"[!] Real-time AWS pricing fetch failed: {e}")
+    return None
+
+
+def _resolve_gcp_price(sku: str, mapped_region: str, region: str) -> float | None:
+    """Helper to query live GCP pricing with database caching."""
+    try:
+        if PRICES_CACHE["gcp"] is None:
+            from reaper.collectors.gcp_prices import GCPPriceClient
+            gcp_client = GCPPriceClient()
+            PRICES_CACHE["gcp"] = gcp_client.get_live_prices()
+        
+        match = next((p for p in PRICES_CACHE["gcp"] if p["skuName"].lower() == sku.lower() and p["armRegionName"] == mapped_region), None)
+        if match:
+            hourly_rate = float(match["retailPrice"])
+            
+            # Cache in DB
+            try:
+                from reaper.engine.models import RegionPriceCache, SessionLocal
+                db = SessionLocal()
+                db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
+                new_cache = RegionPriceCache(
+                    sku_id=sku,
+                    region_name=region,
+                    price=hourly_rate,
+                    currency="USD",
+                )
+                db.add(new_cache)
+                db.commit()
+                db.close()
+            except Exception:
+                pass
+            return hourly_rate
+    except Exception as e:
+        print(f"[!] Real-time GCP pricing fetch failed: {e}")
+    return None
+
+
+def _resolve_realtime_price(provider: str, sku: str, mapped_region: str, region: str) -> float | None:
+    """Helper to query live pricing APIs with database caching."""
+    prov = provider.lower()
+    if prov == "azure":
+        return _resolve_azure_price(sku, mapped_region, region)
+    if prov == "aws":
+        return _resolve_aws_price(sku, mapped_region, region)
+    if prov == "gcp":
+        return _resolve_gcp_price(sku, mapped_region, region)
+    return None
+
+
+def _resolve_fallback_price(provider: str, sku: str, component_type: str, generic_name: str, provider_fallbacks: dict) -> float:
+    """Helper to compute fallback pricing when live APIs and DB cache miss."""
+    sku_lower = sku.lower()
+    hourly_rate = provider_fallbacks.get(sku_lower)
+    
+    if hourly_rate is not None:
+        return hourly_rate
+        
+    # Substring/partial matching
+    for fallback_key, price in provider_fallbacks.items():
+        if fallback_key in sku_lower or sku_lower in fallback_key:
+            hourly_rate = price
+            break
+
+    if hourly_rate is None:
+        # Semantic mapping based on component type and names
+        comp_type = component_type.lower()
+        generic_lower = generic_name.lower()
+        prov_lower = provider.lower()
+        
+        is_compute = "compute" in comp_type or "vm" in sku_lower or "virtual machine" in generic_lower or "compute" in generic_lower or "server" in generic_lower
+        is_db = "db" in comp_type or "database" in comp_type or "db" in sku_lower or "database" in generic_lower or "sql" in generic_lower or "postgres" in generic_lower
+        is_storage = "storage" in comp_type or "store" in comp_type or "storage" in sku_lower or "blob" in generic_lower or "s3" in generic_lower or "bucket" in generic_lower or "disk" in generic_lower
+        is_net = "net" in comp_type or "network" in comp_type or "net" in sku_lower or "network" in generic_lower or "vpc" in generic_lower or "vnet" in generic_lower or "ip" in generic_lower
+
+        if is_compute:
+            hourly_rate = 0.0416 if prov_lower == "aws" else (0.067 if prov_lower == "gcp" else 0.096)
+        elif is_db:
+            hourly_rate = 0.08 if prov_lower == "aws" else (0.10 if prov_lower == "gcp" else 0.130)
+        elif is_storage:
+            hourly_rate = 0.02
+        elif is_net:
+            hourly_rate = 0.005
+        else:
+            hourly_rate = 0.05
+            
+    return hourly_rate
+
+
 def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
     """
     Takes the structured LLM blueprint, queries the region_price_cache table,
     calculates monthly operational metrics, and applies a resilient fallback matrix.
     """
-    global _AWS_PRICES_CACHE, _GCP_PRICES_CACHE
     total_monthly_cost = 0.0
     calculated_components = []
 
     # High-fidelity static fallback matrix for development/offline parity
-    # Keeps your dashboard functional even if the Go core hasn't cached the SKU yet
     price_fallbacks = {
         "azure": {
             "standard_sig_v5": 0.096,
@@ -357,7 +517,7 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
             "centralindia": "centralindia",
             "southeastasia": "southeastasia",
             "australiaeast": "australiaeast",
-            "brazilsouth": "brazilsouth"
+            "brazilsouth": "brazilsouth",
         },
         "aws": {
             "eastus": "us-east-1",
@@ -367,7 +527,7 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
             "centralindia": "ap-south-1",
             "southeastasia": "ap-southeast-1",
             "australiaeast": "ap-southeast-2",
-            "brazilsouth": "sa-east-1"
+            "brazilsouth": "sa-east-1",
         },
         "gcp": {
             "eastus": "us-east1",
@@ -377,8 +537,8 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
             "centralindia": "asia-south1",
             "southeastasia": "asia-southeast1",
             "australiaeast": "australia-southeast1",
-            "brazilsouth": "southamerica-east1"
-        }
+            "brazilsouth": "southamerica-east1",
+        },
     }
 
     provider_fallbacks = price_fallbacks.get(provider.lower(), {})
@@ -391,12 +551,12 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
 
         # --- DATABASE QUERY BLOCK ---
         try:
-            from reaper.engine.models import SessionLocal, RegionPriceCache
+            from reaper.engine.models import RegionPriceCache, SessionLocal
             db = SessionLocal()
             db_record = db.query(RegionPriceCache).filter(
-                RegionPriceCache.region_name == region
+                RegionPriceCache.region_name == region,
             ).filter(
-                (RegionPriceCache.sku_id.ilike(sku)) | (RegionPriceCache.sku_id.ilike(f"%{sku}%"))
+                (RegionPriceCache.sku_id.ilike(sku)) | (RegionPriceCache.sku_id.ilike(f"%{sku}%")),
             ).first()
             
             if db_record:
@@ -407,141 +567,11 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
 
         # --- REAL-TIME API PRICING DOCK ---
         if hourly_rate is None:
-            if provider.lower() == "azure":
-                try:
-                    from reaper.collectors.azure_prices import AzurePriceClient
-                    client = AzurePriceClient()
-                    clean_sku = sku
-                    if clean_sku.lower().startswith("standard_"):
-                        parts = clean_sku.split("_")
-                        clean_sku = "Standard_" + "_".join(parts[1:])
-                    
-                    query = f"armSkuName eq '{clean_sku}' and armRegionName eq '{mapped_region}' and priceType eq 'Consumption'"
-                    res = client.get_prices(filter_query=query)
-                    if not res:
-                        query = f"armSkuName eq '{sku}' and priceType eq 'Consumption'"
-                        res = client.get_prices(filter_query=query)
-                    
-                    if res:
-                        best_price = next((r for r in res if not r.get("reservationTerm")), res[0])
-                        hourly_rate = float(best_price.get("retailPrice", 0))
-                        
-                        # Cache in DB
-                        try:
-                            from reaper.engine.models import SessionLocal, RegionPriceCache
-                            db = SessionLocal()
-                            db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
-                            new_cache = RegionPriceCache(
-                                sku_id=sku,
-                                region_name=region,
-                                price=hourly_rate,
-                                currency="USD"
-                            )
-                            db.add(new_cache)
-                            db.commit()
-                            db.close()
-                        except Exception:
-                            pass
-                except Exception as e:
-                    print(f"[!] Real-time Azure pricing fetch failed: {e}")
-
-            elif provider.lower() == "aws":
-                try:
-                    if _AWS_PRICES_CACHE is None:
-                        from reaper.collectors.aws_prices import AWSPriceClient
-                        aws_client = AWSPriceClient()
-                        _AWS_PRICES_CACHE = aws_client.get_live_prices()
-                    
-                    match = next((p for p in _AWS_PRICES_CACHE if p["skuName"].lower() == sku.lower() and p["armRegionName"] == mapped_region), None)
-                    if match:
-                        hourly_rate = float(match["retailPrice"])
-                        
-                        # Cache in DB
-                        try:
-                            from reaper.engine.models import SessionLocal, RegionPriceCache
-                            db = SessionLocal()
-                            db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
-                            new_cache = RegionPriceCache(
-                                sku_id=sku,
-                                region_name=region,
-                                price=hourly_rate,
-                                currency="USD"
-                            )
-                            db.add(new_cache)
-                            db.commit()
-                            db.close()
-                        except Exception:
-                            pass
-                except Exception as e:
-                    print(f"[!] Real-time AWS pricing fetch failed: {e}")
-
-            elif provider.lower() == "gcp":
-                try:
-                    if _GCP_PRICES_CACHE is None:
-                        from reaper.collectors.gcp_prices import GCPPriceClient
-                        gcp_client = GCPPriceClient()
-                        _GCP_PRICES_CACHE = gcp_client.get_live_prices()
-                    
-                    match = next((p for p in _GCP_PRICES_CACHE if p["skuName"].lower() == sku.lower() and p["armRegionName"] == mapped_region), None)
-                    if match:
-                        hourly_rate = float(match["retailPrice"])
-                        
-                        # Cache in DB
-                        try:
-                            from reaper.engine.models import SessionLocal, RegionPriceCache
-                            db = SessionLocal()
-                            db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
-                            new_cache = RegionPriceCache(
-                                sku_id=sku,
-                                region_name=region,
-                                price=hourly_rate,
-                                currency="USD"
-                            )
-                            db.add(new_cache)
-                            db.commit()
-                            db.close()
-                        except Exception:
-                            pass
-                except Exception as e:
-                    print(f"[!] Real-time GCP pricing fetch failed: {e}")
+            hourly_rate = _resolve_realtime_price(provider, sku, mapped_region, region)
 
         # --- FALLBACK CIRCUIT BREAKER ---
         if hourly_rate is None:
-            sku_lower = sku.lower()
-            hourly_rate = provider_fallbacks.get(sku_lower)
-            
-            if hourly_rate is None:
-                # Substring/partial matching
-                for fallback_key, price in provider_fallbacks.items():
-                    if fallback_key in sku_lower or sku_lower in fallback_key:
-                        hourly_rate = price
-                        break
-
-            if hourly_rate is None:
-                # Semantic mapping based on component type and names
-                comp_type = item.component_type.lower()
-                generic_lower = item.generic_name.lower()
-                
-                if "compute" in comp_type or "vm" in sku_lower or "virtual machine" in generic_lower or "compute" in generic_lower or "server" in generic_lower:
-                    if provider.lower() == "aws":
-                        hourly_rate = 0.0416
-                    elif provider.lower() == "gcp":
-                        hourly_rate = 0.067
-                    else:
-                        hourly_rate = 0.096
-                elif "db" in comp_type or "database" in comp_type or "db" in sku_lower or "database" in generic_lower or "sql" in generic_lower or "postgres" in generic_lower:
-                    if provider.lower() == "aws":
-                        hourly_rate = 0.08
-                    elif provider.lower() == "gcp":
-                        hourly_rate = 0.10
-                    else:
-                        hourly_rate = 0.130
-                elif "storage" in comp_type or "store" in comp_type or "storage" in sku_lower or "blob" in generic_lower or "s3" in generic_lower or "bucket" in generic_lower or "disk" in generic_lower:
-                    hourly_rate = 0.02
-                elif "net" in comp_type or "network" in comp_type or "net" in sku_lower or "network" in generic_lower or "vpc" in generic_lower or "vnet" in generic_lower or "ip" in generic_lower:
-                    hourly_rate = 0.005
-                else:
-                    hourly_rate = 0.05
+            hourly_rate = _resolve_fallback_price(provider, sku, item.component_type, item.generic_name, provider_fallbacks)
 
         # Calculate standard cloud monthly operational hours (730 hours/month)
         monthly_cost = float(hourly_rate) * 730 * quantity
