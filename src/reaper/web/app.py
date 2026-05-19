@@ -175,11 +175,21 @@ def sync_settings():
 
 @app.before_request
 def check_setup():
-    if request.path.startswith("/static") or request.path.startswith("/api/"):
+    if request.path.startswith("/static") or request.path.startswith("/api/") or "favicon" in request.path:
         return None
     if is_first_run() and request.endpoint != "settings":
         return redirect(url_for("settings", tab="cloud"))
     return None
+
+
+@app.route("/favicon.ico")
+def favicon_ico():
+    return send_file(os.path.join(app.root_path, "static", "assets", "favicon.ico"))
+
+
+@app.route("/favicon.png")
+def favicon_png():
+    return send_file(os.path.join(app.root_path, "static", "assets", "favicon.png"))
 
 
 @app.route("/")
