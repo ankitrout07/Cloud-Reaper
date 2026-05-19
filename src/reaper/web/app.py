@@ -175,7 +175,11 @@ def sync_settings():
 
 @app.before_request
 def check_setup():
-    if request.path.startswith("/static") or request.path.startswith("/api/") or "favicon" in request.path:
+    if (
+        request.path.startswith("/static")
+        or request.path.startswith("/api/")
+        or "favicon" in request.path
+    ):
         return None
     if is_first_run() and request.endpoint != "settings":
         return redirect(url_for("settings", tab="cloud"))
