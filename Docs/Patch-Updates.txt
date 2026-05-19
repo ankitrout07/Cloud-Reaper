@@ -1,4 +1,174 @@
 ////// this section will have patch updates that will be applied to the codebase //////
 
-1. Add a llm for cloud infrastructure design and cost estimation  /////
-    
+1. Correct the cost addition issue in price catalog and architect 
+2. Make a about page for the project and my linkedin profile will be added there 
+3. Calibrate the colors in theme section as white theme is not visible 
+
+4.add option for switching directories and remove the Cloud Connection
+Subscription ID
+ID...
+Tenant ID
+ID...
+Client ID
+ID...
+Client Secret
+••••••••
+Connect Infrastructure section from the settings page
+
+5. in alert channel add logos of dicord and slack  to add the alert Connection
+
+6. add a section for docs in sidebar. there add documentation for each feature about our cloud reaper project and how to use
+in documentation add section for product docs and changelogs, we will update the changelogs and product docs on every release.
+
+7. Live Multi-Cloud Regional Arbitrage Swapper
+When the AI designs an infrastructure stack on Azure, give the user a one-click button to swap cloud environments or regions to find immediate hidden discounts.
+The Concept: An interactive toggle on the UI card: [ See AWS Alternative ] or [ Optimize Region Selection ].
+How it works: When clicked, the frontend fires a WebSocket event to your Python intelligence engine. The engine cross-references the generated asset definitions against your region_price_cache table in PostgreSQL.
+The UI Component: A side-by-side comparison box showing that relocating the exact same processing fleet from a premium region to an adjacent cost-optimized region will instantly lower the running bill by 18%.
+
+## 📘 Theoretical Engine: Knapsack Optimization Framework
+
+The "Cost-Bounded Performance Copilot" operates as a **Bounded Knapsack Optimization Engine** wrapped in an LLM heuristic proxy.
+
+### 1. Mathematical Objective Function
+
+Let $S$ be the set of available cloud resource SKUs (Compute, Storage, Database, Network) provided by the cloud vendor's price cache. Each SKU $i \in S$ possesses a deterministic monthly cost $C_i$ and a multi-dimensional performance metric vector $\mathbf{P}_i = [ \text{vCPU}_i, \text{RAM}_i, \text{IOPS}_i, \text{SLA}_i ]$.
+
+The application workload requirement provided by the user establishes a weighting vector $\mathbf{W} = [w_c, w_m, w_i, w_s]$ to normalize performance into a scalar efficiency coefficient $V_i = \mathbf{W} \cdot \mathbf{P}_i$.
+
+The core engine maximizes system performance under a hard boundary budget capacity ($B$):
+
+$$\max \sum_{i \in S} V_i x_i$$
+
+$$\text{subject to} \quad \sum_{i \in S} C_i x_i \le B$$
+
+Where $x_i \in \mathbb{N}_0$ represents the absolute instance quantity of the chosen resource SKU.
+
+### 2. Heuristic Execution Profile
+
+Deterministic integer programming fails when processing arbitrary natural language specifications (e.g., *"highly available API production cluster"*). The LLM processes this via three steps:
+
+1. **Dynamic Weight Allocation:** It translates structural descriptions into the weighting vector $\mathbf{W}$ (e.g., database workloads shift priority to RAM and IOPS weights).
+2. **Topological Slicing:** It splits budget $B$ into functional infrastructure layers (Networking, Tier-1 Compute, Database Persistence) ensuring a baseline operational topology is maintained.
+3. **SKU Selection:** It executes greedy selection from the highest-performing available SKUs within each slice without violating the maximum budget limit $B$.
+
+---
+
+## 🛠️ Implementation Blueprint
+
+This implementation embeds directly into your existing Python `src/reaper/engine/` layer and exposes an active API control hook to the Flask web layer.
+
+### 1. The Pydantic Data Contract (`src/reaper/engine/copilot_schemas.py`)
+
+```python
+# src/reaper/engine/copilot_schemas.py
+from pydantic import BaseModel, Field
+from typing import List
+
+class ItemizedComponent(BaseModel):
+    name: str = Field(..., description="Logical identification of resource component.")
+    service_type: str = Field(..., description="Exact Infrastructure-as-Code identifier resource type.")
+    sku_size: str = Field(..., description="Optimized high-performance SKU selected under boundary constraints.")
+    quantity: int = Field(..., description="Total integer count of deployed instances.")
+    monthly_cost: float = Field(..., description="Aggregated monthly resource financial impact in USD.")
+    perf_factor: str = Field(..., description="Technical justification tracking performance maximization.")
+
+class OptimizationBlueprintSchema(BaseModel):
+    system_architecture_overview: str = Field(..., description="High-level systemic execution summary.")
+    max_budget_boundary: float = Field(..., description="The user-defined maximum absolute budget limit.")
+    calculated_total_cost: float = Field(..., description="Total aggregated monthly cost. Must be <= max_budget_boundary.")
+    efficiency_index_score: int = Field(..., description="Performance throughput value score per dollar spent (1-100).")
+    infrastructure_components: List[ItemizedComponent] = Field(..., description="Optimized component manifest.")
+    production_terraform_hcl: str = Field(..., description="Valid, production-ready, deployment-grade Terraform code block.")
+
+```
+
+### 2. The Core Optimization Copilot (`src/reaper/engine/copilot_engine.py`)
+
+```python
+# src/reaper/engine/copilot_engine.py
+import os
+from google import genai
+from google.genai import types
+from reaper.engine.copilot_schemas import OptimizationBlueprintSchema
+
+class KnapsackCopilotEngine:
+    def __init__(self):
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("CRITICAL: GEMINI_API_KEY environment variable is missing from runtime context.")
+        self.client = genai.Client(api_key=api_key)
+        self.model_identity = "gemini-3-flash"
+
+    def compile_max_performance_infrastructure(self, cloud_provider: str, user_intent: str, budget_limit: float) -> OptimizationBlueprintSchema:
+        """Calculates and generates the maximum efficiency infrastructure stack strictly bounded by financial limits."""
+        
+        system_rules = (
+            f"You are the Core FinOps Intelligence Engine for Cloud-Reaper.\n"
+            f"Target Provider: {cloud_provider.upper()}\n"
+            f"Maximum Absolute Budget Boundary: ${budget_limit:.2f}/month.\n\n"
+            f"CRITICAL OPERATIONAL RULES:\n"
+            f"1. Maximize system performance, throughput, availability, and capacity for the given workload intent.\n"
+            f"2. calculated_total_cost MUST be less than or equal to ${budget_limit:.2f}/month. Never exceed this limit.\n"
+            f"3. Do not minimize cost blindly; spend up to the budget limit if it translates into maximum compute performance.\n"
+            f"4. Ensure valid architectural practices (e.g., do not omit load balancers or base networks for scale-out designs).\n"
+            f"5. All generated Terraform components MUST contain production tagging configurations: Env='sandbox' and Owner='ankit'.\n"
+            f"6. Return strictly valid JSON adhering perfectly to the required output schema metadata contract."
+        )
+
+        execution_payload = response = self.client.models.generate_content(
+            model=self.model_identity,
+            contents=f"Workload Goal Specification: {user_intent}",
+            config=types.GenerateContentConfig(
+                system_instruction=system_rules,
+                response_mime_type="application/json",
+                response_schema=OptimizationBlueprintSchema,
+                temperature=0.1, # Enforces rigid structural and mathematical compliance
+            ),
+        )
+
+        return OptimizationBlueprintSchema.model_validate_json(execution_payload.text)
+
+```
+
+### 3. Web Layer Route Configuration (`src/reaper/web/copilot_routes.py`)
+
+```python
+# src/reaper/web/copilot_routes.py
+from flask import Blueprint, request, jsonify
+from reaper.engine.copilot_engine import KnapsackCopilotEngine
+
+copilot_api = Blueprint('copilot_api', __name__)
+engine_instance = None
+
+def get_engine():
+    global engine_instance
+    if engine_instance is None:
+        engine_instance = KnapsackCopilotEngine()
+    return engine_instance
+
+@copilot_api.route('/api/v1/copilot/optimize', methods=['POST'])
+def process_optimization_request():
+    payload = request.get_json() or {}
+    provider = payload.get("provider", "azure").strip().lower()
+    user_intent = payload.get("intent", "").strip()
+    budget_limit = payload.get("budget_cap")
+
+    if not user_intent or budget_limit is None:
+        return jsonify({"status": "error", "message": "Missing mandatory params: 'intent' and 'budget_cap'."}), 400
+
+    try:
+        budget_float = float(budget_limit)
+        engine = get_engine()
+        optimized_result = engine.compile_max_performance_infrastructure(
+            cloud_provider=provider,
+            user_intent=user_intent,
+            budget_limit=budget_float
+        )
+        return jsonify({"status": "success", "blueprint": optimized_result.model_dump()}), 200
+
+    except ValueError:
+        return jsonify({"status": "error", "message": "Invalid type constraint: 'budget_cap' must be a numeric value."}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Pipeline Execution Fault: {str(e)}"}), 500
+
