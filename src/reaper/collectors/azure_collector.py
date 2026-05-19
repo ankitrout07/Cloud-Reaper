@@ -3,6 +3,8 @@ import json
 import os
 import platform
 import subprocess
+import threading
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -24,6 +26,30 @@ from reaper.engine.logic import BudgetForecaster
 from reaper.engine.models import CostHistory, RegionPriceCache, SessionLocal
 
 load_dotenv()
+
+_GLOBAL_CACHE = {}
+_CACHE_LOCK = threading.Lock()
+
+
+def get_cached_data(cache_key, fetch_fn, ttl_seconds=60):
+    """
+    Get data from global memory cache or fetch it if missing/expired.
+    Thread-safe and high-performance.
+    """
+    now = time.time()
+    with _CACHE_LOCK:
+        if cache_key in _GLOBAL_CACHE:
+            timestamp, data = _GLOBAL_CACHE[cache_key]
+            if now - timestamp < ttl_seconds:
+                return data
+
+    data = fetch_fn()
+
+    with _CACHE_LOCK:
+        _GLOBAL_CACHE[cache_key] = (now, data)
+
+    return data
+
 
 _COST_FORECAST_CACHE = {}  # subscription_id -> (timestamp, spend_data)
 _CPU_AVERAGE_CACHE = {}  # subscription_id -> (timestamp, cpu_average)
@@ -63,18 +89,23 @@ class AzureCollector:
 
     def get_vm_inventory(self):
         """Fetches all VMs and their sizes."""
-        vms = self.compute.virtual_machines.list_all()
-        inventory = []
-        for vm in vms:
-            inventory.append(
-                {
-                    "name": vm.name,
-                    "size": vm.hardware_profile.vm_size,
-                    "location": vm.location,
-                    "status": "Managed",
-                }
-            )
-        return inventory
+        cache_key = f"vm_inventory_{self.subscription_id}"
+
+        def fetch():
+            vms = self.compute.virtual_machines.list_all()
+            inventory = []
+            for vm in vms:
+                inventory.append(
+                    {
+                        "name": vm.name,
+                        "size": vm.hardware_profile.vm_size,
+                        "location": vm.location,
+                        "status": "Managed",
+                    }
+                )
+            return inventory
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=60)
 
     def get_idle_vms(self, cpu_threshold=5.0):
         """Finds VMs with avg CPU utilization below threshold over last 7 days."""
@@ -959,28 +990,33 @@ class AzureCollector:
         """
         Executes the Go Performance Core to fetch real-time Azure scan data.
         """
-        is_windows = platform.system() == "Windows"
-        binary_name = "reaper-engine.exe" if is_windows else "reaper-engine"
-        go_binary = Path(__file__).resolve().parents[3] / "bin" / binary_name
+        cache_key = f"go_scan_{self.subscription_id}"
 
-        if not go_binary.exists():
-            print(f"[-] Error: Go binary not found at {go_binary}. Run ./reap.sh to build.")
-            return {}
+        def fetch():
+            is_windows = platform.system() == "Windows"
+            binary_name = "reaper-engine.exe" if is_windows else "reaper-engine"
+            go_binary = Path(__file__).resolve().parents[3] / "bin" / binary_name
 
-        try:
-            result = subprocess.run(
-                [str(go_binary), "--subscription", self.subscription_id],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if result.returncode == 0:
-                return json.loads(result.stdout)
-            print(f"[-] Go Engine Error: {result.stderr}")
-            return {}
-        except Exception as e:
-            print(f"[-] Failed to execute Go Scraper: {e}")
-            return {}
+            if not go_binary.exists():
+                print(f"[-] Error: Go binary not found at {go_binary}. Run ./reap.sh to build.")
+                return {}
+
+            try:
+                result = subprocess.run(
+                    [str(go_binary), "--subscription", self.subscription_id],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if result.returncode == 0:
+                    return json.loads(result.stdout)
+                print(f"[-] Go Engine Error: {result.stderr}")
+                return {}
+            except Exception as e:
+                print(f"[-] Failed to execute Go Scraper: {e}")
+                return {}
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=60)
 
     def get_arbitrage_data(self, sku: str, regions: list[str]):
         """
