@@ -13,17 +13,19 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 
 ## 🚀 Key Features
 
-### 1. 📊 Inform Phase — Visibility
+### 1. 📊 Inform Phase — Visibility & High Performance
 - **⚡ High-Velocity Scanning:** Custom Go engine with goroutines for sub-second Azure resource auditing.
+- **🚀 High-Performance In-Memory Cache:** Thread-safe global memory caching (`threading.Lock`) with custom TTLs for Go scans and Azure VM inventories, delivering sub-millisecond dashboard page rendering on refresh.
 - **🏷️ Tag Health Score:** Automated audit of critical tags (`Owner`, `Env`) for 100% cost attribution.
 - **📈 Anomaly Detection:** Real-time detection of cost spikes via seasonal-aware ARIMA forecasting.
-- **🌍 Regional Price Intelligence:** Lazy-cached Azure SKU pricing per region via `RegionPriceCache` (PostgreSQL).
+- **🌍 Regional Price Intelligence:** Lazy-cached Azure/AWS/GCP SKU pricing per region via `RegionPriceCache` (PostgreSQL).
 
-### 2. 📉 Optimize Phase — Waste Reduction
+### 2. 📉 Optimize & GreenOps Phase — Waste & Carbon Reduction
+- **🌱 Dynamic GreenOps Carbon Index:** Live estimation of Regional Grid Carbon Intensity (gCO2eq/kWh) for virtual machine fleets, generating geographic placement recommendations for green migration.
 - **🧟 Zombie Hunting:** Identifies orphaned disks, snapshots, and idle compute resources automatically.
 - **💎 RI/SP Advisor:** Recommends Reserved Instances based on actual uptime and inventory patterns.
-- **❄️ Cold Storage Identifier:** Scans unused storage and suggests Cool/Archive tier migrations.
-- **🤖 AI Regional Arbitrage:** Automatically compares SKU pricing across regions and recommends cheaper deployments.
+- **❄️ Cold Storage Identifier:** Scans unused storage dynamically and suggests cost-efficient Cool/Archive tier migrations.
+- **🤖 AI Regional Arbitrage:** Standard-compliant multi-cloud (AWS, GCP, Azure) real-time pricing clients offering region-to-region arbitrage estimation.
 
 ### 3. ⚖️ Operate Phase — Governance
 - **🛡️ Policy Guardrails:** Real-time audit against FinOps best practices via Azure Resource Graph.
