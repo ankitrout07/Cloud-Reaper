@@ -189,12 +189,16 @@ def check_setup():
 
 @app.route("/favicon.ico")
 def favicon_ico():
-    return send_from_directory(str(_web_dir / "static" / "assets"), "favicon.ico", mimetype="image/x-icon")
+    return send_from_directory(
+        str(_web_dir / "static" / "assets"), "favicon.ico", mimetype="image/x-icon"
+    )
 
 
 @app.route("/favicon.png")
 def favicon_png():
-    return send_from_directory(str(_web_dir / "static" / "assets"), "favicon.png", mimetype="image/png")
+    return send_from_directory(
+        str(_web_dir / "static" / "assets"), "favicon.png", mimetype="image/png"
+    )
 
 
 @app.route("/")
