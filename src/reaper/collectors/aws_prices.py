@@ -9,6 +9,7 @@ class AWSPriceClient:
         "RDS": "https://instances.vantage.sh/rds/instances.json",
         "ElastiCache": "https://instances.vantage.sh/cache/instances.json",
     }
+    URL = URLS["EC2"]
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
