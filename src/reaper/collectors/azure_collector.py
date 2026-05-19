@@ -1128,10 +1128,42 @@ class AzureCollector:
 
     def get_virtual_tags(self):
         """
-        Returns virtual tagging logic.
+        Hierarchical Virtual Tagging Engine.
+        Dynamically applies logical business taxonomies to raw cloud resources 
+        without altering physical Azure tags.
         """
-        # Feature removed mock data. To be implemented using real Azure API tags.
-        return []
+        vms = self.get_vm_inventory()
+        
+        # Define internal business taxonomy rules programmatically
+        tag_rules = [
+            (lambda r: "prod" in r.get("name", "").lower(), {"Environment": "Production", "BusinessUnit": "Core"}),
+            (lambda r: "dev" in r.get("name", "").lower() or "test" in r.get("name", "").lower(), {"Environment": "R&D", "BusinessUnit": "Engineering"}),
+            (lambda r: "aks" in r.get("name", "").lower() or "k8s" in r.get("name", "").lower(), {"ServiceType": "Kubernetes", "CostCenter": "Platform-Eng"}),
+            (lambda r: "sql" in r.get("name", "").lower() or "db" in r.get("name", "").lower(), {"ServiceType": "Database", "CostCenter": "Data-Eng"}),
+        ]
+
+        mapped_resources = []
+        for vm in vms:
+            virtual_tags = {}
+            
+            # Apply virtual rules programmatically on the fly
+            for rule_fn, taxonomy in tag_rules:
+                if rule_fn(vm):
+                    virtual_tags.update(taxonomy)
+            
+            # Default fallback for unallocated spend
+            if "BusinessUnit" not in virtual_tags:
+                virtual_tags["BusinessUnit"] = "Unallocated"
+                virtual_tags["Environment"] = "Unknown"
+
+            mapped_resources.append({
+                "resource_name": vm.get("name"),
+                "physical_location": vm.get("location"),
+                "virtual_tags": virtual_tags,
+                "cost_center": virtual_tags.get("CostCenter", "Unassigned")
+            })
+
+        return mapped_resources
 
     def get_greenops_recommendations(self):
         """
