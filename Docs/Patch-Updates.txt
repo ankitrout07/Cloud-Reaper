@@ -4,17 +4,7 @@
 2. Make a about page for the project and my linkedin profile will be added there 
 3. Calibrate the colors in theme section as white theme is not visible 
 
-4.add option for switching directories and remove the Cloud Connection
-Subscription ID
-ID...
-Tenant ID
-ID...
-Client ID
-ID...
-Client Secret
-••••••••
-Connect Infrastructure section from the settings page
-
+4.
 5. in alert channel add logos of dicord and slack  to add the alert Connection
 
 6. add a section for docs in sidebar. there add documentation for each feature about our cloud reaper project and how to use

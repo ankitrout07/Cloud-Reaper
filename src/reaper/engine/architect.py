@@ -311,6 +311,8 @@ def _resolve_azure_price(sku: str, mapped_region: str, region: str) -> float | N
         if res:
             best_price = next((r for r in res if not r.get("reservationTerm")), res[0])
             hourly_rate = float(best_price.get("retailPrice", 0))
+            if "Month" in best_price.get("unitOfMeasure", ""):
+                hourly_rate = hourly_rate / 730
 
             # Cache in DB
             try:

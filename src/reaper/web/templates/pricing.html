@@ -384,6 +384,9 @@
             countBadge.innerText = totalCount;
             totalHr.innerText = `$${totalHourly.toFixed(4)}`;
             totalMo.innerText = `$${(totalHourly * 730).toFixed(2)}`;
+            
+            architectEstimate.totalHourly = totalHourly;
+            architectEstimate.totalMonthly = totalHourly * 730;
         }
 
         function togglePricing(mode) {
