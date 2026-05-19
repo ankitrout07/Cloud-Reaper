@@ -802,7 +802,7 @@ class AzureCollector:
                     "bucket": "auditbackupsprod",
                     "size_gb": 5800,
                     "monthly_savings": 58.00,
-                }
+                },
             ]
         return candidates[:5]
 
@@ -836,7 +836,7 @@ class AzureCollector:
                     "name": "customer-db-vm",
                     "target": "Azure SQL (Managed)",
                     "annual_savings": 2160.0,
-                }
+                },
             ]
         return candidates[:5]
 
@@ -1136,13 +1136,15 @@ class AzureCollector:
                     current_g = carbon_intensities.get(loc, 350)
                     target_g = carbon_intensities.get(target, 150)
                     savings_pct = int(((current_g - target_g) / current_g) * 100)
-                    
-                    recommendations.append({
-                        "name": vm.name,
-                        "current_region": vm.location,
-                        "target_region": target.upper(),
-                        "savings_pct": savings_pct
-                    })
+
+                    recommendations.append(
+                        {
+                            "name": vm.name,
+                            "current_region": vm.location,
+                            "target_region": target.upper(),
+                            "savings_pct": savings_pct,
+                        }
+                    )
         except Exception:
             pass
 
@@ -1166,7 +1168,7 @@ class AzureCollector:
                     "current_region": "West Europe",
                     "target_region": "North Europe",
                     "savings_pct": 68,  # (290 - 90) / 290 = 68%
-                }
+                },
             ]
         return recommendations[:5]
 
