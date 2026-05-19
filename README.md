@@ -16,11 +16,15 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 ### 1. 📊 Inform Phase — Visibility & High Performance
 - **⚡ High-Velocity Scanning:** Custom Go engine with goroutines for sub-second Azure resource auditing.
 - **🚀 High-Performance In-Memory Cache:** Thread-safe global memory caching (`threading.Lock`) with custom TTLs for Go scans and Azure VM inventories, delivering sub-millisecond dashboard page rendering on refresh.
+- **🏷️ Hierarchical Virtual Tagging:** Programmatically builds nested, logical metadata tags to map costs to internal business taxonomies without altering physical cloud tags.
+- **🧠 Unified AI/LLM Token Tracking:** Connects to external AI providers (OpenAI, Anthropic, etc.) to track generative AI API billing metrics alongside standard infrastructure costs.
 - **🏷️ Tag Health Score:** Automated audit of critical tags (`Owner`, `Env`) for 100% cost attribution.
 - **📈 Anomaly Detection:** Real-time detection of cost spikes via seasonal-aware ARIMA forecasting.
 - **🌍 Regional Price Intelligence:** Lazy-cached Azure/AWS/GCP SKU pricing per region via `RegionPriceCache` (PostgreSQL).
 
 ### 2. 📉 Optimize & GreenOps Phase — Waste & Carbon Reduction
+- **📦 Continuous Cluster Bin-Packing:** Evaluates Kubernetes pod requirements in real-time, executing live container migrations to maximize node utilization and terminate empty VMs automatically.
+- **💤 Deep Zero-Downtime Cluster Hibernation:** Scales non-production clusters down to zero during non-working hours, instantly spinning them back up upon developer request.
 - **🌱 Dynamic GreenOps Carbon Index:** Live estimation of Regional Grid Carbon Intensity (gCO2eq/kWh) for virtual machine fleets, generating geographic placement recommendations for green migration.
 - **🧟 Zombie Hunting:** Identifies orphaned disks, snapshots, and idle compute resources automatically.
 - **💎 RI/SP Advisor:** Recommends Reserved Instances based on actual uptime and inventory patterns.
@@ -28,6 +32,7 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 - **🤖 AI Regional Arbitrage:** Standard-compliant multi-cloud (AWS, GCP, Azure) real-time pricing clients offering region-to-region arbitrage estimation.
 
 ### 3. ⚖️ Operate Phase — Governance
+- **🛑 Shift-Left PR Cost Simulation:** Integrates with code control planes (GitHub Actions/Terraform) to run dry-run estimations, preventing expensive infrastructure mistakes before code is merged.
 - **🛡️ Policy Guardrails:** Real-time audit against FinOps best practices via Azure Resource Graph.
 - **🚨 Budget Kill-Switch:** Automated VM deallocation safeguards for sandbox environments.
 - **🔔 Discord Notifications:** Webhook-driven alerts for budget breaches and anomalies.
