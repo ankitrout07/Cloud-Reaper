@@ -212,7 +212,7 @@ class AIArchitectManager:
                     raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
 
                 # Call Gemini Structured Output API
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_key}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={self.gemini_key}"
                 payload = {
                     "contents": [{"parts": [{"text": system_instructions}, {"text": user_prompt}]}],
                     "generationConfig": {
