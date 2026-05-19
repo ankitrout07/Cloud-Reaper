@@ -1502,6 +1502,7 @@ def spot_prediction():
 def k8s_bin_packing():
     try:
         from reaper.engine.workload import KubernetesOptimizer
+
         optimizer = KubernetesOptimizer()
         return jsonify({"status": "success", "bin_packing": optimizer.get_bin_packing_assessment()})
     except Exception as e:
@@ -1512,6 +1513,7 @@ def k8s_bin_packing():
 def k8s_hibernation():
     try:
         from reaper.engine.workload import KubernetesOptimizer
+
         optimizer = KubernetesOptimizer()
         return jsonify({"status": "success", "hibernation": optimizer.get_hibernation_status()})
     except Exception as e:
@@ -1530,7 +1532,7 @@ def ai_token_tracking():
                 "input_cost_usd": 62.25,
                 "output_cost_usd": 186.75,
                 "total_cost_usd": 249.00,
-                "equivalent_vm_hours": 171.7
+                "equivalent_vm_hours": 171.7,
             },
             {
                 "provider": "Anthropic",
@@ -1540,7 +1542,7 @@ def ai_token_tracking():
                 "input_cost_usd": 26.70,
                 "output_cost_usd": 133.50,
                 "total_cost_usd": 160.20,
-                "equivalent_vm_hours": 110.5
+                "equivalent_vm_hours": 110.5,
             },
             {
                 "provider": "Anyscale",
@@ -1550,16 +1552,18 @@ def ai_token_tracking():
                 "input_cost_usd": 31.50,
                 "output_cost_usd": 31.50,
                 "total_cost_usd": 63.00,
-                "equivalent_vm_hours": 43.4
-            }
+                "equivalent_vm_hours": 43.4,
+            },
         ]
         total_ai_spend = sum(item["total_cost_usd"] for item in allocations)
-        return jsonify({
-            "status": "success",
-            "allocations": allocations,
-            "total_ai_spend_usd": round(total_ai_spend, 2),
-            "consolidated_report": "AI workloads consolidated. Total AI spend is 12% of total subscription infrastructure cost."
-        })
+        return jsonify(
+            {
+                "status": "success",
+                "allocations": allocations,
+                "total_ai_spend_usd": round(total_ai_spend, 2),
+                "consolidated_report": "AI workloads consolidated. Total AI spend is 12% of total subscription infrastructure cost.",
+            }
+        )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
