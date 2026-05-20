@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cloud Reaper | Price Catalog</title>
     <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/static/js/theme.js"></script>
     <script src="/static/js/setup.js"></script>
@@ -73,9 +74,9 @@
                 </div>
 
                 <div class="flex gap-2 bg-white/5 p-1 rounded-xl border border-white/5 mb-8 w-fit">
-                    <button id="prov-azure" onclick="switchProvider('azure')" class="prov-btn px-6 py-2 bg-cyan-500 rounded-lg text-[#0d1117] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 transition-all">Azure</button>
-                    <button id="prov-aws" onclick="switchProvider('aws')" class="prov-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all">AWS</button>
-                    <button id="prov-gcp" onclick="switchProvider('gcp')" class="prov-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all">GCP</button>
+                    <button id="prov-azure" onclick="switchProvider('azure')" class="prov-btn px-6 py-2 bg-cyan-500 rounded-lg text-[#0d1117] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 transition-all flex items-center justify-center gap-2"><i class="fab fa-microsoft text-sm"></i> Azure</button>
+                    <button id="prov-aws" onclick="switchProvider('aws')" class="prov-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"><i class="fab fa-aws text-sm"></i> AWS</button>
+                    <button id="prov-gcp" onclick="switchProvider('gcp')" class="prov-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"><i class="fab fa-google text-sm"></i> GCP</button>
                 </div>
 
                 <div class="mb-6 relative">
@@ -420,11 +421,11 @@
             
             // Update toggle buttons
             document.querySelectorAll('.prov-btn').forEach(btn => {
-                btn.className = "prov-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all";
+                btn.className = "prov-btn px-6 py-2 hover:bg-white/5 rounded-lg text-slate-400 text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2";
             });
             const activeBtn = document.getElementById(`prov-${provider}`);
             if (activeBtn) {
-                activeBtn.className = "prov-btn px-6 py-2 bg-cyan-500 rounded-lg text-[#0d1117] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 transition-all";
+                activeBtn.className = "prov-btn px-6 py-2 bg-cyan-500 rounded-lg text-[#0d1117] text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-500/20 transition-all flex items-center justify-center gap-2";
             }
             
             // Refresh prices
