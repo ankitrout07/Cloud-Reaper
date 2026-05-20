@@ -105,8 +105,8 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
 
 from reaper.web.copilot_routes import copilot_api
-from reaper.web.search_routes import search_bp
 from reaper.web.metrics_routes import telemetry_bp
+from reaper.web.search_routes import search_bp
 
 app.register_blueprint(copilot_api)
 app.register_blueprint(search_bp)
@@ -368,7 +368,7 @@ def handle_update_integrations(data):
     # Track separate URLs
     discord_url = data.get("discord_webhook_url")
     slack_url = data.get("slack_webhook_url")
-    
+
     if discord_url is not None:
         settings_state["discord_webhook_url"] = discord_url
         settings_state["webhook_url"] = discord_url
@@ -376,7 +376,7 @@ def handle_update_integrations(data):
         settings_state["slack_webhook_url"] = slack_url
         if not settings_state.get("webhook_url"):
             settings_state["webhook_url"] = slack_url
-            
+
     # legacy compatibility if legacy webhook_url is passed directly
     if "webhook_url" in data:
         legacy_url = data.get("webhook_url", "")

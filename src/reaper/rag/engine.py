@@ -1,8 +1,9 @@
 # src/reaper/rag/engine.py
-import os
 import glob
+import os
+
 from google import genai
-from google.genai import types
+
 
 class DocSearchEngine:
     def __init__(self):
@@ -10,37 +11,40 @@ class DocSearchEngine:
         if not api_key:
             raise ValueError("CRITICAL: GEMINI_API_KEY environment variable is unconfigured.")
         self.client = genai.Client(api_key=api_key)
-        self.embedding_model = "models/gemini-embedding-2" # Standard structural text embedding generation model
+        self.embedding_model = (
+            "models/gemini-embedding-2"  # Standard structural text embedding generation model
+        )
         self.docs_index = []
 
     def load_and_index_docs(self, docs_dir: str = "docs"):
         """Reads and indexes all markdown files from the target repository documentation tree."""
         self.docs_index = []
         search_path = os.path.join(docs_dir, "**/*.md")
-        
+
         for file_path in glob.glob(search_path, recursive=True):
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
-                
+
             # Naive chunking strategy split by structural section headers
             chunks = content.split("\n## ")
             for idx, chunk in enumerate(chunks):
                 if not chunk.strip():
                     continue
-                
+
                 clean_chunk = chunk if idx == 0 else f"## {chunk}"
                 # Generate embedding vectors for this specific document block
                 try:
                     response = self.client.models.embed_content(
-                        model=self.embedding_model,
-                        contents=clean_chunk
+                        model=self.embedding_model, contents=clean_chunk
                     )
-                    
-                    self.docs_index.append({
-                        "file_name": os.path.basename(file_path),
-                        "text": clean_chunk,
-                        "vector": response.embeddings[0].values
-                    })
+
+                    self.docs_index.append(
+                        {
+                            "file_name": os.path.basename(file_path),
+                            "text": clean_chunk,
+                            "vector": response.embeddings[0].values,
+                        }
+                    )
                 except Exception as e:
                     print(f"WARN: Error generating embedding for chunk in {file_path}: {e}")
 
@@ -51,8 +55,7 @@ class DocSearchEngine:
 
         # Generate embedding vector for the inbound search query
         query_response = self.client.models.embed_content(
-            model=self.embedding_model,
-            contents=user_query
+            model=self.embedding_model, contents=user_query
         )
         query_vector = query_response.embeddings[0].values
 
@@ -62,7 +65,7 @@ class DocSearchEngine:
             dot_product = sum(q * d for q, d in zip(query_vector, doc["vector"]))
             q_norm = sum(q * q for q in query_vector) ** 0.5
             d_norm = sum(d * d for d in doc["vector"]) ** 0.5
-            
+
             similarity = dot_product / (q_norm * d_norm) if (q_norm * d_norm) > 0 else 0
             scored_results.append((similarity, doc))
 
@@ -71,8 +74,8 @@ class DocSearchEngine:
         return [
             {
                 "file": item[1]["file_name"],
-                "content": item[1]["text"][:300] + "...", # Snip preview string length
-                "confidence_score": f"{item[0] * 100:.2f}%"
+                "content": item[1]["text"][:300] + "...",  # Snip preview string length
+                "confidence_score": f"{item[0] * 100:.2f}%",
             }
             for item in scored_results[:top_k]
         ]

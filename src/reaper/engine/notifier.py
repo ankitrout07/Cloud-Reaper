@@ -7,7 +7,7 @@ def send_discord_alert(title, message, color=0x3B82F6, webhook_url=None):
     """
     if not webhook_url:
         webhook_url = "https://discord.com/api/webhooks/YOUR_WEBHOOK_HERE"
-    
+
     if "YOUR_WEBHOOK" in webhook_url:
         return False
 
@@ -48,4 +48,3 @@ def send_slack_alert(message, webhook_url=None):
     except Exception as e:
         print(f"[-] Slack Notify Failed: {e}")
         return False
-

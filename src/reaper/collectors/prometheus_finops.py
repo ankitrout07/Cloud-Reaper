@@ -1,9 +1,10 @@
 # src/reaper/collectors/prometheus_finops.py
-import requests
-import time
 import logging
 
+import requests
+
 logger = logging.getLogger("reaper.collector.prometheus")
+
 
 class PrometheusFinOpsCollector:
     def __init__(self, prometheus_url: str = "http://localhost:9090"):
@@ -13,13 +14,13 @@ class PrometheusFinOpsCollector:
         """Executes PromQL queries to calculate average CPU utilization across clusters."""
         # PromQL query tracking average non-idle CPU percentage across the fleet
         promql_query = f"100 - (avg by (instance) (rate(node_cpu_seconds_total{{mode='idle'}}[{duration_window}])) * 100)"
-        
+
         try:
-            response = requests.get(self.api_endpoint, params={'query': promql_query}, timeout=10)
+            response = requests.get(self.api_endpoint, params={"query": promql_query}, timeout=10)
             if response.status_code != 200:
                 logger.error(f"Prometheus query failure. HTTP Status: {response.status_code}")
                 return {}
-            
+
             results = response.json().get("data", {}).get("result", [])
             utilization_map = {}
             for item in results:
@@ -27,8 +28,8 @@ class PrometheusFinOpsCollector:
                 # Extract the final scalar metric reading tuple [timestamp, value]
                 value = float(item.get("value", [0, 0])[1])
                 utilization_map[instance] = round(value, 2)
-            
+
             return utilization_map
         except Exception as e:
-            logger.critical(f"Failed to reach Prometheus API backend: {str(e)}")
+            logger.critical(f"Failed to reach Prometheus API backend: {e!s}")
             return {}
