@@ -6,7 +6,7 @@
 
 3. Calibrate the colors in theme section as white theme is not visible 
 
-4. in alert channel add logos of dicord and slack  to add the alert Connection
+4. In alert channel add logos of dicord and slack  to add the alert Connection
 
 5. Financial planning Sections and under it add the following 
 Budget
@@ -17,6 +17,13 @@ Issues
 Commitments
 Savings Models
 
-6.
+6. Pasted IMage add to the codebase AND MAKE IT IN SECTION "OVERVIEW"
 
 7. Add icons for the cloud providers that are in cloud providers for each cloud provider we have declared
+
+8. NOW UNDER Integrations section make the following -
+Kubernetes
+Docs
+Enable Kubernetes Agent - Vantage integrations with your Kubernetes cluster via the Vantage Kubernetes Agent. Once the integration is enabled you will need to deploy the Vantage agent into your Kubernetes clusters.
+
+9. 
