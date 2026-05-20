@@ -145,13 +145,369 @@ def get_telemetry_driven_insights():
         return jsonify({"status": "error", "message": f"Telemetry parsing failure: {str(e)}"}), 500
 
 11.-------------------------------------------------------------------------------------------------------------------------------------------
-
+Cost Reports:(Grafana and Prometheus integration)
+Add to Dashboard shortcut: The Cost Report ellipsis menu now includes an Add to Dashboard option, letting you navigate directly to Dashboards to add the current report as a widget.
+Kubernetes Efficiency Report regions: Kubernetes Efficiency Reports now support filtering and grouping by Region, making it easier to analyze idle and total Kubernetes costs by cloud region.
+Budget Performance in report notifications: Cost Report notifications now include a Budget Performance section when the report has linked budgets, helping recipients compare actual spend against budget targets directly from scheduled email, Slack, or Microsoft Teams updates.
+Cost Recommendations:
+Potential Savings currency conversion: Cost Recommendations Potential Savings amounts on Resource Reports and rightsizing views now correctly display in your workspace’s configured currency.
+Idle GKE cluster recommendations: Vantage now surfaces idle Google Kubernetes Engine (GKE) cluster recommendations, identifying clusters with little or no workload activity so you can scale them down or delete them. A new Idle GKE Cluster tab is available on affected GKE cluster resources with the recommended remediation.
+Active Resources & Resource Reports:
+ELB instance metadata: ELB Active Resources now display registered EC2 instance metadata, including target group details, making it easier to understand which instances are behind each load balancer.
+Active Resources chart and Cost Report link: The Active Resources detail page now defaults to a stacked bar chart grouped by service and category, and includes a View in Cost Report button that links directly to the default Cost Report filtered by the resource.
+Resource Report folders: Resource Reports can now be organized into folders, with support for bulk move operations and search across folders—matching the same folder experience already available for Cost Reports.
+S3 Last Accessed Date: S3 Active Resources now include a Last Accessed Date metadata field, derived from S3 request activity in your billing data, making it easier to identify unused or infrequently accessed buckets.
+Virtual Tags & Tagging:
+Preferred virtual tags: You can now mark Virtual Tags as preferred directly from the Virtual Tags tab on the Tags settings page, in addition to the existing All Tags tab workflow.
 
 12.-------------------------------------------------------------------------------------------------------------------------------------------
+1. Raw Telemetry Extraction (From Prometheus HTTP API)
+Prometheus exposes a native REST API under the /api/v1 namespace that outputs raw website performance metric payloads completely structured in JSON.
 
+The Target Endpoint Format
+To pull real-time historical usage data of your website (e.g., HTTP request counts or duration rates over a range), your engine-go or Python collector queries the Prometheus Range Query Engine:
+
+Plaintext
+GET http://<prometheus-host>:9090/api/v1/query_range?query=rate(http_requests_total[5m])&start=2026-05-20T12:00:00Z&end=2026-05-20T17:00:00Z&step=15s
+The Inbound JSON Payload Structure
+Prometheus returns an envelope structure containing a timestamp/value matrix:
+
+JSON
+{
+  "status": "success",
+  "data": {
+    "resultType": "matrix",
+    "result": [
+      {
+        "metric": {
+          "__name__": "http_requests_total",
+          "instance": "production-web-server-01",
+          "job": "website-frontend",
+          "status_code": "200"
+        },
+        "values": [
+          [1779285600, "42.5"], 
+          [1779285615, "48.1"]  
+        ]
+      }
+    ]
+  }
+}
+How Cloud-Reaper Leverages This
+Your backend parses the values array (Format: [Unix_Timestamp, "Value_String"]).
+
+It calculates the workload utilization trends and matches the instance label against your PostgreSQL resources table.
+
+If the request volume is near zero for days, Cloud-Reaper flags it as a Zombie Resource to save costs.
+
+2. Dashboard Template Extraction (From Grafana HTTP API)
+If you already have beautiful, custom cost-tracking or infrastructure panels designed inside Grafana, you do not need to re-code them on your frontend. Grafana exports its entire visualization system as a JSON Model.
+
+The Export Endpoint Format
+To extract a dashboard panel's complete chart config code, hit Grafana's core HTTP API using a Service Account token:
+
+Plaintext
+GET http://<grafana-host>:3000/api/dashboards/uid/<dashboard-uid>
+The Inbound JSON Layout Structure
+This returns a standard configuration payload detailing the panel's visual format, query parameters, and chart types:
+
+JSON
+{
+  "dashboard": {
+    "id": 104,
+    "title": "Production Website FinOps Overview",
+    "panels": [
+      {
+        "type": "timeseries",
+        "title": "Network Transit Egress Cost Overhead",
+        "targets": [
+          {
+            "datasource": { "type": "prometheus", "uid": "prom-prod" },
+            "expr": "sum(rate(container_network_transmit_bytes_total[5m]))"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "decbytes" }
+        }
+      }
+    ]
+  }
+}
+1. Updated Integration Card Template (src/reaper/web/templates/integrations.html)
+Replace or extend your existing template block to incorporate the explicit HTML5 file-drop zone. This code includes the required CSS styling to match Cloud-Reaper's standard Glassmorphism + Cyan Glow frontend design.
+
+HTML
+<div class="glass-card p-4 animated-fade-in" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(0, 243, 255, 0.1); border-radius: 8px; padding: 20px; margin-top: 20px;">
+    <h4 style="color: #00f3ff; margin-top: 0; margin-bottom: 10px;">
+        <i class="fas fa-file-import mr-2"></i> Ad-Hoc JSON Telemetry Ingestion
+    </h4>
+    <p class="text-muted" style="font-size: 13px; margin-bottom: 15px;">
+        Drag and drop an exported Prometheus or Grafana JSON data file here to generate instantaneous cost-reduction statistics.
+    </p>
+
+    <div id="drop-zone" style="border: 2px dashed rgba(0, 243, 255, 0.3); border-radius: 6px; padding: 30px; text-align: center; background: rgba(0, 0, 0, 0.2); cursor: pointer; transition: all 0.3s ease;">
+        <i class="fas fa-cloud-arrow-up" style="font-size: 32px; color: rgba(0, 243, 255, 0.6); margin-bottom: 10px;"></i>
+        <p id="drop-zone-text" style="color: #aaa; font-size: 13px; margin: 0;">
+            Drag & Drop metrics.json here or <span style="color: #00f3ff; text-decoration: underline;">browse local files</span>
+        </p>
+        <input type="file" id="file-input" accept=".json" style="display: none;">
+    </div>
+
+    <div id="upload-stats-panel" style="display: none; margin-top: 20px; padding-top: 15px; border-top: 1px solid #333;">
+        <h5 style="color: #fff; margin-top: 0; font-size: 14px;">Parsed Ingestion Metrics Summary</h5>
+        <div style="display: flex; gap: 15px; margin-top: 10px;">
+            <div style="background: rgba(0,0,0,0.4); padding: 10px; border-radius: 4px; flex: 1; text-align: center;">
+                <span style="display: block; font-size: 11px; color: #888;">Detected Targets</span>
+                <strong id="stat-targets" style="color: #00f3ff; font-size: 18px;">0</strong>
+            </div>
+            <div style="background: rgba(0,0,0,0.4); padding: 10px; border-radius: 4px; flex: 1; text-align: center;">
+                <span style="display: block; font-size: 11px; color: #888;">Avg CPU Load</span>
+                <strong id="stat-cpu" style="color: #ffae00; font-size: 18px;">0%</strong>
+            </div>
+            <div style="background: rgba(0,0,0,0.4); padding: 10px; border-radius: 4px; flex: 1; text-align: center;">
+                <span style="display: block; font-size: 11px; color: #888;">Est. Waste Index</span>
+                <strong id="stat-waste" style="color: #ff5f5f; font-size: 18px;">0%</strong>
+            </div>
+        </div>
+    </div>
+</div>
+2. High-Performance Client-Side Parsing Engine
+Add this script to the bottom of your template file or your global static asset JS file. It hooks directly into the browser's native HTML5 Drag and Drop API events (dragover, dragleave, drop), processes the JSON payload using the asynchronous FileReader API, and dynamically extracts and updates your dashboard statistics.
+
+JavaScript
+// Append this implementation script logic to your dashboard web layouts
+document.addEventListener("DOMContentLoaded", () => {
+    const dropZone = document.getElementById("drop-zone");
+    const fileInput = document.getElementById("file-input");
+    const dropZoneText = document.getElementById("drop-zone-text");
+
+    // Click handler to route drop-zone interaction to the hidden native file picker
+    dropZone.addEventListener("click", () => fileInput.click());
+
+    // Prevent default browser behaviors for file dropping
+    ["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
+        window.addEventListener(eventName, (e) => e.preventDefault(), false);
+    });
+
+    // Visual hover states using Cloud-Reaper cyan border styling highlights
+    dropZone.addEventListener("dragover", () => {
+        dropZone.style.border = "2px dashed #00f3ff";
+        dropZone.style.background = "rgba(0, 243, 255, 0.05)";
+    });
+
+    ["dragleave", "drop"].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.border = "2px dashed rgba(0, 243, 255, 0.3)";
+            dropZone.style.background = "rgba(0, 0, 0, 0.2)";
+        });
+    });
+
+    // Handle dropping execution hook
+    dropZone.addEventListener("drop", (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            processTelemetryJsonFile(files[0]);
+        }
+    });
+
+    // Handle manual browse selection change hook
+    fileInput.addEventListener("change", (e) => {
+        if (e.target.files.length > 0) {
+            processTelemetryJsonFile(e.target.files[0]);
+        }
+    });
+
+    function processTelemetryJsonFile(file) {
+        if (file.type !== "application/json" && !file.name.endsWith(".json")) {
+            alert("CRITICAL ERROR: Cloud-Reaper ingestion only accepts valid .json telemetry reports.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const parsedData = JSON.parse(event.target.result);
+                
+                // Update UI text to demonstrate successful file parsing action
+                dropZoneText.innerHTML = `<i class="fas fa-check-circle" style="color:#00ff66;"></i> Successfully Loaded: <strong>${file.name}</strong>`;
+                
+                // Execute standard metric processing mapping over Prometheus metric models
+                renderExtractedStats(parsedData);
+            } catch (err) {
+                alert("PARSING ERROR: Provided file is not a structurally sound JSON payload document.");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function renderExtractedStats(jsonData) {
+        // Safe, basic heuristic parsing strategy looking for native Prometheus data structures
+        const resultsArray = jsonData?.data?.result || [];
+        const targetsCount = resultsArray.length || 1;
+        
+        // Simulating analytical cost evaluations directly from payload metadata readings
+        let totalCalculatedCpu = 0;
+        resultsArray.forEach(item => {
+            const lastValue = item.values ? parseFloat(item.values[item.values.length - 1][1]) : parseFloat(item.value?.[1] || 15);
+            totalCalculatedCpu += isNaN(lastValue) ? 15 : lastValue;
+        });
+
+        const avgCpu = (totalCalculatedCpu / targetsCount).toFixed(1);
+        const wasteFactor = avgCpu < 15 ? (100 - parseFloat(avgCpu)).toFixed(0) : 0;
+
+        // Populate visual stats numbers into the DOM containers instantly
+        document.getElementById("stat-targets").innerText = targetsCount;
+        document.getElementById("stat-cpu").innerText = `${avgCpu}%`;
+        document.getElementById("stat-waste").innerText = `${wasteFactor}%`;
+
+        // Reveal the visualization card panel inside the workspace view
+        document.getElementById("upload-stats-panel").style.display = "block";
+    }
+});
 
 13.-------------------------------------------------------------------------------------------------------------------------------------------
+To implement a dedicated, high-speed centralized search system restricted entirely to your Cloud-Reaper internal markdown documentation files, we will build a Vector-Embedded RAG (Retrieval-Augmented Generation) Search Engine using a Python-based SQLite Vector database (sqlite-vec) or a lightweight in-memory matrix combined with your Go core or Python intelligence layer.
 
+This replaces basic, slow grep-style text matching with a contextual search system that understands engineering intent (e.g., searching for "how do I fix idle compute" will successfully return your documentation files on Prometheus underutilization metrics, even if the exact phrase "idle compute" isn't written in the text).
+
+1. Target Documentation Directory Tree
+The search system will crawl and index your internal .md technical spec documentation layout located inside your workspace repository:
+
+Plaintext
+Cloud-Reaper/
+└── docs/
+    ├── architecture.md
+    ├── deployment.md
+    ├── finops_policies.md
+    └── telemetry_setup.md
+2. The Embedded Vector Search Implementation Engine (src/reaper/engine/search_engine.py)
+This script initializes your search utility. It reads your local markdown documentation tree, splits the content into digestible sections, generates technical vector embeddings using gemini-3-flash, and runs a cosine-similarity matrix match to find the most relevant document sections instantly.
+
+Python
+# src/reaper/engine/search_engine.py
+import os
+import glob
+from google import genai
+from google.genai import types
+
+class DocSearchEngine:
+    def __init__(self):
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("CRITICAL: GEMINI_API_KEY environment variable is unconfigured.")
+        self.client = genai.Client(api_key=api_key)
+        self.embedding_model = "text-embedding-004" # Standard structural text embedding generation model
+        self.docs_index = []
+
+    def load_and_index_docs(self, docs_dir: str = "docs"):
+        """Reads and indexes all markdown files from the target repository documentation tree."""
+        self.docs_index = []
+        search_path = os.path.join(docs_dir, "**/*.md")
+        
+        for file_path in glob.glob(search_path, recursive=True):
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                
+            # Naive chunking strategy split by structural section headers
+            chunks = content.split("\n## ")
+            for idx, chunk in enumerate(chunks):
+                if not chunk.strip():
+                    continue
+                
+                clean_chunk = chunk if idx == 0 else f"## {chunk}"
+                # Generate embedding vectors for this specific document block
+                response = self.client.models.embed_content(
+                    model=self.embedding_model,
+                    contents=clean_chunk
+                )
+                
+                self.docs_index.append({
+                    "file_name": os.path.basename(file_path),
+                    "text": clean_chunk,
+                    "vector": response.embeddings[0].values
+                })
+
+    def query_docs(self, user_query: str, top_k: int = 3) -> list:
+        """Executes a contextual vector similarity search against the indexed document arrays."""
+        if not self.docs_index:
+            return []
+
+        # Generate embedding vector for the inbound search query
+        query_response = self.client.models.embed_content(
+            model=self.embedding_model,
+            contents=user_query
+        )
+        query_vector = query_response.embeddings[0].values
+
+        # Perform a mathematical Cosine Similarity cross-reference calculation
+        scored_results = []
+        for doc in self.docs_index:
+            dot_product = sum(q * d for q, d in zip(query_vector, doc["vector"]))
+            q_norm = sum(q * q for q in query_vector) ** 0.5
+            d_norm = sum(d * d for d in doc["vector"]) ** 0.5
+            
+            similarity = dot_product / (q_norm * d_norm) if (q_norm * d_norm) > 0 else 0
+            scored_results.append((similarity, doc))
+
+        # Sort by highest match percentage and return top matches
+        scored_results.sort(key=lambda x: x[0], reverse=True)
+        return [
+            {
+                "file": item[1]["file_name"],
+                "content": item[1]["text"][:300] + "...", # Snip preview string length
+                "confidence_score": f"{item[0] * 100:.2f}%"
+            }
+            for item in scored_results[:top_k]
+        ]
+3. The Search System API Controller Routing (src/reaper/web/search_routes.py)
+Now, we wrap this engine in a fast HTTP route controller within your Flask backend app stack, making it queryable by your dashboard templates via AJAX or fetch calls.
+
+Python
+# src/reaper/web/search_routes.py
+from flask import Blueprint, request, jsonify
+from reaper.engine.search_engine import DocSearchEngine
+
+search_bp = Blueprint('search_api', __name__)
+search_engine = DocSearchEngine()
+
+# Pre-load and index the markdown files into memory on server initialization
+try:
+    search_engine.load_and_index_docs(docs_dir="docs")
+except Exception as e:
+    print(f"WARN: Initial documentation indexing bypassed: {str(e)}")
+
+@search_bp.route('/api/v1/docs/search', methods=['POST'])
+def handle_docs_search():
+    payload = request.get_json() or {}
+    query_string = payload.get("query", "").strip()
+
+    if not query_string:
+        return jsonify({"status": "error", "message": "Search query string parameter cannot be blank."}), 400
+
+    try:
+        search_hits = search_engine.query_docs(user_query=query_string, top_k=3)
+        return jsonify({
+            "status": "success",
+            "results": search_hits
+        }), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Documentation engine fault: {str(e)}"}), 500
+Behind the Scenes: How One Key Powers Both Features
+Both features leverage different components of the same underlying Google GenAI suite. Your existing API key grants you access to multiple specialized models within that ecosystem:
+
+                            ┌───────────────────┐
+                            │  GEMINI_API_KEY   │
+                            └─────────┬─────────┘
+                                      │
+         ┌────────────────────────────┴────────────────────────────┐
+         ▼                                                         ▼
+┌─────────────────────────────────┐               ┌─────────────────────────────────┐
+│       gemini-3-flash            │               │       text-embedding-004        │
+├─────────────────────────────────┤               ├─────────────────────────────────┤
+│ Powers: Build with AI           │               │ Powers: Documentation Search    │
+│ Task: Generates architecture    │               │ Task: Converts Markdown text    │
+│ blueprints and structured JSON  │               │ into mathematical vector arrays │
+└─────────────────────────────────┘               └─────────────────────────────────┘
 
 14.-------------------------------------------------------------------------------------------------------------------------------------------
 
