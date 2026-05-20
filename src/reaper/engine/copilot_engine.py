@@ -1,27 +1,38 @@
 # src/reaper/engine/copilot_engine.py
 import os
 import warnings
+
 from google import genai
 from google.genai import types
+
 from reaper.engine.copilot_schemas import OptimizationBlueprintSchema
 
 # Suppress EOL warnings from google-auth if any
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.auth")
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.oauth2")
 
+
 class KnapsackCopilotEngine:
     def __init__(self):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            raise ValueError("CRITICAL: GEMINI_API_KEY environment variable is missing from runtime context.")
+            raise ValueError(
+                "CRITICAL: GEMINI_API_KEY environment variable is missing from runtime context."
+            )
         self.client = genai.Client(api_key=api_key)
         self.model_identity = "gemini-2.5-flash"
         self._cache = {}
 
-    def compile_max_performance_infrastructure(self, cloud_provider: str, user_intent: str, budget_limit: float) -> OptimizationBlueprintSchema:
+    def compile_max_performance_infrastructure(
+        self, cloud_provider: str, user_intent: str, budget_limit: float
+    ) -> OptimizationBlueprintSchema:
         """Calculates and generates the maximum efficiency infrastructure stack strictly bounded by financial limits."""
-        
-        cache_key = (cloud_provider.lower().strip(), user_intent.lower().strip(), float(budget_limit))
+
+        cache_key = (
+            cloud_provider.lower().strip(),
+            user_intent.lower().strip(),
+            float(budget_limit),
+        )
         if cache_key in self._cache:
             return self._cache[cache_key]
 
@@ -45,16 +56,15 @@ class KnapsackCopilotEngine:
                 system_instruction=system_rules,
                 response_mime_type="application/json",
                 response_schema=OptimizationBlueprintSchema,
-                temperature=0.1, # Enforces rigid structural and mathematical compliance
+                temperature=0.1,  # Enforces rigid structural and mathematical compliance
             ),
         )
 
         result = OptimizationBlueprintSchema.model_validate_json(response.text)
-        
+
         # Evict old entries if cache grows too large
         if len(self._cache) >= 128:
             self._cache.pop(next(iter(self._cache)))
-            
+
         self._cache[cache_key] = result
         return result
-
