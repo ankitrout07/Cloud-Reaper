@@ -85,6 +85,29 @@
                 </p>
             </header>
 
+            <!-- Premium RAG Vector Search Bar -->
+            <div class="mb-8 max-w-2xl relative">
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-cyan-400"></i>
+                </div>
+                <input type="text" id="doc-search-input" placeholder="Search documentation contextually... (e.g. how do I fix idle compute)" 
+                       class="w-full pl-10 pr-24 py-3 bg-[#161a22] border border-cyan-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition text-sm">
+                <button onclick="triggerDocSearch()" class="absolute right-2 top-2 px-4 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-black text-xs font-black uppercase rounded-lg transition">
+                    Search
+                </button>
+            </div>
+
+            <!-- RAG Search Results Panel -->
+            <div id="search-results-panel" class="hidden mb-8 p-6 glass-morph border border-cyan-500/30" style="background: rgba(18, 21, 26, 0.95);">
+                <div class="flex justify-between items-center mb-4 pb-2 border-b border-white/5">
+                    <h3 class="text-cyan-400 text-xs font-black uppercase tracking-wider"><i class="fas fa-magic mr-2"></i> RAG Semantic Matches</h3>
+                    <button onclick="closeSearchResults()" class="text-gray-500 hover:text-white transition"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="search-results-content" class="space-y-4">
+                    <!-- Dynamic Results -->
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
                 <!-- Navigation Sidebar -->
                 <div class="md:col-span-1 space-y-2">
@@ -202,6 +225,73 @@
                     behavior: 'smooth'
                 });
             });
+        });
+
+        async function triggerDocSearch() {
+            const input = document.getElementById("doc-search-input");
+            const query = input.value.trim();
+            if (!query) return;
+
+            const panel = document.getElementById("search-results-panel");
+            const content = document.getElementById("search-results-content");
+
+            panel.classList.remove("hidden");
+            content.innerHTML = `
+                <div class="flex items-center gap-2 p-4">
+                    <i class="fas fa-circle-notch animate-spin text-cyan-400"></i>
+                    <span class="text-xs text-gray-400 font-bold uppercase tracking-wider">Retrieving relevant context from vector index...</span>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/v1/docs/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+                const data = await response.json();
+
+                if (data.status === "success" && data.results.length > 0) {
+                    let html = "";
+                    data.results.forEach(res => {
+                        html += `
+                            <div class="p-4 bg-white/5 border border-white/5 rounded-xl space-y-2 hover:border-cyan-500/20 transition">
+                                <div class="flex justify-between items-center pb-1 border-b border-white/5">
+                                    <span class="text-xs font-black uppercase text-cyan-400"><i class="far fa-file-alt mr-1"></i> ${res.file}</span>
+                                    <span class="px-2 py-0.5 bg-cyan-500/10 text-cyan-400 text-[9px] font-black uppercase rounded">${res.confidence_score} match</span>
+                                </div>
+                                <p class="text-xs text-slate-300 leading-relaxed font-mono">${res.content}</p>
+                            </div>
+                        `;
+                    });
+                    content.innerHTML = html;
+                } else {
+                    content.innerHTML = `
+                        <div class="p-4 text-center text-xs text-gray-500">
+                            <i class="fas fa-search-minus text-lg mb-2 block"></i>
+                            No highly relevant documentation sections found. Try matching other operational concepts.
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                content.innerHTML = `
+                    <div class="p-4 text-center text-xs text-red-400 uppercase font-bold">
+                        <i class="fas fa-exclamation-triangle mr-2"></i> Documentation vector engine unconfigured or offline.
+                    </div>
+                `;
+            }
+        }
+
+        function closeSearchResults() {
+            document.getElementById("search-results-panel").classList.add("hidden");
+            document.getElementById("doc-search-input").value = "";
+        }
+
+        // Add Enter key event listener to search input
+        document.getElementById("doc-search-input")?.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                triggerDocSearch();
+            }
         });
     </script>
 </body>

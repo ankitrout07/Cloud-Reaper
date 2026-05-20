@@ -105,8 +105,12 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
 
 from reaper.web.copilot_routes import copilot_api
+from reaper.web.search_routes import search_bp
+from reaper.web.metrics_routes import telemetry_bp
 
 app.register_blueprint(copilot_api)
+app.register_blueprint(search_bp)
+app.register_blueprint(telemetry_bp)
 
 VAULT_UNLOCK_TTL_SEC = int(os.getenv("VAULT_UNLOCK_TTL_SEC", "3600"))
 thread = None
@@ -153,6 +157,8 @@ settings_state = {
     "scheduled_sleep": {"enabled": False, "stop_time": "20:00", "start_time": "08:00"},
     "mandatory_tags": ["owner", "project"],
     "webhook_url": "",
+    "discord_webhook_url": "",
+    "slack_webhook_url": "",
     "budget_threshold": 1000.0,
     "auto_flag_compliance": True,
 }
@@ -359,7 +365,27 @@ def handle_update_compliance(data):
 
 
 def handle_update_integrations(data):
-    settings_state["webhook_url"] = data.get("webhook_url", "")
+    # Track separate URLs
+    discord_url = data.get("discord_webhook_url")
+    slack_url = data.get("slack_webhook_url")
+    
+    if discord_url is not None:
+        settings_state["discord_webhook_url"] = discord_url
+        settings_state["webhook_url"] = discord_url
+    if slack_url is not None:
+        settings_state["slack_webhook_url"] = slack_url
+        if not settings_state.get("webhook_url"):
+            settings_state["webhook_url"] = slack_url
+            
+    # legacy compatibility if legacy webhook_url is passed directly
+    if "webhook_url" in data:
+        legacy_url = data.get("webhook_url", "")
+        settings_state["webhook_url"] = legacy_url
+        if "discord" in legacy_url:
+            settings_state["discord_webhook_url"] = legacy_url
+        elif "slack" in legacy_url:
+            settings_state["slack_webhook_url"] = legacy_url
+
     return jsonify({"status": "success", "msg": "Integrations updated"})
 
 
@@ -875,6 +901,11 @@ def api_architect_estimate():
 @app.route("/docs")
 def docs():
     return render_template("docs.html")
+
+
+@app.route("/integrations")
+def integrations():
+    return render_template("integrations.html", settings=settings_state)
 
 
 @app.route("/monitor")
