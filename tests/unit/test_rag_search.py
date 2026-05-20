@@ -1,6 +1,7 @@
 # tests/unit/test_rag_search.py
 import unittest
 from unittest.mock import MagicMock, patch
+import os
 
 from reaper.rag import DocSearchEngine
 
@@ -64,4 +65,124 @@ class TestDocSearchEngine(unittest.TestCase):
             results = engine.query_docs("perfect match", top_k=1)
             self.assertEqual(len(results), 1)
             self.assertEqual(results[0]["file"], "architecture.md")
+            self.assertTrue(results[0]["confidence_score"].endswith("%"))
+
+    @patch("google.genai.Client")
+    def test_sentence_window_splitting(self, mock_client_class):
+        """Verifies that multi-sentence sections are split and enriched with left/right context."""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_embedding = MagicMock()
+        mock_embedding.values = [0.1, 0.2]
+        mock_response.embeddings = [mock_embedding]
+        mock_client.models.embed_content.return_value = mock_response
+        mock_client_class.return_value = mock_client
+
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "fake_key"}):
+            engine = DocSearchEngine()
+            # Feed multi-sentence content
+            content = "# Title\nThis is sentence one. This is sentence two. This is sentence three."
+            
+            with patch("builtins.open", unittest.mock.mock_open(read_data=content)):
+                with patch("glob.glob", return_value=["docs/telemetry.md"]):
+                    engine.load_and_index_docs("docs")
+
+            # Check that three sentences were split
+            self.assertEqual(len(engine.docs_index), 3)
+            
+            # First sentence check
+            self.assertEqual(engine.docs_index[0]["sentence"], "This is sentence one.")
+            self.assertEqual(engine.docs_index[0]["left_context"], "")
+            self.assertEqual(engine.docs_index[0]["right_context"], "This is sentence two. This is sentence three.")
+
+            # Second sentence check
+            self.assertEqual(engine.docs_index[1]["sentence"], "This is sentence two.")
+            self.assertEqual(engine.docs_index[1]["left_context"], "This is sentence one.")
+            self.assertEqual(engine.docs_index[1]["right_context"], "This is sentence three.")
+
+            # Third sentence check
+            self.assertEqual(engine.docs_index[2]["sentence"], "This is sentence three.")
+            self.assertEqual(engine.docs_index[2]["left_context"], "This is sentence one. This is sentence two.")
+            self.assertEqual(engine.docs_index[2]["right_context"], "")
+
+    @patch("google.genai.Client")
+    def test_bm25_and_rrf(self, mock_client_class):
+        """Verifies BM25 index creation and sparse-dense RRF fusion rankings."""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_embedding = MagicMock()
+        # Query vector close to document 2 but document 1 has perfect lexical match
+        mock_embedding.values = [0.1, 0.9]
+        mock_response.embeddings = [mock_embedding]
+        mock_client.models.embed_content.return_value = mock_response
+        mock_client_class.return_value = mock_client
+
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "fake_key"}):
+            engine = DocSearchEngine()
+            engine.docs_index = [
+                {
+                    "file_name": "database.md",
+                    "sentence": "Configure PostgreSQL replication targets.",
+                    "vector": [0.9, 0.1],  # low dense similarity
+                },
+                {
+                    "file_name": "other.md",
+                    "sentence": "This is a random unrelated document.",
+                    "vector": [0.1, 0.9],  # high dense similarity
+                },
+            ]
+
+            # Searching for exact lexical keyword "PostgreSQL"
+            results = engine.query_docs("PostgreSQL", top_k=2)
+            
+            # The PostgreSQL document should rank first due to strong sparse match and fusion
+            self.assertEqual(results[0]["file"], "database.md")
+
+    @patch("google.genai.Client")
+    def test_cross_encoder_rerank_and_fallback(self, mock_client_class):
+        """Verifies that the Cross-Encoder fallback works offline and ranks correctly."""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_embedding = MagicMock()
+        mock_embedding.values = [0.5, 0.5]
+        mock_response.embeddings = [mock_embedding]
+        mock_client.models.embed_content.return_value = mock_response
+        mock_client_class.return_value = mock_client
+
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "fake_key"}):
+            engine = DocSearchEngine()
+            engine.docs_index = [
+                {
+                    "file_name": "a.md",
+                    "sentence": "Q-Learning is a model-free reinforcement learning algorithm.",
+                    "vector": [0.5, 0.5],
+                },
+                {
+                    "file_name": "b.md",
+                    "sentence": "Kubernetes runs containerized workloads in pods.",
+                    "vector": [0.5, 0.5],
+                },
+            ]
+
+            # Query has exact overlap with Q-Learning document
+            results = engine.query_docs("Q-Learning", top_k=1)
+            self.assertEqual(results[0]["file"], "a.md")
             self.assertEqual(results[0]["confidence_score"], "100.00%")
+
+    @patch("google.genai.Client")
+    def test_get_document_context_safely(self, mock_client_class):
+        """Verifies Claude-style situating document context generation is accurate."""
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "fake_key"}):
+            engine = DocSearchEngine()
+            
+            content = "# Cloud-Reaper System Architecture\n\nThis is the core design philosophy details."
+            context = engine.get_document_context_safely("docs/architecture.md", content)
+            
+            # Verify global title and paragraph are present
+            self.assertIn("Document: architecture.md", context)
+            self.assertIn("Title: Cloud-Reaper System Architecture", context)
+            self.assertIn("Summary:", context)
+            self.assertIn("design philosophy", context)
