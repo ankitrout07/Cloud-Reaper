@@ -221,10 +221,10 @@ class TestSearchRoutes(unittest.TestCase):
             {
                 "file": "4_audit_logs.md",
                 "content": "To maintain operational integrity and strict regulatory compliance, Cloud-Reaper includes a high-fidelity, comprehensive Audit Logging system.",
-                "confidence_score": "95.50%"
+                "confidence_score": "95.50%",
             }
         ]
-        
+
         response = self.client.post(
             "/api/v1/docs/search",
             json={"query": "audit logs"},
