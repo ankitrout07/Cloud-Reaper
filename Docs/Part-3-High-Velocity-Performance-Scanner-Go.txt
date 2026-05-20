@@ -1,0 +1,136 @@
+================================================================================
+☁️ CLOUD-REAPER COMPREHENSIVE DOCUMENTATION
+PART 3: HIGH-VELOCITY PERFORMANCE SCANNING CORE (GO ENGINE)
+================================================================================
+
+To operate at scale in enterprise environments with tens of thousands of active
+resources, Cloud-Reaper offloads all cloud scanning, network queries, and pricing
+ingestion to a custom-built Go performance core (`src/engine-go/`). This binary
+runs natively on the host system or inside containers, returning highly optimized
+JSON outputs or writing directly to the PostgreSQL database.
+
+
+1. CONCURRENCY PIPELINE & TOKEN-BUCKET RATE LIMITING
+------------------------------------------------------
+* Location: `src/engine-go/main.go`
+* Philosophy: Cloud APIs are heavily rate-limited. Running sequential API scans
+  across thousands of virtual machines results in hours of delays, while naive
+  multi-threading leads to instant 429 HTTP rate-limiting blocks.
+* Engineering Strategy:
+  - Worker Pool Concurrency: Spawns parallel workers using native Go Goroutines
+    (`go func(...)`).
+  - Thread Synchronization: Employs `sync.WaitGroup` to orchestrate structural
+    scanner coordination, ensuring all sub-scans complete before the unified JSON
+    report is serialized.
+  - Mutual Exclusion: Protects shared data structures (e.g., aggregated VM lists,
+    price lists) using `sync.Mutex` (`mu.Lock()` and `mu.Unlock()`) to eliminate
+    memory race conditions.
+  - Token-Bucket Rate Limiter: Integrates `golang.org/x/time/rate` to enforce
+    strict rate limits:
+    `limiter = rate.NewLimiter(rate.Every(time.Second/10), 10)`
+    This sets a hard ceiling of 10 requests per second with a burst capacity of 10.
+    Every single HTTP fetch or SDK invocation executes `_ = limiter.Wait(ctx)`,
+    which blocks until a token is available in the bucket. This guarantees that
+    Cloud-Reaper never triggers provider rate limits.
+
+
+2. PARALLEL AZURE RESOURCE SCRAPER (AzureScraper)
+---------------------------------------------------
+* Location: `src/engine-go/collectors/azure_scraper.go`
+* Scans:
+  - Virtual Machines: Uses `armcompute.NewVirtualMachinesClient` to retrieve the entire
+    VM inventory. Fetches location, tags, hardware profile SKU sizes, and power states.
+  - Telemetry Metric Processing: Concurrently queries Azure Monitor CPU utilization using
+    `armmonitor.NewMetricsClient`. Initiates list queries utilizing PT1H intervals over
+    a rolling 24-hour window.
+  - Orphaned Storage Disks: Queries `armcompute.NewDisksClient` to identify disks
+    whose `ManagedBy` property is `nil`. Unattached disks are instantly flagged for
+    de-provisioning.
+  - Asset Classification:
+    * IsProtected: Evaluates tag namespaces. If a resource contains the tag key
+      `reaper-ignore` set to `true` or `environment` set to `production`, it is marked
+      as protected and shielded from automated budget-action scripts.
+    * IsUnallocated: Flagged as true if critical governance tags (`owner`, `project`)
+      are missing or if average CPU utilization drops below 5.0% (indicating waste).
+
+
+3. AZURE RETAIL PRICES COLLECTOR & CACHING (fetchPriceData / FetchAzurePrice)
+-------------------------------------------------------------------------------
+* Location: `src/engine-go/main.go` & `src/engine-go/collectors/price_client.go`
+* Target: Azure Retail Prices API (`https://prices.azure.com/api/retail/prices`)
+* Details:
+  - Real-time Pricing Fetcher: Concurrently pulls consumption-based retail price sheets
+    across an array of 23 diverse cloud service namespaces (Virtual Machines, Storage,
+    Networking, SQL Databases, Redis, App Services, Cosmos DB, AKS, VPNs, Load Balancers, etc.).
+  - Normalization Rules:
+    - Filters out administrative "Support" charges and "Savings Plan" SKU entries.
+    - Resolves minimum billing counts: `normalizedPrice = retailPrice / minUnits`.
+    - Automatically classifies monthly vs. hourly billing models by parsing the
+      `unitOfMeasure` metadata tag.
+  - High-Velocity Arbitrage Hook: Uses worker pools and a limit semaphore (`concurrency := 10`)
+    to execute rapid parallel regional price scans across target geographic hubs.
+
+
+4. AWS SCRAPER & GCP SCRAPER
+-----------------------------
+* Location: `src/engine-go/collectors/aws_scraper.go` & `gcp_scraper.go`
+* Details:
+  - Standardized Interface: Both collectors implement the unified Go `CloudProvider`
+    interface contract:
+    ```go
+    type CloudProvider interface {
+        Authenticate(creds map[string]string) error
+        ScanResources() ([]models.Resource, error)
+        GetHourlyRate(sku string) (float64, error)
+    }
+    ```
+  - AWS Collector: Authenticates using AWS IAM access keys. Scans EC2 VM instances,
+    EBS volumes, and S3 buckets. Map tags to identify untagged assets.
+  - GCP Collector: Integrates with GCP Service Account credentials JSON and target
+    project identifiers. Scans GCP Compute Engine VM instances, persistent storage
+    disks, and Google Cloud Storage (GCS) buckets.
+
+
+5. KUBERNETES SCRAPER & OPTIMIZER (MostAllocatedOptimizer Bin-Packing)
+------------------------------------------------------------------------
+* Location: `src/engine-go/collectors/k8s_scraper.go` & `k8s_optimizer.go`
+* Details:
+  - Ingress Mechanism: Integrates directly with standard Kubernetes API endpoints,
+    reading local `kubeconfig` paths or running inside clusters using Service Account
+    tokens.
+  - Node Metric Audits: Pulls precise millicore CPU allocation and memory consumption
+    telemetry per node.
+  - MostAllocated Bin-Packing Strategy:
+    Cloud-Reaper uses a "MostAllocated" bin-packing strategy to maximize resource
+    density:
+    - If a Kubernetes node's CPU allocation drops below a 20% density threshold (`cpuUtil < 0.20`)
+      while still containing active scheduled pods, the optimizer generates a `DRAIN` plan.
+    - This plan suggests evicting those pods and migrating them to denser nodes,
+      allowing the empty virtual machine node to be de-allocated, saving standard
+      operational costs (e.g., ~$40/mo per standard node).
+
+
+6. NETWORK TRANSIT SCRAPER
+---------------------------
+* Location: `src/engine-go/collectors/network_scraper.go`
+* Details:
+  - Network Ingress/Egress Audit: Tracks data flow volumes (GB) moving across cloud network
+    boundaries, subnets, and individual Virtual Network Interfaces (NICs).
+  - Cross-Availability Zone Transit Tracking: Monitors expensive cross-AZ traffic.
+    High inter-zone communications are flagged as "Cross-AZ Egress Friction" inside
+    the FinOps performance cli.
+
+
+7. POSTGRESQL DATABASE INGESTION BRIDGE
+----------------------------------------
+* Location: `src/engine-go/db/` & `src/engine-go/main.go` (Function: `pushToDB`)
+* Details:
+  - Direct SQL Engine: Bypasses ORM slow paths. The Go binary connects directly to
+    the PostgreSQL instance using a thread-safe connection pool.
+  - Batch Upserts: Automatically upserts scanned resource records using SQL transactions.
+  - Automatic Garbage Collection: Deallocates old resources from the database if they
+    have not been seen for more than 5 minutes:
+    `CleanupInactiveResources(time.Now().Add(-5 * time.Minute))`
+  - Metric Seeding: Automatically populates business baseline metrics (such as
+    `ACTIVE_USERS`, `API_REQUESTS`, and `CICD_BUILDS`) to feed the Python unit economics
+    regression models.

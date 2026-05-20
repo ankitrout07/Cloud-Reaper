@@ -19,11 +19,27 @@ Savings Models
 
 6. Pasted IMage add to the codebase AND MAKE IT IN SECTION "OVERVIEW"
 
-7. Add icons for the cloud providers that are in cloud providers for each cloud provider we have declared
+7. Revise the favicon.ico in project
 
 8. NOW UNDER Integrations section make the following -
 Kubernetes
 Docs
 Enable Kubernetes Agent - Vantage integrations with your Kubernetes cluster via the Vantage Kubernetes Agent. Once the integration is enabled you will need to deploy the Vantage agent into your Kubernetes clusters.
 
-9. 
+9. Add a notification bell icon at the sidebar between finops intelligence and build with ai Sections
+Cost Alerts
+Receive an alert when costs meet specific currency-based or percentage based change threshold. Learn More
+
+Report Notifications
+Manage your report and dashboard notifications.
+
+All Costs Weekly
+Weekly notification from All Resources
+
+Integrations
+Broadcast notifications to your preferred team workspaces.
+Slack, Microsoft Teams,  Discord
+
+
+10. 
+

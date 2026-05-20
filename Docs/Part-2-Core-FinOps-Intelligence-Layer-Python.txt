@@ -1,0 +1,186 @@
+================================================================================
+☁️ CLOUD-REAPER COMPREHENSIVE DOCUMENTATION
+PART 2: CORE FINOPS INTELLIGENCE & TELEMETRY MACHINE LEARNING LAYER (PYTHON)
+================================================================================
+
+The heart of Cloud-Reaper's decision-making logic resides within its Python 3.12+
+intelligence layer (`src/reaper/engine/`). Instead of basic static threshold
+triggers (e.g., alert if CPU > 80%), Cloud-Reaper employs statistical models,
+reinforcement learning, and time-series forecasting.
+
+
+1. ZOMBIE HUNTER HEURISTICS (ZombieScorer)
+-------------------------------------------
+* Location: `src/reaper/engine/logic.py` (Class: `ZombieScorer`)
+* Purpose: Automatically identifies orphaned disks, snapshots, and idle compute
+  resources running up empty bills.
+* Mathematical Strategy:
+  - Aggregates multi-dimensional telemetry (resource attachment status, IOPS
+    history).
+  - Employs a cumulative heuristic score (0 - 100).
+  - Rule 1 (Attachment Status): If a storage volume or block device is unattached/
+    orphaned, it receives a base penalty of +50.
+  - Rule 2 (IOPS Activity): Examines the last 7 days of disk read/write telemetry.
+    If all data points are < 10 IOPS for 7 consecutive days, it adds +45 to the score.
+    If only a single point is present and current IOPS is < 5, it falls back to +20.
+  - Threshold Breach: If the overall cumulative score is >= 90 (which occurs if a
+    disk is both unattached AND has near-zero IOPS), the resource is flagged as a
+    "Zombie".
+  - Automated Signaling: Instantly fires a webhook notification warning to Discord
+    with detailed heuristic scores and rationales, enabling instant one-click deletion.
+
+
+2. BUDGET FORECASTING WITH ARIMA (BudgetForecaster)
+-----------------------------------------------------
+* Location: `src/reaper/engine/logic.py` (Class: `BudgetForecaster`)
+* Purpose: Provides highly accurate projections of End-of-Month (EoM) cloud spend
+  to prevent budget blowouts before they happen.
+* Model Details:
+  - Takes a historical list of daily infrastructure costs.
+  - Insufficient Data Safeguard: If the historical dataset contains fewer than 5
+    data points, it automatically defaults to a linear trend fallback model, applying
+    a flat rolling average to project remaining days.
+  - ARIMA Integration: For datasets >= 5 points, it initializes an AutoRegressive
+    Integrated Moving Average model with an order constraint of ARIMA(1, 1, 1). This order
+    is mathematically optimal for cloud billing trends because:
+      * AR(1): Accounts for the immediate autoregressive nature of day-to-day spend.
+      * I(1): Integrates trend differences to achieve stationarity in cost spikes.
+      * MA(1): Smooths out brief erratic jumps caused by batch jobs.
+  - Confidence Scoring: Automatically assigns confidence levels based on historical
+    size: "low" (< 5 days), "medium" (5-14 days), and "high" (> 14 days of history).
+
+
+3. AUTONOMOUS REINFORCEMENT LEARNING RIGHT-SIZING AGENT (RightsizingAgent)
+--------------------------------------------------------------------------
+* Location: `src/reaper/engine/calculator.py` (Class: `RightsizingAgent`)
+* Purpose: Evaluates virtual machine metrics to suggest cost-efficient SKU sizes
+  without violating strict performance SLAs.
+* Mathematical Strategy (Q-Learning RL Agent):
+  - State Space Discretization: Discretizes four key continuous telemetry metrics:
+    CPU utilization, Memory utilization, IOPS capacity, and Network bandwidth.
+    Each dimension is discretized into 3 discrete tiers based on utilization:
+      * Tier 0: Low (< 30%)
+      * Tier 1: Medium (30% - 70%)
+      * Tier 2: High (>= 70%)
+    This yields a discrete State space tuple of (CPU, Mem, IOPS, Net) containing
+    3^4 = 81 total potential state combinations.
+  - Action Space: Defines 4 possible actions:
+      * "stay": Maintain the current virtual machine SKU size.
+      * "downscale": Shrink the CPU core count or RAM allotment (e.g., Standard_D4s -> Standard_D2s).
+      * "upscale": Expand resource footprint to handle load spikes safely.
+      * "migrate_family": Move to another family tier (e.g., burstable B-series or memory-optimized E-series).
+  - Training Exploration vs. Exploitation: Employs an epsilon-greedy strategy. During
+    training, `epsilon` dictates exploration probability. During active inference,
+    `epsilon` is set to 0.0, ensuring strict deterministic exploitation of the learned Q-table.
+  - Q-Learning Update Rule:
+    Q(s, a) = Q(s, a) + alpha * [ Reward + gamma * max_a'(Q(s', a')) - Q(s, a) ]
+    * learning_rate (alpha): 0.1 (regulates update magnitude)
+    * discount_factor (gamma): 0.9 (weighs future resource efficiency rewards)
+  - SLA Safeguards & Risk Profiling: Automatically evaluates risks during evaluation:
+    - High Risk: Moving families when memory or CPU utilization is > 80%.
+    - Medium Risk: Downscaling when peak CPU or memory exceeds 60%.
+    - Low Risk: Standard scaling under moderate or low load.
+    The agent enforces that SLA compliance (`sla_maintained`) is marked as False
+    whenever a "High Risk" classification is triggered, preventing dangerous de-provisioning.
+
+
+4. TIME-SERIES ANOMALY DETECTOR (AnomalyDetector)
+--------------------------------------------------
+* Location: `src/reaper/engine/logic.py` (Class: `AnomalyDetector`)
+* Purpose: Catches unexpected cost spikes immediately, eliminating delayed daily
+  billing surprises.
+* Analytical Pipeline:
+  - Seasonality-Aware Decomposition: Standard threshold systems trigger false
+    alarms on regular weekday load spikes. Cloud-Reaper mitigates this by applying
+    additive seasonal decomposition (`statsmodels.tsa.seasonal.seasonal_decompose`)
+    using a period of 7 (weekly pattern) on datasets containing at least 14 days of spend.
+  - Residual Analysis: The time-series is broken down into:
+    Spend = Trend + Seasonal + Residual
+    By analyzing the Z-score exclusively on the Residual component, regular weekly
+    spikes (e.g., high database backups on Monday mornings) are ignored, while genuine
+    billing anomalies (e.g., leaked heavy GPU instances) are flagged.
+  - Threshold Sensitivity: Uses a default sensitivity parameter of Z = 3.0.
+  - Small Dataset Fallback: If telemetry is < 14 days, it switches to a rolling
+    window Z-score computation based on the last 7 days of rolling mean and standard deviation.
+
+
+5. WORKLOAD PERSONALITY ANALYZER (WorkloadPersonality)
+--------------------------------------------------------
+* Location: `src/reaper/engine/workload.py` (Class: `WorkloadPersonality`)
+* Purpose: Moves past raw metrics to classify the unique structural behavior of
+  workloads, suggesting structural architectural migrations.
+* Logic Engine:
+  - Seasonality Strength: Computes the variance ratio of the seasonal components
+    to the sum of seasonal and residual variances:
+    Strength = Var(Seasonal) / [ Var(Seasonal) + Var(Residual) ]
+  - Workload Classifications:
+    * "Stable": Low residual variability and steady trend profiles.
+    * "Cyclic/Periodic": High seasonal strength (> 0.6). Proposes migration to
+      burstable instance types (B-series) to save up to 40% on base capacity costs.
+    * "Erratic/Bursty": High residual variance (Var(Residual) > Var(Seasonal)).
+      Proposes migrating to compute-optimized (F-series) or dedicated scaling pools.
+
+
+6. PREDICTIVE SCALING ENGINE (PredictiveScalingEngine)
+-------------------------------------------------------
+* Location: `src/reaper/engine/workload.py` (Class: `PredictiveScalingEngine`)
+* Purpose: Avoids reactive auto-scaling lag by forecasting future load requirements,
+  pre-warming infrastructure before workloads hit.
+* Technical Pipeline:
+  - Fits an Autoregressive Integrated Moving Average ARIMA(1, 1, 0) model on a
+    rolling window of historical workload metric telemetry.
+  - Forecast Window: Projects workload intensity 15 steps into the future.
+  - Pre-emptive Scaling Directives:
+    * "PRE_WARM": If the forecasted peak exceeds 85%, scaling is triggered BEFORE the spike.
+    * "SCALE_DOWN": If the forecasted peak is predicted to remain below 20% and current load is < 30%.
+    * "STAY": Keeps allocations steady inside safe operating boundaries.
+
+
+7. SPOT INSTANCE LEASE ADVISOR & PREDICTOR (SpotAdvisor & SpotEvictionPredictor)
+---------------------------------------------------------------------------------
+* Location: `src/reaper/engine/calculator.py` & `workload.py`
+* Purpose: Facilitates the safe use of highly cost-effective Spot VM instances by
+  predicting eviction risks and orchestrating graceful failovers.
+* Components:
+  - SpotEvictionPredictor: Employs a Gradient Boosting Classifier (`scikit-learn`'s
+    `GradientBoostingClassifier`) initialized with 100 decision estimators, a learning
+    rate of 0.1, and a maximum tree depth of 3.
+  - Input Features: Fits three critical real-time features:
+    1. `price_volatility` (0.0 to 1.0): Tracks bid pricing stability over time.
+    2. `demand_index` (0.0 to 1.0): Represents active bidding competition.
+    3. `region_capacity` (0 to 100): Measures available spare compute blocks.
+  - Interruption Probability: Computes the exact eviction probability within a
+    1-to-4 hour window. If eviction probability exceeds 90% (`prob >= 0.90`), the
+    system issues a `migrate_gracefully` action, automating virtual machine state
+    migration before the cloud provider forcibly reclaims the hardware.
+  - SpotAdvisor: Maps regional stability parameters. Classifies regions into risk
+    tiers: Stable (eastus, westus2 - 10% base risk) vs. High-Demand Volatility
+    (southindia, brazilsouth - 35% base risk). Applies complexity multipliers
+    (1.25x) for resource-heavy memory/compute SKU families (E, F, G).
+
+
+8. UNIT ECONOMICS AND PROPORTIONAL ALLOCATIONS
+------------------------------------------------
+* Location: `src/reaper/engine/economics.py`
+* Purpose: Correlates cloud costs directly with core business performance KPIs to
+  calculate profitability margins and assign shared platform overhead fairly.
+* Mathematical Strategy:
+  - BusinessCorrelation (Marginal Cost vs. Marginal Revenue - MC=MR):
+    Fits a linear polynomial regression (numpy's `polyfit` degree 1) mapping daily
+    infra spend against active user trends or API request counts.
+    * Slope (m): Corresponds to the derivative dC/dU, representing the exact marginal
+      infrastructure cost to acquire a single additional user.
+    * Break-Even Point: Computes the exact user volume threshold required to cover
+      fixed platform operations fees, providing structural FinOps financial metrics.
+    * Efficiency Zone: Evaluates if marginal cost is less than average revenue per
+      user (ARPU - default $0.50), outputting clear operational signals.
+  - ProportionalAllocator (Shared Cost Attribution):
+    Ensures absolute cost accountability. Allocates shared platform costs (e.g.,
+    shared network gateways, Kubernetes control planes) proportionally across individual
+    business groups based on their active resource utilization:
+    Cost_Group = (Usage_Group / Usage_Total) * Shared_Platform_Cost
+  - RegionalArbitrage (Geographic Optimization Scans):
+    Identifies arbitrage windows where moving compute SKUs between regional centers
+    reduces billing footprints without changing performance specs. Utilizes Go's
+    concurrency engine to retrieve cross-regional spot/retail rates, computing
+    exact monthly dollar savings and percentage cuts.

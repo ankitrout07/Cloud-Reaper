@@ -1,0 +1,134 @@
+================================================================================
+☁️ CLOUD-REAPER COMPREHENSIVE DOCUMENTATION
+PART 4: GENERATIVE AI COPILOT & UNIFIED AI/LLM TOKEN TRACKING
+================================================================================
+
+One of Cloud-Reaper's most innovative features is its AI-assisted cloud
+architecture planner, which approaches infrastructure provisioning through the lens of
+mathematical cost constraints.
+
+
+1. GEMINI 2.5 FLASH COST-BOUNDED PERFORMANCE COPILOT
+-----------------------------------------------------
+* Location: `src/reaper/engine/copilot_engine.py` (Class: `KnapsackCopilotEngine`)
+* Purpose: Allows users to input a natural-language description of an application
+  (e.g., "high-availability API cluster handling 50k requests per minute") along
+  with a hard monthly budget ceiling (e.g., "$1,200.00/month"), and generates a
+  fully optimized, production-tagged architecture diagram complete with ready-to-run
+  Terraform HCL code.
+* Optimization Paradigm (Heuristic Knapsack Proxy):
+  - Standard infrastructure design is subjective. The Copilot treats it as a
+    Bounded Knapsack Optimization Problem:
+      * Items: Cloud infrastructure resources (compute VMs, databases, storage).
+      * Weights: Monthly cost of each SKU.
+      * Values: Performance throughput, capacity, and SLA availability.
+      * Constraint: Sum of all weights must be less than or equal to the budget cap.
+  - The engine directs the LLM to spend up to the budget cap if doing so yields
+    greater capacity and higher availability, rather than blindly minimizing cost at the
+    expense of system stability.
+* Hardcoded Governance Policies:
+  - System rules require the generated blueprints to include mandatory production-grade
+    architectural components (such as load balancers and secure network boundaries).
+  - All generated resources in the Terraform code must automatically include the standard
+    FinOps governance tags:
+      * Env = "sandbox"
+      * Owner = "ankit"
+* Precision Configuration:
+  - The LLM connection is configured with `temperature=0.1` to enforce strict mathematical
+    rigor, limit structural hallucinations, and guarantee that total cost projections are
+    strictly bounded.
+
+
+2. STRUCTURED SCHEMA CONTRACT VALIDATION (Pydantic Integration)
+----------------------------------------------------------------
+* Location: `src/reaper/engine/copilot_schemas.py`
+* Implementation: The copilot utilizes strict schema validation to ensure that
+  JSON responses map perfectly to Python objects. Pydantic models structure both
+  the individual components and the overall blueprint:
+  - ItemizedComponent:
+    * `name`: Logical resource identifier.
+    * `service_type`: Exact Infrastructure-as-Code resource provider tag.
+    * `sku_size`: Selected optimized instance SKU size (e.g., Standard_D2_v5).
+    * `quantity`: Required count.
+    * `monthly_cost`: Cumulative cost.
+    * `perf_factor`: Technical justification tracking performance maximization.
+  - OptimizationBlueprintSchema:
+    * `system_architecture_overview`: High-level summary of the deployment.
+    * `max_budget_boundary`: The user's monthly budget limit.
+    * `calculated_total_cost`: Monthly cost of the entire stack (validated to ensure it
+      is <= the user's budget).
+    * `efficiency_index_score`: Performance value score per dollar spent (1-100).
+    * `infrastructure_components`: An itemized list of components.
+    * `production_terraform_hcl`: Valid, ready-to-deploy, production-grade Terraform HCL.
+* Strict Response Enforcement:
+  - Integrates with the Google GenAI SDK by passing the Pydantic class directly into
+    the generation configuration:
+    `config=types.GenerateContentConfig(..., response_schema=OptimizationBlueprintSchema)`
+    This forces the model to return valid JSON that matches the schema structure.
+
+
+3. FIFO LRU BLUEPRINT CACHING (128-Entry Capacity)
+----------------------------------------------------
+* Location: `src/reaper/engine/copilot_engine.py` (Field: `self._cache`)
+* Purpose: Prevents redundant AI API calls, reduces operational costs, and delivers
+  sub-millisecond response times for repeat queries.
+* Logic:
+  - Generates a composite cache key using the lowercased cloud provider name, the
+    user's natural language intent, and the exact budget limit.
+  - Performance: If a match is found in the cache, the compiled architecture is returned
+    instantly without calling the external API.
+  - Eviction Policy: Maintains an in-memory First-In, First-Out (FIFO) Least Recently
+    Used (LRU) cache with a maximum capacity of 128 items. Once the cache size hits 128, the
+    oldest cached blueprint is evicted:
+    `self._cache.pop(next(iter(self._cache)))`
+
+
+4. RESILIENT OFFLINE FALLBACK ARCHITECTURE GENERATOR
+------------------------------------------------------
+* Location: `src/reaper/engine/architect.py` (Function: `_generate_local_fallback`)
+* Purpose: Serves as a circuit breaker. If the external AI API keys are missing,
+  invalid, or rate-limited, the system automatically falls back to an offline rule-based
+  synthesizer.
+* Strategy:
+  - Analyzes the user's input prompt using regular expressions to detect architectural patterns:
+    * "kubernetes", "aks", "k8s" -> Provisions managed container clusters.
+    * "database", "sql", "postgres" -> Provisions managed transactional database clusters.
+    * "storage", "s3", "blob" -> Provisions object storage buckets.
+  - Map SKUs to standard default templates:
+    * Azure: standard_d2_v5, Standard_D4s_v5, standard_e2_v5, blob_hot, standard_sig_v5.
+    * AWS: t3.medium, m5.large, db.t3.medium, s3_standard, t3.micro.
+    * GCP: e2-standard-2, n2-standard-2, db-custom-2-7680, gcs_standard.
+  - Automatically scales component quantities based on terms like "prod", "ha",
+    or "high-availability" to meet SLA expectations.
+
+
+5. HIGH-FIDELITY REGIONAL COST RESOLUTION
+------------------------------------------
+* Location: `src/reaper/engine/architect.py` (Function: `resolve_component_costs`)
+* Pipeline:
+  - When the AI generates a generic blueprint, the system queries the SQL
+    `region_price_cache` table to resolve exact costs.
+  - Geographic Region Mapping: Maps generic regional handles (e.g., `eastus`, `westeurope`, `centralindia`)
+    to provider-specific API regional zones (e.g., Azure: `eastus`, AWS: `us-east-1`, GCP: `us-east1`).
+  - Pricing Cascading Checks:
+    1. Checks the local SQLite/PostgreSQL `region_price_cache` table.
+    2. If there's a cache miss, queries the live provider Retail Prices API in real-time.
+    3. If the network call fails, applies a static fallback matrix (e.g., Azure `standard_d2_v5` = $0.096/hr).
+  - Monthly Accumulation: Normalizes prices to a standard cloud month (730 operational hours):
+    Monthly_Cost = SKU_Hourly_Price * 730 * Instance_Quantity
+
+
+6. UNIFIED AI/LLM TOKEN TRACKING AND BILLING METRICS
+-----------------------------------------------------
+* Location: `src/reaper/web/app.py` & `src/reaper/engine/models.py`
+* Purpose: Unified FinOps visibility requires tracking AI API billing metrics alongside
+  traditional infrastructure spend. Generative AI calls consume input and output tokens, which
+  are billed dynamically by AI models.
+* Features:
+  - Token Usage Audits: Connects to external AI provider endpoints to track metrics like
+    input tokens, output tokens, and overall context sizes.
+  - Cost Translation: Uses the pricing model to convert token counts into exact dollar
+    impacts.
+  - Unified Dashboard: Consolidates generative AI token expenses alongside standard
+    virtual machines, networks, and storage costs. This gives engineers and finance teams a
+    complete view of application operational costs, including direct AI model costs.
