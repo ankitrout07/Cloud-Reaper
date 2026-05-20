@@ -13,15 +13,34 @@ Calibrate the colors in theme section as white theme is not visible
 In alert channel add logos of dicord and slack  to add the alert Connection
 
 5.-------------------------------------------------------------------------------------------------------------------------------------------
-Financial planning Sections and under it add the following 
-   Budget
-   Budget Alerts
-   Business Metrics
-   Commitment Reports
-   Issues
-   Commitments
-   Savings Models
+📅 1. Budgets & Budget AlertsIn enterprise FinOps, a "Budget" is a static or seasonally adjusted cost envelope defined by finance for a given scope (e.g., a specific team, project, or cloud account), while "Budget Alerts" are the notification dispatch layers wrapped around them.Backend Data Model (models.py)Pythonfrom sqlalchemy import Column, String, Numeric, Integer, ForeignKey, DateTime
+from sqlalchemy.orm import relationship
+from src.reaper.engine.models import Base
 
+class Budget(Base):
+    __tablename__ = "budgets"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True, nullable=False)
+    scope_type = Column(String, nullable=False) # e.g., "TAG", "PROVIDER", "ACCOUNT"
+    scope_value = Column(String, nullable=False) # e.g., "Owner=ankit" or "azure"
+    monthly_limit = Column(Numeric(15, 4), nullable=False)
+
+class BudgetAlert(Base):
+    __tablename__ = "budget_alerts"
+    id = Column(Integer, primary_key=True)
+    budget_id = Column(Integer, ForeignKey("budgets.id"), nullable=False)
+    threshold_percentage = Column(Numeric(5, 2), nullable=False) # e.g., 85.00 for 85%
+    notification_channel = Column(String, default="DISCORD")
+    is_triggered = Column(Boolean, default=False)
+Core Execution LogicBudgets Pipeline: The engine must periodically query the cost_history table, group the data by your designated scope parameter, and calculate the current cumulative month-to-date ($\text{MTD}$) total. It then combines this value with your BudgetForecaster (ARIMA model) output to determine whether forecasted spending is on track to breach the hard budget ceiling.Budget Alerts Engine: A cron loop checks if $\text{MTD Cost} \ge (\text{Monthly Limit} \times \text{Threshold Percentage})$. If the condition evaluates to True, it fires a signaling package to your Discord webhook handler and sets the is_triggered flag to prevent duplicate notification fatigue.📈 2. Business MetricsThis section drives Unit Economics. Raw cloud infrastructure metrics mean very little unless they are contextualized alongside operational business payloads (e.g., cost per active tracking user, cost per CI/CD compilation run, cost per API request).Core Execution LogicThe Telemetry Hook: This view reads directly from the existing business_metrics database table.Algorithmic Engine: It passes this data block straight into your BusinessCorrelation analytical pipeline. By using a first-degree polynomial regression ($\mathbf{y} = m\mathbf{x} + c$), it calculates the exact derivative $\frac{dC}{dU}$ (marginal cloud infrastructure cost to acquire one additional operational metric entity).Vantage-Style Use Case: It shifts the conversation from "Our AWS bill went up by $10,000" to "Our AWS bill went up because we processed 1,000,000 more API transactions, and our efficiency per transaction actually improved by 4%".🤝 3. Commitments & Commitment ReportsCloud providers offer massive financial discounts (up to 72%) via Reserved Instances (RIs) and Savings Plans (SPs) in exchange for a committed contract to use a fixed baseline amount of compute capacity over a 1- or 3-year term.Backend Data Model (models.py)Pythonclass CloudCommitment(Base):
+    __tablename__ = "cloud_commitments"
+    id = Column(String, primary_key=True) # e.g., AWS SP ARN or Azure Reservation ID
+    provider_type = Column(String, nullable=False) # aws, azure
+    commitment_type = Column(String, nullable=False) # "SAVINGS_PLAN", "RESERVED_INSTANCE"
+    hourly_commitment = Column(Numeric(10, 4), nullable=False) # The agreed dollar-per-hour spend contract
+    status = Column(String, nullable=False) # ACTIVE, EXPIRED, RETIRED
+    expiration_date = Column(DateTime, nullable=False)
+Core Execution LogicCommitments Inventory: This panel runs an index audit table mapping active commitments across all integrated accounts, pulling structural data types, contract duration markers, hourly cost matrices, and hard expiration dates.Commitment Reports Evaluation: This module calculates Utilization and Coverage ratios by processing your time-series usage telemetry:$$\text{Commitment Coverage \%} = \left( \frac{\text{On-Demand Spend Covered by RI/SP}}{\text{Total Eligible On-Demand Spend}} \right) \times 100$$If your computed utilization matches $100\%$ but your overall coverage drops below a safe operational margin (e.g., $< 70\%$), it indicates your architecture is leaking funds into expensive on-demand billing categories.🧪 4. Savings ModelsThe Savings Model platform functions as a mathematical sandbox. It acts as the direct planning workspace where your engineering and finance teams design commitment strategies before executing purchases.Core Execution LogicIntegration Module: Tightly integrates your live database telemetry files with your SavingsPlanner / SpotAdvisor Python calculation blocks.Simulation Loop: Engineers use this panel to evaluate complex "what-if" capacity deployment adjustments. For example: "What happens if we purchase an additional $10/hr AWS Compute Savings Plan and migrate 40% of our on-demand workloads over to Spot Instances?"Algorithmic Execution: The system parses your historical on-demand baseline matrix, overlays the simulated contract profile, evaluates structural risk targets via your SpotEvictionPredictor rules, and outputs a clean efficiency matrix tracking expected net cash savings and overcommitment risks.⚠️ 5. IssuesThe operational dispatch command center for Cloud-Reaper's automated orchestration systems. This is the centralized hub where actionable anomalies, compliance alerts, and infrastructure cleanups are organized for triage.Core Execution LogicAggregator Ingestion: Collects and processes background signals generated by your underlying machine learning layers. It pulls events directly from your ZombieScorer detections, AnomalyDetector residual threshold breaches, and k8s_optimizer pod drainage plans.Operational Status Triage: Every event generates an itemized triage entry with state states: OPEN, ACKNOWLEDGED, RESOLVED, or DISMISSED.Actionable Controls: Every issue card exposes explicit user execution buttons that connect to your backend action routes:[ Dismiss Issue ] $\longrightarrow$ Injects a custom reaper-ignore rule or dynamic exemption marker into the resource table metadata.[ Execute Remediation ] $\longrightarrow$ Connects directly to your Go automation core, initiating an instant API transaction call to prune the target disk or trigger an immediate zero-downtime cluster hibernation sequence.
 6.-------------------------------------------------------------------------------------------------------------------------------------------
 Pasted IMage add to the codebase AND MAKE IT IN SECTION "OVERVIEW"
 
@@ -161,209 +180,6 @@ Virtual Tags & Tagging:
 Preferred virtual tags: You can now mark Virtual Tags as preferred directly from the Virtual Tags tab on the Tags settings page, in addition to the existing All Tags tab workflow.
 
 12.-------------------------------------------------------------------------------------------------------------------------------------------
-1. Raw Telemetry Extraction (From Prometheus HTTP API)
-Prometheus exposes a native REST API under the /api/v1 namespace that outputs raw website performance metric payloads completely structured in JSON.
-
-The Target Endpoint Format
-To pull real-time historical usage data of your website (e.g., HTTP request counts or duration rates over a range), your engine-go or Python collector queries the Prometheus Range Query Engine:
-
-Plaintext
-GET http://<prometheus-host>:9090/api/v1/query_range?query=rate(http_requests_total[5m])&start=2026-05-20T12:00:00Z&end=2026-05-20T17:00:00Z&step=15s
-The Inbound JSON Payload Structure
-Prometheus returns an envelope structure containing a timestamp/value matrix:
-
-JSON
-{
-  "status": "success",
-  "data": {
-    "resultType": "matrix",
-    "result": [
-      {
-        "metric": {
-          "__name__": "http_requests_total",
-          "instance": "production-web-server-01",
-          "job": "website-frontend",
-          "status_code": "200"
-        },
-        "values": [
-          [1779285600, "42.5"], 
-          [1779285615, "48.1"]  
-        ]
-      }
-    ]
-  }
-}
-How Cloud-Reaper Leverages This
-Your backend parses the values array (Format: [Unix_Timestamp, "Value_String"]).
-
-It calculates the workload utilization trends and matches the instance label against your PostgreSQL resources table.
-
-If the request volume is near zero for days, Cloud-Reaper flags it as a Zombie Resource to save costs.
-
-2. Dashboard Template Extraction (From Grafana HTTP API)
-If you already have beautiful, custom cost-tracking or infrastructure panels designed inside Grafana, you do not need to re-code them on your frontend. Grafana exports its entire visualization system as a JSON Model.
-
-The Export Endpoint Format
-To extract a dashboard panel's complete chart config code, hit Grafana's core HTTP API using a Service Account token:
-
-Plaintext
-GET http://<grafana-host>:3000/api/dashboards/uid/<dashboard-uid>
-The Inbound JSON Layout Structure
-This returns a standard configuration payload detailing the panel's visual format, query parameters, and chart types:
-
-JSON
-{
-  "dashboard": {
-    "id": 104,
-    "title": "Production Website FinOps Overview",
-    "panels": [
-      {
-        "type": "timeseries",
-        "title": "Network Transit Egress Cost Overhead",
-        "targets": [
-          {
-            "datasource": { "type": "prometheus", "uid": "prom-prod" },
-            "expr": "sum(rate(container_network_transmit_bytes_total[5m]))"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": { "unit": "decbytes" }
-        }
-      }
-    ]
-  }
-}
-1. Updated Integration Card Template (src/reaper/web/templates/integrations.html)
-Replace or extend your existing template block to incorporate the explicit HTML5 file-drop zone. This code includes the required CSS styling to match Cloud-Reaper's standard Glassmorphism + Cyan Glow frontend design.
-
-HTML
-<div class="glass-card p-4 animated-fade-in" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(0, 243, 255, 0.1); border-radius: 8px; padding: 20px; margin-top: 20px;">
-    <h4 style="color: #00f3ff; margin-top: 0; margin-bottom: 10px;">
-        <i class="fas fa-file-import mr-2"></i> Ad-Hoc JSON Telemetry Ingestion
-    </h4>
-    <p class="text-muted" style="font-size: 13px; margin-bottom: 15px;">
-        Drag and drop an exported Prometheus or Grafana JSON data file here to generate instantaneous cost-reduction statistics.
-    </p>
-
-    <div id="drop-zone" style="border: 2px dashed rgba(0, 243, 255, 0.3); border-radius: 6px; padding: 30px; text-align: center; background: rgba(0, 0, 0, 0.2); cursor: pointer; transition: all 0.3s ease;">
-        <i class="fas fa-cloud-arrow-up" style="font-size: 32px; color: rgba(0, 243, 255, 0.6); margin-bottom: 10px;"></i>
-        <p id="drop-zone-text" style="color: #aaa; font-size: 13px; margin: 0;">
-            Drag & Drop metrics.json here or <span style="color: #00f3ff; text-decoration: underline;">browse local files</span>
-        </p>
-        <input type="file" id="file-input" accept=".json" style="display: none;">
-    </div>
-
-    <div id="upload-stats-panel" style="display: none; margin-top: 20px; padding-top: 15px; border-top: 1px solid #333;">
-        <h5 style="color: #fff; margin-top: 0; font-size: 14px;">Parsed Ingestion Metrics Summary</h5>
-        <div style="display: flex; gap: 15px; margin-top: 10px;">
-            <div style="background: rgba(0,0,0,0.4); padding: 10px; border-radius: 4px; flex: 1; text-align: center;">
-                <span style="display: block; font-size: 11px; color: #888;">Detected Targets</span>
-                <strong id="stat-targets" style="color: #00f3ff; font-size: 18px;">0</strong>
-            </div>
-            <div style="background: rgba(0,0,0,0.4); padding: 10px; border-radius: 4px; flex: 1; text-align: center;">
-                <span style="display: block; font-size: 11px; color: #888;">Avg CPU Load</span>
-                <strong id="stat-cpu" style="color: #ffae00; font-size: 18px;">0%</strong>
-            </div>
-            <div style="background: rgba(0,0,0,0.4); padding: 10px; border-radius: 4px; flex: 1; text-align: center;">
-                <span style="display: block; font-size: 11px; color: #888;">Est. Waste Index</span>
-                <strong id="stat-waste" style="color: #ff5f5f; font-size: 18px;">0%</strong>
-            </div>
-        </div>
-    </div>
-</div>
-2. High-Performance Client-Side Parsing Engine
-Add this script to the bottom of your template file or your global static asset JS file. It hooks directly into the browser's native HTML5 Drag and Drop API events (dragover, dragleave, drop), processes the JSON payload using the asynchronous FileReader API, and dynamically extracts and updates your dashboard statistics.
-
-JavaScript
-// Append this implementation script logic to your dashboard web layouts
-document.addEventListener("DOMContentLoaded", () => {
-    const dropZone = document.getElementById("drop-zone");
-    const fileInput = document.getElementById("file-input");
-    const dropZoneText = document.getElementById("drop-zone-text");
-
-    // Click handler to route drop-zone interaction to the hidden native file picker
-    dropZone.addEventListener("click", () => fileInput.click());
-
-    // Prevent default browser behaviors for file dropping
-    ["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
-        window.addEventListener(eventName, (e) => e.preventDefault(), false);
-    });
-
-    // Visual hover states using Cloud-Reaper cyan border styling highlights
-    dropZone.addEventListener("dragover", () => {
-        dropZone.style.border = "2px dashed #00f3ff";
-        dropZone.style.background = "rgba(0, 243, 255, 0.05)";
-    });
-
-    ["dragleave", "drop"].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => {
-            dropZone.style.border = "2px dashed rgba(0, 243, 255, 0.3)";
-            dropZone.style.background = "rgba(0, 0, 0, 0.2)";
-        });
-    });
-
-    // Handle dropping execution hook
-    dropZone.addEventListener("drop", (e) => {
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            processTelemetryJsonFile(files[0]);
-        }
-    });
-
-    // Handle manual browse selection change hook
-    fileInput.addEventListener("change", (e) => {
-        if (e.target.files.length > 0) {
-            processTelemetryJsonFile(e.target.files[0]);
-        }
-    });
-
-    function processTelemetryJsonFile(file) {
-        if (file.type !== "application/json" && !file.name.endsWith(".json")) {
-            alert("CRITICAL ERROR: Cloud-Reaper ingestion only accepts valid .json telemetry reports.");
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            try {
-                const parsedData = JSON.parse(event.target.result);
-                
-                // Update UI text to demonstrate successful file parsing action
-                dropZoneText.innerHTML = `<i class="fas fa-check-circle" style="color:#00ff66;"></i> Successfully Loaded: <strong>${file.name}</strong>`;
-                
-                // Execute standard metric processing mapping over Prometheus metric models
-                renderExtractedStats(parsedData);
-            } catch (err) {
-                alert("PARSING ERROR: Provided file is not a structurally sound JSON payload document.");
-            }
-        };
-        reader.readAsText(file);
-    }
-
-    function renderExtractedStats(jsonData) {
-        // Safe, basic heuristic parsing strategy looking for native Prometheus data structures
-        const resultsArray = jsonData?.data?.result || [];
-        const targetsCount = resultsArray.length || 1;
-        
-        // Simulating analytical cost evaluations directly from payload metadata readings
-        let totalCalculatedCpu = 0;
-        resultsArray.forEach(item => {
-            const lastValue = item.values ? parseFloat(item.values[item.values.length - 1][1]) : parseFloat(item.value?.[1] || 15);
-            totalCalculatedCpu += isNaN(lastValue) ? 15 : lastValue;
-        });
-
-        const avgCpu = (totalCalculatedCpu / targetsCount).toFixed(1);
-        const wasteFactor = avgCpu < 15 ? (100 - parseFloat(avgCpu)).toFixed(0) : 0;
-
-        // Populate visual stats numbers into the DOM containers instantly
-        document.getElementById("stat-targets").innerText = targetsCount;
-        document.getElementById("stat-cpu").innerText = `${avgCpu}%`;
-        document.getElementById("stat-waste").innerText = `${wasteFactor}%`;
-
-        // Reveal the visualization card panel inside the workspace view
-        document.getElementById("upload-stats-panel").style.display = "block";
-    }
-});
 
 13.-------------------------------------------------------------------------------------------------------------------------------------------
 
