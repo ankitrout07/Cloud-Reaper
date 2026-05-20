@@ -98,11 +98,11 @@ async function connectInfrastructure() {
     }
 }
 
-// Sidebar dynamic highlighting (path + settings tab query)
+// Sidebar dynamic highlighting (path + settings/financial tab query)
 function initializeSidebarHighlighting() {
     const currentPath = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
-    const settingsTab = params.get("tab");
+    const settingsTab = params.get("tab") || (currentPath === "/financial" ? "budget" : "");
     const navLinks = document.querySelectorAll("#sidebar a.nav-link");
 
     navLinks.forEach((link) => {
@@ -112,7 +112,7 @@ function initializeSidebarHighlighting() {
         const navTab = link.getAttribute("data-nav-tab");
 
         let isActive = false;
-        if (navTab && currentPath === "/settings") {
+        if (navTab && (currentPath === "/settings" || currentPath === "/financial")) {
             isActive = settingsTab === navTab;
         } else if (navPath) {
             isActive =

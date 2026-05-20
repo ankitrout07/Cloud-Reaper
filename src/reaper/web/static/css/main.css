@@ -78,9 +78,8 @@ body {
     flex-direction: column;
     height: 100vh;
     width: var(--sidebar-collapsed);
-    overflow-x: hidden;
-    overflow-y: auto;
-    padding: 1.5rem 0;
+    overflow: hidden;                /* sidebar itself never scrolls */
+    padding: 1.5rem 0 0;
     box-shadow: 10px 0 30px rgba(0, 0, 0, 0.35);
     transition: width 0.3s ease;
 }
@@ -127,7 +126,25 @@ body {
     width: 100%;
     padding: 0 0.75rem;
     flex: 1;
-    min-height: 0;
+    min-height: 0;                   /* allows flex child to shrink below content size */
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Themed micro-scrollbar for nav region */
+.sidebar-nav::-webkit-scrollbar {
+    width: 3px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    transition: background 0.2s ease;
+}
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(91, 141, 239, 0.35);
 }
 
 .sidebar-footer {
@@ -135,8 +152,10 @@ body {
     flex-direction: column;
     gap: 0.75rem;
     width: 100%;
-    padding: 0 0.75rem 0.5rem;
-    margin-top: auto;
+    padding: 0.75rem 0.75rem 1rem;
+    flex-shrink: 0;                  /* footer never shrinks — always visible */
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    margin-top: 0;
 }
 
 .sidebar-link {
@@ -184,12 +203,78 @@ body {
 }
 
 .sidebar-section-title {
-    margin: 0.75rem 0 0.25rem 0.75rem;
-    font-size: 0.625rem;
+    margin: 0.5rem 0 0.25rem 0;
+    padding: 0.625rem 0.75rem 0.2rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.6rem;
     font-weight: 800;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
+    color: #4b5563;
+}
+
+/* ── Sub-navigation links (nested under a section header) ── */
+.sidebar-sub-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.45rem 0.75rem 0.45rem 1.375rem;
+    border-radius: 0.5rem;
     color: #6b7280;
+    text-decoration: none;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    min-height: 2.25rem;
+    position: relative;
+}
+
+/* Thin vertical connector bar on the left */
+.sidebar-sub-link::before {
+    content: '';
+    position: absolute;
+    left: 0.625rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.5px;
+    height: 55%;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 1px;
+    transition: background 0.2s ease, height 0.2s ease;
+}
+
+.sidebar-sub-link .sidebar-icon {
+    width: 1.1rem;
+    height: 1.1rem;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.sidebar-sub-link:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: #9ca3af;
+}
+
+.sidebar-sub-link:hover .sidebar-icon {
+    opacity: 0.9;
+}
+
+.sidebar-sub-link:hover::before {
+    background: rgba(91, 141, 239, 0.35);
+    height: 70%;
+}
+
+.sidebar-sub-link.nav-link-active {
+    background: rgba(91, 141, 239, 0.07);
+    color: #8baef5;
+}
+
+.sidebar-sub-link.nav-link-active .sidebar-icon {
+    opacity: 1;
+}
+
+.sidebar-sub-link.nav-link-active::before {
+    background: #5b8def;
+    width: 2px;
+    height: 65%;
 }
 
 .sidebar-status {

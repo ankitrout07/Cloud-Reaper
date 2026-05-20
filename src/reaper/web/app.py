@@ -856,6 +856,70 @@ def finops():
     return render_template("finops.html")
 
 
+@app.route("/financial")
+def financial():
+    tab = request.args.get("tab", "budget")
+    allowed_tabs = ["budget", "alerts", "business-metrics", "commitment-reports", "issues", "commitments", "savings-models"]
+    if tab not in allowed_tabs:
+        tab = "budget"
+
+    # Get settings state for rendering
+    db = SessionLocal()
+    try:
+        db_metrics = db.query(BusinessMetric).order_by(BusinessMetric.date.desc()).all()
+    except Exception:
+        db_metrics = []
+    finally:
+        db.close()
+
+    # Fallback default business metrics if none exist
+    if not db_metrics:
+        # Just simulated objects with properties matching SQLAlchemy Model
+        class MockMetric:
+            def __init__(self, name, val, u):
+                self.metric_name = name
+                self.value = val
+                self.unit = u
+                self.date = datetime.datetime.now(datetime.UTC)
+        db_metrics = [
+            MockMetric("ACTIVE_USERS", 12400.0, "1 User"),
+            MockMetric("API_REQUESTS", 5240000.0, "1K Requests"),
+            MockMetric("MODEL_COMPUTATIONS", 48000.0, "1 Computation"),
+        ]
+
+    return render_template(
+        "financial.html",
+        active_tab=tab,
+        settings=settings_state,
+        db_metrics=db_metrics
+    )
+
+
+@app.route("/api/finops/business-metrics", methods=["POST"])
+def add_business_metric():
+    try:
+        data = request.json or {}
+        name = data.get("metric_name")
+        value = data.get("value")
+        unit = data.get("unit")
+
+        if not name or value is None or not unit:
+            return jsonify({"status": "error", "message": "All fields are required."}), 400
+
+        db = SessionLocal()
+        metric = BusinessMetric(
+            metric_name=name.upper().replace(" ", "_"),
+            value=float(value),
+            unit=unit
+        )
+        db.add(metric)
+        db.commit()
+        db.close()
+        return jsonify({"status": "success", "message": f"Metric '{name}' recorded successfully."}), 201
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route("/build-with-ai", methods=["GET"])
 def build_with_ai():
     """Renders the AI Multi-Cloud Architect Estimator workspace dashboard."""
