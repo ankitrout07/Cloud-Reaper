@@ -1,7 +1,6 @@
 # tests/unit/test_rag_search.py
 import unittest
 from unittest.mock import MagicMock, patch
-import os
 
 from reaper.rag import DocSearchEngine
 
@@ -82,18 +81,21 @@ class TestDocSearchEngine(unittest.TestCase):
             engine = DocSearchEngine()
             # Feed multi-sentence content
             content = "# Title\nThis is sentence one. This is sentence two. This is sentence three."
-            
+
             with patch("builtins.open", unittest.mock.mock_open(read_data=content)):
                 with patch("glob.glob", return_value=["docs/telemetry.md"]):
                     engine.load_and_index_docs("docs")
 
             # Check that three sentences were split
             self.assertEqual(len(engine.docs_index), 3)
-            
+
             # First sentence check
             self.assertEqual(engine.docs_index[0]["sentence"], "This is sentence one.")
             self.assertEqual(engine.docs_index[0]["left_context"], "")
-            self.assertEqual(engine.docs_index[0]["right_context"], "This is sentence two. This is sentence three.")
+            self.assertEqual(
+                engine.docs_index[0]["right_context"],
+                "This is sentence two. This is sentence three.",
+            )
 
             # Second sentence check
             self.assertEqual(engine.docs_index[1]["sentence"], "This is sentence two.")
@@ -102,7 +104,9 @@ class TestDocSearchEngine(unittest.TestCase):
 
             # Third sentence check
             self.assertEqual(engine.docs_index[2]["sentence"], "This is sentence three.")
-            self.assertEqual(engine.docs_index[2]["left_context"], "This is sentence one. This is sentence two.")
+            self.assertEqual(
+                engine.docs_index[2]["left_context"], "This is sentence one. This is sentence two."
+            )
             self.assertEqual(engine.docs_index[2]["right_context"], "")
 
     @patch("google.genai.Client")
@@ -134,7 +138,7 @@ class TestDocSearchEngine(unittest.TestCase):
 
             # Searching for exact lexical keyword "PostgreSQL"
             results = engine.query_docs("PostgreSQL", top_k=2)
-            
+
             # The PostgreSQL document should rank first due to strong sparse match and fusion
             self.assertEqual(results[0]["file"], "database.md")
 
@@ -177,10 +181,12 @@ class TestDocSearchEngine(unittest.TestCase):
 
         with patch.dict("os.environ", {"GEMINI_API_KEY": "fake_key"}):
             engine = DocSearchEngine()
-            
-            content = "# Cloud-Reaper System Architecture\n\nThis is the core design philosophy details."
+
+            content = (
+                "# Cloud-Reaper System Architecture\n\nThis is the core design philosophy details."
+            )
             context = engine.get_document_context_safely("docs/architecture.md", content)
-            
+
             # Verify global title and paragraph are present
             self.assertIn("Document: architecture.md", context)
             self.assertIn("Title: Cloud-Reaper System Architecture", context)
