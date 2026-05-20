@@ -2,6 +2,11 @@
 
 Here is the log of our historical and current updates.
 
+## v1.2.0 - The Governance & Compliance Update
+*May 20, 2026*
+- Introduced Audit Logging for tracking changes to Cost Reports, Virtual Tags, and Segments.
+- Integrated Audit Log system guides directly into the RAG Search and Documentation portals.
+
 ## v1.1.0 - The Strategy Update
 *May 19, 2026*
 - Added System Documentation portal (Product Docs & Changelog).

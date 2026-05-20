@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from reaper.rag import DocSearchEngine
+from reaper.web.app import app
 
 
 class TestDocSearchEngine(unittest.TestCase):
@@ -192,3 +193,45 @@ class TestDocSearchEngine(unittest.TestCase):
             self.assertIn("Title: Cloud-Reaper System Architecture", context)
             self.assertIn("Summary:", context)
             self.assertIn("design philosophy", context)
+
+
+class TestSearchRoutes(unittest.TestCase):
+    def setUp(self):
+        app.config["TESTING"] = True
+        app.config["WTF_CSRF_ENABLED"] = False
+        app.config["SECRET_KEY"] = "test-secret-key"
+        self.client = app.test_client()
+        self.first_run_patcher = patch("reaper.web.app.is_first_run", return_value=False)
+        self.mock_first_run = self.first_run_patcher.start()
+
+    def tearDown(self):
+        self.first_run_patcher.stop()
+
+    def test_docs_page(self):
+        """Test that the /docs route renders successfully."""
+        response = self.client.get("/docs")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Audit Logs &amp; Change Tracking", response.data)
+        self.assertIn(b"Attribution Stability Index", response.data)
+
+    @patch("reaper.web.search_routes.search_engine")
+    def test_handle_docs_search(self, mock_search_engine):
+        """Test the /api/v1/docs/search endpoint."""
+        mock_search_engine.query_docs.return_value = [
+            {
+                "file": "4_audit_logs.md",
+                "content": "To maintain operational integrity and strict regulatory compliance, Cloud-Reaper includes a high-fidelity, comprehensive Audit Logging system.",
+                "confidence_score": "95.50%"
+            }
+        ]
+        
+        response = self.client.post(
+            "/api/v1/docs/search",
+            json={"query": "audit logs"},
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(len(data["results"]), 1)
+        self.assertEqual(data["results"][0]["file"], "4_audit_logs.md")
+        self.assertIn("Audit Logging system", data["results"][0]["content"])
