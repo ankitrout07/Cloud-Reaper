@@ -240,6 +240,16 @@ def setup_env() -> None:
         # Port Conflict Check
         with env_file.open("r", encoding="utf-8") as f:
             lines = f.readlines()
+        
+        # Ensure GEMINI_API_KEY is present in existing .env
+        if not any(line.strip().startswith("GEMINI_API_KEY=") for line in lines):
+            print("[*] Appending default GEMINI_API_KEY to existing .env...")
+            with env_file.open("a", encoding="utf-8") as f:
+                f.write("\nGEMINI_API_KEY=your_actual_gemini_api_key_here\n")
+            # Reload lines to ensure port extraction still works correctly
+            with env_file.open("r", encoding="utf-8") as f:
+                lines = f.readlines()
+
         port = next(
             (
                 line.split("=", 1)[1].strip().strip('"').strip("'")

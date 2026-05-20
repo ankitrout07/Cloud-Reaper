@@ -7,7 +7,7 @@
 
 A high-performance **Hybrid FinOps Intelligence Engine** designed to bridge the gap between cloud finance and engineering action.
 
-Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive scanning speeds across large-scale Azure environments, providing real-time cost reduction recommendations, regional price arbitrage, and automated governance enforcement.
+Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive scanning speeds across large-scale multi-cloud environments, providing real-time cost reduction recommendations, regional price arbitrage, automated governance enforcement, and a **Cost-Bounded Performance Copilot** powered by Google Gemini AI.
 
 ---
 
@@ -30,6 +30,7 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 - **💎 RI/SP Advisor:** Recommends Reserved Instances based on actual uptime and inventory patterns.
 - **❄️ Cold Storage Identifier:** Scans unused storage dynamically and suggests cost-efficient Cool/Archive tier migrations.
 - **🤖 AI Regional Arbitrage:** Standard-compliant multi-cloud (AWS, GCP, Azure) real-time pricing clients offering region-to-region arbitrage estimation.
+- **🧠 Cost-Bounded Performance Copilot:** A Bounded Knapsack Optimization Engine backed by **Gemini 2.5 Flash** that generates maximum-performance infrastructure stacks (with production Terraform HCL) strictly bounded by a user-defined monthly budget. Features in-memory FIFO caching (128-entry LRU) for sub-millisecond repeat query resolution.
 
 ### 3. ⚖️ Operate Phase — Governance
 - **🛑 Shift-Left PR Cost Simulation:** Integrates with code control planes (GitHub Actions/Terraform) to run dry-run estimations, preventing expensive infrastructure mistakes before code is merged.
@@ -85,8 +86,11 @@ Cloud-Reaper/
 │   ├── reaper/             # Python Intelligence & Web Layer
 │   │   ├── collectors/     # Azure scrapers, auth, config manager, price client
 │   │   ├── engine/         # FinOps models, scheduler, notifier, economics
+│   │   │   ├── copilot_engine.py   # KnapsackCopilotEngine (Gemini GenAI)
+│   │   │   └── copilot_schemas.py  # Pydantic schemas for structured LLM output
 │   │   ├── services/       # Log streamer / notification services
 │   │   └── web/            # Flask app, templates, static assets
+│   │       └── copilot_routes.py   # Blueprint: /api/v1/copilot/optimize
 │   └── engine-go/          # Go High-Velocity Performance Core
 │       ├── collectors/     # network_scraper, k8s_optimizer, auth
 │       ├── db/             # PostgreSQL bridge
@@ -107,6 +111,7 @@ Cloud-Reaper/
 | Language (Go) | Go 1.24+ |
 | Database | PostgreSQL 15 (SQLAlchemy 2.0) |
 | Web Framework | Flask + Flask-SocketIO (gevent) |
+| AI Copilot | Google GenAI (`google-genai`) · Gemini 2.5 Flash · Bounded Knapsack Optimizer |
 | Frontend | HTML5, Vanilla JS, CSS (Glassmorphism + Cyan Glow) |
 | PDF Export | WeasyPrint |
 | Python Quality | Ruff · Mypy · Pytest · Bandit · Safety |
@@ -122,6 +127,7 @@ Cloud-Reaper/
 - Go 1.24+
 - Docker (for PostgreSQL)
 - Azure CLI (`az login`)
+- `GEMINI_API_KEY` — Google AI Studio API key (required for the AI Copilot)
 
 ### One-Command Setup
 
@@ -131,7 +137,7 @@ cd Cloud-Reaper
 python bootstrap.py
 ```
 
-`bootstrap.py` handles everything automatically — Go build, venv, dependencies, `.env`, and dashboard launch. Dashboard available at **http://localhost:5001**.
+`bootstrap.py` handles everything automatically — Go build, venv, dependencies, `.env` (including `GEMINI_API_KEY` scaffolding), and dashboard launch. Dashboard available at **http://localhost:5001**.
 
 > Full setup guide → **[HOW_TO_RUN.md](HOW_TO_RUN.md)**
 > Portability & Docker guide → **[PORTABILITY.md](PORTABILITY.md)**
@@ -148,6 +154,31 @@ PYTHONPATH=src python -m reaper.web.app
 
 ---
 
+## 🧠 Cost-Bounded Performance Copilot
+
+The Copilot is a **Bounded Knapsack Optimization Engine** wrapped in an LLM heuristic proxy. It translates a free-text workload description and a hard budget cap into a maximum-performance, production-tagged infrastructure blueprint with Terraform HCL.
+
+### API Endpoint
+
+```bash
+POST /api/v1/copilot/optimize
+```
+
+**Request body:**
+```json
+{
+  "provider": "azure",
+  "intent": "high-availability API cluster handling 50k RPM",
+  "budget_cap": 1200.00
+}
+```
+
+**Response includes:** `system_architecture_overview`, `infrastructure_components` (name, SKU, quantity, monthly cost, perf justification), `calculated_total_cost`, `efficiency_index_score`, and `production_terraform_hcl`.
+
+> Set `GEMINI_API_KEY` in your `.env` to activate the Copilot.
+
+---
+
 ## 🗄️ Database
 
 Cloud-Reaper uses PostgreSQL with the following key tables:
@@ -159,6 +190,8 @@ Cloud-Reaper uses PostgreSQL with the following key tables:
 | `action_logs` | Audit trail for reap actions |
 | `business_metrics` | Unit economics data (users, requests) |
 | `region_price_cache` | Lazy-cached Azure SKU pricing per region |
+| `vault_entries` | Encrypted secret entries (Fernet AES-128) |
+| `cloud_connections` | Multi-cloud provider credential manifests |
 
 Run `docker run --name cloud-reaper-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres` to spin up a local DB, then `bootstrap.py` will run `init_db()` automatically.
 

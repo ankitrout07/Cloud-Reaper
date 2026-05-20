@@ -104,6 +104,9 @@ app = Flask(
 app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
 
+from reaper.web.copilot_routes import copilot_api
+app.register_blueprint(copilot_api)
+
 VAULT_UNLOCK_TTL_SEC = int(os.getenv("VAULT_UNLOCK_TTL_SEC", "3600"))
 thread = None
 thread_lock = threading.Lock()
