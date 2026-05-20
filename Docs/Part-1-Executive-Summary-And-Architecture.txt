@@ -45,8 +45,8 @@ capabilities of both developer ecosystems:
 │              FINOPS INTELLIGENCE & OPTIMIZATION LAYER (Python 3.12+)         │
 │  - Ingests telemetry databases and constructs predictive ML pipelines.       │
 │  - Performs seasonal ARIMA forecasting & seasonal-decomposition anomalies.   │
-│  - Executes Q-learning evaluation for scaling and rightsizing VM pools.     │
-│  - Manages AI Copilot logic and structured schema contract validation.        │
+│  - Executes Q-learning evaluation for scaling and rightsizing VM pools.      │
+│  - Manages AI Copilot logic and structured schema contract validation.       │
 └──────────────────────────────────────┬───────────────────────────────────────┘
                                        │ (Flask / Websockets API)
 ┌──────────────────────────────────────▼───────────────────────────────────────┐
