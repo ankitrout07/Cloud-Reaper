@@ -911,7 +911,7 @@ def docs():
         files = sorted(glob.glob(os.path.join(docs_dir, "*.md")))
         for file_path in files:
             filename = os.path.basename(file_path)
-            title = filename.replace(".md", "").replace("_", " ").title()
+            title = filename.replace(".md", "").lstrip("0123456789_").replace("_", " ").title()
             with open(file_path, encoding="utf-8") as f:
                 content = f.read()
             docs_data.append({"filename": filename, "title": title, "content": content})
