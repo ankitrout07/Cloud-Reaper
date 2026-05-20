@@ -859,7 +859,15 @@ def finops():
 @app.route("/financial")
 def financial():
     tab = request.args.get("tab", "budget")
-    allowed_tabs = ["budget", "alerts", "business-metrics", "commitment-reports", "issues", "commitments", "savings-models"]
+    allowed_tabs = [
+        "budget",
+        "alerts",
+        "business-metrics",
+        "commitment-reports",
+        "issues",
+        "commitments",
+        "savings-models",
+    ]
     if tab not in allowed_tabs:
         tab = "budget"
 
@@ -881,6 +889,7 @@ def financial():
                 self.value = val
                 self.unit = u
                 self.date = datetime.datetime.now(datetime.UTC)
+
         db_metrics = [
             MockMetric("ACTIVE_USERS", 12400.0, "1 User"),
             MockMetric("API_REQUESTS", 5240000.0, "1K Requests"),
@@ -888,10 +897,7 @@ def financial():
         ]
 
     return render_template(
-        "financial.html",
-        active_tab=tab,
-        settings=settings_state,
-        db_metrics=db_metrics
+        "financial.html", active_tab=tab, settings=settings_state, db_metrics=db_metrics
     )
 
 
@@ -908,14 +914,14 @@ def add_business_metric():
 
         db = SessionLocal()
         metric = BusinessMetric(
-            metric_name=name.upper().replace(" ", "_"),
-            value=float(value),
-            unit=unit
+            metric_name=name.upper().replace(" ", "_"), value=float(value), unit=unit
         )
         db.add(metric)
         db.commit()
         db.close()
-        return jsonify({"status": "success", "message": f"Metric '{name}' recorded successfully."}), 201
+        return jsonify(
+            {"status": "success", "message": f"Metric '{name}' recorded successfully."}
+        ), 201
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
