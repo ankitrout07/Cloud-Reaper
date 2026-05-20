@@ -43,32 +43,6 @@
             color: #8baef5;
             text-transform: uppercase;
         }
-
-        .feature-card {
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            padding: 1.5rem;
-            transition: all 0.3s ease;
-        }
-
-        .feature-card:hover {
-            border-color: rgba(6, 182, 212, 0.4);
-            box-shadow: 0 0 20px rgba(6, 182, 212, 0.1);
-        }
-        
-        .feature-card h3 {
-            color: #fff;
-            font-size: 1rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-        
-        .feature-card p {
-            color: #94a3b8;
-            font-size: 0.85rem;
-            line-height: 1.6;
-        }
     </style>
 </head>
 
@@ -110,122 +84,124 @@
 
             <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
                 <!-- Navigation Sidebar -->
-                <div class="md:col-span-1 space-y-2">
-                    <a href="#product-docs" class="block p-3 glass-morph text-cyan-400 text-xs font-bold uppercase tracking-wider hover:bg-white/5 transition">Product Docs</a>
-                    <a href="#features" class="block p-3 glass-morph text-gray-400 text-xs font-bold uppercase tracking-wider hover:bg-white/5 hover:text-white transition">Features Guide</a>
-                    <a href="#changelog" class="block p-3 glass-morph text-gray-400 text-xs font-bold uppercase tracking-wider hover:bg-white/5 hover:text-white transition">Changelog</a>
+                <div class="md:col-span-1 space-y-2" id="doc-nav-sidebar">
+                    {% for doc in docs_data %}
+                    <button onclick="showDoc('{{ doc.filename }}')" 
+                            id="nav-btn-{{ doc.filename }}" 
+                            class="w-full text-left block p-3.5 glass-morph {% if loop.first %}text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]{% else %}text-gray-400 border border-white/5{% endif %} text-xs font-black uppercase tracking-wider hover:bg-white/5 hover:text-white transition-all duration-300">
+                        <i class="far fa-file-alt mr-2 text-[10px] {% if loop.first %}text-cyan-400{% else %}text-gray-500{% endif %}" id="nav-icon-{{ doc.filename }}"></i>
+                        {{ doc.title }}
+                    </button>
+                    {% endfor %}
                 </div>
 
                 <!-- Main Content -->
-                <div class="md:col-span-3 space-y-8">
-                    <!-- Product Docs -->
-                    <section id="product-docs" class="glass-morph doc-section">
+                <div class="md:col-span-3 space-y-8" id="doc-content-container">
+                    {% for doc in docs_data %}
+                    <section id="section-{{ doc.filename }}" class="glass-morph doc-section {% if not loop.first %}hidden{% endif %} transition-opacity duration-300">
                         <div class="doc-header">
-                            <i class="fas fa-book text-cyan-400 text-xl"></i>
-                            <h2>Product Docs</h2>
+                            <i class="fas fa-file-alt text-cyan-400 text-xl"></i>
+                            <h2>{{ doc.title }}</h2>
                         </div>
-                        <div class="prose prose-invert max-w-none text-sm text-slate-300">
-                            <p class="mb-4">Welcome to the Cloud Reaper intelligence suite. Cloud Reaper is a high-performance multi-cloud FinOps engine designed to bridge the gap between cloud engineering and financial accountability.</p>
-                            <p class="mb-4">With real-time asset tracking, predictive AI resource sizing, and dynamic multi-cloud architecture builders, this engine helps organizations drastically reduce operational waste while optimizing global deployments.</p>
-                            <p><strong>Note:</strong> We update these product docs along with every major release. Keep an eye on this section to understand how to fully utilize the Reaper engine.</p>
+                        <div class="prose prose-invert max-w-none text-xs text-slate-300 doc-markdown-body" data-markdown-content="{{ doc.content | escape }}">
+                            <!-- Dynamic Markdown Rendered HTML goes here -->
                         </div>
                     </section>
-
-                    <!-- Features Guide -->
-                    <section id="features" class="glass-morph doc-section">
-                        <div class="doc-header">
-                            <i class="fas fa-layer-group text-purple-400 text-xl"></i>
-                            <h2>Features & How to Use</h2>
-                        </div>
-                        
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div class="feature-card">
-                                <h3><i class="fas fa-chart-pie text-cyan-400 mr-2"></i> Dashboard</h3>
-                                <p>The central hub for all metrics. Access real-time FinOps charts, burn rate analysis, and a snapshot of your infrastructure's health and budget tracking.</p>
-                            </div>
-                            
-                            <div class="feature-card">
-                                <h3><i class="fas fa-tags text-blue-400 mr-2"></i> Price Catalog</h3>
-                                <p>Browse up-to-date cloud SKUs and costs dynamically. You can build an arbitrary cart of resources to generate a Bill of Materials (BOM) export as a PDF.</p>
-                            </div>
-
-                            <div class="feature-card">
-                                <h3><i class="fas fa-robot text-green-400 mr-2"></i> Build with AI</h3>
-                                <p>Use natural language to describe the application or infrastructure you want to deploy. Our Architect AI Engine will synthesize a cost-optimized, secure BOM across your preferred cloud vendor.</p>
-                            </div>
-
-                            <div class="feature-card">
-                                <h3><i class="fas fa-search-dollar text-orange-400 mr-2"></i> FinOps Intelligence</h3>
-                                <p>Scan connected environments for idle resources, right-size VMs, enforce tagging compliance policies, and identify unattached storage arrays eating up costs.</p>
-                            </div>
-
-                            <div class="feature-card">
-                                <h3><i class="fas fa-server text-indigo-400 mr-2"></i> Cloud Monitor</h3>
-                                <p>Monitor real-time telemetry from your cloud. The real-time Go engine streams CPU and Memory usage down to the second, helping you visualize the heartbeat of your workloads.</p>
-                            </div>
-                            
-                            <div class="feature-card">
-                                <h3><i class="fas fa-cog text-slate-400 mr-2"></i> Settings & Vault</h3>
-                                <p>Securely connect your Azure, AWS, and GCP environments. Update AI strategy and FinOps governance policies. The Vault stores connection secrets safely using high-grade encryption.</p>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- Changelog -->
-                    <section id="changelog" class="glass-morph doc-section">
-                        <div class="doc-header">
-                            <i class="fas fa-history text-green-400 text-xl"></i>
-                            <h2>Changelog</h2>
-                        </div>
-                        <div class="space-y-6">
-                            
-                            <!-- Release Item -->
-                            <div class="border-l-2 border-cyan-500 pl-4">
-                                <h3 class="text-white font-bold mb-1">v1.1.0 - The Strategy Update</h3>
-                                <span class="text-[10px] uppercase font-black text-slate-500 tracking-wider bg-black/40 px-2 py-1 rounded inline-block mb-3">May 19, 2026</span>
-                                <ul class="list-disc list-inside text-sm text-slate-400 space-y-1">
-                                    <li>Added System Documentation portal (Product Docs & Changelog).</li>
-                                    <li>Fixed a major bug where generated Bill of Materials incorrectly multiplied flat-rate monthly SKUs by 730 hours.</li>
-                                    <li>Resolved an issue where total costs were improperly exported in the Price Catalog BOM PDF.</li>
-                                    <li>Refactored Settings to include a robust "Switch Directory" module, abandoning the static connection fields.</li>
-                                </ul>
-                            </div>
-
-                            <!-- Release Item -->
-                            <div class="border-l-2 border-slate-700 pl-4 opacity-75">
-                                <h3 class="text-white font-bold mb-1">v1.0.0 - Genesis Release</h3>
-                                <span class="text-[10px] uppercase font-black text-slate-500 tracking-wider bg-black/40 px-2 py-1 rounded inline-block mb-3">May 15, 2026</span>
-                                <ul class="list-disc list-inside text-sm text-slate-400 space-y-1">
-                                    <li>Introduced Cloud Reaper hybrid FinOps engine.</li>
-                                    <li>Launched AI Architect for automated infrastructure design.</li>
-                                    <li>Implemented Go-based resource scraper architecture for maximum efficiency.</li>
-                                    <li>Introduced PostgreSQL caching layer for instantaneous region pricing data.</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </section>
+                    {% endfor %}
                 </div>
             </div>
         </div>
     </main>
-    <script>
-        // Simple active link highlighting script
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                
-                document.querySelectorAll('.md\\:col-span-1 a').forEach(a => {
-                    a.classList.remove('text-cyan-400');
-                    a.classList.add('text-gray-400');
-                });
-                this.classList.add('text-cyan-400');
-                this.classList.remove('text-gray-400');
 
-                document.querySelector(this.getAttribute('href')).scrollIntoView({
-                    behavior: 'smooth'
-                });
+    <script>
+        // High-Fidelity Markdown Parser
+        function parseMarkdown(md) {
+            if (!md) return "";
+            
+            // Basic sanitization
+            let html = md
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+            
+            // Math blocks: $$ ... $$
+            html = html.replace(/\$\$(.*?)\$\$/gs, (match, formula) => {
+                const cleanFormula = formula.replace(/\\/g, "").trim();
+                return `<div class="bg-black/40 p-5 rounded-2xl border border-cyan-500/10 my-6 text-center font-mono text-[11px] text-cyan-300 tracking-wider shadow-inner shadow-cyan-500/5 leading-loose">${cleanFormula}</div>`;
             });
-        });
+            
+            // Code blocks: ```lang ... ```
+            html = html.replace(/```(?:[a-zA-Z0-9]+)?\n([\s\S]*?)\n```/g, (match, code) => {
+                return `<pre class="bg-black/50 p-5 rounded-2xl border border-white/5 my-5 text-[11px] font-mono text-cyan-400 overflow-x-auto shadow-inner leading-relaxed"><code>${code}</code></pre>`;
+            });
+            
+            // Inline code: `code`
+            html = html.replace(/`([^`]+)`/g, '<code class="bg-white/5 border border-white/5 px-2 py-0.5 rounded-lg font-mono text-[10px] text-[#ff60b5]">$1</code>');
+            
+            // Headers
+            html = html.replace(/^# (.*?)$/gm, '<h1 class="text-xl font-black text-white uppercase tracking-wider mb-6 pb-2 border-b border-white/10 mt-2">$1</h1>');
+            html = html.replace(/^## (.*?)$/gm, '<h2 class="text-sm font-black text-cyan-400 uppercase tracking-widest mt-8 mb-4 flex items-center gap-2"><i class="fas fa-chevron-right text-[10px] text-cyan-500"></i> $1</h2>');
+            html = html.replace(/^### (.*?)$/gm, '<h3 class="text-xs font-black text-slate-300 uppercase tracking-wider mt-6 mb-3">$1</h3>');
+            
+            // Lists
+            html = html.replace(/^[-\*] (.*?)$/gm, '<li class="ml-4 list-disc text-slate-300 my-2 leading-relaxed">$1</li>');
+            html = html.replace(/^\d+\. (.*?)$/gm, '<li class="ml-4 list-decimal text-slate-300 my-2 leading-relaxed">$1</li>');
+            
+            // Bold
+            html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-white">$1</strong>');
+            
+            // Paragraph splits by double newlines
+            const blocks = html.split(/\n{2,}/);
+            html = blocks.map(block => {
+                block = block.trim();
+                if (!block) return "";
+                if (block.startsWith("<h") || block.startsWith("<p") || block.startsWith("<div") || block.startsWith("<pre") || block.startsWith("<li")) {
+                    return block;
+                }
+                return `<p class="mb-4 text-slate-300 leading-relaxed text-xs">${block}</p>`;
+            }).join("\n");
+            
+            return html;
+        }
+
+        function showDoc(filename) {
+            // Hide all sections
+            document.querySelectorAll('#doc-content-container section').forEach(sec => {
+                sec.classList.add('hidden');
+            });
+            // Show target section
+            const activeSection = document.getElementById('section-' + filename);
+            if (activeSection) {
+                activeSection.classList.remove('hidden');
+            }
+            
+            // Reset all buttons style
+            document.querySelectorAll('#doc-nav-sidebar button').forEach(btn => {
+                btn.className = "w-full text-left block p-3.5 glass-morph text-gray-400 border border-white/5 text-xs font-black uppercase tracking-wider hover:bg-white/5 hover:text-white transition-all duration-300";
+            });
+            // Reset icons style
+            document.querySelectorAll('#doc-nav-sidebar i').forEach(icon => {
+                icon.className = "far fa-file-alt mr-2 text-[10px] text-gray-500";
+            });
+
+            // Set active button style
+            const activeBtn = document.getElementById('nav-btn-' + filename);
+            if (activeBtn) {
+                activeBtn.className = "w-full text-left block p-3.5 glass-morph text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)] text-xs font-black uppercase tracking-wider hover:bg-white/5 hover:text-white transition-all duration-300";
+            }
+            const activeIcon = document.getElementById('nav-icon-' + filename);
+            if (activeIcon) {
+                activeIcon.className = "far fa-file-alt mr-2 text-[10px] text-cyan-400";
+            }
+        }
+
+        function showDocAndScroll(filename) {
+            showDoc(filename);
+            const activeSection = document.getElementById('section-' + filename);
+            if (activeSection) {
+                activeSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
 
         async function triggerDocSearch() {
             const input = document.getElementById("doc-search-input");
@@ -255,12 +231,16 @@
                     let html = "";
                     data.results.forEach(res => {
                         html += `
-                            <div class="p-4 bg-white/5 border border-white/5 rounded-xl space-y-2 hover:border-cyan-500/20 transition">
+                            <div onclick="showDocAndScroll('${res.file}')" class="p-4 bg-white/5 border border-white/5 rounded-xl space-y-2 hover:border-cyan-500/30 hover:bg-white/10 transition cursor-pointer group relative overflow-hidden">
+                                <div class="absolute right-0 top-0 w-24 h-24 bg-cyan-500/5 blur-xl group-hover:bg-cyan-500/10 transition"></div>
                                 <div class="flex justify-between items-center pb-1 border-b border-white/5">
-                                    <span class="text-xs font-black uppercase text-cyan-400"><i class="far fa-file-alt mr-1"></i> ${res.file}</span>
-                                    <span class="px-2 py-0.5 bg-cyan-500/10 text-cyan-400 text-[9px] font-black uppercase rounded">${res.confidence_score} match</span>
+                                    <span class="text-xs font-black uppercase text-cyan-400 flex items-center gap-1.5"><i class="far fa-file-alt"></i> ${res.file.replace(".md", "").replace("_", " ").toUpperCase()}</span>
+                                    <span class="px-2 py-0.5 bg-cyan-500/10 text-cyan-400 text-[9px] font-black uppercase rounded shadow-sm">${res.confidence_score} match</span>
                                 </div>
                                 <p class="text-xs text-slate-300 leading-relaxed font-mono">${res.content}</p>
+                                <div class="text-[9px] text-gray-500 uppercase tracking-widest font-black flex items-center gap-1.5 pt-1 group-hover:text-cyan-400 transition-colors">
+                                    <span>Click to navigate to section</span> <i class="fas fa-arrow-right text-[8px]"></i>
+                                </div>
                             </div>
                         `;
                     });
@@ -287,11 +267,19 @@
             document.getElementById("doc-search-input").value = "";
         }
 
-        // Add Enter key event listener to search input
-        document.getElementById("doc-search-input")?.addEventListener("keypress", function(e) {
-            if (e.key === "Enter") {
-                triggerDocSearch();
-            }
+        // Initialize and parse markdown elements on startup
+        document.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll(".doc-markdown-body").forEach(el => {
+                const rawContent = el.getAttribute("data-markdown-content");
+                el.innerHTML = parseMarkdown(rawContent);
+            });
+
+            // Add Enter key event listener to search input
+            document.getElementById("doc-search-input")?.addEventListener("keypress", function(e) {
+                if (e.key === "Enter") {
+                    triggerDocSearch();
+                }
+            });
         });
     </script>
 </body>
