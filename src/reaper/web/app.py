@@ -901,7 +901,10 @@ def api_architect_estimate():
 @app.route("/docs")
 def docs():
     import glob
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+    base_dir = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    )
     docs_dir = os.path.join(base_dir, "docs")
     docs_data = []
     if os.path.exists(docs_dir):
@@ -909,15 +912,10 @@ def docs():
         for file_path in files:
             filename = os.path.basename(file_path)
             title = filename.replace(".md", "").replace("_", " ").title()
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
-            docs_data.append({
-                "filename": filename,
-                "title": title,
-                "content": content
-            })
+            docs_data.append({"filename": filename, "title": title, "content": content})
     return render_template("docs.html", docs_data=docs_data)
-
 
 
 @app.route("/integrations")
