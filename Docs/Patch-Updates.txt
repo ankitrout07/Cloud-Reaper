@@ -1,32 +1,41 @@
 ////// this section will have patch updates that will be applied to the codebase //////
 
-1. Audit Logs - Track changes to Cost Reports, Virtual Tags, and Segments. Documentation
+1.-------------------------------------------------------------------------------------------------------------------------------------------
+Audit Logs - Track changes to Cost Reports, Virtual Tags, and Segments. Documentation
 
-2. Make a about page for the project and my linkedin profile will be added there 
+2.-------------------------------------------------------------------------------------------------------------------------------------------
+Make a about page for the project and my linkedin profile will be added there 
 
-3. Calibrate the colors in theme section as white theme is not visible 
+3.-------------------------------------------------------------------------------------------------------------------------------------------
+Calibrate the colors in theme section as white theme is not visible 
 
-4. In alert channel add logos of dicord and slack  to add the alert Connection
+4.------------------------------------------------------------------------------------------------------------------------------------------- 
+In alert channel add logos of dicord and slack  to add the alert Connection
 
-5. Financial planning Sections and under it add the following 
-Budget
-Budget Alerts
-Business Metrics
-Commitment Reports
-Issues
-Commitments
-Savings Models
+5.-------------------------------------------------------------------------------------------------------------------------------------------
+Financial planning Sections and under it add the following 
+   Budget
+   Budget Alerts
+   Business Metrics
+   Commitment Reports
+   Issues
+   Commitments
+   Savings Models
 
-6. Pasted IMage add to the codebase AND MAKE IT IN SECTION "OVERVIEW"
+6.-------------------------------------------------------------------------------------------------------------------------------------------
+Pasted IMage add to the codebase AND MAKE IT IN SECTION "OVERVIEW"
 
-7. Revise the favicon.ico in project
+7.-------------------------------------------------------------------------------------------------------------------------------------------
+Revise the favicon.ico in project
 
-8. NOW UNDER Integrations section make the following -
+8.-------------------------------------------------------------------------------------------------------------------------------------------
+NOW UNDER Integrations section make the following -
 Kubernetes
 Docs
 Enable Kubernetes Agent - Vantage integrations with your Kubernetes cluster via the Vantage Kubernetes Agent. Once the integration is enabled you will need to deploy the Vantage agent into your Kubernetes clusters.
 
-9. Add a notification bell icon at the sidebar between finops intelligence and build with ai Sections
+9.-------------------------------------------------------------------------------------------------------------------------------------------
+Add a notification bell icon at the sidebar between finops intelligence and build with ai Sections
 Cost Alerts
 Receive an alert when costs meet specific currency-based or percentage based change threshold. Learn More
 
@@ -40,6 +49,114 @@ Integrations
 Broadcast notifications to your preferred team workspaces.
 Slack, Microsoft Teams,  Discord
 
+10.-------------------------------------------------------------------------------------------------------------------------------------------
+By extracting live performance metrics (vCPU utilization, memory footprints, and network throughput) from Prometheus via its PromQL HTTP API, your Python intelligence layer can cross-reference actual resource usage against the raw cost metrics stored in your PostgreSQL region_price_cache table. This bridges the gap between raw capacity and actual deployment waste.Here is the technical architecture, implementation engine, and validation method to inject this capability directly into Cloud-Reaper.📐 The Theory: Mapping Telemetry to Financial WasteCommercial tools often look at cloud bills statically. To calculate true financial waste dynamically, we cross-reference pricing metrics with real-time utilization data over a time window ($T$):$$\text{Waste Rate (\%)} = 100 \times \left( 1.0 - \frac{\frac{1}{T}\int_{0}^{T} \text{Metric}_{\text{actual}}(t) \, dt}{\text{Metric}_{\text{provisioned}}} \right)$$If an instance runs at an average of 8% CPU utilization over a 7-day window, your engine flags the exact dollar volume being wasted per hour on idle headroom.🛠️ Implementation EngineThis production-grade core service connects directly to your internal Prometheus data layer, executes real-time metric evaluations, and surfaces precise cost-optimization recommendations.1. Prometheus Metric Collector (src/reaper/collectors/prometheus_finops.py)Python# src/reaper/collectors/prometheus_finops.py
+import requests
+import time
+import logging
 
-10. 
+logger = logging.getLogger("reaper.collector.prometheus")
 
+class PrometheusFinOpsCollector:
+    def __init__(self, prometheus_url: str = "http://localhost:9090"):
+        self.api_endpoint = f"{prometheus_url}/api/v1/query"
+
+    def fetch_node_avg_cpu_utilization(self, duration_window: str = "7d") -> dict:
+        """Executes PromQL queries to calculate average CPU utilization across clusters."""
+        # PromQL query tracking average non-idle CPU percentage across the fleet
+        promql_query = f"100 - (avg by (instance) (rate(node_cpu_seconds_total{{mode='idle'}}[{duration_window}])) * 100)"
+        
+        try:
+            response = requests.get(self.api_endpoint, params={'query': promql_query}, timeout=10)
+            if response.status_code != 200:
+                logger.error(f"Prometheus query failure. HTTP Status: {response.status_code}")
+                return {}
+            
+            results = response.json().get("data", {}).get("result", [])
+            utilization_map = {}
+            for item in results:
+                instance = item.get("metric", {}).get("instance", "unknown")
+                # Extract the final scalar metric reading tuple [timestamp, value]
+                value = float(item.get("value", [0, 0])[1])
+                utilization_map[instance] = round(value, 2)
+            
+            return utilization_map
+        except requests.exceptions.RequestException as e:
+            logger.critical(f"Failed to reach Prometheus API backend: {str(e)}")
+            return {}
+2. FinOps Metric Cross-Reference Engine (src/reaper/engine/metrics_analyzer.py)This service maps your live Prometheus performance readings directly to your cloud inventory costs to calculate exact financial waste.Python# src/reaper/engine/metrics_analyzer.py
+from reaper.collectors.prometheus_finops import PrometheusFinOpsCollector
+
+class FinOpsTelemetryAnalyzer:
+    def __init__(self, prometheus_url: str):
+        self.prom_collector = PrometheusFinOpsCollector(prometheus_url)
+
+    def analyze_compute_waste_index(self, active_inventory: list) -> list:
+        """Cross-references Prometheus utilization data against actual asset cost metrics."""
+        cpu_metrics = self.prom_collector.fetch_node_avg_cpu_utilization()
+        optimization_insights = []
+
+        for asset in active_inventory:
+            instance_ip = asset.get("private_ip")
+            monthly_cost = asset.get("monthly_cost", 0.0)
+            
+            # Match inventory assets with active Prometheus telemetry instances
+            matching_instance = next((inst for inst in cpu_metrics if instance_ip in inst), None)
+            avg_utilization = cpu_metrics.get(matching_instance, 50.0) if matching_instance else 50.0
+
+            # Underutilization threshold rule: Flag instances running under 10% capacity
+            if avg_utilization < 10.0:
+                potential_savings = monthly_cost * 0.50 # Target a baseline 50% scale-down downsize
+                insight = {
+                    "resource_id": asset.get("resource_id"),
+                    "current_sku": asset.get("sku_size"),
+                    "avg_cpu_utilization": f"{avg_utilization}%",
+                    "monthly_waste_impact": f"${potential_savings:.2f}",
+                    "remediation_action": "DOWNGRADE_SKU_FAMILY"
+                }
+                optimization_insights.append(insight)
+
+        return optimization_insights
+3. Exposing the Analytical API Controller (src/reaper/web/metrics_routes.py)Python# src/reaper/web/metrics_routes.py
+from flask import Blueprint, jsonify, request
+from reaper.engine.metrics_analyzer import FinOpsTelemetryAnalyzer
+
+telemetry_bp = Blueprint('telemetry_api', __name__)
+# Points to internal standard Prometheus routing endpoints
+analyzer = FinOpsTelemetryAnalyzer(prometheus_url="http://localhost:9090")
+
+@telemetry_bp.route('/api/v1/finops/telemetry-insights', methods=['POST'])
+def get_telemetry_driven_insights():
+    # Simulated mapping payload representing active PostgreSQL inventory rows
+    # In practice, query your local database table 'resources' here
+    mock_db_inventory = [
+        {"resource_id": "aks-worker-01", "private_ip": "10.0.1.4", "sku_size": "Standard_D4_v5", "monthly_cost": 140.0},
+        {"resource_id": "aks-worker-02", "private_ip": "10.0.1.5", "sku_size": "Standard_B2s", "monthly_cost": 30.0}
+    ]
+
+    try:
+        actionable_insights = analyzer.analyze_compute_waste_index(mock_db_inventory)
+        return jsonify({
+            "status": "success",
+            "telemetry_source": "Prometheus v1 Engine",
+            "recommendations": actionable_insights
+        }), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Telemetry parsing failure: {str(e)}"}), 500
+
+11.-------------------------------------------------------------------------------------------------------------------------------------------
+
+
+12.-------------------------------------------------------------------------------------------------------------------------------------------
+
+
+13.-------------------------------------------------------------------------------------------------------------------------------------------
+
+
+14.-------------------------------------------------------------------------------------------------------------------------------------------
+
+
+15.-------------------------------------------------------------------------------------------------------------------------------------------
+
+
+16.-------------------------------------------------------------------------------------------------------------------------------------------
