@@ -179,5 +179,37 @@ class CloudConnection(Base):
     )
 
 
+class Budget(Base):
+    __tablename__ = "budgets"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True, nullable=False)
+    scope_type = Column(String, nullable=False)  # e.g., "TAG", "PROVIDER", "ACCOUNT"
+    scope_value = Column(String, nullable=False)  # e.g., "Owner=ankit" or "azure"
+    monthly_limit = Column(Numeric(15, 4), nullable=False)
+
+
+class BudgetAlert(Base):
+    __tablename__ = "budget_alerts"
+
+    id = Column(Integer, primary_key=True)
+    budget_id = Column(Integer, ForeignKey("budgets.id"), nullable=False)
+    threshold_percentage = Column(Numeric(5, 2), nullable=False)  # e.g., 85.00 for 85%
+    notification_channel = Column(String, default="DISCORD")
+    is_triggered = Column(Boolean, default=False)
+
+
+class CloudCommitment(Base):
+    __tablename__ = "cloud_commitments"
+
+    id = Column(String, primary_key=True)  # e.g., AWS SP ARN or Azure Reservation ID
+    provider_type = Column(String, nullable=False)  # aws, azure
+    commitment_type = Column(String, nullable=False)  # "SAVINGS_PLAN", "RESERVED_INSTANCE"
+    hourly_commitment = Column(Numeric(10, 4), nullable=False)  # The agreed dollar-per-hour spend contract
+    status = Column(String, nullable=False)  # ACTIVE, EXPIRED, RETIRED
+    expiration_date = Column(DateTime, nullable=False)
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
+

@@ -1,192 +1,92 @@
-////// this section will have patch updates that will be applied to the codebase //////
+# Cloud-Reaper Remaining Patch Updates Plan
 
-1.-------------------------------------------------------------------------------------------------------------------------------------------
-Audit Logs - Track changes to Cost Reports, Virtual Tags, and Segments. Documentation
+This plan describes the implementation details for completing the remaining patch updates from `Docs/Patch-Updates.txt` in the `Cloud-Reaper` workspace.
 
-2.-------------------------------------------------------------------------------------------------------------------------------------------
-Make a about page for the project and my linkedin profile will be added there 
+---
 
-3.-------------------------------------------------------------------------------------------------------------------------------------------
-Calibrate the colors in theme section as white theme is not visible 
+## Proposed Changes
 
-4.------------------------------------------------------------------------------------------------------------------------------------------- 
-In alert channel add logos of dicord and slack  to add the alert Connection
+We will systematically implement the requirements in the following components:
 
-5.-------------------------------------------------------------------------------------------------------------------------------------------
-📅 1. Budgets & Budget AlertsIn enterprise FinOps, a "Budget" is a static or seasonally adjusted cost envelope defined by finance for a given scope (e.g., a specific team, project, or cloud account), while "Budget Alerts" are the notification dispatch layers wrapped around them.Backend Data Model (models.py)Pythonfrom sqlalchemy import Column, String, Numeric, Integer, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
-from src.reaper.engine.models import Base
+### 1. Database Layer
 
-class Budget(Base):
-    __tablename__ = "budgets"
-    id = Column(Integer, primary_key=True)
-    name = Column(String, unique=True, nullable=False)
-    scope_type = Column(String, nullable=False) # e.g., "TAG", "PROVIDER", "ACCOUNT"
-    scope_value = Column(String, nullable=False) # e.g., "Owner=ankit" or "azure"
-    monthly_limit = Column(Numeric(15, 4), nullable=False)
+#### [MODIFY] [models.py](file:///Users/ankitanupamrout/git/Cloud-Reaper/src/reaper/engine/models.py)
+We will add the new SQLAlchemy models: `Budget`, `BudgetAlert`, and `CloudCommitment`. Because `init_db()` is called automatically when Flask starts up, these tables will be generated seamlessly.
 
-class BudgetAlert(Base):
-    __tablename__ = "budget_alerts"
-    id = Column(Integer, primary_key=True)
-    budget_id = Column(Integer, ForeignKey("budgets.id"), nullable=False)
-    threshold_percentage = Column(Numeric(5, 2), nullable=False) # e.g., 85.00 for 85%
-    notification_channel = Column(String, default="DISCORD")
-    is_triggered = Column(Boolean, default=False)
-Core Execution LogicBudgets Pipeline: The engine must periodically query the cost_history table, group the data by your designated scope parameter, and calculate the current cumulative month-to-date ($\text{MTD}$) total. It then combines this value with your BudgetForecaster (ARIMA model) output to determine whether forecasted spending is on track to breach the hard budget ceiling.Budget Alerts Engine: A cron loop checks if $\text{MTD Cost} \ge (\text{Monthly Limit} \times \text{Threshold Percentage})$. If the condition evaluates to True, it fires a signaling package to your Discord webhook handler and sets the is_triggered flag to prevent duplicate notification fatigue.📈 2. Business MetricsThis section drives Unit Economics. Raw cloud infrastructure metrics mean very little unless they are contextualized alongside operational business payloads (e.g., cost per active tracking user, cost per CI/CD compilation run, cost per API request).Core Execution LogicThe Telemetry Hook: This view reads directly from the existing business_metrics database table.Algorithmic Engine: It passes this data block straight into your BusinessCorrelation analytical pipeline. By using a first-degree polynomial regression ($\mathbf{y} = m\mathbf{x} + c$), it calculates the exact derivative $\frac{dC}{dU}$ (marginal cloud infrastructure cost to acquire one additional operational metric entity).Vantage-Style Use Case: It shifts the conversation from "Our AWS bill went up by $10,000" to "Our AWS bill went up because we processed 1,000,000 more API transactions, and our efficiency per transaction actually improved by 4%".🤝 3. Commitments & Commitment ReportsCloud providers offer massive financial discounts (up to 72%) via Reserved Instances (RIs) and Savings Plans (SPs) in exchange for a committed contract to use a fixed baseline amount of compute capacity over a 1- or 3-year term.Backend Data Model (models.py)Pythonclass CloudCommitment(Base):
-    __tablename__ = "cloud_commitments"
-    id = Column(String, primary_key=True) # e.g., AWS SP ARN or Azure Reservation ID
-    provider_type = Column(String, nullable=False) # aws, azure
-    commitment_type = Column(String, nullable=False) # "SAVINGS_PLAN", "RESERVED_INSTANCE"
-    hourly_commitment = Column(Numeric(10, 4), nullable=False) # The agreed dollar-per-hour spend contract
-    status = Column(String, nullable=False) # ACTIVE, EXPIRED, RETIRED
-    expiration_date = Column(DateTime, nullable=False)
-Core Execution LogicCommitments Inventory: This panel runs an index audit table mapping active commitments across all integrated accounts, pulling structural data types, contract duration markers, hourly cost matrices, and hard expiration dates.Commitment Reports Evaluation: This module calculates Utilization and Coverage ratios by processing your time-series usage telemetry:$$\text{Commitment Coverage \%} = \left( \frac{\text{On-Demand Spend Covered by RI/SP}}{\text{Total Eligible On-Demand Spend}} \right) \times 100$$If your computed utilization matches $100\%$ but your overall coverage drops below a safe operational margin (e.g., $< 70\%$), it indicates your architecture is leaking funds into expensive on-demand billing categories.🧪 4. Savings ModelsThe Savings Model platform functions as a mathematical sandbox. It acts as the direct planning workspace where your engineering and finance teams design commitment strategies before executing purchases.Core Execution LogicIntegration Module: Tightly integrates your live database telemetry files with your SavingsPlanner / SpotAdvisor Python calculation blocks.Simulation Loop: Engineers use this panel to evaluate complex "what-if" capacity deployment adjustments. For example: "What happens if we purchase an additional $10/hr AWS Compute Savings Plan and migrate 40% of our on-demand workloads over to Spot Instances?"Algorithmic Execution: The system parses your historical on-demand baseline matrix, overlays the simulated contract profile, evaluates structural risk targets via your SpotEvictionPredictor rules, and outputs a clean efficiency matrix tracking expected net cash savings and overcommitment risks.⚠️ 5. IssuesThe operational dispatch command center for Cloud-Reaper's automated orchestration systems. This is the centralized hub where actionable anomalies, compliance alerts, and infrastructure cleanups are organized for triage.Core Execution LogicAggregator Ingestion: Collects and processes background signals generated by your underlying machine learning layers. It pulls events directly from your ZombieScorer detections, AnomalyDetector residual threshold breaches, and k8s_optimizer pod drainage plans.Operational Status Triage: Every event generates an itemized triage entry with state states: OPEN, ACKNOWLEDGED, RESOLVED, or DISMISSED.Actionable Controls: Every issue card exposes explicit user execution buttons that connect to your backend action routes:[ Dismiss Issue ] $\longrightarrow$ Injects a custom reaper-ignore rule or dynamic exemption marker into the resource table metadata.[ Execute Remediation ] $\longrightarrow$ Connects directly to your Go automation core, initiating an instant API transaction call to prune the target disk or trigger an immediate zero-downtime cluster hibernation sequence.
-6.-------------------------------------------------------------------------------------------------------------------------------------------
-Pasted IMage add to the codebase AND MAKE IT IN SECTION "OVERVIEW"
+- **`Budget`**: Represents static or seasonally adjusted cost envelopes.
+- **`BudgetAlert`**: Notification dispatch configurations linked to a specific budget.
+- **`CloudCommitment`**: Multi-cloud reserved instance and savings plan contract tracker.
 
-7.-------------------------------------------------------------------------------------------------------------------------------------------
-Revise the favicon.ico in project
+---
 
-8.-------------------------------------------------------------------------------------------------------------------------------------------
-NOW UNDER Integrations section make the following -
-Kubernetes
-Docs
-Enable Kubernetes Agent - Vantage integrations with your Kubernetes cluster via the Vantage Kubernetes Agent. Once the integration is enabled you will need to deploy the Vantage agent into your Kubernetes clusters.
+### 2. Flask Application Routing
 
-9.-------------------------------------------------------------------------------------------------------------------------------------------
-Add a notification bell icon at the sidebar between finops intelligence and build with ai Sections
-Cost Alerts
-Receive an alert when costs meet specific currency-based or percentage based change threshold. Learn More
+#### [MODIFY] [app.py](file:///Users/ankitanupamrout/git/Cloud-Reaper/src/reaper/web/app.py)
+We will add a new endpoint `/about` to serve our custom and premium About page.
+```python
+@app.route("/about")
+def about():
+    return render_template("about.html")
+```
 
-Report Notifications
-Manage your report and dashboard notifications.
+---
 
-All Costs Weekly
-Weekly notification from All Resources
+### 3. User Interface Templates & Views
 
-Integrations
-Broadcast notifications to your preferred team workspaces.
-Slack, Microsoft Teams,  Discord
+#### [NEW] [about.html](file:///Users/ankitanupamrout/git/Cloud-Reaper/src/reaper/web/templates/about.html)
+We will create a high-fidelity glassmorphic page displaying details about the Cloud-Reaper project, features, and a premium card highlighting the author with their LinkedIn profile (`https://www.linkedin.com/in/ankitrout07`). We'll style it to match the existing sci-fi/neon cybernetic aesthetics.
 
-10.-------------------------------------------------------------------------------------------------------------------------------------------
-By extracting live performance metrics (vCPU utilization, memory footprints, and network throughput) from Prometheus via its PromQL HTTP API, your Python intelligence layer can cross-reference actual resource usage against the raw cost metrics stored in your PostgreSQL region_price_cache table. This bridges the gap between raw capacity and actual deployment waste.Here is the technical architecture, implementation engine, and validation method to inject this capability directly into Cloud-Reaper.📐 The Theory: Mapping Telemetry to Financial WasteCommercial tools often look at cloud bills statically. To calculate true financial waste dynamically, we cross-reference pricing metrics with real-time utilization data over a time window ($T$):$$\text{Waste Rate (\%)} = 100 \times \left( 1.0 - \frac{\frac{1}{T}\int_{0}^{T} \text{Metric}_{\text{actual}}(t) \, dt}{\text{Metric}_{\text{provisioned}}} \right)$$If an instance runs at an average of 8% CPU utilization over a 7-day window, your engine flags the exact dollar volume being wasted per hour on idle headroom.🛠️ Implementation EngineThis production-grade core service connects directly to your internal Prometheus data layer, executes real-time metric evaluations, and surfaces precise cost-optimization recommendations.1. Prometheus Metric Collector (src/reaper/collectors/prometheus_finops.py)Python# src/reaper/collectors/prometheus_finops.py
-import requests
-import time
-import logging
+#### [MODIFY] [_sidebar.html](file:///Users/ankitanupamrout/git/Cloud-Reaper/src/reaper/web/templates/_sidebar.html)
+- Add a new "About" link at the bottom.
+- Inject a bell icon link for Alerts/Notifications between "Build with AI" and "Financial Intelligence" sections, specifically at line 32 above the "Financial Intelligence" header.
 
-logger = logging.getLogger("reaper.collector.prometheus")
+#### [MODIFY] [financial.html](file:///Users/ankitanupamrout/git/Cloud-Reaper/src/reaper/web/templates/financial.html)
+- Enrich the "Budget Alerts" tab with structured and beautiful card modules for:
+  - **Cost Alerts**: Notification threshold settings (Learn More).
+  - **Report Notifications**: Scheduled report dispatches.
+  - **All Costs Weekly**: Weekly summary dispatches.
+  - **Integrations**: Discord, Slack, and Microsoft Teams broadcast hubs.
+- Integrate Discord and Slack brand colors and logos directly into inputs, titles, and labels of the webhook settings card.
 
-class PrometheusFinOpsCollector:
-    def __init__(self, prometheus_url: str = "http://localhost:9090"):
-        self.api_endpoint = f"{prometheus_url}/api/v1/query"
+#### [MODIFY] [integrations.html](file:///Users/ankitanupamrout/git/Cloud-Reaper/src/reaper/web/templates/integrations.html)
+- Add a new **Kubernetes Agent card** inside the "Static Connections" section.
+- Incorporate a direct link to `docs.html#kubernetes` (Docs) and a premium toggle switch.
+- Include a simulated toggle function `toggleK8sAgent(element)` showing toast feedback for activation status.
 
-    def fetch_node_avg_cpu_utilization(self, duration_window: str = "7d") -> dict:
-        """Executes PromQL queries to calculate average CPU utilization across clusters."""
-        # PromQL query tracking average non-idle CPU percentage across the fleet
-        promql_query = f"100 - (avg by (instance) (rate(node_cpu_seconds_total{{mode='idle'}}[{duration_window}])) * 100)"
-        
-        try:
-            response = requests.get(self.api_endpoint, params={'query': promql_query}, timeout=10)
-            if response.status_code != 200:
-                logger.error(f"Prometheus query failure. HTTP Status: {response.status_code}")
-                return {}
-            
-            results = response.json().get("data", {}).get("result", [])
-            utilization_map = {}
-            for item in results:
-                instance = item.get("metric", {}).get("instance", "unknown")
-                # Extract the final scalar metric reading tuple [timestamp, value]
-                value = float(item.get("value", [0, 0])[1])
-                utilization_map[instance] = round(value, 2)
-            
-            return utilization_map
-        except requests.exceptions.RequestException as e:
-            logger.critical(f"Failed to reach Prometheus API backend: {str(e)}")
-            return {}
-2. FinOps Metric Cross-Reference Engine (src/reaper/engine/metrics_analyzer.py)This service maps your live Prometheus performance readings directly to your cloud inventory costs to calculate exact financial waste.Python# src/reaper/engine/metrics_analyzer.py
-from reaper.collectors.prometheus_finops import PrometheusFinOpsCollector
+#### [MODIFY] [index.html](file:///Users/ankitanupamrout/git/Cloud-Reaper/src/reaper/web/templates/index.html)
+- Create a dedicated, premium **System Overview & Architecture** card on the main dashboard (`index.html`).
+- This section will display the copied topology image (`/static/img/Pasted_image.png`) with responsive dimensions, alongside high-fidelity metrics and descriptions of Cloud-Reaper's architecture.
 
-class FinOpsTelemetryAnalyzer:
-    def __init__(self, prometheus_url: str):
-        self.prom_collector = PrometheusFinOpsCollector(prometheus_url)
+---
 
-    def analyze_compute_waste_index(self, active_inventory: list) -> list:
-        """Cross-references Prometheus utilization data against actual asset cost metrics."""
-        cpu_metrics = self.prom_collector.fetch_node_avg_cpu_utilization()
-        optimization_insights = []
+### 4. Stylesheets & Static Assets
 
-        for asset in active_inventory:
-            instance_ip = asset.get("private_ip")
-            monthly_cost = asset.get("monthly_cost", 0.0)
-            
-            # Match inventory assets with active Prometheus telemetry instances
-            matching_instance = next((inst for inst in cpu_metrics if instance_ip in inst), None)
-            avg_utilization = cpu_metrics.get(matching_instance, 50.0) if matching_instance else 50.0
+#### [MODIFY] [main.css](file:///Users/ankitanupamrout/git/Cloud-Reaper/src/reaper/web/static/css/main.css)
+- Append a comprehensive set of Light Theme overrides under the `[data-theme="light"]` selector using the `!important` flag.
+- The overrides will calibrate hardcoded background utilities (`bg-white/5`, `bg-black/40`, `glass-card`, `glass-morph`), text colors (`text-white`, `text-slate-300`), form elements (`glass-input`), and accents (`glow-text-cyan`, `text-cyan-400`, `text-green-400`, `text-blue-400`) to guarantee high contrast, solid legibility, and visual excellence under light mode.
 
-            # Underutilization threshold rule: Flag instances running under 10% capacity
-            if avg_utilization < 10.0:
-                potential_savings = monthly_cost * 0.50 # Target a baseline 50% scale-down downsize
-                insight = {
-                    "resource_id": asset.get("resource_id"),
-                    "current_sku": asset.get("sku_size"),
-                    "avg_cpu_utilization": f"{avg_utilization}%",
-                    "monthly_waste_impact": f"${potential_savings:.2f}",
-                    "remediation_action": "DOWNGRADE_SKU_FAMILY"
-                }
-                optimization_insights.append(insight)
+#### [NEW] [favicon.png](file:///Users/ankitanupamrout/git/Cloud-Reaper/src/reaper/web/static/assets/favicon.png)
+- Standardize and upgrade the brand favicon.ico / favicon.png using high-fidelity graphics.
 
-        return optimization_insights
-3. Exposing the Analytical API Controller (src/reaper/web/metrics_routes.py)Python# src/reaper/web/metrics_routes.py
-from flask import Blueprint, jsonify, request
-from reaper.engine.metrics_analyzer import FinOpsTelemetryAnalyzer
+---
 
-telemetry_bp = Blueprint('telemetry_api', __name__)
-# Points to internal standard Prometheus routing endpoints
-analyzer = FinOpsTelemetryAnalyzer(prometheus_url="http://localhost:9090")
+### 5. Automated Tests
 
-@telemetry_bp.route('/api/v1/finops/telemetry-insights', methods=['POST'])
-def get_telemetry_driven_insights():
-    # Simulated mapping payload representing active PostgreSQL inventory rows
-    # In practice, query your local database table 'resources' here
-    mock_db_inventory = [
-        {"resource_id": "aks-worker-01", "private_ip": "10.0.1.4", "sku_size": "Standard_D4_v5", "monthly_cost": 140.0},
-        {"resource_id": "aks-worker-02", "private_ip": "10.0.1.5", "sku_size": "Standard_B2s", "monthly_cost": 30.0}
-    ]
+#### [MODIFY] [test_engine_models.py](file:///Users/ankitanupamrout/git/Cloud-Reaper/tests/unit/test_engine_models.py)
+We will add new unit tests for `Budget`, `BudgetAlert`, and `CloudCommitment` to assert that they instantiate correctly with all required schemas.
 
-    try:
-        actionable_insights = analyzer.analyze_compute_waste_index(mock_db_inventory)
-        return jsonify({
-            "status": "success",
-            "telemetry_source": "Prometheus v1 Engine",
-            "recommendations": actionable_insights
-        }), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": f"Telemetry parsing failure: {str(e)}"}), 500
+---
 
-11.-------------------------------------------------------------------------------------------------------------------------------------------
-Cost Reports:(Grafana and Prometheus integration)
-Add to Dashboard shortcut: The Cost Report ellipsis menu now includes an Add to Dashboard option, letting you navigate directly to Dashboards to add the current report as a widget.
-Kubernetes Efficiency Report regions: Kubernetes Efficiency Reports now support filtering and grouping by Region, making it easier to analyze idle and total Kubernetes costs by cloud region.
-Budget Performance in report notifications: Cost Report notifications now include a Budget Performance section when the report has linked budgets, helping recipients compare actual spend against budget targets directly from scheduled email, Slack, or Microsoft Teams updates.
-Cost Recommendations:
-Potential Savings currency conversion: Cost Recommendations Potential Savings amounts on Resource Reports and rightsizing views now correctly display in your workspace’s configured currency.
-Idle GKE cluster recommendations: Vantage now surfaces idle Google Kubernetes Engine (GKE) cluster recommendations, identifying clusters with little or no workload activity so you can scale them down or delete them. A new Idle GKE Cluster tab is available on affected GKE cluster resources with the recommended remediation.
-Active Resources & Resource Reports:
-ELB instance metadata: ELB Active Resources now display registered EC2 instance metadata, including target group details, making it easier to understand which instances are behind each load balancer.
-Active Resources chart and Cost Report link: The Active Resources detail page now defaults to a stacked bar chart grouped by service and category, and includes a View in Cost Report button that links directly to the default Cost Report filtered by the resource.
-Resource Report folders: Resource Reports can now be organized into folders, with support for bulk move operations and search across folders—matching the same folder experience already available for Cost Reports.
-S3 Last Accessed Date: S3 Active Resources now include a Last Accessed Date metadata field, derived from S3 request activity in your billing data, making it easier to identify unused or infrequently accessed buckets.
-Virtual Tags & Tagging:
-Preferred virtual tags: You can now mark Virtual Tags as preferred directly from the Virtual Tags tab on the Tags settings page, in addition to the existing All Tags tab workflow.
+## Verification Plan
 
-12.-------------------------------------------------------------------------------------------------------------------------------------------
+### Automated Tests
+- We will execute `pytest tests/unit/test_engine_models.py` to ensure SQLAlchemy models function properly.
+- Run `pytest` across the entire workspace to check for regressions.
 
-13.-------------------------------------------------------------------------------------------------------------------------------------------
-
-14.-------------------------------------------------------------------------------------------------------------------------------------------
-
-
-15.-------------------------------------------------------------------------------------------------------------------------------------------
-
-
-16.-------------------------------------------------------------------------------------------------------------------------------------------
+### Manual Verification
+- Launch the Flask web server using `python main.py` or equivalent and navigate through:
+  - **Main Dashboard**: Inspect the "System Overview & Architecture" card and check if `Pasted_image.png` renders perfectly.
+  - **Sidebar**: Ensure the Bell Icon link and the "About" link are correctly positioned, styled, and navigable.
+  - **About Page**: Ensure the glassmorphic LinkedIn card and social elements look stunning and match the cybernetic design system.
+  - **Budget Alerts**: Toggle light/dark modes and verify text readability of Slack/Discord configurations and the newly enriched card modules.
+  - **Integrations**: Check that the Kubernetes card renders with its toggle, and the simulated agent activator produces visual toast notifications.
