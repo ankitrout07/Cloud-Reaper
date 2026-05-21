@@ -457,3 +457,73 @@ h1, h2, h3, h4, p, span, div {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
+
+/* Light theme: comprehensive readability overrides */
+[data-theme="light"] .text-white {
+    color: #0f172a !important;
+}
+
+[data-theme="light"] .text-slate-300,
+[data-theme="light"] .text-slate-400 {
+    color: #475569 !important;
+}
+
+[data-theme="light"] .text-cyan-400 {
+    color: #0891b2 !important;
+}
+
+[data-theme="light"] .text-green-400,
+[data-theme="light"] .text-green-500 {
+    color: #15803d !important;
+}
+
+[data-theme="light"] .text-blue-400 {
+    color: #1d4ed8 !important;
+}
+
+[data-theme="light"] .glow-text-cyan {
+    color: #0e7490 !important;
+    text-shadow: none !important;
+}
+
+[data-theme="light"] .bg-black\/40,
+[data-theme="light"] .bg-black\/20 {
+    background-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+[data-theme="light"] .glass-card,
+[data-theme="light"] .glass-morph,
+[data-theme="light"] .glass {
+    background: #ffffff !important;
+    border-color: rgba(15, 23, 42, 0.1) !important;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06) !important;
+}
+
+[data-theme="light"] .glass-input,
+[data-theme="light"] input.glass-input,
+[data-theme="light"] .glass-input:focus {
+    background: #f8fafc !important;
+    border-color: rgba(15, 23, 42, 0.15) !important;
+    color: #0f172a !important;
+}
+
+[data-theme="light"] .glass-input::placeholder {
+    color: #94a3b8 !important;
+}
+
+[data-theme="light"] thead.bg-white\/5,
+[data-theme="light"] tr.border-white\/5,
+[data-theme="light"] .divide-white\/5 > * {
+    border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+[data-theme="light"] .hover\:bg-white\/5:hover,
+[data-theme="light"] .hover\:bg-white\/10:hover {
+    background-color: rgba(15, 23, 42, 0.05) !important;
+}
+
+[data-theme="light"] .sidebar-icon.text-cyan-400,
+[data-theme="light"] .sidebar-icon.text-amber-400 {
+    filter: none !important;
+    opacity: 1 !important;
+}

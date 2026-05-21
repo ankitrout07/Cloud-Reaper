@@ -149,6 +149,24 @@
                                 </button>
                             </div>
                         </div>
+
+                        <div class="integration-card border-cyan-500/20">
+                            <div class="flex justify-between items-start gap-4">
+                                <div>
+                                    <h5 class="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                                        <i class="fas fa-dharmachakra text-cyan-400"></i> Kubernetes Agent
+                                    </h5>
+                                    <p class="text-xs text-gray-400 mt-2">Deploy the in-cluster FinOps agent to scrape node-level utilization and correlate pod waste with pricing cache.</p>
+                                    <a href="/docs#kubernetes" class="inline-flex items-center gap-1 mt-3 text-[10px] font-black uppercase text-cyan-400 hover:text-cyan-300 transition">
+                                        <i class="fas fa-book text-[9px]"></i> View Docs
+                                    </a>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer shrink-0" title="Toggle Kubernetes agent">
+                                    <input type="checkbox" class="sr-only peer" onchange="toggleK8sAgent(this)">
+                                    <div class="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:bg-cyan-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -463,6 +481,16 @@
                 saveBtn.innerHTML = origHtml;
                 saveBtn.disabled = false;
             }
+        }
+
+        function toggleK8sAgent(element) {
+            const active = element.checked;
+            showToast(
+                active
+                    ? "Kubernetes agent activated — cluster telemetry sync enabled."
+                    : "Kubernetes agent deactivated — telemetry sync paused.",
+                "success"
+            );
         }
 
         function showToast(message, type = "success") {

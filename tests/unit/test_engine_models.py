@@ -1,7 +1,7 @@
 import datetime
 
 from reaper.collectors.config_manager import normalize_resource
-from reaper.engine.models import CloudConnection, CostHistory, Resource
+from reaper.engine.models import Budget, BudgetAlert, CloudCommitment, CloudConnection, CostHistory, Resource
 
 try:
     from datetime import UTC
@@ -58,6 +58,51 @@ def test_cloud_connection_model_instantiation():
     assert conn.connection_name == "prod-aws"
     assert conn.credentials["region"] == "us-east-1"
     assert conn.is_active is True
+
+
+def test_budget_model_instantiation():
+    budget = Budget(
+        name="prod-monthly",
+        scope_type="TAG",
+        scope_value="Owner=ankit",
+        monthly_limit=5000.00,
+    )
+
+    assert budget.name == "prod-monthly"
+    assert budget.scope_type == "TAG"
+    assert budget.scope_value == "Owner=ankit"
+    assert float(budget.monthly_limit) == 5000.00
+
+
+def test_budget_alert_model_instantiation():
+    alert = BudgetAlert(
+        budget_id=1,
+        threshold_percentage=85.00,
+        notification_channel="DISCORD",
+        is_triggered=False,
+    )
+
+    assert alert.budget_id == 1
+    assert float(alert.threshold_percentage) == 85.00
+    assert alert.notification_channel == "DISCORD"
+    assert alert.is_triggered is False
+
+
+def test_cloud_commitment_model_instantiation():
+    commitment = CloudCommitment(
+        id="arn:aws:savingsplans::123:sp/sp-abc",
+        provider_type="aws",
+        commitment_type="SAVINGS_PLAN",
+        hourly_commitment=1.25,
+        status="ACTIVE",
+        expiration_date=datetime.datetime(2027, 6, 1, tzinfo=UTC),
+    )
+
+    assert commitment.id == "arn:aws:savingsplans::123:sp/sp-abc"
+    assert commitment.provider_type == "aws"
+    assert commitment.commitment_type == "SAVINGS_PLAN"
+    assert float(commitment.hourly_commitment) == 1.25
+    assert commitment.status == "ACTIVE"
 
 
 def test_normalize_aws_resource():

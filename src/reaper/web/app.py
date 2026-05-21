@@ -968,6 +968,11 @@ def api_architect_estimate():
         return jsonify({"error": f"Failed to compile AI architecture: {e!s}"}), 500
 
 
+@app.route("/about")
+def about():
+    return render_template("about.html")
+
+
 @app.route("/docs")
 def docs():
     import glob

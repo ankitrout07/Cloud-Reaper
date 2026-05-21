@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cloud Reaper | Financial Intelligence</title>
     <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/static/js/theme.js"></script>
     <script src="/static/js/setup.js"></script>
@@ -278,22 +279,68 @@
 
                 <!-- 2. BUDGET ALERTS TAB -->
                 <div id="tab-content-alerts" class="tab-pane hidden flex flex-col gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="glass-card p-5 border-white/5 border-l-4 border-l-rose-500/60">
+                            <div class="flex items-start justify-between gap-3 mb-3">
+                                <div>
+                                    <h3 class="text-sm font-bold text-white uppercase tracking-wide">Cost Alerts</h3>
+                                    <p class="text-slate-400 text-xs mt-1">Threshold notifications when daily pacing breaches your budget envelope.</p>
+                                </div>
+                                <span class="px-2 py-0.5 bg-rose-500/10 text-rose-400 text-[10px] font-bold uppercase rounded-full border border-rose-500/20">Active</span>
+                            </div>
+                            <button type="button" class="text-cyan-400 text-[10px] font-bold uppercase tracking-wider hover:text-cyan-300 transition">Learn More →</button>
+                        </div>
+                        <div class="glass-card p-5 border-white/5 border-l-4 border-l-blue-500/60">
+                            <div class="flex items-start justify-between gap-3 mb-3">
+                                <div>
+                                    <h3 class="text-sm font-bold text-white uppercase tracking-wide">Report Notifications</h3>
+                                    <p class="text-slate-400 text-xs mt-1">Scheduled FinOps report dispatches to your configured channels.</p>
+                                </div>
+                                <span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase rounded-full border border-blue-500/20">Weekly</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 font-mono">Next dispatch: Mon 09:00 UTC</p>
+                        </div>
+                        <div class="glass-card p-5 border-white/5 border-l-4 border-l-emerald-500/60">
+                            <div class="flex items-start justify-between gap-3 mb-3">
+                                <div>
+                                    <h3 class="text-sm font-bold text-white uppercase tracking-wide">All Costs Weekly</h3>
+                                    <p class="text-slate-400 text-xs mt-1">Consolidated weekly spend summary across all connected providers.</p>
+                                </div>
+                                <span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase rounded-full border border-emerald-500/20">Enabled</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500">Includes MTD burn, forecast delta, and top waste drivers.</p>
+                        </div>
+                        <div class="glass-card p-5 border-white/5 border-l-4 border-l-purple-500/60">
+                            <h3 class="text-sm font-bold text-white uppercase tracking-wide mb-3">Integrations</h3>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5865F2]/15 border border-[#5865F2]/30 text-[#a5b4fc] text-[10px] font-bold uppercase"><i class="fab fa-discord"></i> Discord</span>
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#E01E5A]/15 border border-[#E01E5A]/30 text-[#fda4af] text-[10px] font-bold uppercase"><i class="fab fa-slack"></i> Slack</span>
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5059C9]/15 border border-[#5059C9]/30 text-[#93c5fd] text-[10px] font-bold uppercase"><i class="fab fa-microsoft"></i> Teams</span>
+                            </div>
+                            <p class="text-slate-400 text-xs mt-3">Broadcast hubs for cost, report, and dashboard notifications.</p>
+                        </div>
+                    </div>
+
                     <div class="glass-card p-6 border-white/5">
-                        <h2 class="text-2xl font-bold text-white mb-2">Budget Threshold Webhook Alerts</h2>
-                        <p class="text-slate-400 text-sm mb-6">Configure instant multi-channel webhook notifications to receive slack/discord warnings when spending surges.</p>
+                        <h2 class="text-2xl font-bold text-white mb-2">Webhook Broadcast Settings</h2>
+                        <p class="text-slate-400 text-sm mb-6">Configure instant multi-channel webhook notifications when spending surges.</p>
                         
                         <div class="flex flex-col gap-6 mb-8">
-                            <div>
-                                <label class="text-slate-400 text-xs uppercase font-bold block mb-2">Discord Webhook URL</label>
-                                <input type="text" id="discord-webhook-url" class="glass-input w-full" placeholder="https://discord.com/api/webhooks/..." value="{{ settings.discord_webhook_url or '' }}">
+                            <div class="p-4 rounded-xl border border-[#5865F2]/25 bg-[#5865F2]/5">
+                                <label class="text-[#a5b4fc] text-xs uppercase font-bold flex items-center gap-2 mb-2">
+                                    <i class="fab fa-discord text-[#5865F2] text-lg"></i> Discord Webhook URL
+                                </label>
+                                <input type="text" id="discord-webhook-url" class="glass-input w-full border-[#5865F2]/20 focus:border-[#5865F2]/50" placeholder="https://discord.com/api/webhooks/..." value="{{ settings.discord_webhook_url or '' }}">
                             </div>
                             
-                            <div>
-                                <label class="text-slate-400 text-xs uppercase font-bold block mb-2">Slack Webhook URL</label>
-                                <input type="text" id="slack-webhook-url" class="glass-input w-full" placeholder="https://hooks.slack.com/services/..." value="{{ settings.slack_webhook_url or '' }}">
+                            <div class="p-4 rounded-xl border border-[#E01E5A]/25 bg-[#E01E5A]/5">
+                                <label class="text-[#fda4af] text-xs uppercase font-bold flex items-center gap-2 mb-2">
+                                    <i class="fab fa-slack text-[#E01E5A] text-lg"></i> Slack Webhook URL
+                                </label>
+                                <input type="text" id="slack-webhook-url" class="glass-input w-full border-[#E01E5A]/20 focus:border-[#E01E5A]/50" placeholder="https://hooks.slack.com/services/..." value="{{ settings.slack_webhook_url or '' }}">
                             </div>
 
-                            <div class="flex gap-4">
+                            <div class="flex flex-wrap gap-4">
                                 <button onclick="saveWebhooks()" class="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-semibold transition shadow-[0_0_15px_rgba(6,182,212,0.3)]">
                                     Save Configurations
                                 </button>
