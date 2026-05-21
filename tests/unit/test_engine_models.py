@@ -1,7 +1,14 @@
 import datetime
 
 from reaper.collectors.config_manager import normalize_resource
-from reaper.engine.models import Budget, BudgetAlert, CloudCommitment, CloudConnection, CostHistory, Resource
+from reaper.engine.models import (
+    Budget,
+    BudgetAlert,
+    CloudCommitment,
+    CloudConnection,
+    CostHistory,
+    Resource,
+)
 
 try:
     from datetime import UTC
