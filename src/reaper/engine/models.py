@@ -205,11 +205,12 @@ class CloudCommitment(Base):
     id = Column(String, primary_key=True)  # e.g., AWS SP ARN or Azure Reservation ID
     provider_type = Column(String, nullable=False)  # aws, azure
     commitment_type = Column(String, nullable=False)  # "SAVINGS_PLAN", "RESERVED_INSTANCE"
-    hourly_commitment = Column(Numeric(10, 4), nullable=False)  # The agreed dollar-per-hour spend contract
+    hourly_commitment = Column(
+        Numeric(10, 4), nullable=False
+    )  # The agreed dollar-per-hour spend contract
     status = Column(String, nullable=False)  # ACTIVE, EXPIRED, RETIRED
     expiration_date = Column(DateTime, nullable=False)
 
 
 def init_db():
     Base.metadata.create_all(bind=engine)
-
