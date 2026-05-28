@@ -36,8 +36,10 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 - **🛑 Shift-Left PR Cost Simulation:** Integrates with code control planes (GitHub Actions/Terraform) to run dry-run estimations, preventing expensive infrastructure mistakes before code is merged.
 - **🛡️ Policy Guardrails:** Real-time audit against FinOps best practices via Azure Resource Graph.
 - **🚨 Budget Kill-Switch:** Automated VM deallocation safeguards for sandbox environments.
-- **🔔 Discord Notifications:** Webhook-driven alerts for budget breaches and anomalies.
+- **🔔 Multi-Channel Alerting Hub:** Webhook-driven alerts via Discord, Slack, and Microsoft Teams for budget breaches, thresholds, and scheduled reports.
 - **📄 PDF BOM Export:** One-click Bill of Materials export from the Architect Estimator.
+- **💼 Cloud Commitment Tracking:** Centralized tracking of Multi-Cloud Savings Plans and Reserved Instances across AWS and Azure.
+- **☸️ Kubernetes Agent Integration:** Seamless connection monitoring for container cost allocation and cluster bin-packing.
 
 ---
 
@@ -90,7 +92,9 @@ Cloud-Reaper/
 │   │   │   └── copilot_schemas.py  # Pydantic schemas for structured LLM output
 │   │   ├── services/       # Log streamer / notification services
 │   │   └── web/            # Flask app, templates, static assets
-│   │       └── copilot_routes.py   # Blueprint: /api/v1/copilot/optimize
+│   │       ├── copilot_routes.py   # Blueprint: /api/v1/copilot/optimize
+│   │       ├── templates/          # Jinja templates (index, about, financial, integrations)
+│   │       └── static/             # Light/Dark mode CSS and High-fidelity UI assets
 │   └── engine-go/          # Go High-Velocity Performance Core
 │       ├── collectors/     # network_scraper, k8s_optimizer, auth
 │       ├── db/             # PostgreSQL bridge
@@ -112,7 +116,7 @@ Cloud-Reaper/
 | Database | PostgreSQL 15 (SQLAlchemy 2.0) |
 | Web Framework | Flask + Flask-SocketIO (gevent) |
 | AI Copilot | Google GenAI (`google-genai`) · Gemini 2.5 Flash · Bounded Knapsack Optimizer |
-| Frontend | HTML5, Vanilla JS, CSS (Glassmorphism + Cyan Glow) |
+| Frontend | HTML5, Vanilla JS, CSS (Glassmorphism + Cyan Glow, Adaptive Light/Dark Mode) |
 | PDF Export | WeasyPrint |
 | Python Quality | Ruff · Mypy · Pytest · Bandit · Safety |
 | Go Quality | Golangci-lint |
@@ -137,7 +141,7 @@ cd Cloud-Reaper
 python bootstrap.py
 ```
 
-`bootstrap.py` handles everything automatically — Go build, venv, dependencies, `.env` (including `GEMINI_API_KEY` scaffolding), and dashboard launch. Dashboard available at **http://localhost:5001**.
+`bootstrap.py` handles everything automatically — Go build, venv, dependencies, `.env` (including `GEMINI_API_KEY` scaffolding), and dashboard launch. Dashboard available at **http://localhost:5001**. Explore the System Overview, Architecture, and About pages directly from the dashboard!
 
 > Full setup guide → **[HOW_TO_RUN.md](HOW_TO_RUN.md)**
 > Portability & Docker guide → **[PORTABILITY.md](PORTABILITY.md)**
@@ -192,6 +196,9 @@ Cloud-Reaper uses PostgreSQL with the following key tables:
 | `region_price_cache` | Lazy-cached Azure SKU pricing per region |
 | `vault_entries` | Encrypted secret entries (Fernet AES-128) |
 | `cloud_connections` | Multi-cloud provider credential manifests |
+| `budgets` | Static and seasonally adjusted cost envelopes |
+| `budget_alerts` | Notification dispatch configurations for budgets |
+| `cloud_commitments` | Multi-cloud reserved instance and savings plan contracts |
 
 Run `docker run --name cloud-reaper-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres` to spin up a local DB, then `bootstrap.py` will run `init_db()` automatically.
 
