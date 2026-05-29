@@ -8,7 +8,8 @@ telemetry_bp = Blueprint("telemetry_api", __name__)
 # Points to internal standard Prometheus routing endpoints
 analyzer = FinOpsTelemetryAnalyzer(prometheus_url="http://localhost:9090")
 
-from reaper.engine.models import SessionLocal, Resource
+from reaper.engine.models import Resource, SessionLocal
+
 
 @telemetry_bp.route("/api/v1/finops/telemetry-insights", methods=["POST"])
 def get_telemetry_driven_insights():
@@ -18,12 +19,14 @@ def get_telemetry_driven_insights():
         db_inventory = []
         for r in resources:
             tags = r.tags or {}
-            db_inventory.append({
-                "resource_id": r.id,
-                "private_ip": tags.get("private_ip") or "",
-                "sku_size": tags.get("sku_size") or r.type or "Unknown",
-                "monthly_cost": float(tags.get("monthly_cost", 0.0))
-            })
+            db_inventory.append(
+                {
+                    "resource_id": r.id,
+                    "private_ip": tags.get("private_ip") or "",
+                    "sku_size": tags.get("sku_size") or r.type or "Unknown",
+                    "monthly_cost": float(tags.get("monthly_cost", 0.0)),
+                }
+            )
     except Exception as e:
         db.close()
         return jsonify({"status": "error", "message": f"Database fetch failure: {e!s}"}), 500
