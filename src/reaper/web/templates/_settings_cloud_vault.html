@@ -1,126 +1,226 @@
             <div id="cloud-tab" class="hidden space-y-8 mt-4 animate-fade-in">
-                <div class="p-8 bg-cyan-500/5 border border-white/5 rounded-3xl border-l-4 border-l-cyan-500/50">
-                    <h4 class="text-xs font-black text-cyan-400 uppercase mb-2 tracking-widest">Cloud Providers</h4>
-                    <p class="text-[10px] text-slate-500 mb-8 uppercase font-bold">Connect AWS, Azure, GCP, or Kubernetes and switch the active scanning context.</p>
+                <div class="p-8 bg-[#0c1222] border border-white/[0.06] rounded-3xl relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-64 h-64 bg-blue-500/[0.03] blur-[100px] rounded-full"></div>
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/10 flex items-center justify-center border border-white/[0.06]">
+                            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/></svg>
+                        </span>
+                        <h4 class="text-xs font-black text-white/90 uppercase tracking-widest">Cloud Providers</h4>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mb-8 ml-12 font-medium">Connect AWS, Azure, GCP, or Kubernetes and switch the active scanning context.</p>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                        <div class="p-5 rounded-2xl border border-white/10 bg-black/30">
-                            <div class="flex justify-between items-center mb-3">
-                                <span class="font-black text-white flex items-center gap-2"><i class="fab fa-aws text-cyan-400 text-lg"></i> AWS</span>
-                                <span id="cloud-status-aws" class="text-[10px] font-bold uppercase text-slate-500">Not connected</span>
+                        <!-- AWS -->
+                        <div class="group p-5 rounded-2xl border border-white/[0.06] bg-white/[0.015] hover:bg-white/[0.03] hover:border-white/[0.1] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="font-bold text-white/90 flex items-center gap-3 text-sm">
+                                    <span class="w-8 h-8 rounded-lg bg-[#FF9900]/10 flex items-center justify-center border border-[#FF9900]/20">
+                                        <i class="fab fa-aws text-[#FF9900] text-sm"></i>
+                                    </span>
+                                    AWS
+                                </span>
+                                <span id="cloud-status-aws" class="text-[9px] font-bold uppercase tracking-wider text-slate-600 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]">Disconnected</span>
                             </div>
                             <div class="flex gap-2">
-                                <button type="button" onclick="toggleCloudPanel('aws')" class="flex-1 py-2 text-[9px] font-black uppercase bg-white/5 rounded-lg">Configure</button>
-                                <button type="button" id="cloud-switch-aws" onclick="switchSettingsProvider('aws')" class="flex-1 py-2 text-[9px] font-black uppercase bg-cyan-500/10 text-cyan-400 rounded-lg border border-cyan-500/20">Activate</button>
+                                <button type="button" onclick="toggleCloudPanel('aws')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.06] rounded-xl border border-white/[0.06] text-slate-400 hover:text-white transition-all">Configure</button>
+                                <button type="button" id="cloud-switch-aws" onclick="switchSettingsProvider('aws')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-blue-500/[0.08] text-blue-400 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition-all">Activate</button>
                             </div>
                         </div>
-                        <div class="p-5 rounded-2xl border border-white/10 bg-black/30">
-                            <div class="flex justify-between items-center mb-3">
-                                <span class="font-black text-white flex items-center gap-2"><i class="fab fa-microsoft text-cyan-400 text-lg"></i> Azure</span>
-                                <span id="cloud-status-azure" class="text-[10px] font-bold uppercase text-slate-500">Not connected</span>
+                        <!-- Azure -->
+                        <div class="group p-5 rounded-2xl border border-white/[0.06] bg-white/[0.015] hover:bg-white/[0.03] hover:border-white/[0.1] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="font-bold text-white/90 flex items-center gap-3 text-sm">
+                                    <span class="w-8 h-8 rounded-lg bg-[#0078D4]/10 flex items-center justify-center border border-[#0078D4]/20">
+                                        <i class="fab fa-microsoft text-[#0078D4] text-sm"></i>
+                                    </span>
+                                    Azure
+                                </span>
+                                <span id="cloud-status-azure" class="text-[9px] font-bold uppercase tracking-wider text-slate-600 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]">Disconnected</span>
                             </div>
                             <div class="flex gap-2">
-                                <button type="button" onclick="toggleCloudPanel('azure')" class="flex-1 py-2 text-[9px] font-black uppercase bg-white/5 rounded-lg">Configure</button>
-                                <button type="button" id="cloud-switch-azure" onclick="switchSettingsProvider('azure')" class="flex-1 py-2 text-[9px] font-black uppercase bg-cyan-500/10 text-cyan-400 rounded-lg border border-cyan-500/20">Activate</button>
+                                <button type="button" onclick="toggleCloudPanel('azure')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.06] rounded-xl border border-white/[0.06] text-slate-400 hover:text-white transition-all">Configure</button>
+                                <button type="button" id="cloud-switch-azure" onclick="switchSettingsProvider('azure')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-blue-500/[0.08] text-blue-400 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition-all">Activate</button>
                             </div>
                         </div>
-                        <div class="p-5 rounded-2xl border border-white/10 bg-black/30">
-                            <div class="flex justify-between items-center mb-3">
-                                <span class="font-black text-white flex items-center gap-2"><i class="fab fa-google text-cyan-400 text-lg"></i> GCP</span>
-                                <span id="cloud-status-gcp" class="text-[10px] font-bold uppercase text-slate-500">Not connected</span>
+                        <!-- GCP -->
+                        <div class="group p-5 rounded-2xl border border-white/[0.06] bg-white/[0.015] hover:bg-white/[0.03] hover:border-white/[0.1] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="font-bold text-white/90 flex items-center gap-3 text-sm">
+                                    <span class="w-8 h-8 rounded-lg bg-[#4285F4]/10 flex items-center justify-center border border-[#4285F4]/20">
+                                        <i class="fab fa-google text-[#4285F4] text-sm"></i>
+                                    </span>
+                                    GCP
+                                </span>
+                                <span id="cloud-status-gcp" class="text-[9px] font-bold uppercase tracking-wider text-slate-600 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]">Disconnected</span>
                             </div>
                             <div class="flex gap-2">
-                                <button type="button" onclick="toggleCloudPanel('gcp')" class="flex-1 py-2 text-[9px] font-black uppercase bg-white/5 rounded-lg">Configure</button>
-                                <button type="button" id="cloud-switch-gcp" onclick="switchSettingsProvider('gcp')" class="flex-1 py-2 text-[9px] font-black uppercase bg-cyan-500/10 text-cyan-400 rounded-lg border border-cyan-500/20">Activate</button>
+                                <button type="button" onclick="toggleCloudPanel('gcp')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.06] rounded-xl border border-white/[0.06] text-slate-400 hover:text-white transition-all">Configure</button>
+                                <button type="button" id="cloud-switch-gcp" onclick="switchSettingsProvider('gcp')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-blue-500/[0.08] text-blue-400 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition-all">Activate</button>
                             </div>
                         </div>
-                        <div class="p-5 rounded-2xl border border-white/10 bg-black/30">
-                            <div class="flex justify-between items-center mb-3">
-                                <span class="font-black text-white flex items-center gap-2"><i class="fas fa-network-wired text-cyan-400 text-lg"></i> Kubernetes</span>
-                                <span id="cloud-status-k8s" class="text-[10px] font-bold uppercase text-slate-500">Not connected</span>
+                        <!-- Kubernetes -->
+                        <div class="group p-5 rounded-2xl border border-white/[0.06] bg-white/[0.015] hover:bg-white/[0.03] hover:border-white/[0.1] transition-all duration-300">
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="font-bold text-white/90 flex items-center gap-3 text-sm">
+                                    <span class="w-8 h-8 rounded-lg bg-[#326CE5]/10 flex items-center justify-center border border-[#326CE5]/20">
+                                        <i class="fas fa-network-wired text-[#326CE5] text-sm"></i>
+                                    </span>
+                                    Kubernetes
+                                </span>
+                                <span id="cloud-status-k8s" class="text-[9px] font-bold uppercase tracking-wider text-slate-600 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]">Disconnected</span>
                             </div>
                             <div class="flex gap-2">
-                                <button type="button" onclick="toggleCloudPanel('k8s')" class="flex-1 py-2 text-[9px] font-black uppercase bg-white/5 rounded-lg">Configure</button>
-                                <button type="button" id="cloud-switch-k8s" onclick="switchSettingsProvider('k8s')" class="flex-1 py-2 text-[9px] font-black uppercase bg-cyan-500/10 text-cyan-400 rounded-lg border border-cyan-500/20">Activate</button>
+                                <button type="button" onclick="toggleCloudPanel('k8s')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.06] rounded-xl border border-white/[0.06] text-slate-400 hover:text-white transition-all">Configure</button>
+                                <button type="button" id="cloud-switch-k8s" onclick="switchSettingsProvider('k8s')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-blue-500/[0.08] text-blue-400 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition-all">Activate</button>
                             </div>
                         </div>
                     </div>
 
-                    <div id="cloud-panel-aws" class="cloud-provider-panel hidden p-6 bg-black/40 border border-white/10 rounded-2xl space-y-4">
-                        <input id="settings-aws-access-key-id" placeholder="AWS_ACCESS_KEY_ID" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-cyan-300 outline-none">
-                        <input id="settings-aws-secret-access-key" type="password" placeholder="AWS_SECRET_ACCESS_KEY" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-cyan-300 outline-none">
-                        <input id="settings-aws-region" placeholder="us-east-1" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-cyan-300 outline-none">
-                        <button type="button" id="settings-connect-aws" onclick="connectSettingsProvider('aws')" class="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-[#0d1117] font-black uppercase tracking-widest rounded-xl">Connect & Activate</button>
+                    <!-- Configuration Panels -->
+                    <div id="cloud-panel-aws" class="cloud-provider-panel hidden p-6 bg-[#080d18] border border-white/[0.06] rounded-2xl space-y-3 animate-fade-in">
+                        <div class="flex items-center gap-2 mb-2"><span class="w-1.5 h-1.5 rounded-full bg-[#FF9900]"></span><span class="text-[9px] font-bold uppercase tracking-widest text-slate-500">AWS Credentials</span></div>
+                        <input id="settings-aws-access-key-id" placeholder="AWS_ACCESS_KEY_ID" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600">
+                        <input id="settings-aws-secret-access-key" type="password" placeholder="AWS_SECRET_ACCESS_KEY" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600">
+                        <input id="settings-aws-region" placeholder="us-east-1" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600">
+                        <button type="button" id="settings-connect-aws" onclick="connectSettingsProvider('aws')" class="w-full py-3 mt-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold uppercase tracking-widest rounded-xl text-[10px] transition-all shadow-lg shadow-blue-500/10">Connect & Activate</button>
                     </div>
 
-                    <div id="cloud-panel-azure" class="cloud-provider-panel hidden p-6 bg-black/40 border border-white/10 rounded-2xl space-y-4">
-                        <input id="settings-azure-subscription-id" placeholder="Subscription ID" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-cyan-300 outline-none">
-                        <input id="settings-azure-tenant-id" placeholder="Tenant ID" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-cyan-300 outline-none">
-                        <input id="settings-azure-client-id" placeholder="Client ID" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-cyan-300 outline-none">
-                        <input id="settings-azure-client-secret" type="password" placeholder="Client Secret" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-cyan-300 outline-none">
-                        <button type="button" id="settings-connect-azure" onclick="connectSettingsProvider('azure')" class="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-[#0d1117] font-black uppercase tracking-widest rounded-xl">Connect & Activate</button>
+                    <div id="cloud-panel-azure" class="cloud-provider-panel hidden p-6 bg-[#080d18] border border-white/[0.06] rounded-2xl space-y-3 animate-fade-in">
+                        <div class="flex items-center gap-2 mb-2"><span class="w-1.5 h-1.5 rounded-full bg-[#0078D4]"></span><span class="text-[9px] font-bold uppercase tracking-widest text-slate-500">Azure Service Principal</span></div>
+                        <input id="settings-azure-subscription-id" placeholder="Subscription ID" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600">
+                        <input id="settings-azure-tenant-id" placeholder="Tenant ID" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600">
+                        <input id="settings-azure-client-id" placeholder="Client ID" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600">
+                        <input id="settings-azure-client-secret" type="password" placeholder="Client Secret" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600">
+                        <button type="button" id="settings-connect-azure" onclick="connectSettingsProvider('azure')" class="w-full py-3 mt-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold uppercase tracking-widest rounded-xl text-[10px] transition-all shadow-lg shadow-blue-500/10">Connect & Activate</button>
                     </div>
 
-                    <div id="cloud-panel-gcp" class="cloud-provider-panel hidden p-6 bg-black/40 border border-white/10 rounded-2xl space-y-4">
-                        <input id="settings-gcp-project-id" placeholder="PROJECT_ID" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-cyan-300 outline-none">
-                        <label class="text-[10px] uppercase tracking-widest text-slate-500">Service Account JSON</label>
-                        <input id="settings-gcp-key-file" type="file" accept=".json" class="w-full text-[11px] text-slate-300">
-                        <button type="button" id="settings-connect-gcp" onclick="connectSettingsProvider('gcp')" class="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-[#0d1117] font-black uppercase tracking-widest rounded-xl">Connect & Activate</button>
+                    <div id="cloud-panel-gcp" class="cloud-provider-panel hidden p-6 bg-[#080d18] border border-white/[0.06] rounded-2xl space-y-3 animate-fade-in">
+                        <div class="flex items-center gap-2 mb-2"><span class="w-1.5 h-1.5 rounded-full bg-[#4285F4]"></span><span class="text-[9px] font-bold uppercase tracking-widest text-slate-500">GCP Service Account</span></div>
+                        <input id="settings-gcp-project-id" placeholder="PROJECT_ID" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600">
+                        <label class="text-[9px] uppercase tracking-widest text-slate-500 font-medium block mt-1">Service Account JSON</label>
+                        <input id="settings-gcp-key-file" type="file" accept=".json" class="w-full text-[11px] text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-white/[0.05] file:text-slate-400 hover:file:bg-white/[0.08] file:transition file:cursor-pointer">
+                        <button type="button" id="settings-connect-gcp" onclick="connectSettingsProvider('gcp')" class="w-full py-3 mt-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold uppercase tracking-widest rounded-xl text-[10px] transition-all shadow-lg shadow-blue-500/10">Connect & Activate</button>
                     </div>
 
-                    <div id="cloud-panel-k8s" class="cloud-provider-panel hidden p-6 bg-black/40 border border-white/10 rounded-2xl space-y-4">
-                        <input id="settings-k8s-kubeconfig-file" type="file" accept=".yaml,.yml" class="w-full text-[11px] text-slate-300">
-                        <textarea id="settings-k8s-kubeconfig" rows="4" placeholder="Paste kubeconfig" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-cyan-300 outline-none"></textarea>
-                        <input id="settings-k8s-service-account-token" type="password" placeholder="Service Account Token" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-cyan-300 outline-none">
-                        <input id="settings-k8s-context" placeholder="Optional context" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-cyan-300 outline-none">
-                        <button type="button" id="settings-connect-k8s" onclick="connectSettingsProvider('k8s')" class="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-[#0d1117] font-black uppercase tracking-widest rounded-xl">Connect & Activate</button>
+                    <div id="cloud-panel-k8s" class="cloud-provider-panel hidden p-6 bg-[#080d18] border border-white/[0.06] rounded-2xl space-y-3 animate-fade-in">
+                        <div class="flex items-center gap-2 mb-2"><span class="w-1.5 h-1.5 rounded-full bg-[#326CE5]"></span><span class="text-[9px] font-bold uppercase tracking-widest text-slate-500">Kubernetes Cluster</span></div>
+                        <input id="settings-k8s-kubeconfig-file" type="file" accept=".yaml,.yml" class="w-full text-[11px] text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-white/[0.05] file:text-slate-400 hover:file:bg-white/[0.08] file:transition file:cursor-pointer">
+                        <textarea id="settings-k8s-kubeconfig" rows="4" placeholder="Paste kubeconfig" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600 resize-none"></textarea>
+                        <input id="settings-k8s-service-account-token" type="password" placeholder="Service Account Token" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600">
+                        <input id="settings-k8s-context" placeholder="Optional context" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600">
+                        <button type="button" id="settings-connect-k8s" onclick="connectSettingsProvider('k8s')" class="w-full py-3 mt-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold uppercase tracking-widest rounded-xl text-[10px] transition-all shadow-lg shadow-blue-500/10">Connect & Activate</button>
                     </div>
                 </div>
             </div>
 
             <div id="vault-tab" class="hidden space-y-8 mt-4 animate-fade-in">
-                <div class="p-8 bg-purple-500/5 border border-white/5 rounded-3xl border-l-4 border-l-purple-500/50">
-                    <h4 class="text-xs font-black text-purple-400 uppercase mb-2 tracking-widest">Secure Vault</h4>
-                    <p class="text-[10px] text-slate-500 mb-8 uppercase font-bold">Store passcodes, credentials, and notes behind a vault passcode.</p>
+                <div class="p-8 bg-[#0c1222] border border-white/[0.06] rounded-3xl relative overflow-hidden">
+                    <!-- Decorative background -->
+                    <div class="absolute top-0 right-0 w-72 h-72 bg-violet-500/[0.03] blur-[120px] rounded-full"></div>
+                    <div class="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/[0.02] blur-[80px] rounded-full"></div>
 
-                    <div id="vault-setup-block" class="{% if vault_configured %}hidden{% endif %} space-y-4 max-w-md">
-                        <div class="form-group mb-3">
-                            <label class="text-[10px] text-slate-500 uppercase font-black block mb-2">Passcode Verification Type</label>
-                            <select id="vault-setup-type" class="w-full bg-black/60 border border-white/10 p-3 rounded-xl text-xs text-purple-300 outline-none" onchange="toggleVaultSetupPlaceholder()">
-                                <option value="password">8-Character Secure Password</option>
-                                <option value="pin">4-Character PIN / Code</option>
-                            </select>
-                        </div>
-                        <p id="vault-setup-tip" class="text-xs text-slate-400">Create your vault passcode (minimum 8 characters).</p>
-                        <input id="vault-setup-passcode" type="password" placeholder="Vault passcode" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-purple-300 outline-none">
-                        <input id="vault-setup-confirm" type="password" placeholder="Confirm passcode" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-purple-300 outline-none">
-                        <button type="button" onclick="setupVault()" class="w-full py-3 bg-purple-500 hover:bg-purple-400 text-white font-black uppercase tracking-widest rounded-xl">Create Vault</button>
-                    </div>
-
-                    <div id="vault-unlock-block" class="hidden space-y-4 max-w-md">
-                        <p class="text-xs text-slate-400">Enter your vault passcode to unlock.</p>
-                        <input id="vault-unlock-passcode" type="password" placeholder="Vault passcode" class="w-full bg-black/40 border border-white/10 p-4 rounded-2xl text-xs font-mono text-purple-300 outline-none">
-                        <div class="flex gap-3">
-                            <button type="button" onclick="unlockVault()" class="flex-1 py-3 bg-purple-500 hover:bg-purple-400 text-white font-black uppercase tracking-widest rounded-xl">Unlock Vault</button>
-                            <button type="button" onclick="resetVault()" class="px-4 py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 font-black uppercase tracking-widest rounded-xl text-[10px] transition-colors">Reset</button>
-                        </div>
-                    </div>
-
-                    <div id="vault-content-block" class="hidden space-y-6">
-                        <div class="flex justify-between items-center">
-                            <div class="flex items-center gap-3">
-                                <span class="text-[10px] font-black uppercase text-green-400 flex items-center gap-1.5">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span> Vault unlocked
-                                </span>
-                                <button type="button" onclick="resetVault()" class="px-3 py-1.5 text-[9px] font-black uppercase bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg transition-colors">Reset Vault</button>
+                    <!-- Header -->
+                    <div class="flex items-center justify-between mb-8 relative">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/20 to-indigo-500/10 flex items-center justify-center border border-white/[0.06] shadow-lg shadow-violet-500/5">
+                                <svg class="w-4.5 h-4.5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            </span>
+                            <div>
+                                <h4 class="text-xs font-black text-white/90 uppercase tracking-widest">Secure Vault</h4>
+                                <p class="text-[10px] text-slate-500 font-medium mt-0.5">AES-128 encrypted credential storage</p>
                             </div>
-                            <button type="button" onclick="lockVault()" class="px-4 py-2 text-[9px] font-black uppercase bg-white/5 border border-white/10 rounded-lg">Lock</button>
                         </div>
-                        <div id="vault-entries-list" class="space-y-3"></div>
-                        <div class="p-6 bg-black/40 border border-white/10 rounded-2xl space-y-4">
-                            <h5 class="text-[10px] font-black uppercase text-purple-400 tracking-widest">Add entry</h5>
-                            <input id="vault-entry-label" placeholder="Label (e.g. Production DB)" class="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs text-white outline-none">
-                            <select id="vault-entry-type" class="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs text-purple-300 outline-none">
+                        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.05]">
+                            <svg class="w-3 h-3 text-violet-400/70" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
+                            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-500">PBKDF2 · Fernet</span>
+                        </div>
+                    </div>
+
+                    <!-- Vault Setup -->
+                    <div id="vault-setup-block" class="{% if vault_configured %}hidden{% endif %} relative">
+                        <div class="max-w-md mx-auto">
+                            <div class="text-center mb-8">
+                                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-indigo-500/10 flex items-center justify-center border border-white/[0.06] mx-auto mb-4">
+                                    <svg class="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                </div>
+                                <h5 class="text-sm font-bold text-white/90 mb-1">Initialize Your Vault</h5>
+                                <p class="text-[10px] text-slate-500 max-w-xs mx-auto">Create a master passcode to encrypt all stored secrets with PBKDF2-derived keys.</p>
+                            </div>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-[9px] text-slate-500 uppercase font-bold block mb-1.5 ml-1 tracking-wider">Verification Type</label>
+                                    <select id="vault-setup-type" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs text-slate-300 outline-none focus:border-violet-500/30 transition cursor-pointer" onchange="toggleVaultSetupPlaceholder()">
+                                        <option value="password">8-Character Secure Password</option>
+                                        <option value="pin">4-Character PIN / Code</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-[9px] text-slate-500 uppercase font-bold block mb-1.5 ml-1 tracking-wider">Master Passcode</label>
+                                    <input id="vault-setup-passcode" type="password" placeholder="Enter vault passcode" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-violet-500/30 transition placeholder:text-slate-600">
+                                </div>
+                                <div>
+                                    <label class="text-[9px] text-slate-500 uppercase font-bold block mb-1.5 ml-1 tracking-wider">Confirm Passcode</label>
+                                    <input id="vault-setup-confirm" type="password" placeholder="Confirm passcode" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-violet-500/30 transition placeholder:text-slate-600">
+                                </div>
+                                <p id="vault-setup-tip" class="text-[9px] text-slate-500 italic ml-1">Minimum 8 characters. This passcode cannot be recovered.</p>
+                                <button type="button" onclick="setupVault()" class="w-full py-3.5 mt-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold uppercase tracking-widest rounded-xl text-[10px] transition-all shadow-lg shadow-violet-500/15">Create Vault</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vault Unlock -->
+                    <div id="vault-unlock-block" class="hidden relative">
+                        <div class="max-w-md mx-auto">
+                            <div class="text-center mb-8">
+                                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/15 to-orange-500/10 flex items-center justify-center border border-white/[0.06] mx-auto mb-4">
+                                    <svg class="w-7 h-7 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
+                                </div>
+                                <h5 class="text-sm font-bold text-white/90 mb-1">Vault Locked</h5>
+                                <p class="text-[10px] text-slate-500 max-w-xs mx-auto">Enter your master passcode to decrypt and access stored secrets.</p>
+                            </div>
+                            <div class="space-y-3">
+                                <input id="vault-unlock-passcode" type="password" placeholder="Enter vault passcode" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-violet-500/30 transition placeholder:text-slate-600">
+                                <div class="flex gap-3">
+                                    <button type="button" onclick="unlockVault()" class="flex-1 py-3.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold uppercase tracking-widest rounded-xl text-[10px] transition-all shadow-lg shadow-violet-500/15">Unlock Vault</button>
+                                    <button type="button" onclick="resetVault()" class="px-5 py-3.5 bg-white/[0.03] hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 border border-white/[0.06] hover:border-rose-500/20 font-bold uppercase tracking-widest rounded-xl text-[9px] transition-all">Reset</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vault Content (Unlocked) -->
+                    <div id="vault-content-block" class="hidden space-y-6 relative">
+                        <div class="flex justify-between items-center p-4 bg-emerald-500/[0.04] rounded-xl border border-emerald-500/10">
+                            <div class="flex items-center gap-3">
+                                <span class="flex items-center gap-2 text-[10px] font-bold uppercase text-emerald-400">
+                                    <span class="relative flex h-2 w-2">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                                    </span>
+                                    Vault Unlocked
+                                </span>
+                                <span class="text-[9px] text-slate-600 font-mono">•  Session active</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="resetVault()" class="px-3 py-1.5 text-[9px] font-bold uppercase bg-rose-500/[0.06] hover:bg-rose-500/15 text-rose-400/70 hover:text-rose-400 border border-rose-500/10 hover:border-rose-500/20 rounded-lg transition-all">Reset</button>
+                                <button type="button" onclick="lockVault()" class="px-3 py-1.5 text-[9px] font-bold uppercase bg-white/[0.03] hover:bg-white/[0.06] text-slate-500 hover:text-white border border-white/[0.06] rounded-lg transition-all flex items-center gap-1.5">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                    Lock
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Vault Entries List -->
+                        <div id="vault-entries-list" class="space-y-2"></div>
+
+                        <!-- Add Entry Form -->
+                        <div class="p-6 bg-[#080d18] border border-white/[0.06] rounded-2xl space-y-3">
+                            <div class="flex items-center gap-2 mb-3">
+                                <svg class="w-3.5 h-3.5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                                <h5 class="text-[10px] font-bold uppercase text-white/70 tracking-widest">New Entry</h5>
+                            </div>
+                            <input id="vault-entry-label" placeholder="Label (e.g. Production DB)" class="w-full bg-white/[0.02] border border-white/[0.06] p-3 rounded-xl text-xs text-slate-300 outline-none focus:border-violet-500/30 transition placeholder:text-slate-600">
+                            <select id="vault-entry-type" class="w-full bg-white/[0.02] border border-white/[0.06] p-3 rounded-xl text-xs text-slate-300 outline-none focus:border-violet-500/30 transition cursor-pointer">
                                 <option value="credential">General Credential</option>
                                 <option value="api_key">API Secret Key</option>
                                 <option value="private_key">SSH Private Key</option>
@@ -128,10 +228,15 @@
                                 <option value="passcode">System Passcode</option>
                                 <option value="note">Secure Memo Note</option>
                             </select>
-                            <input id="vault-entry-username" placeholder="Username (optional)" class="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs text-white outline-none">
-                            <input id="vault-entry-value" type="password" placeholder="Secret value" class="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs text-white outline-none">
-                            <textarea id="vault-entry-notes" rows="2" placeholder="Notes (optional)" class="w-full bg-black/40 border border-white/10 p-3 rounded-xl text-xs text-white outline-none"></textarea>
-                            <button type="button" onclick="saveVaultEntry()" class="w-full py-3 bg-purple-500/20 hover:bg-purple-500 text-purple-300 hover:text-white border border-purple-500/30 font-black uppercase tracking-widest rounded-xl text-[10px]">Save to Vault</button>
+                            <input id="vault-entry-username" placeholder="Username (optional)" class="w-full bg-white/[0.02] border border-white/[0.06] p-3 rounded-xl text-xs text-slate-300 outline-none focus:border-violet-500/30 transition placeholder:text-slate-600">
+                            <input id="vault-entry-value" type="password" placeholder="Secret value" class="w-full bg-white/[0.02] border border-white/[0.06] p-3 rounded-xl text-xs text-slate-300 outline-none focus:border-violet-500/30 transition placeholder:text-slate-600">
+                            <textarea id="vault-entry-notes" rows="2" placeholder="Notes (optional)" class="w-full bg-white/[0.02] border border-white/[0.06] p-3 rounded-xl text-xs text-slate-300 outline-none focus:border-violet-500/30 transition placeholder:text-slate-600 resize-none"></textarea>
+                            <button type="button" onclick="saveVaultEntry()" class="w-full py-3 bg-gradient-to-r from-violet-600/80 to-indigo-600/80 hover:from-violet-500 hover:to-indigo-500 text-white/90 hover:text-white border border-violet-500/10 font-bold uppercase tracking-widest rounded-xl text-[10px] transition-all shadow-lg shadow-violet-500/10">
+                                <span class="flex items-center justify-center gap-2">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                                    Save to Vault
+                                </span>
+                            </button>
                         </div>
                     </div>
                 </div>
