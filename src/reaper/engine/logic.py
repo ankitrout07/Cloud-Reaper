@@ -147,7 +147,7 @@ class RightSizer:
             net_proxy = 40
             rl_eval = rl_agent.evaluate_migration(
                 metrics={"cpu": max_usage, "mem": mem_proxy, "iops": iops_proxy, "net": net_proxy},
-                current_sku=vm["size"]
+                current_sku=vm["size"],
             )
 
             recommended_size = vm["size"]

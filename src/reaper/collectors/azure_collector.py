@@ -72,7 +72,9 @@ class ThreadSafeList:
 
 # Caches for historical data to avoid refetching and smooth out graphs
 _COST_FORECAST_CACHE: dict[str, Any] = {}
-_CPU_AVERAGE_CACHE: dict[str, tuple[float, float]] = {}  # subscription_id -> (timestamp, cpu_average)
+_CPU_AVERAGE_CACHE: dict[
+    str, tuple[float, float]
+] = {}  # subscription_id -> (timestamp, cpu_average)
 
 
 def _vm_series_family(vm_size: str) -> str:

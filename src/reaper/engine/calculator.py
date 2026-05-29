@@ -151,6 +151,7 @@ class CostCalculator:
         symbol = symbols.get(self.currency, "$")
         return f"{symbol}{amount:,.2f}"
 
+
 class RightsizingAgent:
     """
     Reinforcement Learning (Q-learning) Workload Rightsizing Agent.

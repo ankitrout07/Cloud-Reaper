@@ -65,6 +65,7 @@ class BM25:
 class DocSearchEngine:
     def __init__(self):
         import os
+
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("CRITICAL: GEMINI_API_KEY environment variable is unconfigured.")
@@ -219,7 +220,7 @@ class DocSearchEngine:
         )
         query_vector = query_response.embeddings[0].values
         q_norm = sum(q * q for q in query_vector) ** 0.5
-        
+
         dense_scores = []
         for idx, doc in enumerate(self.docs_index):
             vector = doc["vector"]
@@ -227,7 +228,7 @@ class DocSearchEngine:
             d_norm = sum(d * d for d in vector) ** 0.5
             similarity = dot_product / (q_norm * d_norm) if (q_norm * d_norm) > 0 else 0
             dense_scores.append((idx, similarity))
-        
+
         dense_scores.sort(key=lambda x: x[1], reverse=True)
         return dense_scores
 
@@ -244,9 +245,12 @@ class DocSearchEngine:
 
     def _rerank_candidates_gemini(self, user_query: str, top_candidates: list) -> list:
         scored_candidates = []
-        if not (hasattr(self.client, "models") and not isinstance(self.client, MagicMock if "MagicMock" in globals() else object)):
+        if not (
+            hasattr(self.client, "models")
+            and not isinstance(self.client, MagicMock if "MagicMock" in globals() else object)
+        ):
             return []
-            
+
         candidates_str = ""
         for rank_idx, (_, doc) in enumerate(top_candidates):
             sentence_body = doc.get("sentence", doc.get("text", ""))
@@ -287,6 +291,7 @@ class DocSearchEngine:
             )
             if response and response.text:
                 import json
+
                 parsed_res = json.loads(response.text)
                 scores_list = parsed_res.get("scores", [])
                 scores_map = {item["id"]: item["score"] for item in scores_list}
@@ -298,7 +303,9 @@ class DocSearchEngine:
             return []
         return scored_candidates
 
-    def _local_fallback_rerank(self, user_query: str, top_candidates: list, dense_scores: list) -> list:
+    def _local_fallback_rerank(
+        self, user_query: str, top_candidates: list, dense_scores: list
+    ) -> list:
         scored_candidates = []
         query_words = set(re.findall(r"\w+", user_query.lower()))
         for idx, doc in top_candidates:
@@ -341,15 +348,21 @@ class DocSearchEngine:
         for idx in range(len(self.docs_index)):
             r_dense = dense_ranks.get(idx, len(self.docs_index) + 1)
             r_sparse = sparse_ranks.get(idx, len(self.docs_index) + 1)
-            rrf_scores.append((idx, 1.0 / (rrf_constant + r_dense) + 1.0 / (rrf_constant + r_sparse)))
+            rrf_scores.append(
+                (idx, 1.0 / (rrf_constant + r_dense) + 1.0 / (rrf_constant + r_sparse))
+            )
 
         rrf_scores.sort(key=lambda x: x[1], reverse=True)
         candidate_pool_size = max(top_k * 4, 10)
-        top_candidates = [(idx, self.docs_index[idx]) for idx, _ in rrf_scores[:candidate_pool_size]]
+        top_candidates = [
+            (idx, self.docs_index[idx]) for idx, _ in rrf_scores[:candidate_pool_size]
+        ]
 
         scored_candidates = self._rerank_candidates_gemini(user_query, top_candidates)
         if not scored_candidates:
-            scored_candidates = self._local_fallback_rerank(user_query, top_candidates, dense_scores)
+            scored_candidates = self._local_fallback_rerank(
+                user_query, top_candidates, dense_scores
+            )
 
         scored_candidates.sort(key=lambda x: x[0], reverse=True)
         final_results = []
@@ -361,10 +374,12 @@ class DocSearchEngine:
             enriched_content = f"{left} {sentence}".strip() if left else sentence
             enriched_content = f"{enriched_content} {right}".strip() if right else enriched_content
 
-            final_results.append({
-                "file": doc["file_name"],
-                "content": enriched_content,
-                "confidence_score": f"{score:.2f}%",
-            })
+            final_results.append(
+                {
+                    "file": doc["file_name"],
+                    "content": enriched_content,
+                    "confidence_score": f"{score:.2f}%",
+                }
+            )
 
         return final_results

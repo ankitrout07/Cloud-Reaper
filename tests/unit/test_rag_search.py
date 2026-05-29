@@ -84,8 +84,9 @@ class TestDocSearchEngine(unittest.TestCase):
             # Feed multi-sentence content
             content = "# Title\nThis is sentence one. This is sentence two. This is sentence three."
 
-            with patch("builtins.open", unittest.mock.mock_open(read_data=content)), patch(
-                "pathlib.Path.rglob", return_value=[Path("docs/telemetry.md")]
+            with (
+                patch("builtins.open", unittest.mock.mock_open(read_data=content)),
+                patch("pathlib.Path.rglob", return_value=[Path("docs/telemetry.md")]),
             ):
                 engine.load_and_index_docs("docs")
 
