@@ -137,9 +137,7 @@ class RightSizer:
             model.fit(x_vals, y_vals)
 
             # Predict "Safe Peak" (Mean + 2*Std or similar heuristic from regression)
-            predicted_mean = model.predict([[len(usage)]])[0]
             max_usage = max(usage)
-            safe_target = max(predicted_mean, max_usage) * 1.2  # 20% buffer
 
             # Use Autonomous RL Agent for sizing evaluation
             rl_agent = RightsizingAgent()
@@ -148,7 +146,8 @@ class RightSizer:
             iops_proxy = 50
             net_proxy = 40
             rl_eval = rl_agent.evaluate_migration(
-                max_usage, mem_proxy, iops_proxy, net_proxy, vm["size"]
+                metrics={"cpu": max_usage, "mem": mem_proxy, "iops": iops_proxy, "net": net_proxy},
+                current_sku=vm["size"]
             )
 
             recommended_size = vm["size"]

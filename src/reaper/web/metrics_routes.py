@@ -2,20 +2,19 @@
 from flask import Blueprint, jsonify, request
 
 from reaper.engine.metrics_analyzer import FinOpsTelemetryAnalyzer
+from reaper.engine.models import Resource, SessionLocal
 from reaper.engine.notifier import send_discord_alert, send_slack_alert
 
 telemetry_bp = Blueprint("telemetry_api", __name__)
 # Points to internal standard Prometheus routing endpoints
 analyzer = FinOpsTelemetryAnalyzer(prometheus_url="http://localhost:9090")
 
-from reaper.engine.models import Resource, SessionLocal
-
 
 @telemetry_bp.route("/api/v1/finops/telemetry-insights", methods=["POST"])
 def get_telemetry_driven_insights():
     db = SessionLocal()
     try:
-        resources = db.query(Resource).filter(Resource.active == True).all()
+        resources = db.query(Resource).filter(Resource.active).all()
         db_inventory = []
         for r in resources:
             tags = r.tags or {}

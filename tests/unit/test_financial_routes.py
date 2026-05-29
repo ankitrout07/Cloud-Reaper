@@ -1,21 +1,19 @@
 import json
-import os
-
-# Set path and import flask app
 import sys
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src")))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
-from reaper.web.app import app
+from reaper.web.app import app  # noqa: E402
 
 
 class FinancialRoutesTestCase(unittest.TestCase):
     def setUp(self):
         app.config["TESTING"] = True
         app.config["WTF_CSRF_ENABLED"] = False
-        app.config["SECRET_KEY"] = "test-secret-key"
+        app.config["SECRET_KEY"] = "dummy-test-key-for-testing-only"  # noqa: S105
         self.client = app.test_client()
 
         # Mock the auth check so that it does not redirect during testing

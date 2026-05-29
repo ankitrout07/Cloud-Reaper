@@ -7,6 +7,7 @@ import threading
 import time
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.authorization import AuthorizationManagementClient
@@ -27,7 +28,7 @@ from reaper.engine.models import CostHistory, RegionPriceCache, SessionLocal
 
 load_dotenv()
 
-_GLOBAL_CACHE = {}
+_GLOBAL_CACHE: dict[str, tuple[float, Any]] = {}
 _CACHE_LOCK = threading.Lock()
 
 
@@ -51,8 +52,27 @@ def get_cached_data(cache_key, fetch_fn, ttl_seconds=60):
     return data
 
 
-_COST_FORECAST_CACHE = {}  # subscription_id -> (timestamp, spend_data)
-_CPU_AVERAGE_CACHE = {}  # subscription_id -> (timestamp, cpu_average)
+class ThreadSafeList:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.items = []
+
+    def append(self, item):
+        with self.lock:
+            self.items.append(item)
+
+    def extend(self, items):
+        with self.lock:
+            self.items.extend(items)
+
+    def get_items(self):
+        with self.lock:
+            return list(self.items)
+
+
+# Caches for historical data to avoid refetching and smooth out graphs
+_COST_FORECAST_CACHE: dict[str, Any] = {}
+_CPU_AVERAGE_CACHE: dict[str, tuple[float, float]] = {}  # subscription_id -> (timestamp, cpu_average)
 
 
 def _vm_series_family(vm_size: str) -> str:
@@ -268,7 +288,7 @@ class AzureCollector:
         now = time.time()
         cache_entry = _CPU_AVERAGE_CACHE.get(self.subscription_id)
         if cache_entry and (now - cache_entry[0] < 60.0):
-            return cache_entry[1]
+            return float(cache_entry[1])
 
         try:
             vms = list(self.compute.virtual_machines.list_all())
@@ -298,7 +318,7 @@ class AzureCollector:
         if not values:
             return None
 
-        avg = sum(values) / len(values)
+        avg = float(sum(values) / len(values))
         _CPU_AVERAGE_CACHE[self.subscription_id] = (now, avg)
         return avg
 

@@ -1,17 +1,16 @@
 # src/reaper/web/copilot_routes.py
+from functools import lru_cache
+
 from flask import Blueprint, jsonify, request
 
 from reaper.engine.copilot_engine import KnapsackCopilotEngine
 
 copilot_api = Blueprint("copilot_api", __name__)
-engine_instance = None
 
 
+@lru_cache(maxsize=1)
 def get_engine():
-    global engine_instance
-    if engine_instance is None:
-        engine_instance = KnapsackCopilotEngine()
-    return engine_instance
+    return KnapsackCopilotEngine()
 
 
 @copilot_api.route("/api/v1/copilot/optimize", methods=["POST"])

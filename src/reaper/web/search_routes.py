@@ -1,5 +1,4 @@
-# src/reaper/web/search_routes.py
-import os
+from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
@@ -9,15 +8,13 @@ search_bp = Blueprint("search_api", __name__)
 search_engine = DocSearchEngine()
 
 # Find project root relative to this file
-base_dir = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
-docs_dir_path = os.path.join(base_dir, "docs")
+base_dir = Path(__file__).resolve().parent.parent.parent.parent
+docs_dir_path = base_dir / "docs"
 
 # Pre-load and index the markdown files into memory on server initialization
 try:
-    if os.path.exists(docs_dir_path):
-        search_engine.load_and_index_docs(docs_dir=docs_dir_path)
+    if docs_dir_path.exists():
+        search_engine.load_and_index_docs(docs_dir=str(docs_dir_path))
     else:
         search_engine.load_and_index_docs(docs_dir="docs")
 except Exception as e:

@@ -21,7 +21,7 @@ class KnapsackCopilotEngine:
             )
         self.client = genai.Client(api_key=api_key)
         self.model_identity = "gemini-2.5-flash"
-        self._cache = {}
+        self._cache: dict[tuple[str, str, float], OptimizationBlueprintSchema] = {}
 
     def compile_max_performance_infrastructure(
         self, cloud_provider: str, user_intent: str, budget_limit: float

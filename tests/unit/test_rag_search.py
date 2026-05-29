@@ -1,5 +1,6 @@
 # tests/unit/test_rag_search.py
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from reaper.rag import DocSearchEngine
@@ -8,15 +9,15 @@ from reaper.web.app import app
 
 class TestDocSearchEngine(unittest.TestCase):
     @patch("google.genai.Client")
-    @patch("glob.glob")
+    @patch("pathlib.Path.rglob")
     @patch(
         "builtins.open",
         new_callable=unittest.mock.mock_open,
         read_data="## Section A\nThis is architecture.\n## Section B\nThis is deployment.",
     )
-    def test_load_and_index_docs(self, mock_file, mock_glob, mock_client_class):
+    def test_load_and_index_docs(self, _mock_file, mock_rglob, mock_client_class):
         # Setup mocks
-        mock_glob.return_value = ["docs/architecture.md"]
+        mock_rglob.return_value = [Path("docs/architecture.md")]
 
         mock_client = MagicMock()
         mock_response = MagicMock()
@@ -83,9 +84,10 @@ class TestDocSearchEngine(unittest.TestCase):
             # Feed multi-sentence content
             content = "# Title\nThis is sentence one. This is sentence two. This is sentence three."
 
-            with patch("builtins.open", unittest.mock.mock_open(read_data=content)):
-                with patch("glob.glob", return_value=["docs/telemetry.md"]):
-                    engine.load_and_index_docs("docs")
+            with patch("builtins.open", unittest.mock.mock_open(read_data=content)), patch(
+                "pathlib.Path.rglob", return_value=[Path("docs/telemetry.md")]
+            ):
+                engine.load_and_index_docs("docs")
 
             # Check that three sentences were split
             self.assertEqual(len(engine.docs_index), 3)
@@ -199,7 +201,7 @@ class TestSearchRoutes(unittest.TestCase):
     def setUp(self):
         app.config["TESTING"] = True
         app.config["WTF_CSRF_ENABLED"] = False
-        app.config["SECRET_KEY"] = "test-secret-key"
+        app.config["SECRET_KEY"] = "dummy-test-key-for-testing-only"  # noqa: S105
         self.client = app.test_client()
         self.first_run_patcher = patch("reaper.web.app.is_first_run", return_value=False)
         self.mock_first_run = self.first_run_patcher.start()

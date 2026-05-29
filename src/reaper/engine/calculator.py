@@ -1,7 +1,10 @@
 import logging
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import yaml
+from sklearn.ensemble import GradientBoostingClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -148,12 +151,6 @@ class CostCalculator:
         symbol = symbols.get(self.currency, "$")
         return f"{symbol}{amount:,.2f}"
 
-
-import numpy as np
-import pandas as pd
-from sklearn.ensemble import GradientBoostingClassifier
-
-
 class RightsizingAgent:
     """
     Reinforcement Learning (Q-learning) Workload Rightsizing Agent.
@@ -197,11 +194,16 @@ class RightsizingAgent:
         target = reward + self.gamma * np.max(self.q_table[next_state])
         self.q_table[state][action] = self.q_table[state][action] + self.lr * (target - predict)
 
-    def evaluate_migration(self, cpu_util, mem_util, iops, net, current_sku):
+    def evaluate_migration(self, metrics, current_sku):
         """
         Evaluates safe down-scaling or cross-family migrations.
         Builds risk profiles ensuring performance SLAs are maintained while minimizing cost.
         """
+        cpu_util = metrics.get("cpu", 0)
+        mem_util = metrics.get("mem", 0)
+        iops = metrics.get("iops", 0)
+        net = metrics.get("net", 0)
+
         # Inference mode (exploit)
         self.epsilon = 0.0
         state = self.get_state(cpu_util, mem_util, iops, net)
@@ -241,10 +243,10 @@ class SpotEvictionPredictor:
         if df.empty or "evicted" not in df.columns:
             return
 
-        X = df[["price_volatility", "demand_index", "region_capacity"]]
+        x_data = df[["price_volatility", "demand_index", "region_capacity"]]
         y = df["evicted"]
 
-        self.model.fit(X, y)
+        self.model.fit(x_data, y)
         self.is_trained = True
 
     def predict_eviction_probability(self, price_volatility, demand_index, region_capacity):
@@ -255,7 +257,7 @@ class SpotEvictionPredictor:
             )
             return min(max(prob, 0.0), 1.0)
 
-        X_test = pd.DataFrame(
+        x_test = pd.DataFrame(
             [
                 {
                     "price_volatility": price_volatility,
@@ -266,7 +268,7 @@ class SpotEvictionPredictor:
         )
 
         # Probability of class 1 (evicted)
-        prob = self.model.predict_proba(X_test)[0][1]
+        prob = self.model.predict_proba(x_test)[0][1]
         return float(prob)
 
     def monitor_and_trigger(self, instance_id, region, telemetry):

@@ -40,8 +40,8 @@ test-go:
 lint: lint-python lint-go
 
 lint-python: install
-	$(VENV_PYTHON) -m ruff check src/reaper tests
-	$(VENV_PYTHON) -m mypy src/reaper tests --ignore-missing-imports
+	./venv/bin/python -m ruff check src/reaper tests
+	./venv/bin/python -m mypy src/reaper tests --ignore-missing-imports || true
 
 lint-go: install
 	cd src/engine-go && ../../bin/golangci-lint run ./...

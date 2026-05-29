@@ -1,15 +1,16 @@
 import logging
+from typing import ClassVar
 
 import requests
 
 
 class AWSPriceClient:
-    URLS = {
+    URLS: ClassVar[dict[str, str]] = {
         "EC2": "https://ec2instances.info/instances.json",
         "RDS": "https://instances.vantage.sh/rds/instances.json",
         "ElastiCache": "https://instances.vantage.sh/cache/instances.json",
     }
-    URL = URLS["EC2"]
+    URL: ClassVar[str] = URLS["EC2"]
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)

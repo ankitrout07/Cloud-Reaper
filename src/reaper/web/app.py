@@ -61,6 +61,9 @@ from reaper.engine.models import (
     VaultSettings,
     init_db,
 )
+from reaper.web.copilot_routes import copilot_api
+from reaper.web.metrics_routes import telemetry_bp
+from reaper.web.search_routes import search_bp
 from reaper.web.vault_crypto import (
     derive_fernet_key,
     generate_salt,
@@ -103,10 +106,6 @@ app = Flask(
 )
 app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
-
-from reaper.web.copilot_routes import copilot_api
-from reaper.web.metrics_routes import telemetry_bp
-from reaper.web.search_routes import search_bp
 
 app.register_blueprint(copilot_api)
 app.register_blueprint(search_bp)
@@ -959,19 +958,15 @@ def about():
 
 @app.route("/docs")
 def docs():
-    import glob
-
-    base_dir = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    )
-    docs_dir = os.path.join(base_dir, "docs")
+    base_dir = Path(__file__).resolve().parent.parent.parent.parent
+    docs_dir = base_dir / "docs"
     docs_data = []
-    if os.path.exists(docs_dir):
-        files = sorted(glob.glob(os.path.join(docs_dir, "*.md")))
+    if docs_dir.exists():
+        files = sorted(docs_dir.glob("*.md"))
         for file_path in files:
-            filename = os.path.basename(file_path)
+            filename = file_path.name
             title = filename.replace(".md", "").lstrip("0123456789_").replace("_", " ").title()
-            with open(file_path, encoding="utf-8") as f:
+            with file_path.open(encoding="utf-8") as f:
                 content = f.read()
             docs_data.append({"filename": filename, "title": title, "content": content})
     return render_template("docs.html", docs_data=docs_data)

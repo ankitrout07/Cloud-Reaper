@@ -285,7 +285,10 @@ class AIArchitectManager:
                     ],
                     response_format=ArchitectureBlueprint,
                 )
-                return response.choices[0].message.parsed
+                parsed = response.choices[0].message.parsed
+                if parsed is None:
+                    raise ValueError("Failed to parse response from OpenAI API.")
+                return parsed
         except Exception as e:
             print(f"[!] AI synthesis error: {e!s}. Activating local offline fallback generator.")
             return _generate_local_fallback(user_prompt, provider)
@@ -340,16 +343,21 @@ def _resolve_azure_price(sku: str, mapped_region: str, region: str) -> float | N
 def _resolve_aws_price(sku: str, mapped_region: str, region: str) -> float | None:
     """Helper to query live AWS pricing with database caching."""
     try:
-        if PRICES_CACHE["aws"] is None:
+        aws_prices = PRICES_CACHE["aws"]
+        if aws_prices is None:
             from reaper.collectors.aws_prices import AWSPriceClient
 
             aws_client = AWSPriceClient()
-            PRICES_CACHE["aws"] = aws_client.get_live_prices()
+            aws_prices = aws_client.get_live_prices()
+            PRICES_CACHE["aws"] = aws_prices
+
+        if aws_prices is None:
+            return None
 
         match = next(
             (
                 p
-                for p in PRICES_CACHE["aws"]
+                for p in aws_prices
                 if p["skuName"].lower() == sku.lower() and p["armRegionName"] == mapped_region
             ),
             None,
@@ -383,16 +391,21 @@ def _resolve_aws_price(sku: str, mapped_region: str, region: str) -> float | Non
 def _resolve_gcp_price(sku: str, mapped_region: str, region: str) -> float | None:
     """Helper to query live GCP pricing with database caching."""
     try:
-        if PRICES_CACHE["gcp"] is None:
+        gcp_prices = PRICES_CACHE["gcp"]
+        if gcp_prices is None:
             from reaper.collectors.gcp_prices import GCPPriceClient
 
             gcp_client = GCPPriceClient()
-            PRICES_CACHE["gcp"] = gcp_client.get_live_prices()
+            gcp_prices = gcp_client.get_live_prices()
+            PRICES_CACHE["gcp"] = gcp_prices
+
+        if gcp_prices is None:
+            return None
 
         match = next(
             (
                 p
-                for p in PRICES_CACHE["gcp"]
+                for p in gcp_prices
                 if p["skuName"].lower() == sku.lower() and p["armRegionName"] == mapped_region
             ),
             None,
@@ -445,7 +458,7 @@ def _resolve_fallback_price(
     hourly_rate = provider_fallbacks.get(sku_lower)
 
     if hourly_rate is not None:
-        return hourly_rate
+        return float(hourly_rate)
 
     # Substring/partial matching
     for fallback_key, price in provider_fallbacks.items():
@@ -506,7 +519,7 @@ def _resolve_fallback_price(
         else:
             hourly_rate = 0.05
 
-    return hourly_rate
+    return float(hourly_rate)
 
 
 def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
