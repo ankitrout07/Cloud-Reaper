@@ -92,6 +92,8 @@ class ActionLog(Base):
     action_type = Column(String)  # REAP, KILL, PROTECTION_ADD
     status = Column(String)  # SUCCESS, FAILED
     details = Column(String)
+    previous_hash = Column(String)
+    signature = Column(String)
     timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
 
     resource = relationship("Resource", back_populates="action_logs")

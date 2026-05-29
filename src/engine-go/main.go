@@ -439,13 +439,25 @@ func runProviderScan(providerType string) {
 		log.Fatal(err)
 	}
 
-	// Basic credential mapping from environment
-	creds := map[string]string{
-		"access_key_id":        os.Getenv("AWS_ACCESS_KEY_ID"),
-		"secret_access_key":    os.Getenv("AWS_SECRET_ACCESS_KEY"),
-		"region":               os.Getenv("AWS_REGION"),
-		"project_id":           os.Getenv("GCP_PROJECT_ID"),
-		"service_account_json": os.Getenv("GCP_SERVICE_ACCOUNT_JSON"),
+	// Try fetching from vault first
+	vaultCreds, err := db.GetActiveCloudCredentials(providerType)
+	var creds map[string]string
+	if err == nil && vaultCreds != nil {
+		creds = make(map[string]string)
+		for k, v := range vaultCreds {
+			if strVal, ok := v.(string); ok {
+				creds[k] = strVal
+			}
+		}
+	} else {
+		// Fallback to basic credential mapping from environment
+		creds = map[string]string{
+			"access_key_id":        os.Getenv("AWS_ACCESS_KEY_ID"),
+			"secret_access_key":    os.Getenv("AWS_SECRET_ACCESS_KEY"),
+			"region":               os.Getenv("AWS_REGION"),
+			"project_id":           os.Getenv("GCP_PROJECT_ID"),
+			"service_account_json": os.Getenv("GCP_SERVICE_ACCOUNT_JSON"),
+		}
 	}
 
 	if err := p.Authenticate(creds); err != nil {

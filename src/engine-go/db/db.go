@@ -2,6 +2,8 @@ package db
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"sync"
@@ -106,4 +108,48 @@ func AddCostHistory(resourceID string, cost float64, costType string) error {
 	_, err = db.Exec(context.Background(), "INSERT INTO cost_history (resource_id, cost, cost_type, currency, date) VALUES ($1, $2, $3, $4, $5)",
 		resourceID, cost, costType, "USD", time.Now())
 	return err
+}
+
+func AppendSignedActionLog(resourceID, actionType, details string) error {
+	db, err := Connect()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	var previousHash string
+	err = db.QueryRow(ctx, "SELECT signature FROM action_logs ORDER BY id DESC LIMIT 1").Scan(&previousHash)
+	if err != nil && err != pgx.ErrNoRows {
+		return err
+	}
+	if err == pgx.ErrNoRows {
+		previousHash = "0000000000000000000000000000000000000000000000000000000000000000"
+	}
+
+	timestamp := time.Now().UTC()
+	rawStr := fmt.Sprintf("%s|%s|%s|%s|%s", resourceID, actionType, details, timestamp.Format(time.RFC3339Nano), previousHash)
+	hasher := sha256.New()
+	hasher.Write([]byte(rawStr))
+	signature := hex.EncodeToString(hasher.Sum(nil))
+
+	_, err = db.Exec(ctx, "INSERT INTO action_logs (resource_id, action_type, status, details, previous_hash, signature, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+		resourceID, actionType, "SUCCESS", details, previousHash, signature, timestamp)
+	return err
+}
+
+func GetActiveCloudCredentials(provider string) (map[string]interface{}, error) {
+	db, err := Connect()
+	if err != nil {
+		return nil, err
+	}
+
+	var creds map[string]interface{}
+	err = db.QueryRow(context.Background(), "SELECT credentials FROM cloud_connections WHERE provider_type = $1 AND is_active = true LIMIT 1", provider).Scan(&creds)
+	if err != nil {
+		return nil, err
+	}
+
+	_ = AppendSignedActionLog("SYSTEM", "VAULT_READ", fmt.Sprintf("Authorized key read for provider: %s", provider))
+
+	return creds, nil
 }

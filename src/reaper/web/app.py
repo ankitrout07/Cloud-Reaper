@@ -880,22 +880,6 @@ def financial():
     finally:
         db.close()
 
-    # Fallback default business metrics if none exist
-    if not db_metrics:
-        # Just simulated objects with properties matching SQLAlchemy Model
-        class MockMetric:
-            def __init__(self, name, val, u):
-                self.metric_name = name
-                self.value = val
-                self.unit = u
-                self.date = datetime.datetime.now(datetime.UTC)
-
-        db_metrics = [
-            MockMetric("ACTIVE_USERS", 12400.0, "1 User"),
-            MockMetric("API_REQUESTS", 5240000.0, "1K Requests"),
-            MockMetric("MODEL_COMPUTATIONS", 48000.0, "1 Computation"),
-        ]
-
     return render_template(
         "financial.html", active_tab=tab, settings=settings_state, db_metrics=db_metrics
     )

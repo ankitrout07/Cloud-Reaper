@@ -8,28 +8,30 @@ telemetry_bp = Blueprint("telemetry_api", __name__)
 # Points to internal standard Prometheus routing endpoints
 analyzer = FinOpsTelemetryAnalyzer(prometheus_url="http://localhost:9090")
 
+from reaper.engine.models import SessionLocal, Resource
 
 @telemetry_bp.route("/api/v1/finops/telemetry-insights", methods=["POST"])
 def get_telemetry_driven_insights():
-    # Simulated mapping payload representing active PostgreSQL inventory rows
-    # In practice, query your local database table 'resources' here
-    mock_db_inventory = [
-        {
-            "resource_id": "aks-worker-01",
-            "private_ip": "10.0.1.4",
-            "sku_size": "Standard_D4_v5",
-            "monthly_cost": 140.0,
-        },
-        {
-            "resource_id": "aks-worker-02",
-            "private_ip": "10.0.1.5",
-            "sku_size": "Standard_B2s",
-            "monthly_cost": 30.0,
-        },
-    ]
+    db = SessionLocal()
+    try:
+        resources = db.query(Resource).filter(Resource.active == True).all()
+        db_inventory = []
+        for r in resources:
+            tags = r.tags or {}
+            db_inventory.append({
+                "resource_id": r.id,
+                "private_ip": tags.get("private_ip") or "",
+                "sku_size": tags.get("sku_size") or r.type or "Unknown",
+                "monthly_cost": float(tags.get("monthly_cost", 0.0))
+            })
+    except Exception as e:
+        db.close()
+        return jsonify({"status": "error", "message": f"Database fetch failure: {e!s}"}), 500
+    finally:
+        db.close()
 
     try:
-        actionable_insights = analyzer.analyze_compute_waste_index(mock_db_inventory)
+        actionable_insights = analyzer.analyze_compute_waste_index(db_inventory)
         return jsonify(
             {
                 "status": "success",
