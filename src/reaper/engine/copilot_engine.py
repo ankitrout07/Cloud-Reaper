@@ -24,7 +24,9 @@ class KnapsackCopilotEngine:
         self.model_identity = "gemini-2.5-flash"
         self._cache: dict[tuple[str, str, float], OptimizationBlueprintSchema] = {}
 
-    @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3), reraise=True)
+    @retry(
+        wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3), reraise=True
+    )
     def compile_max_performance_infrastructure(
         self, cloud_provider: str, user_intent: str, budget_limit: float
     ) -> OptimizationBlueprintSchema:
@@ -82,7 +84,9 @@ class AnomalyTriager:
         self.client = genai.Client(api_key=api_key)
         self.model_identity = "gemini-2.5-flash"
 
-    @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3), reraise=True)
+    @retry(
+        wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3), reraise=True
+    )
     def generate_triage_playbook(self, service_name: str, cost: float, deviation: str) -> str:
         """Analyzes a spend anomaly and generates a human-readable mitigation playbook."""
         system_rules = (

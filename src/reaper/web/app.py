@@ -1353,14 +1353,15 @@ def anomalies_triage():
         service = data.get("service", "Unknown")
         cost = float(data.get("cost", 0.0))
         deviation = data.get("deviation", "Unknown")
-        
+
         if not service:
             return jsonify({"status": "error", "message": "Missing service name"}), 400
-            
+
         from reaper.engine.copilot_engine import AnomalyTriager
+
         triager = AnomalyTriager()
         playbook = triager.generate_triage_playbook(service, cost, deviation)
-        
+
         return jsonify({"status": "success", "playbook": playbook})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
