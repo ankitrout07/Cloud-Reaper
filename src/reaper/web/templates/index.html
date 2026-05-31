@@ -316,16 +316,7 @@
         </button>
     </div>
 
-    <!-- Reaper Intelligence Console (NEW) -->
-    <div id="console-terminal" class="terminal-container" style="display:none;">
-        <div class="flex justify-between items-center mb-2">
-            <span class="text-cyan-400 font-bold uppercase tracking-widest text-xs">AZURE BACKEND LOGS</span>
-            <button onclick="toggleConsole()" class="text-cyan-400 font-black hover:text-white transition">X</button>
-        </div>
-        <div id="log-output" class="log-stream">
-            <p class="system-msg text-slate-500">> Initializing Cloud-Reaper Log Stream...</p>
-        </div>
-    </div>
+    {% include "_console.html" %}
 
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -683,40 +674,6 @@
         }
 
         // Real-time CPU chart + Socket.IO: static/js/theme.js (window.__reaperSocket, metric_update)
-
-        const socket = window.__reaperSocket || (window.__reaperSocket = io());
-
-        socket.on('new_log', function (msg) {
-            const output = document.getElementById('log-output');
-            const logEntry = document.createElement('p');
-            logEntry.className = 'log-line';
-            logEntry.innerText = `[${new Date().toLocaleTimeString()}] ${msg.data}`;
-            output.appendChild(logEntry);
-            output.scrollTop = output.scrollHeight;
-        });
-
-        function startLogStream() {
-            socket.emit('start_log_stream');
-        }
-
-        function toggleConsole() {
-            const terminal = document.getElementById('console-terminal');
-            terminal.style.display = (terminal.style.display === 'none') ? 'block' : 'none';
-
-            if (terminal.style.display === 'block') {
-                document.getElementById('log-output').innerHTML = ''; // Clear previous logs
-                startLogStream();
-            }
-        }
-
-        function logToConsole(msg, type = 'info') {
-            const output = document.getElementById('log-output');
-            const logEntry = document.createElement('p');
-            logEntry.className = 'log-line text-slate-400';
-            logEntry.innerText = `[${new Date().toLocaleTimeString()}] > ${msg}`;
-            output.appendChild(logEntry);
-            output.scrollTop = output.scrollHeight;
-        }
 
         // Hook into runScan to show console activity
         const originalRunScan = runScan;

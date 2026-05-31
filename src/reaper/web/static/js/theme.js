@@ -360,3 +360,55 @@ function toggleAppTheme() {
         initFinopsDashboardCharts(state);
     });
 })();
+
+// === Global Console Terminal Functions ===
+
+(function() {
+    const sock = window.__reaperEnsureSocket ? window.__reaperEnsureSocket() : null;
+    if (sock && !window.__reaperConsoleHooked) {
+        window.__reaperConsoleHooked = true;
+        sock.on('new_log', function (msg) {
+            const output = document.getElementById('log-output');
+            if (!output) return;
+            const logEntry = document.createElement('p');
+            logEntry.className = 'log-line text-cyan-200';
+            logEntry.innerText = `[${new Date().toLocaleTimeString()}] ${msg.data}`;
+            output.appendChild(logEntry);
+            output.scrollTop = output.scrollHeight;
+        });
+    }
+})();
+
+window.startLogStream = function() {
+    const sock = window.__reaperEnsureSocket ? window.__reaperEnsureSocket() : null;
+    if (sock) {
+        sock.emit('start_log_stream');
+    }
+};
+
+window.toggleConsole = function(forceOpen = false) {
+    const terminal = document.getElementById('console-terminal');
+    if (!terminal) return;
+    
+    if (forceOpen) {
+        terminal.style.display = 'block';
+    } else {
+        terminal.style.display = (terminal.style.display === 'none') ? 'block' : 'none';
+    }
+
+    if (terminal.style.display === 'block') {
+        const output = document.getElementById('log-output');
+        if (output) output.innerHTML = ''; // Clear previous logs
+        window.startLogStream();
+    }
+};
+
+window.logToConsole = function(msg, type = 'info') {
+    const output = document.getElementById('log-output');
+    if (!output) return;
+    const logEntry = document.createElement('p');
+    logEntry.className = type === 'success' ? 'log-line text-green-400' : 'log-line text-slate-400';
+    logEntry.innerText = `[${new Date().toLocaleTimeString()}] > ${msg}`;
+    output.appendChild(logEntry);
+    output.scrollTop = output.scrollHeight;
+};

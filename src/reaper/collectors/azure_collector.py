@@ -21,6 +21,7 @@ from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.subscription import SubscriptionClient
 from azure.mgmt.web import WebSiteManagementClient
 from dotenv import load_dotenv
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from reaper.collectors.azure_prices import AzurePriceClient
 from reaper.engine.logic import BudgetForecaster
@@ -109,6 +110,7 @@ class AzureCollector:
         except ImportError:
             self.cost_management = None  # pyrefly: ignore [bad-assignment]
 
+    @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3), reraise=True)
     def get_vm_inventory(self):
         """Fetches all VMs and their sizes."""
         cache_key = f"vm_inventory_{self.subscription_id}"
@@ -129,6 +131,7 @@ class AzureCollector:
 
         return get_cached_data(cache_key, fetch, ttl_seconds=60)
 
+    @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3), reraise=True)
     def get_idle_vms(self, cpu_threshold=5.0):
         """Finds VMs with avg CPU utilization below threshold over last 7 days."""
         try:
@@ -192,6 +195,7 @@ class AzureCollector:
                 idle_vms.append(res)
         return idle_vms
 
+    @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3), reraise=True)
     def get_orphaned_network_resources(self):
         """Monitors Public IPs and Load Balancers with zero associations."""
         ips = self.network.public_ip_addresses.list_all()
@@ -210,6 +214,7 @@ class AzureCollector:
             ],
         }
 
+    @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3), reraise=True)
     def get_orphaned_disks(self):
         """Identifies disks and snapshots that are NOT attached to any VM."""
         disks = self.compute.disks.list()
@@ -719,6 +724,7 @@ class AzureCollector:
         report.sort(key=lambda x: x["usage"], reverse=True)
         return report
 
+    @retry(wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3), reraise=True)
     def get_anomaly_data(self):
         """Detect spend anomalies using real Azure Cost Management data."""
         if not self.cost_management:
@@ -774,6 +780,9 @@ class AzureCollector:
                         "cost": round(sum(costs), 2),
                         "is_anomaly": is_anomaly,
                         "deviation": f"{'+' if dev > 0 else ''}{round(dev)}%",
+                        "pct_above_ma": round(dev, 1),
+                        "daily_history": costs,
+                        "today_spend": costs[-1] if costs else 0
                     }
                 )
 
