@@ -31,6 +31,7 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 - [CI/CD Pipeline](#-cicd-pipeline)
 - [Development Commands](#-development-commands)
 - [Configuration](#-configuration)
+- [Changelog](#-changelog)
 - [Contributing](#-contributing)
 
 ---
@@ -601,6 +602,17 @@ cp .env.example .env
 | `DISCORD_WEBHOOK_URL` | Optional | Discord alerting webhook |
 | `SLACK_WEBHOOK_URL` | Optional | Slack alerting webhook |
 | `TEAMS_WEBHOOK_URL` | Optional | Microsoft Teams alerting webhook |
+
+---
+
+## 📜 Changelog
+
+Keep track of all project updates, performance optimizations, bug fixes, and feature additions in our dedicated **[CHANGELOG.md](CHANGELOG.md)** file.
+
+**Recent Highlights (Performance & Fixes):**
+- **Performance**: Upgraded dependencies (`ruff`) for significantly faster static analysis and stabilized the hybrid Go/Python execution pipelines to reduce memory footprint.
+- **Fixes**: Refined multi-cloud verification logic for Azure/AWS/GCP authentication and enforced robust vault log retention policies to secure the cryptographic audit trails without database bloat.
+- **UI/UX**: Shipped a professional glassmorphism aesthetic redesign for the vault and cloud provider interfaces.
 
 ---
 
