@@ -153,7 +153,7 @@ class DocSearchEngine:
             return
 
         for file_path in search_path.rglob("*.md"):
-            with open(file_path, encoding="utf-8") as f:
+            with file_path.open(encoding="utf-8") as f:
                 content = f.read()
 
             # Global Document Context for Claude-style chunk situating

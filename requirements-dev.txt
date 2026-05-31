@@ -1,5 +1,5 @@
 # Development & Testing Tools
-ruff==0.1.9
+ruff==0.15.15
 pytest==7.4.3
 pytest-cov==4.1.0
 mypy==1.8.0
