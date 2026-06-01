@@ -61,7 +61,8 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 | **💎 RI/SP Advisor** | Recommends Reserved Instances based on actual uptime and inventory patterns |
 | **❄️ Cold Storage Identifier** | Scans unused storage and suggests cost-efficient Cool/Archive tier migrations |
 | **🤖 AI Regional Arbitrage** | Multi-cloud real-time pricing clients with region-to-region arbitrage estimation |
-| **🧠 Cost-Bounded Copilot** | Bounded Knapsack Optimizer backed by **Gemini 2.5 Flash** with 128-entry LRU cache |
+| **🧠 Cost-Bounded Copilot** | Bounded Knapsack Optimizer backed by **Gemini 3.1 Pro** with 128-entry LRU cache |
+| **✨ AI Anomaly Triage** | One-click playbook generation using Gemini 3.1 Pro to automatically investigate and triage detected cost deviations |
 
 ### ⚖️ Phase 3 — Operate: Governance & Security
 
@@ -215,7 +216,7 @@ Cloud-Reaper/
 | **Language (Go)** | Go 1.24+ |
 | **Database** | PostgreSQL 15 (SQLAlchemy 2.0 ORM + pgx/v5 driver) |
 | **Web Framework** | Flask + Flask-SocketIO (gevent WebSocket transport) |
-| **AI Copilot** | Google GenAI (`google-genai`) · Gemini 2.5 Flash · Bounded Knapsack Optimizer |
+| **AI Copilot** | Google GenAI (`google-genai`) · Gemini 3.1 Pro · Bounded Knapsack Optimizer |
 | **RAG Search** | BM25 sparse retrieval + Gemini Embedding dense retrieval + RRF fusion |
 | **Frontend** | HTML5, Vanilla JS, CSS (Professional Dark Theme, Adaptive Light/Dark Mode) |
 | **Charting** | Chart.js (real-time WebSocket-driven telemetry graphs) |
@@ -356,7 +357,7 @@ The RAG pipeline implements a 4-stage search strategy:
 1. **Dense Retrieval** — Gemini Embedding (`gemini-embedding-2`) for semantic vector similarity
 2. **Sparse Retrieval** — Custom BM25 implementation with IDF smoothing for keyword matching
 3. **Reciprocal Rank Fusion (RRF)** — Combines dense and sparse rankings (k=60)
-4. **Cross-Encoder Re-Ranking** — Gemini 2.5 Flash re-scores top candidates for final relevance ordering
+4. **Cross-Encoder Re-Ranking** — Gemini 3.1 Pro re-scores top candidates for final relevance ordering
 
 ### Features
 - **Claude-style contextual chunk situating** — Each sentence chunk is prefixed with document-level summary context
@@ -495,6 +496,7 @@ docker run --name cloud-reaper-db \
 |---|---|---|
 | `GET` | `/financial` | Financial intelligence dashboard |
 | `GET` | `/api/metrics/compute-waste` | Compute waste index analysis |
+| `POST` | `/api/finops/anomalies/triage` | AI-powered anomaly triage and playbook generation |
 
 ### AI & Search
 
