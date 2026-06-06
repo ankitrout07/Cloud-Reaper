@@ -39,7 +39,11 @@ from flask import (
 )
 from flask_socketio import SocketIO
 from sqlalchemy import func
-from weasyprint import HTML
+try:
+    from weasyprint import HTML
+except Exception as e:
+    HTML = None
+    print(f"[*] WeasyPrint could not be loaded: {e}")
 
 from reaper.collectors.auth_check import check_azure_status
 from reaper.collectors.aws_prices import AWSPriceClient
@@ -1288,6 +1292,8 @@ def export_bom():
 
         # Generate PDF in memory
         pdf_out = io.BytesIO()
+        if HTML is None:
+            return jsonify({"status": "error", "message": "WeasyPrint is not available on this platform (native libraries like libgobject may be missing)."}), 500
         HTML(string=rendered_html).write_pdf(pdf_out)
         pdf_out.seek(0)
 
