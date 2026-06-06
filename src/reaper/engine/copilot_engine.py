@@ -1,17 +1,16 @@
 # src/reaper/engine/copilot_engine.py
-import os
-import warnings
-import threading
 import copy
+import os
 import re
-from typing import Optional
+import threading
+import warnings
 
 from google import genai
 from google.genai import types
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from reaper.engine.copilot_schemas import OptimizationBlueprintSchema
 from reaper.engine.calculator import CostCalculator
+from reaper.engine.copilot_schemas import OptimizationBlueprintSchema
 
 # Suppress EOL warnings from google-auth if any
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.auth")
@@ -34,7 +33,7 @@ DOWNGRADE_PATHS = {
         "compute": ["n2-standard-2", "e2-standard-2"],
         "database": ["db-custom-2-7680", "db-f1-micro"],
         "storage": ["gcs_standard"],
-    }
+    },
 }
 
 
@@ -51,7 +50,9 @@ class KnapsackCopilotEngine:
         self._cache_lock = threading.Lock()
         self.calculator = CostCalculator()
 
-    def _calculate_component_cost(self, provider: str, service_type: str, sku: str, quantity: int, region: str = "eastus") -> float:
+    def _calculate_component_cost(
+        self, provider: str, service_type: str, sku: str, quantity: int, region: str = "eastus"
+    ) -> float:
         """
         Looks up the monthly cost for a given infrastructure component using:
         1. RegionPriceCache SQL table.
@@ -61,7 +62,7 @@ class KnapsackCopilotEngine:
         prov = provider.lower().strip()
         sku_clean = sku.strip()
         cat = service_type.lower().strip()
-        
+
         # Normalize category
         if prov == "aws":
             if "compute" in cat or "vm" in cat or "instance" in cat:
@@ -75,12 +76,19 @@ class KnapsackCopilotEngine:
                 cat = "storage"
             elif "network" in cat:
                 cat = "networking"
-            elif "paas" in cat or "db" in cat or "sql" in cat or "postgres" in cat or "database" in cat:
+            elif (
+                "paas" in cat
+                or "db" in cat
+                or "sql" in cat
+                or "postgres" in cat
+                or "database" in cat
+            ):
                 cat = "paas"
 
         # 1. DB Query Block using RegionPriceCache
         try:
             from reaper.engine.models import RegionPriceCache, SessionLocal
+
             db = SessionLocal()
             db_record = (
                 db.query(RegionPriceCache)
@@ -109,13 +117,14 @@ class KnapsackCopilotEngine:
                 if k.lower() == sku_clean.lower():
                     matched_rate = float(val)
                     break
-            
+
             if matched_rate is not None:
-                is_storage_type = cat in ["storage", "disk", "ebs"] or "per_gb_month" in sku_clean.lower()
+                is_storage_type = (
+                    cat in ["storage", "disk", "ebs"] or "per_gb_month" in sku_clean.lower()
+                )
                 if is_storage_type:
                     return matched_rate * quantity
-                else:
-                    return matched_rate * 730 * quantity
+                return matched_rate * 730 * quantity
         except Exception:
             pass
 
@@ -161,10 +170,10 @@ class KnapsackCopilotEngine:
 
         return rate * 730 * quantity
 
-    def _downgrade_sku(self, provider: str, service_type: str, current_sku: str) -> Optional[str]:
+    def _downgrade_sku(self, provider: str, service_type: str, current_sku: str) -> str | None:
         prov = provider.lower().strip()
         cat = service_type.lower().strip()
-        
+
         # Normalize category
         if prov == "aws":
             if "compute" in cat or "vm" in cat or "instance" in cat:
@@ -178,7 +187,13 @@ class KnapsackCopilotEngine:
                 cat = "compute"
             elif "storage" in cat or "disk" in cat:
                 cat = "storage"
-            elif "paas" in cat or "db" in cat or "sql" in cat or "postgres" in cat or "database" in cat:
+            elif (
+                "paas" in cat
+                or "db" in cat
+                or "sql" in cat
+                or "postgres" in cat
+                or "database" in cat
+            ):
                 cat = "paas"
         elif prov == "gcp":
             if "compute" in cat or "vm" in cat:
@@ -191,7 +206,7 @@ class KnapsackCopilotEngine:
         path = DOWNGRADE_PATHS.get(prov, {}).get(cat, [])
         if not path:
             return None
-            
+
         current_sku_lower = current_sku.lower().strip()
         try:
             idx = -1
@@ -203,12 +218,12 @@ class KnapsackCopilotEngine:
                 return path[idx + 1]
         except Exception:
             pass
-            
+
         # Try substring lookup
         for idx, sku in enumerate(path[:-1]):
             if sku.lower() in current_sku_lower or current_sku_lower in sku.lower():
                 return path[idx + 1]
-                
+
         return None
 
     def _get_pricing_context_sheet(self, provider: str) -> str:
@@ -217,32 +232,57 @@ class KnapsackCopilotEngine:
         lines = [
             f"GROUNDED PRICING CHEAT SHEET FOR {prov.upper()}:",
             "Use these exact SKU sizes and their monthly rates to align with the budget limit.",
-            ""
+            "",
         ]
-        
+
         known_skus = []
         if prov == "aws":
-            known_skus = ["t3.micro", "t3.small", "t3.medium", "m5.large", "gp3_per_gb_month", "s3_standard"]
+            known_skus = [
+                "t3.micro",
+                "t3.small",
+                "t3.medium",
+                "m5.large",
+                "gp3_per_gb_month",
+                "s3_standard",
+            ]
         elif prov == "azure":
             known_skus = [
-                "standard_d2s_v3", "standard_b2s", "premium_ssd_p6_64gb", "standard_hdd_s4_32gb", 
-                "unassociated_ip", "idle_load_balancer", "application_gateway_waf_v2", 
-                "app_service_plan_premiumv3_p1v3", "sql_database_serverless_s0",
-                "standard_d2s_v5", "standard_d4s_v5", "standard_e2_v5", "standard_sig_v5", "blob_hot"
+                "standard_d2s_v3",
+                "standard_b2s",
+                "premium_ssd_p6_64gb",
+                "standard_hdd_s4_32gb",
+                "unassociated_ip",
+                "idle_load_balancer",
+                "application_gateway_waf_v2",
+                "app_service_plan_premiumv3_p1v3",
+                "sql_database_serverless_s0",
+                "standard_d2s_v5",
+                "standard_d4s_v5",
+                "standard_e2_v5",
+                "standard_sig_v5",
+                "blob_hot",
             ]
         elif prov == "gcp":
-            known_skus = ["e2-standard-2", "n2-standard-2", "gcs_standard", "db-custom-2-7680", "db-f1-micro"]
+            known_skus = [
+                "e2-standard-2",
+                "n2-standard-2",
+                "gcs_standard",
+                "db-custom-2-7680",
+                "db-f1-micro",
+            ]
 
         db_prices = {}
         try:
             from reaper.engine.models import RegionPriceCache, SessionLocal
+
             db = SessionLocal()
             for sku in known_skus:
                 record = (
                     db.query(RegionPriceCache)
                     .filter(
                         RegionPriceCache.region_name == "eastus",
-                        (RegionPriceCache.sku_id.ilike(sku)) | (RegionPriceCache.sku_id.ilike(f"%{sku}%"))
+                        (RegionPriceCache.sku_id.ilike(sku))
+                        | (RegionPriceCache.sku_id.ilike(f"%{sku}%")),
                     )
                     .first()
                 )
@@ -275,7 +315,7 @@ class KnapsackCopilotEngine:
             user_intent.lower().strip(),
             float(budget_limit),
         )
-        
+
         with self._cache_lock:
             if cache_key in self._cache:
                 return copy.deepcopy(self._cache[cache_key])
@@ -316,13 +356,13 @@ class KnapsackCopilotEngine:
         while iteration < max_iterations:
             total_recalculated_cost = 0.0
             component_costs = []
-            
+
             for comp in result.infrastructure_components:
                 cost = self._calculate_component_cost(
                     provider=cloud_provider,
                     service_type=comp.service_type,
                     sku=comp.sku_size,
-                    quantity=comp.quantity
+                    quantity=comp.quantity,
                 )
                 comp.monthly_cost = cost
                 total_recalculated_cost += cost
@@ -341,27 +381,26 @@ class KnapsackCopilotEngine:
                 if comp.quantity > 1:
                     old_qty = comp.quantity
                     new_qty = old_qty - 1
-                    
+
                     # Regex replacement of count in Terraform HCL
                     old_hcl = result.production_terraform_hcl
                     new_hcl = re.sub(rf"count\s*=\s*{old_qty}\b", f"count = {new_qty}", old_hcl)
-                    
+
                     comp.quantity = new_qty
                     result.production_terraform_hcl = new_hcl
                     downgraded_any = True
                     break
-                else:
-                    old_sku = comp.sku_size
-                    new_sku = self._downgrade_sku(cloud_provider, comp.service_type, old_sku)
-                    if new_sku:
-                        # Regex replacement of SKU in Terraform HCL
-                        old_hcl = result.production_terraform_hcl
-                        new_hcl = re.sub(re.escape(old_sku), new_sku, old_hcl, flags=re.IGNORECASE)
-                        
-                        comp.sku_size = new_sku
-                        result.production_terraform_hcl = new_hcl
-                        downgraded_any = True
-                        break
+                old_sku = comp.sku_size
+                new_sku = self._downgrade_sku(cloud_provider, comp.service_type, old_sku)
+                if new_sku:
+                    # Regex replacement of SKU in Terraform HCL
+                    old_hcl = result.production_terraform_hcl
+                    new_hcl = re.sub(re.escape(old_sku), new_sku, old_hcl, flags=re.IGNORECASE)
+
+                    comp.sku_size = new_sku
+                    result.production_terraform_hcl = new_hcl
+                    downgraded_any = True
+                    break
 
             if not downgraded_any:
                 break

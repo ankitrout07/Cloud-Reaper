@@ -1,9 +1,10 @@
 import os
-from datetime import datetime, timezone
+from datetime import datetime
+
 try:
     from datetime import UTC
 except ImportError:
-    UTC = timezone.utc
+    UTC = UTC
 
 from dotenv import load_dotenv
 from sqlalchemy import (

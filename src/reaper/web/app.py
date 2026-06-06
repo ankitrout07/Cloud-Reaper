@@ -39,6 +39,7 @@ from flask import (
 )
 from flask_socketio import SocketIO
 from sqlalchemy import func
+
 try:
     from weasyprint import HTML
 except Exception as e:
@@ -1293,7 +1294,12 @@ def export_bom():
         # Generate PDF in memory
         pdf_out = io.BytesIO()
         if HTML is None:
-            return jsonify({"status": "error", "message": "WeasyPrint is not available on this platform (native libraries like libgobject may be missing)."}), 500
+            return jsonify(
+                {
+                    "status": "error",
+                    "message": "WeasyPrint is not available on this platform (native libraries like libgobject may be missing).",
+                }
+            ), 500
         HTML(string=rendered_html).write_pdf(pdf_out)
         pdf_out.seek(0)
 
