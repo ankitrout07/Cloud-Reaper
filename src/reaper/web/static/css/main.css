@@ -527,3 +527,14 @@ h1, h2, h3, h4, p, span, div {
     filter: none !important;
     opacity: 1 !important;
 }
+
+/* UI Rendering Stabilisation & Smoothness Optimisations */
+.glass, .glass-card, .glass-morph, .tab-pane {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 300px;
+    will-change: transform, border-color, opacity;
+}
+
+.animate-fade-in, .animate-slide-in {
+    will-change: transform, opacity;
+}
