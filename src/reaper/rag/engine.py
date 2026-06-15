@@ -127,7 +127,7 @@ class DocSearchEngine:
                 # Transient service hiccup — back off and retry.
                 if "503" in exc_str or "UNAVAILABLE" in exc_str:
                     if attempt < self._EMBED_MAX_RETRIES - 1:
-                        backoff = self._EMBED_BASE_BACKOFF * (2 ** attempt) + random.uniform(0, 0.5)
+                        backoff = self._EMBED_BASE_BACKOFF * (2**attempt) + random.uniform(0, 0.5)
                         print(
                             f"WARN: Gemini embedding 503 (attempt {attempt + 1}/{self._EMBED_MAX_RETRIES}). "
                             f"Retrying in {backoff:.1f}s…"
@@ -135,7 +135,9 @@ class DocSearchEngine:
                         time.sleep(backoff)
                         continue
                     # Final attempt also failed
-                    print(f"WARN: Gemini embedding 503 – giving up after {self._EMBED_MAX_RETRIES} attempts.")
+                    print(
+                        f"WARN: Gemini embedding 503 – giving up after {self._EMBED_MAX_RETRIES} attempts."
+                    )
                     return None
 
                 # ── Any other error ────────────────────────────────────────
@@ -264,9 +266,7 @@ class DocSearchEngine:
                         break
 
                     left_context = " ".join(sentences[max(0, s_idx - 2) : s_idx])
-                    right_context = " ".join(
-                        sentences[s_idx + 1 : min(len(sentences), s_idx + 3)]
-                    )
+                    right_context = " ".join(sentences[s_idx + 1 : min(len(sentences), s_idx + 3)])
                     situated_content = f"{doc_context}\n\nSentence: {sentence}"
 
                     # Use backoff-aware helper — returns None on unrecoverable error

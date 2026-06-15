@@ -365,21 +365,22 @@ def _init_database() -> bool:
     data_dir = REPO_ROOT / "data"
     data_dir.mkdir(exist_ok=True)
     db_path = data_dir / "reaper.db"
-    
+
     try:
         # Import the models to create tables
         import sys
+
         sys.path.insert(0, str(REPO_ROOT / "src"))
-        
+
         from reaper.engine.models.resources import init_db
+
         init_db()
-        
+
         if db_path.exists():
             print(c(f"  Database ready: {db_path}", GREEN))
             return True
-        else:
-            print(c(f"  Database created: {db_path}", GREEN))
-            return True
+        print(c(f"  Database created: {db_path}", GREEN))
+        return True
     except Exception as e:
         print(c(f"  Database initialization: {e}", YELLOW))
         # Don't fail - SQLite will auto-create on first use
@@ -389,7 +390,7 @@ def _init_database() -> bool:
 def cmd_web(args: argparse.Namespace) -> int:
     """Launch the Flask/SocketIO dashboard."""
     print(c("\n[web] Starting Flask/SocketIO dashboard\n", BOLD))
-    
+
     # Setup env file (safe to call multiple times)
     _setup_env_file()
 
@@ -401,14 +402,14 @@ def cmd_web(args: argparse.Namespace) -> int:
     env = merge_venv_into_environ(venv_dir)
     env["PYTHONPATH"] = str((REPO_ROOT / "src").resolve())
     env["FLASK_PORT"] = str(port)
-    
+
     # Use SQLite by default (no DATABASE_URL needed)
     if "DATABASE_URL" not in env or not env.get("DATABASE_URL"):
         data_dir = REPO_ROOT / "data"
         data_dir.mkdir(exist_ok=True)
         db_path = data_dir / "reaper.db"
         env["DATABASE_URL"] = f"sqlite:///{db_path}"
-    
+
     # Initialize database
     _init_database()
 
@@ -488,14 +489,14 @@ def cmd_run(args: argparse.Namespace) -> int:
     context["port"] = _read_port_from_env()
     if getattr(args, "port", None):
         context["port"] = str(args.port)
-    
+
     # Initialize database
     _init_database()
     print(c("[✔] Environment configured.\n", GREEN))
 
     # Phase 4 — Launch web dashboard
     print(c("[4/4] INITIALIZING INTELLIGENCE …", BOLD + CYAN))
-    
+
     # Inject --port into args so cmd_web can read it
     args.port = context["port"]
     return cmd_web(args)
@@ -564,7 +565,7 @@ def _setup_env_file() -> None:
                 f"# DISCORD_WEBHOOK_URL=your_discord_webhook\n"
             )
         print(c(f"  .env created at {env_file}", GREEN))
-        print(c(f"  → Fill in optional secrets as needed for full functionality", YELLOW))
+        print(c("  → Fill in optional secrets as needed for full functionality", YELLOW))
         return
 
     # Patch: append any missing keys

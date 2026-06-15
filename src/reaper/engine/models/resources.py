@@ -29,7 +29,9 @@ if not DATABASE_URL:
     db_path = os.path.join(data_dir, "reaper.db")
     DATABASE_URL = f"sqlite:///{db_path}"
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+engine = create_engine(
+    DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
