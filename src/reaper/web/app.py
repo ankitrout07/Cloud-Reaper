@@ -893,34 +893,39 @@ def financial():
 
 @app.route("/api/v1/finops/simulate/commitment", methods=["POST"])
 def simulate_commitment():
-    # Placeholder simulator logic. 
+    # Placeholder simulator logic.
     data = request.json or {}
-    return jsonify({
-        "status": "success",
-        "message": "Commitment simulated successfully",
-        "savings_estimate": 150.00,
-        "roi_months": 3.5
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "message": "Commitment simulated successfully",
+            "savings_estimate": 150.00,
+            "roi_months": 3.5,
+        }
+    )
+
 
 @app.route("/api/v1/finops/simulate/policy", methods=["POST"])
 def simulate_policy():
     # Placeholder logic for what-if policy application.
     data = request.json or {}
-    return jsonify({
-        "status": "success",
-        "message": "Policy simulation applied",
-        "cost_impact": -250.00
-    })
+    return jsonify(
+        {"status": "success", "message": "Policy simulation applied", "cost_impact": -250.00}
+    )
 
-@app.route('/api/metrics')
+
+@app.route("/api/metrics")
 def get_dashboard_metrics():
     """Provides valid default metrics to satisfy the real-time telemetry canvases"""
-    return jsonify({
-        "status": "healthy",
-        "burn_rate_velocity": 0.00,
-        "efficiency_score": 94.2,
-        "telemetry_stream": []
-    })
+    return jsonify(
+        {
+            "status": "healthy",
+            "burn_rate_velocity": 0.00,
+            "efficiency_score": 94.2,
+            "telemetry_stream": [],
+        }
+    )
+
 
 @app.route("/api/finops/business-metrics", methods=["POST"])
 def add_business_metric():
