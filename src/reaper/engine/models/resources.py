@@ -20,9 +20,16 @@ load_dotenv()
 
 # We need engine-agnostic JSON (not JSONB) for SQLite compatibility
 # in desktop mode
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres")
+# Default to SQLite in a data directory; use PostgreSQL if DATABASE_URL is set
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    # Use SQLite by default
+    data_dir = os.path.join(os.path.dirname(__file__), "../../../data")
+    os.makedirs(data_dir, exist_ok=True)
+    db_path = os.path.join(data_dir, "reaper.db")
+    DATABASE_URL = f"sqlite:///{db_path}"
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

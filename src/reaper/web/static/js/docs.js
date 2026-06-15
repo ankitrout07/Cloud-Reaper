@@ -99,7 +99,7 @@ function closeSearchResults() {
 
 // Re-init markdown rendering on page load and htmx swap
 document.addEventListener('DOMContentLoaded', initMarkdownDocs);
-document.body.addEventListener('htmx:afterSwap', function(evt) {
+document.addEventListener('htmx:afterSwap', function(evt) {
     if (window.location.pathname.includes('/docs')) {
         initMarkdownDocs();
     }

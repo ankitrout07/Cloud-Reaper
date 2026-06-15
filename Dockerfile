@@ -1,9 +1,10 @@
 # Multi-stage build for Cloud-Reaper
-# 1. Build Go Performance Engine
-FROM golang:1.24-alpine AS go-builder
+# 1. Build Go Performance Engine (headless mode for Docker)
+FROM golang:1.25-alpine AS go-builder
 WORKDIR /app
 COPY src/engine-go/ .
-RUN go build -o /reaper-engine main.go
+# Build with headless tag to skip webview dependency
+RUN CGO_ENABLED=0 go build -tags=headless -o /reaper-engine main.go
 
 # 2. Build Python Intelligence Layer & Dashboard
 FROM python:3.12-slim
@@ -20,7 +21,6 @@ RUN apt-get update && apt-get install -y \
     libcairo2 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
-    libgdk-pixbuf2.0-0 \
     libffi-dev \
     shared-mime-info \
     && rm -rf /var/lib/apt/lists/*

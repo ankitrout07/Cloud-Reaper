@@ -97,7 +97,7 @@ function loadInitialTabs() {
 document.addEventListener('DOMContentLoaded', loadInitialTabs);
 
 // HTMX navigation integration
-document.body.addEventListener('htmx:afterSwap', function(evt) {
+document.addEventListener('htmx:afterSwap', function(evt) {
     loadInitialTabs();
 });
 
