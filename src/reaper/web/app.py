@@ -46,11 +46,11 @@ except Exception as e:
     HTML = None
     print(f"[*] WeasyPrint could not be loaded: {e}")
 
-from reaper.collectors.utils.auth_check import check_azure_status
 from reaper.collectors.prices.aws import AWSPriceClient
-from reaper.collectors.providers.azure_collector import AzureCollector
-from reaper.collectors.utils.config_manager import save_config
 from reaper.collectors.prices.gcp import GCPPriceClient
+from reaper.collectors.providers.azure_collector import AzureCollector
+from reaper.collectors.utils.auth_check import check_azure_status
+from reaper.collectors.utils.config_manager import save_config
 from reaper.engine.core.architect import AIArchitectManager, resolve_component_costs
 from reaper.engine.core.calculator import CostCalculator, SpotEvictionPredictor
 from reaper.engine.core.economics import RegionalArbitrage

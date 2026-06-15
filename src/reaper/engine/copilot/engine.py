@@ -9,8 +9,8 @@ from google import genai
 from google.genai import types
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from reaper.engine.core.calculator import CostCalculator
 from reaper.engine.copilot.schemas import OptimizationBlueprintSchema
+from reaper.engine.core.calculator import CostCalculator
 
 # Suppress EOL warnings from google-auth if any
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.auth")

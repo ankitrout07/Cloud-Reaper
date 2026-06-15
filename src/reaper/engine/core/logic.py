@@ -8,8 +8,8 @@ from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 from reaper.engine.core.calculator import RightsizingAgent
-from reaper.engine.notifications.notifier import send_discord_alert
 from reaper.engine.core.workload import WorkloadPersonality
+from reaper.engine.notifications.notifier import send_discord_alert
 
 
 class ZombieScorer:
