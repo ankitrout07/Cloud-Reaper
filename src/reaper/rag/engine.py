@@ -1,6 +1,8 @@
 # src/reaper/rag/engine.py
 import math
+import random
 import re
+import time
 from collections import Counter
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -63,6 +65,11 @@ class BM25:
 
 
 class DocSearchEngine:
+    # Maximum retries for transient (5xx) embedding failures
+    _EMBED_MAX_RETRIES: int = 3
+    # Base backoff in seconds for exponential retry (jittered)
+    _EMBED_BASE_BACKOFF: float = 1.5
+
     def __init__(self):
         import os
 
@@ -73,6 +80,69 @@ class DocSearchEngine:
         self.embedding_model = "models/gemini-embedding-2"
         self.docs_index = []
         self._bm25 = None
+        # Circuit-breaker: set True when the API quota is exhausted (HTTP 429).
+        # Prevents hammering the API with thousands of doomed requests per session.
+        self._quota_exhausted: bool = False
+
+    # ------------------------------------------------------------------
+    # Embedding helper with retry / circuit-breaker logic
+    # ------------------------------------------------------------------
+
+    def _embed_with_backoff(self, content: str) -> list[float] | None:
+        """Call the embedding API with exponential back-off for transient errors.
+
+        Returns the embedding vector on success, or ``None`` if the chunk
+        should be skipped (permanent error / quota exhausted).
+
+        Side-effect: sets ``self._quota_exhausted = True`` when a 429 is
+        encountered so the caller can stop all further embedding calls.
+        """
+        for attempt in range(self._EMBED_MAX_RETRIES):
+            try:
+                response = self.client.models.embed_content(
+                    model=self.embedding_model, contents=content
+                )
+                return response.embeddings[0].values
+
+            except Exception as exc:
+                exc_str = str(exc)
+
+                # ── 429 RESOURCE_EXHAUSTED ─────────────────────────────────
+                # Quota is gone for this daily window.  Parse the suggested
+                # retry delay (if present), log once, set the circuit-breaker
+                # and return None immediately — no further retries.
+                if "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str:
+                    # Try to extract the retryDelay hint from the error payload
+                    delay_match = re.search(r"retryDelay[^0-9]*([0-9]+)", exc_str)
+                    delay_hint = delay_match.group(1) if delay_match else "unknown"
+                    print(
+                        f"WARN: Gemini embedding quota exhausted (429). "
+                        f"Suggested retry delay: {delay_hint}s. "
+                        "Disabling embedding for this session to avoid further quota burn."
+                    )
+                    self._quota_exhausted = True
+                    return None
+
+                # ── 503 UNAVAILABLE ───────────────────────────────────────
+                # Transient service hiccup — back off and retry.
+                if "503" in exc_str or "UNAVAILABLE" in exc_str:
+                    if attempt < self._EMBED_MAX_RETRIES - 1:
+                        backoff = self._EMBED_BASE_BACKOFF * (2 ** attempt) + random.uniform(0, 0.5)
+                        print(
+                            f"WARN: Gemini embedding 503 (attempt {attempt + 1}/{self._EMBED_MAX_RETRIES}). "
+                            f"Retrying in {backoff:.1f}s…"
+                        )
+                        time.sleep(backoff)
+                        continue
+                    # Final attempt also failed
+                    print(f"WARN: Gemini embedding 503 – giving up after {self._EMBED_MAX_RETRIES} attempts.")
+                    return None
+
+                # ── Any other error ────────────────────────────────────────
+                print(f"WARN: Embedding error (attempt {attempt + 1}): {exc}")
+                return None
+
+        return None
 
     def _split_into_sentences(self, text: str) -> list[str]:
         """Splits raw text section into distinct clean sentences, filtering out headings."""
@@ -145,14 +215,29 @@ class DocSearchEngine:
         return f"Document: {file_name}\nTitle: {h1_title}\nSummary: {summary}"
 
     def load_and_index_docs(self, docs_dir: str = "docs"):
-        """Reads and indexes all markdown files from the target repository documentation tree."""
-        self.docs_index = []
-        search_path = Path(docs_dir)
+        """Reads and indexes all markdown files from the target repository documentation tree.
 
+        Embedding calls are protected by an exponential-backoff retry for
+        transient 503 errors and a session-level circuit-breaker for 429
+        quota exhaustion — preventing unbounded API spam on rate-limit hits.
+        """
+        self.docs_index = []
+        # Reset circuit-breaker at the start of every fresh indexing run
+        self._quota_exhausted = False
+
+        search_path = Path(docs_dir)
         if not search_path.exists():
             return
 
         for file_path in search_path.rglob("*.md"):
+            # Stop processing further files once quota is blown for this session
+            if self._quota_exhausted:
+                print(
+                    f"INFO: Skipping remaining docs — embedding quota exhausted. "
+                    f"({file_path.name} and any subsequent files will not be indexed.)"
+                )
+                break
+
             with file_path.open(encoding="utf-8") as f:
                 content = f.read()
 
@@ -161,7 +246,11 @@ class DocSearchEngine:
 
             # Split document into structural sections to prevent semantic cross-bleeding
             sections = content.split("\n## ")
+            file_quota_hit = False
+
             for idx, section in enumerate(sections):
+                if file_quota_hit or self._quota_exhausted:
+                    break
                 if not section.strip():
                     continue
 
@@ -170,36 +259,37 @@ class DocSearchEngine:
 
                 # Store each sentence with contextual window enrichment
                 for s_idx, sentence in enumerate(sentences):
-                    # Get surrounding sentence context
-                    left_context_list = sentences[max(0, s_idx - 2) : s_idx]
-                    right_context_list = sentences[s_idx + 1 : min(len(sentences), s_idx + 3)]
+                    if self._quota_exhausted:
+                        file_quota_hit = True
+                        break
 
-                    left_context = " ".join(left_context_list)
-                    right_context = " ".join(right_context_list)
-
-                    # Situating context prefix
+                    left_context = " ".join(sentences[max(0, s_idx - 2) : s_idx])
+                    right_context = " ".join(
+                        sentences[s_idx + 1 : min(len(sentences), s_idx + 3)]
+                    )
                     situated_content = f"{doc_context}\n\nSentence: {sentence}"
 
-                    try:
-                        # Generate embedding using the situated sentence context
-                        response = self.client.models.embed_content(
-                            model=self.embedding_model, contents=situated_content
-                        )
+                    # Use backoff-aware helper — returns None on unrecoverable error
+                    vector = self._embed_with_backoff(situated_content)
+                    if vector is None:
+                        # _quota_exhausted may have been set inside the helper
+                        if self._quota_exhausted:
+                            file_quota_hit = True
+                        # Either way, skip this chunk and move on
+                        continue
 
-                        self.docs_index.append(
-                            {
-                                "file_name": file_path.name,
-                                "text": situated_content,  # Claude situated context
-                                "sentence": sentence,  # Core sentence
-                                "left_context": left_context,
-                                "right_context": right_context,
-                                "vector": response.embeddings[0].values,
-                            }
-                        )
-                    except Exception as e:
-                        print(f"WARN: Error generating embedding for chunk in {file_path}: {e}")
+                    self.docs_index.append(
+                        {
+                            "file_name": file_path.name,
+                            "text": situated_content,
+                            "sentence": sentence,
+                            "left_context": left_context,
+                            "right_context": right_context,
+                            "vector": vector,
+                        }
+                    )
 
-        # Invalidate BM25 cache so it gets rebuilt
+        # Invalidate BM25 cache so it gets rebuilt on next query
         self._bm25 = None
 
     def get_document_context_safely(self, file_path: str, content: str) -> str:

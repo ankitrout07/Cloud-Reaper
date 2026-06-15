@@ -198,6 +198,149 @@ class TestDocSearchEngine(unittest.TestCase):
             self.assertIn("design philosophy", context)
 
 
+class TestEmbedWithBackoff(unittest.TestCase):
+    """Unit tests for _embed_with_backoff: 429 circuit-breaker and 503 retry logic."""
+
+    def _make_engine(self):
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "fake"}):
+            with patch("google.genai.Client"):
+                return DocSearchEngine()
+
+    # ------------------------------------------------------------------
+    # 429 RESOURCE_EXHAUSTED — should flip the circuit-breaker immediately
+    # ------------------------------------------------------------------
+
+    def test_429_sets_quota_exhausted_and_returns_none(self):
+        engine = self._make_engine()
+        engine.client.models.embed_content.side_effect = Exception(
+            "429 RESOURCE_EXHAUSTED retryDelay30s"
+        )
+
+        result = engine._embed_with_backoff("some content")
+
+        self.assertIsNone(result, "Should return None on 429")
+        self.assertTrue(engine._quota_exhausted, "Circuit-breaker must be set on 429")
+        # Only ONE attempt — no retries allowed for quota exhaustion
+        engine.client.models.embed_content.assert_called_once()
+
+    def test_429_without_retry_delay_hint_still_sets_flag(self):
+        engine = self._make_engine()
+        engine.client.models.embed_content.side_effect = Exception("429 RESOURCE_EXHAUSTED")
+
+        result = engine._embed_with_backoff("content")
+
+        self.assertIsNone(result)
+        self.assertTrue(engine._quota_exhausted)
+
+    # ------------------------------------------------------------------
+    # 503 UNAVAILABLE — should retry with backoff, then give up
+    # ------------------------------------------------------------------
+
+    @patch("reaper.rag.engine.time.sleep")
+    def test_503_retries_then_gives_up(self, mock_sleep):
+        engine = self._make_engine()
+        engine.client.models.embed_content.side_effect = Exception("503 UNAVAILABLE")
+
+        result = engine._embed_with_backoff("some content")
+
+        self.assertIsNone(result, "Should return None after exhausting retries")
+        self.assertFalse(engine._quota_exhausted, "Circuit-breaker must NOT be set for 503")
+        # Should have been called _EMBED_MAX_RETRIES times
+        self.assertEqual(
+            engine.client.models.embed_content.call_count,
+            DocSearchEngine._EMBED_MAX_RETRIES,
+        )
+        # sleep() should have been called for every attempt except the last
+        self.assertEqual(mock_sleep.call_count, DocSearchEngine._EMBED_MAX_RETRIES - 1)
+
+    @patch("reaper.rag.engine.time.sleep")
+    def test_503_recovers_on_second_attempt(self, mock_sleep):
+        engine = self._make_engine()
+        mock_embedding = MagicMock()
+        mock_embedding.values = [0.9, 0.8, 0.7]
+        good_response = MagicMock()
+        good_response.embeddings = [mock_embedding]
+
+        # First call raises 503, second succeeds
+        engine.client.models.embed_content.side_effect = [
+            Exception("503 UNAVAILABLE"),
+            good_response,
+        ]
+
+        result = engine._embed_with_backoff("content")
+
+        self.assertEqual(result, [0.9, 0.8, 0.7], "Should return the vector on recovery")
+        self.assertFalse(engine._quota_exhausted)
+        self.assertEqual(engine.client.models.embed_content.call_count, 2)
+        mock_sleep.assert_called_once()  # one back-off before the successful retry
+
+    # ------------------------------------------------------------------
+    # load_and_index_docs circuit-breaker — should stop all iteration
+    # ------------------------------------------------------------------
+
+    def test_load_and_index_docs_stops_on_quota_exhaustion(self):
+        """Once 429 fires, no further embed_content calls should be made."""
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "fake"}):
+            with patch("google.genai.Client"):
+                engine = DocSearchEngine()
+
+        mock_embedding = MagicMock()
+        mock_embedding.values = [0.1, 0.2]
+        good_response = MagicMock()
+        good_response.embeddings = [mock_embedding]
+
+        call_count = {"n": 0}
+
+        def embed_side_effect(*_args, **_kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 2:
+                raise Exception("429 RESOURCE_EXHAUSTED")
+            return good_response
+
+        engine.client.models.embed_content.side_effect = embed_side_effect
+
+        content = "# Doc\nSentence one. Sentence two. Sentence three. Sentence four. Sentence five."
+
+        with (
+            patch("pathlib.Path.open", unittest.mock.mock_open(read_data=content)),
+            patch("pathlib.Path.rglob", return_value=[Path("docs/test.md")]),
+        ):
+            engine.load_and_index_docs("docs")
+
+        # The circuit-breaker fired on the 2nd call — only the 1st chunk should be indexed
+        self.assertEqual(len(engine.docs_index), 1)
+        self.assertTrue(engine._quota_exhausted)
+        # No more than 2 API calls should have happened (1 success + 1 that triggered 429)
+        self.assertLessEqual(call_count["n"], 2)
+
+    def test_load_and_index_docs_resets_circuit_breaker_on_new_run(self):
+        """Calling load_and_index_docs again must clear _quota_exhausted."""
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "fake"}):
+            with patch("google.genai.Client"):
+                engine = DocSearchEngine()
+
+        # Manually set stale flag from a previous session
+        engine._quota_exhausted = True
+
+        mock_embedding = MagicMock()
+        mock_embedding.values = [0.5, 0.5]
+        good_response = MagicMock()
+        good_response.embeddings = [mock_embedding]
+        engine.client.models.embed_content.return_value = good_response
+
+        content = "# Title\nOne clean sentence."
+
+        with (
+            patch("pathlib.Path.open", unittest.mock.mock_open(read_data=content)),
+            patch("pathlib.Path.rglob", return_value=[Path("docs/clean.md")]),
+        ):
+            engine.load_and_index_docs("docs")
+
+        # After a fresh indexing run the flag is reset and documents are indexed
+        self.assertFalse(engine._quota_exhausted)
+        self.assertGreater(len(engine.docs_index), 0)
+
+
 class TestSearchRoutes(unittest.TestCase):
     def setUp(self):
         app.config["TESTING"] = True
