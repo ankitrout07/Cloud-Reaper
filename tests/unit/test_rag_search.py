@@ -11,7 +11,7 @@ class TestDocSearchEngine(unittest.TestCase):
     @patch("google.genai.Client")
     @patch("pathlib.Path.rglob")
     @patch(
-        "builtins.open",
+        "pathlib.Path.open",
         new_callable=unittest.mock.mock_open,
         read_data="## Section A\nThis is architecture.\n## Section B\nThis is deployment.",
     )
@@ -85,7 +85,7 @@ class TestDocSearchEngine(unittest.TestCase):
             content = "# Title\nThis is sentence one. This is sentence two. This is sentence three."
 
             with (
-                patch("builtins.open", unittest.mock.mock_open(read_data=content)),
+                patch("pathlib.Path.open", unittest.mock.mock_open(read_data=content)),
                 patch("pathlib.Path.rglob", return_value=[Path("docs/telemetry.md")]),
             ):
                 engine.load_and_index_docs("docs")

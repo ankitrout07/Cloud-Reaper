@@ -37,6 +37,7 @@ indent-style = "space"
 [tool.pytest.ini_options]
 testpaths = ["tests", "src/reaper"]
 python_files = "test_*.py"
+pythonpath = ["src"]
 addopts = "-v --cov=reaper --cov-report=term-missing"
 
 [tool.mypy]

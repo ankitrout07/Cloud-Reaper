@@ -192,6 +192,45 @@ class CloudResource(Base):
     last_scanned = Column(DateTime, default=datetime.utcnow)
 
 
+class Budget(Base):
+    __tablename__ = "budgets"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String, nullable=False, index=True)
+    scope_type = Column(String, nullable=False)  # TAG, SUBSCRIPTION, etc.
+    scope_value = Column(String, nullable=False)
+    monthly_limit = Column(Numeric(15, 2), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+
+    alerts = relationship("BudgetAlert", back_populates="budget", cascade="all, delete-orphan")
+
+
+class BudgetAlert(Base):
+    __tablename__ = "budget_alerts"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    budget_id = Column(Integer, ForeignKey("budgets.id"), nullable=False)
+    threshold_percentage = Column(Numeric(5, 2), nullable=False)  # e.g., 85.00
+    notification_channel = Column(String, nullable=False)  # DISCORD, SLACK, etc.
+    is_triggered = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+
+    budget = relationship("Budget", back_populates="alerts")
+
+
+class CloudCommitment(Base):
+    __tablename__ = "cloud_commitments"
+
+    id = Column(String, primary_key=True)
+    provider_type = Column(String, nullable=False, index=True)  # aws, azure, gcp
+    commitment_type = Column(String, nullable=False)  # SAVINGS_PLAN, RESERVED_INSTANCE
+    hourly_commitment = Column(Numeric(15, 4), nullable=False)
+    status = Column(String, nullable=False)  # ACTIVE, EXPIRED, etc.
+    expiration_date = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+
+
+
 def get_desktop_engine():
     """Resolves zero-configuration database mapping inside native system APPDATA"""
     if os.name == "nt" or "PRODUCTION_DESKTOP_MODE" in os.environ:

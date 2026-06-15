@@ -6,21 +6,28 @@ import pytest
 from reaper.engine.copilot.engine import KnapsackCopilotEngine
 from reaper.engine.copilot.schemas import ItemizedComponent, OptimizationBlueprintSchema
 
+pytestmark = pytest.mark.usefixtures("mock_gemini_env")
+
 
 @pytest.fixture
 def mock_gemini_env():
-    with patch.dict(os.environ, {"GEMINI_API_KEY": "fake-api-key"}):
+    with patch.dict(os.environ, {"GEMINI_API_KEY": "fake-api-key"}), \
+         patch("reaper.engine.models.resources.SessionLocal") as mock_session:
+        mock_db = MagicMock()
+        # Mock query chain: query().filter().filter().first() -> None
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
+        mock_session.return_value = mock_db
         yield
 
 
-def test_copilot_engine_initialization(mock_gemini_env):
+def test_copilot_engine_initialization():
     engine = KnapsackCopilotEngine()
     assert engine.calculator is not None
     assert engine._cache_lock is not None
     assert engine._cache == {}
 
 
-def test_calculate_component_cost(mock_gemini_env):
+def test_calculate_component_cost():
     engine = KnapsackCopilotEngine()
 
     # 1. Test fallback rate calculation for azure compute
@@ -39,7 +46,7 @@ def test_calculate_component_cost(mock_gemini_env):
     assert abs(cost_storage - 17.67) < 0.01
 
 
-def test_downgrade_sku(mock_gemini_env):
+def test_downgrade_sku():
     engine = KnapsackCopilotEngine()
 
     # Test valid Azure compute downgrades
@@ -56,7 +63,7 @@ def test_downgrade_sku(mock_gemini_env):
     assert engine._downgrade_sku("azure", "compute", "unknown_sku") is None
 
 
-def test_get_pricing_context_sheet(mock_gemini_env):
+def test_get_pricing_context_sheet():
     engine = KnapsackCopilotEngine()
     sheet = engine._get_pricing_context_sheet("azure")
 
@@ -65,7 +72,7 @@ def test_get_pricing_context_sheet(mock_gemini_env):
     assert "premium_ssd_p6_64gb" in sheet
 
 
-def test_cache_deep_copy_and_eviction(mock_gemini_env):
+def test_cache_deep_copy_and_eviction():
     engine = KnapsackCopilotEngine()
 
     # Pre-populate cache with a mock schema
@@ -115,7 +122,7 @@ def test_cache_deep_copy_and_eviction(mock_gemini_env):
 
 
 @patch("google.genai.Client")
-def test_scale_down_correction_loop(mock_client_cls, mock_gemini_env):
+def test_scale_down_correction_loop(_mock_client_cls):
     engine = KnapsackCopilotEngine()
 
     # Setup mock response containing resources that BREACH the budget boundary

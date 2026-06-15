@@ -12,8 +12,10 @@ logger = logging.getLogger(__name__)
 class CostCalculator:
     def __init__(self, price_book_path=None):
         if price_book_path is None:
-            # Path relative to the current file
-            price_book_path = Path(__file__).resolve().parent / "price_book.yaml"
+            # Path relative to the current file (either in core/ or engine/)
+            p1 = Path(__file__).resolve().parent / "price_book.yaml"
+            p2 = Path(__file__).resolve().parent.parent / "price_book.yaml"
+            price_book_path = p1 if p1.exists() else p2
         self.price_book_path = Path(price_book_path)
         try:
             with self.price_book_path.open() as f:
