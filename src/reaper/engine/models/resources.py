@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 from dotenv import load_dotenv
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     DateTime,
@@ -12,7 +13,6 @@ from sqlalchemy import (
     Numeric,
     String,
     create_engine,
-    JSON
 )
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
