@@ -5,7 +5,7 @@ import numpy as np
 from gymnasium import spaces
 from stable_baselines3 import PPO
 
-from reaper.engine.workload import PredictiveScalingEngine
+from reaper.engine.core.workload import PredictiveScalingEngine
 
 # Constants
 DEFAULT_NODE_COUNT = 5

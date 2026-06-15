@@ -7,9 +7,9 @@ from sklearn.linear_model import LinearRegression
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.seasonal import seasonal_decompose
 
-from reaper.engine.calculator import RightsizingAgent
-from reaper.engine.notifier import send_discord_alert
-from reaper.engine.workload import WorkloadPersonality
+from reaper.engine.core.calculator import RightsizingAgent
+from reaper.engine.notifications.notifier import send_discord_alert
+from reaper.engine.core.workload import WorkloadPersonality
 
 
 class ZombieScorer:

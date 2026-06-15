@@ -1,5 +1,5 @@
-from reaper.collectors.aws_prices import AWSPriceClient
-from reaper.collectors.gcp_prices import GCPPriceClient
+from reaper.collectors.prices.aws import AWSPriceClient
+from reaper.collectors.prices.gcp import GCPPriceClient
 
 
 def test_aws_price_client_init():

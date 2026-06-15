@@ -1,5 +1,5 @@
 # src/reaper/engine/metrics_analyzer.py
-from reaper.collectors.prometheus_finops import PrometheusFinOpsCollector
+from reaper.collectors.telemetry.prometheus_finops import PrometheusFinOpsCollector
 
 
 class FinOpsTelemetryAnalyzer:

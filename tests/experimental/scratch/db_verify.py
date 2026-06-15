@@ -7,7 +7,7 @@ from sqlalchemy import inspect
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent / "src"))
 
 try:
-    from reaper.engine.models import BusinessMetric, SessionLocal, engine, init_db
+    from reaper.engine.models.resources import BusinessMetric, SessionLocal, engine, init_db
 except ImportError:
     print("Error: Could not import reaper modules. Check PYTHONPATH.")
     sys.exit(1)

@@ -1,28 +1,35 @@
 package collectors
 
 import (
+	"cloud-reaper/engine-go/internal/models"
 	"fmt"
 	"strings"
-
-	"cloud-reaper/engine-go/models"
 )
 
 const (
+	KeyReaperIgnore = "reaper-ignore"
+	ValueTrue       = "true"
+	KeyEnvironment  = "environment"
+	ValueProduction = "production"
+	Unknown         = "unknown"
+
 	ProviderAzure = "azure"
 	ProviderAWS   = "aws"
 	ProviderGCP   = "gcp"
 	ProviderK8s   = "k8s"
 )
 
-// CloudProvider is the contract every cloud scraper must implement so main.go
-// can call ScanResources() without cloud-specific SDK knowledge.
+// CloudProvider is the contract every cloud scraper must implement.
+// It allows the engine to use a standardized interface across Azure, AWS,
+// GCP, and Kubernetes.
 type CloudProvider interface {
 	Authenticate(creds map[string]string) error
 	ScanResources() ([]models.Resource, error)
 	GetHourlyRate(sku string) (float64, error)
 }
 
-// NewProvider returns a CloudProvider implementation for the given provider type.
+// NewProvider returns a CloudProvider implementation for the requested
+// cloud provider type.
 func NewProvider(providerType string) (CloudProvider, error) {
 	switch strings.ToLower(strings.TrimSpace(providerType)) {
 	case ProviderAzure:

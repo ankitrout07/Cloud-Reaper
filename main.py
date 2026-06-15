@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from reaper.cli import run_reaper
-from reaper.engine.metrics_cli import display_finops_performance_metrics
+from reaper.engine.telemetry.metrics_cli import display_finops_performance_metrics
 
 
 def main():

@@ -2,9 +2,9 @@ import os
 
 from dotenv import load_dotenv
 
-from reaper.collectors.azure_collector import AzureCollector
-from reaper.engine.calculator import CostCalculator
-from reaper.engine.logic import ZombieScorer
+from reaper.collectors.providers.azure_collector import AzureCollector
+from reaper.engine.core.calculator import CostCalculator
+from reaper.engine.core.logic import ZombieScorer
 from reaper.services.pusher import DataPusher
 
 # Constants

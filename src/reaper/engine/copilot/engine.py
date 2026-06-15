@@ -9,8 +9,8 @@ from google import genai
 from google.genai import types
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from reaper.engine.calculator import CostCalculator
-from reaper.engine.copilot_schemas import OptimizationBlueprintSchema
+from reaper.engine.core.calculator import CostCalculator
+from reaper.engine.copilot.schemas import OptimizationBlueprintSchema
 
 # Suppress EOL warnings from google-auth if any
 warnings.filterwarnings("ignore", category=FutureWarning, module="google.auth")
@@ -87,7 +87,7 @@ class KnapsackCopilotEngine:
 
         # 1. DB Query Block using RegionPriceCache
         try:
-            from reaper.engine.models import RegionPriceCache, SessionLocal
+            from reaper.engine.models.resources import RegionPriceCache, SessionLocal
 
             db = SessionLocal()
             db_record = (
@@ -273,7 +273,7 @@ class KnapsackCopilotEngine:
 
         db_prices = {}
         try:
-            from reaper.engine.models import RegionPriceCache, SessionLocal
+            from reaper.engine.models.resources import RegionPriceCache, SessionLocal
 
             db = SessionLocal()
             for sku in known_skus:

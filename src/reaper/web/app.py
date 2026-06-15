@@ -46,16 +46,16 @@ except Exception as e:
     HTML = None
     print(f"[*] WeasyPrint could not be loaded: {e}")
 
-from reaper.collectors.auth_check import check_azure_status
-from reaper.collectors.aws_prices import AWSPriceClient
-from reaper.collectors.azure_collector import AzureCollector
-from reaper.collectors.config_manager import save_config
-from reaper.collectors.gcp_prices import GCPPriceClient
-from reaper.engine.architect import AIArchitectManager, resolve_component_costs
-from reaper.engine.calculator import CostCalculator, SpotEvictionPredictor
-from reaper.engine.economics import RegionalArbitrage
-from reaper.engine.logic import RightSizer
-from reaper.engine.models import (
+from reaper.collectors.utils.auth_check import check_azure_status
+from reaper.collectors.prices.aws import AWSPriceClient
+from reaper.collectors.providers.azure_collector import AzureCollector
+from reaper.collectors.utils.config_manager import save_config
+from reaper.collectors.prices.gcp import GCPPriceClient
+from reaper.engine.core.architect import AIArchitectManager, resolve_component_costs
+from reaper.engine.core.calculator import CostCalculator, SpotEvictionPredictor
+from reaper.engine.core.economics import RegionalArbitrage
+from reaper.engine.core.logic import RightSizer
+from reaper.engine.models.resources import (
     ActionLog,
     BusinessMetric,
     CloudConnection,
@@ -1369,7 +1369,7 @@ def anomalies_triage():
         if not service:
             return jsonify({"status": "error", "message": "Missing service name"}), 400
 
-        from reaper.engine.copilot_engine import AnomalyTriager
+        from reaper.engine.copilot.engine import AnomalyTriager
 
         triager = AnomalyTriager()
         playbook = triager.generate_triage_playbook(service, cost, deviation)
@@ -1662,7 +1662,7 @@ def spot_prediction():
 @app.route("/api/finops/k8s/bin-packing")
 def k8s_bin_packing():
     try:
-        from reaper.engine.workload import KubernetesOptimizer
+        from reaper.engine.core.workload import KubernetesOptimizer
 
         optimizer = KubernetesOptimizer()
         return jsonify({"status": "success", "bin_packing": optimizer.get_bin_packing_assessment()})
@@ -1673,7 +1673,7 @@ def k8s_bin_packing():
 @app.route("/api/finops/k8s/hibernation")
 def k8s_hibernation():
     try:
-        from reaper.engine.workload import KubernetesOptimizer
+        from reaper.engine.core.workload import KubernetesOptimizer
 
         optimizer = KubernetesOptimizer()
         return jsonify({"status": "success", "hibernation": optimizer.get_hibernation_status()})

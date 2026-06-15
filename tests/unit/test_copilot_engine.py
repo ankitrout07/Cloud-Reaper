@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from reaper.engine.copilot_engine import KnapsackCopilotEngine
-from reaper.engine.copilot_schemas import ItemizedComponent, OptimizationBlueprintSchema
+from reaper.engine.copilot.engine import KnapsackCopilotEngine
+from reaper.engine.copilot.schemas import ItemizedComponent, OptimizationBlueprintSchema
 
 
 @pytest.fixture

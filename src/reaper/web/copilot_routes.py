@@ -3,7 +3,7 @@ from functools import lru_cache
 
 from flask import Blueprint, jsonify, request
 
-from reaper.engine.copilot_engine import KnapsackCopilotEngine
+from reaper.engine.copilot.engine import KnapsackCopilotEngine
 
 copilot_api = Blueprint("copilot_api", __name__)
 

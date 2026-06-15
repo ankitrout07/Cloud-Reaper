@@ -1,11 +1,11 @@
-package main
+package arbitrage
 
 import (
 	"encoding/json"
 	"fmt"
 	"sync"
 
-	"cloud-reaper/engine-go/collectors"
+	"cloud-reaper/engine-go/internal/collectors"
 )
 
 type ArbitrageResult struct {

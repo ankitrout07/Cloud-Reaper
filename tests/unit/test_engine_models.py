@@ -1,7 +1,7 @@
 import datetime
 
-from reaper.collectors.config_manager import normalize_resource
-from reaper.engine.models import (
+from reaper.collectors.utils.config_manager import normalize_resource
+from reaper.engine.models.resources import (
     Budget,
     BudgetAlert,
     CloudCommitment,

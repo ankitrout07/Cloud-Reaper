@@ -2,8 +2,8 @@ import json
 import subprocess
 from pathlib import Path
 
-from reaper.collectors.azure_collector import AzureCollector
-from reaper.engine.schema import validate_scan_result
+from reaper.collectors.providers.azure_collector import AzureCollector
+from reaper.engine.core.schema import validate_scan_result
 
 
 def test_verify_wiring():

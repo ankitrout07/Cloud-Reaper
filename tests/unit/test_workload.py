@@ -1,4 +1,4 @@
-from reaper.engine.workload import PredictiveScalingEngine, SpotAdvisor, WorkloadPersonality
+from reaper.engine.core.workload import PredictiveScalingEngine, SpotAdvisor, WorkloadPersonality
 
 
 def test_workload_personality_stable():

@@ -1,9 +1,9 @@
 # src/reaper/web/metrics_routes.py
 from flask import Blueprint, jsonify, request
 
-from reaper.engine.metrics_analyzer import FinOpsTelemetryAnalyzer
-from reaper.engine.models import Resource, SessionLocal
-from reaper.engine.notifier import send_discord_alert, send_slack_alert
+from reaper.engine.telemetry.metrics_analyzer import FinOpsTelemetryAnalyzer
+from reaper.engine.models.resources import Resource, SessionLocal
+from reaper.engine.notifications.notifier import send_discord_alert, send_slack_alert
 
 telemetry_bp = Blueprint("telemetry_api", __name__)
 # Points to internal standard Prometheus routing endpoints

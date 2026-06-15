@@ -2,8 +2,8 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from reaper.collectors.prometheus_finops import PrometheusFinOpsCollector
-from reaper.engine.metrics_analyzer import FinOpsTelemetryAnalyzer
+from reaper.collectors.telemetry.prometheus_finops import PrometheusFinOpsCollector
+from reaper.engine.telemetry.metrics_analyzer import FinOpsTelemetryAnalyzer
 
 
 class TestPrometheusTelemetry(unittest.TestCase):
@@ -31,7 +31,7 @@ class TestPrometheusTelemetry(unittest.TestCase):
         self.assertEqual(cpu_metrics.get("10.0.1.5"), 50.2)
 
     @patch(
-        "reaper.collectors.prometheus_finops.PrometheusFinOpsCollector.fetch_node_avg_cpu_utilization"
+        "reaper.collectors.telemetry.prometheus_finops.PrometheusFinOpsCollector.fetch_node_avg_cpu_utilization"
     )
     def test_analyze_compute_waste_index(self, mock_fetch):
         # Mock collector metric output

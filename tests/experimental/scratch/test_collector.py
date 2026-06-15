@@ -1,6 +1,6 @@
 import os
 
-from reaper.collectors.azure_collector import AzureCollector
+from reaper.collectors.providers.azure_collector import AzureCollector
 
 
 def test_azure_collector_init():

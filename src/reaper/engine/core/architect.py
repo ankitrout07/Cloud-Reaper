@@ -297,7 +297,7 @@ class AIArchitectManager:
 def _resolve_azure_price(sku: str, mapped_region: str, region: str) -> float | None:
     """Helper to query live Azure pricing API with database caching."""
     try:
-        from reaper.collectors.azure_prices import AzurePriceClient
+        from reaper.collectors.prices.azure import AzurePriceClient
 
         client = AzurePriceClient()
         clean_sku = sku
@@ -319,7 +319,7 @@ def _resolve_azure_price(sku: str, mapped_region: str, region: str) -> float | N
 
             # Cache in DB
             try:
-                from reaper.engine.models import RegionPriceCache, SessionLocal
+                from reaper.engine.models.resources import RegionPriceCache, SessionLocal
 
                 db = SessionLocal()
                 db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
@@ -345,7 +345,7 @@ def _resolve_aws_price(sku: str, mapped_region: str, region: str) -> float | Non
     try:
         aws_prices = PRICES_CACHE["aws"]
         if aws_prices is None:
-            from reaper.collectors.aws_prices import AWSPriceClient
+            from reaper.collectors.prices.aws import AWSPriceClient
 
             aws_client = AWSPriceClient()
             aws_prices = aws_client.get_live_prices()
@@ -367,7 +367,7 @@ def _resolve_aws_price(sku: str, mapped_region: str, region: str) -> float | Non
 
             # Cache in DB
             try:
-                from reaper.engine.models import RegionPriceCache, SessionLocal
+                from reaper.engine.models.resources import RegionPriceCache, SessionLocal
 
                 db = SessionLocal()
                 db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
@@ -393,7 +393,7 @@ def _resolve_gcp_price(sku: str, mapped_region: str, region: str) -> float | Non
     try:
         gcp_prices = PRICES_CACHE["gcp"]
         if gcp_prices is None:
-            from reaper.collectors.gcp_prices import GCPPriceClient
+            from reaper.collectors.prices.gcp import GCPPriceClient
 
             gcp_client = GCPPriceClient()
             gcp_prices = gcp_client.get_live_prices()
@@ -415,7 +415,7 @@ def _resolve_gcp_price(sku: str, mapped_region: str, region: str) -> float | Non
 
             # Cache in DB
             try:
-                from reaper.engine.models import RegionPriceCache, SessionLocal
+                from reaper.engine.models.resources import RegionPriceCache, SessionLocal
 
                 db = SessionLocal()
                 db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
@@ -623,7 +623,7 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
 
         # --- DATABASE QUERY BLOCK ---
         try:
-            from reaper.engine.models import RegionPriceCache, SessionLocal
+            from reaper.engine.models.resources import RegionPriceCache, SessionLocal
 
             db = SessionLocal()
             db_record = (

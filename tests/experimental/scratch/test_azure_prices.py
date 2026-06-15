@@ -1,4 +1,4 @@
-from reaper.collectors.azure_prices import AzurePriceClient
+from reaper.collectors.prices.azure import AzurePriceClient
 
 
 def test_azure_price_client_init():

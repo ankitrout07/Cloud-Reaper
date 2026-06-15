@@ -37,7 +37,7 @@ def test_update_integrations_settings(client):
 
 
 def test_test_webhook_endpoint_discord_success(client):
-    with patch("reaper.engine.notifier.requests.post") as mock_post:
+    with patch("reaper.engine.notifications.notifier.requests.post") as mock_post:
         mock_post.return_value.status_code = 204
 
         payload = {"platform": "discord", "webhook_url": "https://discord.com/api/webhooks/test"}
@@ -52,7 +52,7 @@ def test_test_webhook_endpoint_discord_success(client):
 
 
 def test_test_webhook_endpoint_slack_success(client):
-    with patch("reaper.engine.notifier.requests.post") as mock_post:
+    with patch("reaper.engine.notifications.notifier.requests.post") as mock_post:
         mock_post.return_value.status_code = 200
 
         payload = {"platform": "slack", "webhook_url": "https://hooks.slack.com/services/test"}
