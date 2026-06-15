@@ -32,19 +32,21 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # ANSI colour palette (Ubuntu terminal safe)
 # ---------------------------------------------------------------------------
-RESET  = "\033[0m"
-BOLD   = "\033[1m"
-CYAN   = "\033[36m"
-GREEN  = "\033[32m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
+CYAN = "\033[36m"
+GREEN = "\033[32m"
 YELLOW = "\033[33m"
-RED    = "\033[31m"
-DIM    = "\033[2m"
+RED = "\033[31m"
+DIM = "\033[2m"
+
 
 def c(text: str, colour: str) -> str:
     """Wrap *text* in an ANSI colour code (no-op on Windows without ANSI support)."""
     if platform.system() == "Windows":
         return text
     return f"{colour}{text}{RESET}"
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -61,6 +63,7 @@ REPO_ROOT = Path(__file__).resolve().parent
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _venv_bin_dir(venv_dir: Path) -> Path:
     """``venv/bin`` on Unix, ``venv\\Scripts`` on Windows."""
@@ -115,6 +118,7 @@ def run_cmd(
 # Banner
 # ---------------------------------------------------------------------------
 
+
 def print_banner() -> None:
     width = 62
     print()
@@ -128,6 +132,7 @@ def print_banner() -> None:
 # Command implementations
 # ---------------------------------------------------------------------------
 
+
 def cmd_check(args: argparse.Namespace) -> int:  # noqa: ARG001
     """Verify all system prerequisites and print a status table."""
     print(c("\n[1/1] System prerequisite check", BOLD))
@@ -135,10 +140,10 @@ def cmd_check(args: argparse.Namespace) -> int:  # noqa: ARG001
     ok = True
     checks = {
         "python3": ("Python 3.12+", True),
-        "go":      ("Go 1.24+",     True),
-        "docker":  ("Docker",        False),
-        "az":      ("Azure CLI",     False),
-        "git":     ("Git",           False),
+        "go": ("Go 1.24+", True),
+        "docker": ("Docker", False),
+        "az": ("Azure CLI", False),
+        "git": ("Git", False),
     }
 
     if platform.system() == "Linux":
@@ -167,7 +172,9 @@ def cmd_check(args: argparse.Namespace) -> int:  # noqa: ARG001
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             busy = s.connect_ex(("127.0.0.1", int(port))) == 0
         port_colour = RED if busy else GREEN
-        port_label  = f"port {port} BUSY — change FLASK_PORT in .env" if busy else f"port {port} free"
+        port_label = (
+            f"port {port} BUSY — change FLASK_PORT in .env" if busy else f"port {port} free"
+        )
         print(f"  {c('ℹ', CYAN)}  {'Dashboard port':<18} {c(port_label, port_colour)}")
     except ValueError:
         pass
@@ -178,7 +185,9 @@ def cmd_check(args: argparse.Namespace) -> int:  # noqa: ARG001
 
     print(c("\n[✗] One or more required tools are missing. Install them and retry.\n", RED))
     print("    Ubuntu quick-install hints:")
-    print("      sudo apt-get update && sudo apt-get install -y golang-go docker.io pkg-config libwebkit2gtk-4.0-dev libgtk-3-dev")
+    print(
+        "      sudo apt-get update && sudo apt-get install -y golang-go docker.io pkg-config libwebkit2gtk-4.0-dev libgtk-3-dev"
+    )
     print("      curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash")
     return 1
 
@@ -188,7 +197,7 @@ def cmd_install(args: argparse.Namespace) -> int:
     print(c("\n[install] Setting up Python virtual environment\n", BOLD))
 
     venv_dir = REPO_ROOT / "venv"
-    bindir   = _venv_bin_dir(venv_dir)
+    bindir = _venv_bin_dir(venv_dir)
     pip_path = bindir / "pip"
 
     # --- Create venv ---
@@ -246,8 +255,8 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
         print("    # or follow https://golang.org/dl/")
         return 1
 
-    engine_dir  = REPO_ROOT / "src" / "engine-go"
-    bin_dir     = REPO_ROOT / "bin"
+    engine_dir = REPO_ROOT / "src" / "engine-go"
+    bin_dir = REPO_ROOT / "bin"
     bin_dir.mkdir(exist_ok=True)
     binary_name = "reaper-engine.exe" if platform.system() == "Windows" else "reaper-engine"
     output_path = (bin_dir / binary_name).resolve()
@@ -268,7 +277,7 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
     return 0
 
 
-def cmd_clean(args: argparse.Namespace) -> int:  # noqa: ARG001
+def cmd_clean(args: argparse.Namespace) -> int:
     """Remove build artefacts, caches, and optionally the venv."""
     print(c("\n[clean] Removing build artefacts\n", BOLD))
 
@@ -299,7 +308,7 @@ def cmd_clean(args: argparse.Namespace) -> int:  # noqa: ARG001
     return 0
 
 
-def cmd_scan(args: argparse.Namespace) -> int:  # noqa: ARG001
+def cmd_scan(args: argparse.Namespace) -> int:
     """Run the Azure FinOps CLI scan inside the venv."""
     print(c("\n[scan] Launching Azure FinOps scan\n", BOLD))
     venv_dir, py_exe = _require_venv()
@@ -360,9 +369,9 @@ def cmd_web(args: argparse.Namespace) -> int:
         return 1
 
     port = getattr(args, "port", None) or _read_port_from_env()
-    env  = merge_venv_into_environ(venv_dir)
-    env["PYTHONPATH"]  = str((REPO_ROOT / "src").resolve())
-    env["FLASK_PORT"]  = str(port)
+    env = merge_venv_into_environ(venv_dir)
+    env["PYTHONPATH"] = str((REPO_ROOT / "src").resolve())
+    env["FLASK_PORT"] = str(port)
 
     _print_success_report(str(port))
 
@@ -424,7 +433,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         install_future = executor.submit(cmd_install, args)
-        build_future   = executor.submit(cmd_build,   args)
+        build_future = executor.submit(cmd_build, args)
 
         if install_future.result() != 0:
             print(c("[!] Install step failed.", RED))
@@ -450,9 +459,10 @@ def cmd_run(args: argparse.Namespace) -> int:
 # Private helpers
 # ---------------------------------------------------------------------------
 
+
 def _require_venv() -> tuple[Path, str | None]:
     """Return (venv_dir, python_exe_str).  If venv is missing, print hint and return None."""
-    venv_dir   = REPO_ROOT / "venv"
+    venv_dir = REPO_ROOT / "venv"
     python_exe = str(_venv_bin_dir(venv_dir) / "python")
 
     if not venv_dir.exists() or not Path(python_exe).is_file():
@@ -477,7 +487,7 @@ def _read_port_from_env() -> str:
 
 def _setup_env_file() -> None:
     """Create a default .env if one doesn't exist; patch missing keys."""
-    env_file     = REPO_ROOT / ".env"
+    env_file = REPO_ROOT / ".env"
     default_port = "5001"
 
     if not env_file.exists():
@@ -508,7 +518,7 @@ def _setup_env_file() -> None:
     additions: list[str] = []
     for key, default in [
         ("GEMINI_API_KEY", "your_actual_gemini_api_key_here"),
-        ("FLASK_HOST",     "127.0.0.1"),
+        ("FLASK_HOST", "127.0.0.1"),
     ]:
         if f"{key}=" not in content:
             additions.append(f"{key}={default}")
@@ -553,6 +563,7 @@ def _print_success_report(port: str) -> None:
 # CLI definition
 # ---------------------------------------------------------------------------
 
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="bootstrap.py",
@@ -580,13 +591,17 @@ examples:
 
     # ---- run (default) ----
     p_run = sub.add_parser("run", help="Full boot sequence: install + build + web (default)")
-    p_run.add_argument("--port", type=int, help="Override dashboard port (default: FLASK_PORT in .env or 5001)")
+    p_run.add_argument(
+        "--port", type=int, help="Override dashboard port (default: FLASK_PORT in .env or 5001)"
+    )
     p_run.add_argument("--no-dev", dest="no_dev", action="store_true", help="Skip dev dependencies")
     p_run.set_defaults(func=cmd_run)
 
     # ---- install ----
     p_install = sub.add_parser("install", help="Create venv & install Python dependencies")
-    p_install.add_argument("--no-dev", dest="no_dev", action="store_true", help="Skip requirements-dev.txt")
+    p_install.add_argument(
+        "--no-dev", dest="no_dev", action="store_true", help="Skip requirements-dev.txt"
+    )
     p_install.set_defaults(func=cmd_install)
 
     # ---- build ----
@@ -594,15 +609,25 @@ examples:
     p_build.set_defaults(func=cmd_build)
 
     # ---- check ----
-    p_check = sub.add_parser("check", help="Verify system prerequisites (Go, Docker, Azure CLI, port …)")
+    p_check = sub.add_parser(
+        "check", help="Verify system prerequisites (Go, Docker, Azure CLI, port …)"
+    )
     p_check.set_defaults(func=cmd_check)
 
     # ---- scan ----
     p_scan = sub.add_parser("scan", help="Run the Azure FinOps CLI scan")
-    p_scan.add_argument("--pr-simulation", dest="pr_simulation", action="store_true",
-                        help="Run PR cost-delta simulation instead")
-    p_scan.add_argument("--metrics", dest="metrics_flag", action="store_true",
-                        help="Show live FinOps performance metrics instead")
+    p_scan.add_argument(
+        "--pr-simulation",
+        dest="pr_simulation",
+        action="store_true",
+        help="Run PR cost-delta simulation instead",
+    )
+    p_scan.add_argument(
+        "--metrics",
+        dest="metrics_flag",
+        action="store_true",
+        help="Show live FinOps performance metrics instead",
+    )
     p_scan.set_defaults(func=cmd_scan)
 
     # ---- metrics ----
@@ -631,17 +656,18 @@ examples:
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     os.chdir(REPO_ROOT)
     parser = build_parser()
-    args   = parser.parse_args()
+    args = parser.parse_args()
 
     if args.command is None:
         # No subcommand → full boot (same as `run`)
-        args.command  = "run"
-        args.port     = None
-        args.no_dev   = False
-        args.func     = cmd_run
+        args.command = "run"
+        args.port = None
+        args.no_dev = False
+        args.func = cmd_run
 
     exit_code = args.func(args)
     sys.exit(exit_code)
