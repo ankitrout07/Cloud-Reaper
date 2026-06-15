@@ -1,27 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <link rel="icon" href="/static/assets/favicon.png" type="image/png">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Reaper | Real-Time Monitor</title>
-    <link rel="stylesheet" href="/static/css/main.css">
-    <link rel="stylesheet" href="/static/css/professional-dark.css">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/static/js/theme.js"></script>
-    <script src="/static/js/setup.js"></script>
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-    </style>
-</head>
-<body class="min-h-screen flex">
-    <!-- Sidebar -->
-    {% include "_sidebar.html" %}
-
-    <!-- Main Content -->
-    <main class="app-main flex-1 p-8 lg:p-12">
+{% extends "layouts/_base.html" if not request.headers.get("HX-Request") else "layouts/_empty.html" %}
+{% block content %}
+<main class="app-main flex-1 p-8 lg:p-12">
         <div class="max-w-6xl mx-auto">
             <header class="mb-12">
                 <h1 class="text-4xl font-black tracking-tighter glow-text-cyan uppercase">Real-Time <span class="text-cyan-400">Monitoring</span></h1>
@@ -93,30 +72,4 @@
             </div>
         </div>
     </main>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
-    <script>
-        window.__reaperSocket = window.__reaperSocket || io();
-
-        const distCtx = document.getElementById('distributionChart').getContext('2d');
-        new Chart(distCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['VMs', 'Storage', 'Net', 'SQL'],
-                datasets: [{
-                    data: [45, 25, 15, 15],
-                    backgroundColor: ['#5b8def', '#4a6fa8', '#6b7f9e', '#3d4550'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                cutout: '70%'
-            }
-        });
-    </script>
-</body>
-</html>
+{% endblock %}

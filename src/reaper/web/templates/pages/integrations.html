@@ -1,0 +1,138 @@
+{% extends "layouts/_base.html" if not request.headers.get("HX-Request") else "layouts/_empty.html" %}
+{% block content %}
+<main class="app-main flex-1 p-8 lg:p-12 overflow-y-auto">
+        <div class="max-w-5xl mx-auto">
+            <header class="mb-10">
+                <h1 class="text-4xl font-black tracking-tighter glow-text-cyan uppercase">Integrations <span class="text-cyan-400">Hub</span></h1>
+                <p class="text-gray-500 font-bold uppercase tracking-widest text-[10px] mt-2">Connect Kubernetes, Prometheus, Grafana and Telemetry Feeds</p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Left Column: Settings and Connections -->
+                <div class="md:col-span-2 space-y-6">
+                    <!-- Dynamic File Ingestion -->
+                    <div class="glass-morph p-6" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(0, 243, 255, 0.1);">
+                        <h4 style="color: #00f3ff; margin-top: 0; margin-bottom: 10px;" class="text-lg font-black uppercase">
+                            <i class="fas fa-file-import mr-2"></i> Ad-Hoc JSON Telemetry Ingestion
+                        </h4>
+                        <p class="text-gray-400 mb-4" style="font-size: 13px;">
+                            Drag and drop an exported Prometheus or Grafana JSON data file here to generate instantaneous cost-reduction statistics.
+                        </p>
+
+                        <div id="drop-zone" style="border: 2px dashed rgba(0, 243, 255, 0.3); border-radius: 6px; padding: 40px; text-align: center; background: rgba(0, 0, 0, 0.2); cursor: pointer; transition: all 0.3s ease;">
+                            <i class="fas fa-cloud-arrow-up" style="font-size: 32px; color: rgba(0, 243, 255, 0.6); margin-bottom: 10px;"></i>
+                            <p id="drop-zone-text" style="color: #aaa; font-size: 13px; margin: 0;">
+                                Drag & Drop metrics.json here or <span style="color: #00f3ff; text-decoration: underline;">browse local files</span>
+                            </p>
+                            <input type="file" id="file-input" accept=".json" style="display: none;">
+                        </div>
+
+                        <!-- parsed stats panel -->
+                        <div id="upload-stats-panel" style="display: none; margin-top: 20px; padding-top: 15px; border-top: 1px solid #333;">
+                            <h5 style="color: #fff; margin-top: 0; font-size: 14px;" class="font-bold uppercase tracking-wider text-cyan-400 mb-4">Parsed Ingestion Metrics Summary</h5>
+                            <div style="display: flex; gap: 15px;">
+                                <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; flex: 1; text-align: center; border: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="display: block; font-size: 11px; color: #888; font-weight: 700; text-transform: uppercase;">Detected Targets</span>
+                                    <strong id="stat-targets" style="color: #00f3ff; font-size: 22px;">0</strong>
+                                </div>
+                                <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; flex: 1; text-align: center; border: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="display: block; font-size: 11px; color: #888; font-weight: 700; text-transform: uppercase;">Avg CPU Load</span>
+                                    <strong id="stat-cpu" style="color: #ffae00; font-size: 22px;">0%</strong>
+                                </div>
+                                <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; flex: 1; text-align: center; border: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="display: block; font-size: 11px; color: #888; font-weight: 700; text-transform: uppercase;">Est. Waste Index</span>
+                                    <strong id="stat-waste" style="color: #ff5f5f; font-size: 22px;">0%</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Telemetry insights from active database -->
+                    <div class="glass-morph p-6">
+                        <div class="flex justify-between items-center mb-6">
+                            <h4 class="text-white font-black text-sm uppercase tracking-wider">
+                                <i class="fas fa-server mr-2 text-cyan-400"></i> Active Telemetry Cost Insights
+                            </h4>
+                            <button onclick="fetchTelemetryInsights()" class="px-4 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-black text-xs font-black uppercase rounded-lg transition">
+                                <i class="fas fa-sync-alt mr-1"></i> Sync Telemetry
+                            </button>
+                        </div>
+                        <div id="telemetry-insights-list" class="space-y-4">
+                            <p class="text-xs text-gray-500">Click Sync Telemetry to cross-reference Prometheus metric streams with pricing cache.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Static Connections Setup -->
+                <div class="space-y-6">
+                    <div class="glass-morph p-6 space-y-4">
+                        <h4 class="text-white font-black text-sm uppercase tracking-wider pb-2 border-b border-white/5">
+                            <i class="fas fa-network-wired mr-2 text-green-400"></i> Static Connections
+                        </h4>
+                        <div class="integration-card">
+                            <h5 class="text-xs font-black uppercase tracking-wider text-green-300"><i class="fas fa-bell mr-1"></i> Alert Notifications</h5>
+                            <p class="text-xs text-gray-400 mt-2">Manage your cost, report, and dashboard notifications across platforms.</p>
+                            <div class="flex gap-3 mt-4">
+                                <!-- Discord Trigger Button -->
+                                <button id="btn-discord-webhook" onclick="openWebhookModal('discord')" class="flex-1 bg-black/40 hover:bg-black/60 p-3 rounded-xl flex flex-col items-center justify-center border border-white/5 hover:border-[#5865F2]/40 transition group relative overflow-hidden">
+                                    <div class="flex items-center justify-center mb-1">
+                                        <i class="fab fa-discord text-[#5865F2] text-lg mr-2 group-hover:scale-110 transition duration-300"></i>
+                                        <span class="text-[10px] font-black text-white uppercase tracking-wider">Discord</span>
+                                    </div>
+                                    {% if settings and settings.discord_webhook_url %}
+                                    <div class="flex items-center gap-1 mt-1">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80]"></span>
+                                        <span class="text-[8px] font-black text-green-400 uppercase tracking-widest">Active</span>
+                                    </div>
+                                    {% else %}
+                                    <div class="flex items-center gap-1 mt-1">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-600"></span>
+                                        <span class="text-[8px] font-black text-gray-500 uppercase tracking-widest">Inactive</span>
+                                    </div>
+                                    {% endif %}
+                                </button>
+
+                                <!-- Slack Trigger Button -->
+                                <button id="btn-slack-webhook" onclick="openWebhookModal('slack')" class="flex-1 bg-black/40 hover:bg-black/60 p-3 rounded-xl flex flex-col items-center justify-center border border-white/5 hover:border-[#E01E5A]/40 transition group relative overflow-hidden">
+                                    <div class="flex items-center justify-center mb-1">
+                                        <i class="fab fa-slack text-[#E01E5A] text-lg mr-2 group-hover:scale-110 transition duration-300"></i>
+                                        <span class="text-[10px] font-black text-white uppercase tracking-wider">Slack</span>
+                                    </div>
+                                    {% if settings and settings.slack_webhook_url %}
+                                    <div class="flex items-center gap-1 mt-1">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80]"></span>
+                                        <span class="text-[8px] font-black text-green-400 uppercase tracking-widest">Active</span>
+                                    </div>
+                                    {% else %}
+                                    <div class="flex items-center gap-1 mt-1">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-gray-600"></span>
+                                        <span class="text-[8px] font-black text-gray-500 uppercase tracking-widest">Inactive</span>
+                                    </div>
+                                    {% endif %}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="integration-card border-cyan-500/20">
+                            <div class="flex justify-between items-start gap-4">
+                                <div>
+                                    <h5 class="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                                        <i class="fas fa-dharmachakra text-cyan-400"></i> Kubernetes Agent
+                                    </h5>
+                                    <p class="text-xs text-gray-400 mt-2">Deploy the in-cluster FinOps agent to scrape node-level utilization and correlate pod waste with pricing cache.</p>
+                                    <a href="/docs#kubernetes" class="inline-flex items-center gap-1 mt-3 text-[10px] font-black uppercase text-cyan-400 hover:text-cyan-300 transition">
+                                        <i class="fas fa-book text-[9px]"></i> View Docs
+                                    </a>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer shrink-0" title="Toggle Kubernetes agent">
+                                    <input type="checkbox" class="sr-only peer" onchange="toggleK8sAgent(this)">
+                                    <div class="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:bg-cyan-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+{% endblock %}

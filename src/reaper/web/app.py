@@ -220,7 +220,7 @@ def index():
     az = AzureCollector()
     user_name = az.get_user_name()
     sub_name = az.get_subscription_name()
-    return render_template("index.html", user_name=user_name, sub_name=sub_name)
+    return render_template("pages/index.html", user_name=user_name, sub_name=sub_name)
 
 
 def _cloud_connections_summary() -> tuple[dict[str, dict[str, Any]], str]:
@@ -299,7 +299,7 @@ def settings():
     cloud_summary, active_provider = _cloud_connections_summary()
     vault_configured = _vault_settings_row() is not None
     return render_template(
-        "settings.html",
+        "pages/settings.html",
         cloud_connections=cloud_summary,
         active_provider=active_provider,
         vault_configured=vault_configured,
@@ -852,12 +852,12 @@ def list_subscriptions():
 
 @app.route("/pricing")
 def pricing():
-    return render_template("pricing.html")
+    return render_template("pages/pricing.html")
 
 
 @app.route("/finops")
 def finops():
-    return render_template("finops.html")
+    return render_template("pages/finops.html")
 
 
 @app.route("/financial")
@@ -885,7 +885,7 @@ def financial():
         db.close()
 
     return render_template(
-        "financial.html", active_tab=tab, settings=settings_state, db_metrics=db_metrics
+        "pages/financial.html", active_tab=tab, settings=settings_state, db_metrics=db_metrics
     )
 
 
@@ -917,7 +917,7 @@ def add_business_metric():
 @app.route("/build-with-ai", methods=["GET"])
 def build_with_ai():
     """Renders the AI Multi-Cloud Architect Estimator workspace dashboard."""
-    return render_template("build_with_ai.html")
+    return render_template("pages/build_with_ai.html")
 
 
 @app.route("/api/v1/architect/status", methods=["GET"])
@@ -958,7 +958,7 @@ def api_architect_estimate():
 
 @app.route("/about")
 def about():
-    return render_template("about.html")
+    return render_template("pages/about.html")
 
 
 @app.route("/docs")
@@ -974,17 +974,17 @@ def docs():
             with file_path.open(encoding="utf-8") as f:
                 content = f.read()
             docs_data.append({"filename": filename, "title": title, "content": content})
-    return render_template("docs.html", docs_data=docs_data)
+    return render_template("pages/docs.html", docs_data=docs_data)
 
 
 @app.route("/integrations")
 def integrations():
-    return render_template("integrations.html", settings=settings_state)
+    return render_template("pages/integrations.html", settings=settings_state)
 
 
 @app.route("/monitor")
 def monitor():
-    return render_template("monitor.html")
+    return render_template("pages/monitor.html")
 
 
 @app.route("/dashboard")
@@ -993,7 +993,7 @@ def dashboard():
     user_name = az.get_user_name()
     sub_name = az.get_subscription_name()
     return render_template(
-        "dashboard.html",
+        "pages/dashboard.html",
         user_name=user_name,
         sub_name=sub_name,
         metrics_emit_sec=SOCKET_METRICS_INTERVAL_SEC,
@@ -1284,7 +1284,7 @@ def export_bom():
 
         # Render the HTML template
         rendered_html = render_template(
-            "bom_pdf_template.html",
+            "components/bom_pdf_template.html",
             items=items,
             totalHourly=total_hourly,
             totalMonthly=total_monthly,

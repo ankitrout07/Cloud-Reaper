@@ -1,0 +1,318 @@
+{% extends "layouts/_base.html" if not request.headers.get("HX-Request") else "layouts/_empty.html" %}
+{% block content %}
+<main class="app-main flex-1 p-8 lg:p-12">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+            <div>
+                <h1 class="text-4xl font-bold tracking-tight text-white glow-text-primary">FINOPS <span class="text-cyan-400">INTELLIGENCE</span></h1>
+                <p class="text-slate-400 mt-2 text-lg">Bridging the gap between finance data and engineering action.</p>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="refreshAll()" class="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-semibold transition flex items-center gap-2">
+                    <svg id="refresh-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Sync All Intelligence
+                </button>
+            </div>
+        </div>
+
+        <!-- 1. INFORM PHASE -->
+        <section class="mb-16">
+            <div class="flex items-center gap-3 mb-8">
+                <span class="px-3 py-1 bg-cyan-400/20 text-cyan-400 text-xs font-bold rounded-full border border-cyan-400/30">PHASE 01</span>
+                <h2 class="text-2xl font-bold text-white uppercase tracking-wider">The "Inform" Phase <span class="text-slate-500 font-medium ml-2">(Visibility & Allocation)</span></h2>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Tag Health Score -->
+                <div class="glass-card p-8">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-white">Tag Health Score</h3>
+                            <p class="text-slate-400 text-sm mt-1">Multi-dimensional audit coverage</p>
+                        </div>
+                        <div id="tag-health-indicator" class="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg metric-value">--</div>
+                    </div>
+                    
+                    <div class="space-y-4" id="tag-missing-list">
+                        <!-- Missing tags will be injected here -->
+                    </div>
+
+                    <div class="mt-8 pt-6 border-t border-white/5">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Attribution Integrity</span>
+                            <span id="tag-integrity-pct" class="text-xs font-bold text-cyan-400">0%</span>
+                        </div>
+                        <div class="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                            <div id="tag-health-bar" class="bg-gradient-to-r from-cyan-400 to-blue-500 h-full transition-all duration-1000" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Anomaly Detection -->
+                <div class="glass-card p-8 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 blur-3xl pointer-events-none"></div>
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-white">Anomaly Detection</h3>
+                            <p class="text-slate-400 text-sm mt-1">7-day moving average spikes</p>
+                        </div>
+                        <div id="anomaly-alert-count" class="px-3 py-1 bg-rose-500/20 text-rose-500 border border-rose-500/30 rounded-full text-xs font-bold">0 ALERTS</div>
+                    </div>
+
+                    <div class="space-y-6" id="anomaly-list">
+                        <!-- Anomalies will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Zombie Radar (NEW) -->
+                <div class="glass-card p-8 bg-gradient-to-br from-[#1a0707] to-[#0d0d1a]">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-white uppercase tracking-tighter">Zombie Radar</h3>
+                            <p class="text-rose-500 text-[10px] font-black uppercase tracking-widest mt-1">Heuristic Scoring Active</p>
+                        </div>
+                        <div id="zombie-count-badge" class="w-10 h-10 rounded-full bg-rose-500/20 text-rose-500 flex items-center justify-center font-black animate-pulse">0</div>
+                    </div>
+                    <div class="space-y-4" id="zombie-radar-list">
+                        <p class="text-[10px] text-slate-500 italic">Scanning for dead resources...</p>
+                    </div>
+                </div>
+
+                <!-- Unit Economics -->
+                <div class="glass-card p-8">
+                    <h3 class="text-xl font-bold text-white mb-2">Unit Economics</h3>
+                    <p class="text-slate-400 text-sm mb-6">Efficiency per business metric</p>
+                    
+                    <div class="space-y-6" id="unit-economics-list">
+                        <!-- Metrics will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Burn-Rate Forecast (NEW) -->
+                <div class="glass-card p-8 border-l-4 border-cyan-500">
+                    <h3 class="text-xl font-bold text-white mb-2">Burn-Rate Forecast</h3>
+                    <p class="text-slate-400 text-sm mb-6">Predictive Linear Regression (30-day)</p>
+                    
+                    <div id="burn-rate-container">
+                        <div class="flex justify-between items-end mb-4">
+                            <div>
+                                <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Projected Bill</p>
+                                <p id="projected-total" class="text-3xl font-black text-white metric-value">$0.00</p>
+                            </div>
+                            <div class="text-right">
+                                <p id="burn-trend" class="text-xs font-bold text-emerald-400">0.00%</p>
+                                <p class="text-[9px] text-slate-500 font-bold uppercase">Trend Slope</p>
+                            </div>
+                        </div>
+                        <div id="burn-chart" class="flex items-end gap-1 h-20 bg-black/20 rounded-xl p-3 border border-white/5 relative">
+                            <!-- Bars injected here -->
+                            <div id="prediction-line" class="absolute top-0 bottom-0 border-l border-cyan-400/50 border-dashed hidden" style="left: 50%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Virtual Tagging (NEW) -->
+                <div class="glass-card p-8">
+                    <h3 class="text-xl font-bold text-white mb-2">Virtual Normalization</h3>
+                    <p class="text-slate-400 text-sm mb-6">Logical grouping for attribution</p>
+                    <div class="space-y-3" id="virtual-tags-list">
+                        <!-- Virtual tags injected here -->
+                    </div>
+                </div>
+
+                <!-- GreenOps Carbon Footprint (NEW) -->
+                <div class="glass-card p-8 bg-gradient-to-br from-[#0a1a12] to-[#0d1930]">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-white">GreenOps Sustainability</h3>
+                            <p class="text-emerald-500/80 text-sm mt-1">Carbon Intensity Migration Advisor</p>
+                        </div>
+                        <div class="p-3 bg-emerald-500/20 rounded-2xl text-emerald-500">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5a3.5 3.5 0 013.5 3.5V19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-2a2 2 0 00-2-2h-2a2 2 0 00-2 2v0m2-13a2 2 0 110-4 2 2 0 010 4z"/></svg>
+                        </div>
+                    </div>
+                    <!-- Carbon Offset Chart (NEW) -->
+                    <div class="h-32 mb-6 bg-black/20 rounded-2xl p-2 border border-emerald-500/10">
+                        <canvas id="carbonChart"></canvas>
+                    </div>
+                    <div class="space-y-4" id="greenops-list">
+                        <!-- Carbon recommendations injected here -->
+                    </div>
+                </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. OPTIMIZE PHASE -->
+        <section class="mb-16">
+            <div class="flex items-center gap-3 mb-8">
+                <span class="px-3 py-1 bg-emerald-400/20 text-emerald-400 text-xs font-bold rounded-full border border-emerald-400/30">PHASE 02</span>
+                <h2 class="text-2xl font-bold text-white uppercase tracking-wider">The "Optimize" Phase <span class="text-slate-500 font-medium ml-2">(Waste Reduction)</span></h2>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <!-- Commitment Coverage (RI/SP) -->
+                <div class="glass-card p-8">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-white">Commitment Coverage</h3>
+                        <span id="ri-savings-total" class="text-emerald-400 font-bold metric-value">+$0.00/yr</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead>
+                                <tr class="text-slate-500 border-b border-white/5 uppercase text-[10px] tracking-widest font-bold">
+                                    <th class="pb-3">Candidate</th>
+                                    <th class="pb-3">On-Demand</th>
+                                    <th class="pb-3">RI Monthly</th>
+                                    <th class="pb-3 text-right">Potential</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ri-list" class="divide-y divide-white/5">
+                                <!-- RI candidates will be injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Storage Lifecycle Automation -->
+                <div class="glass-card p-8">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-white">Cold Data Lifecycle</h3>
+                        <span id="storage-savings-total" class="text-emerald-400 font-bold metric-value">$0.00/mo</span>
+                    </div>
+                    <div class="space-y-4" id="storage-list">
+                        <!-- Storage candidates will be injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modernization Advisor -->
+            <div class="glass-card p-8 border-l-4 border-emerald-500 mb-8">
+                <h3 class="text-xl font-bold text-white mb-6">Modernization Advisor</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="modernization-list">
+                    <!-- Modernization tips will be injected here -->
+                </div>
+            </div>
+
+            <!-- AI-Driven Right-Sizing Advisor (NEW) -->
+            <div class="glass-card p-8 bg-gradient-to-br from-[#0d1117] to-[#0d1930] border border-cyan-500/20 shadow-[0_0_50px_rgba(6,182,212,0.1)]">
+                <div class="flex justify-between items-start mb-8">
+                    <div>
+                        <div class="flex items-center gap-3 mb-2">
+                            <div class="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-[10px] font-black uppercase rounded border border-cyan-500/30">AI Powered</div>
+                            <h3 class="text-xl font-bold text-white uppercase tracking-tight">Right-Sizing Advisor</h3>
+                        </div>
+                        <p class="text-slate-400 text-sm">Linear Regression analysis correlating 30-day performance metrics with SKU price units.</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[10px] font-bold text-slate-500 uppercase">Projected Savings</p>
+                        <p id="rightsizing-total-saving" class="text-3xl font-black text-emerald-400 metric-value">$0.00</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="rightsizing-list">
+                    <!-- Right-sizing recommendations will be injected here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. OPERATE PHASE -->
+        <section class="mb-16">
+            <div class="flex items-center gap-3 mb-8">
+                <span class="px-3 py-1 bg-purple-400/20 text-purple-400 text-xs font-bold rounded-full border border-purple-400/30">PHASE 03</span>
+                <h2 class="text-2xl font-bold text-white uppercase tracking-wider">The "Operate" Phase <span class="text-slate-500 font-medium ml-2">(Governance & Culture)</span></h2>
+            </div>
+            <!-- Row 1: Core Metrics -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                <!-- Predictive Savings Simulator (NEW) -->
+                <div class="lg:col-span-2 glass p-8 border-t-4 border-cyan-500/50">
+                    <div class="flex justify-between items-center mb-10">
+                        <div>
+                            <h3 class="text-xs font-black text-cyan-400 uppercase tracking-widest">Predictive Savings Simulator</h3>
+                            <p class="text-[10px] text-gray-500 font-bold mt-1">12-MONTH PROJECTION // "WHAT-IF" ANALYSIS</p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="text-[9px] text-gray-500 uppercase font-black">Intensity</span>
+                            <input type="range" id="sim-intensity" min="0" max="100" value="40" oninput="runSimulation()"
+                                class="w-32 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+                            <span id="sim-intensity-val" class="text-xs font-mono text-cyan-400">40%</span>
+                        </div>
+                    </div>
+                    <div class="h-64 mb-6">
+                        <canvas id="savingsSimChart"></canvas>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-black/20 p-4 rounded-2xl border border-white/5">
+                            <p class="text-[9px] text-gray-500 uppercase font-bold mb-1">Projected Savings</p>
+                            <p id="sim-savings" class="text-xl font-black text-green-400">$0.00</p>
+                        </div>
+                        <div class="bg-black/20 p-4 rounded-2xl border border-white/5">
+                            <p class="text-[9px] text-gray-500 uppercase font-bold mb-1">ROI Velocity</p>
+                            <p id="sim-roi" class="text-xl font-black text-white">2.4x</p>
+                        </div>
+                        <div class="bg-black/20 p-4 rounded-2xl border border-white/5">
+                            <p class="text-[9px] text-gray-500 uppercase font-bold mb-1">CO2 Offset</p>
+                            <p id="sim-co2" class="text-xl font-black text-emerald-400">12.4t</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GreenOps Carbon Footprint (NEW) -->
+                <div class="glass p-8 border-t-4 border-emerald-500/50">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-white">Policy Guardrails</h3>
+                            <p class="text-slate-400 text-sm mt-1">Automated OPA violation detection</p>
+                        </div>
+                        <div id="policy-violation-count" class="w-10 h-10 rounded-full bg-rose-500/20 text-rose-500 flex items-center justify-center font-bold">0</div>
+                    </div>
+                    <div class="space-y-4" id="policy-list">
+                        <!-- Policy violations will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Automated Budget Action (Kill-Switch) -->
+                <div class="glass-card p-8 bg-gradient-to-br from-[#0d1930]/70 to-[#1a0707]/30">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-white">Budget Kill-Switch</h3>
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></div>
+                            <span class="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Enforcement Active</span>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-8" id="budget-list">
+                        <!-- Budget statuses will be injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2FA Pending Actions (NEW) -->
+            <div class="mt-8 glass-card p-8 border-l-4 border-cyan-400">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h3 class="text-xl font-bold text-white uppercase tracking-tight">Pending Reap Approvals <span class="text-cyan-400 ml-2 font-black">2FA REQUIRED</span></h3>
+                        <p class="text-slate-500 text-sm mt-1">Infrastructure remediation requires administrator bypass.</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="text-slate-500 text-[10px] font-bold uppercase tracking-widest border-b border-white/5">
+                                <th class="pb-4">Resource</th>
+                                <th class="pb-4">Waste Score</th>
+                                <th class="pb-4">Monthly Burn</th>
+                                <th class="pb-4 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pending-reap-list" class="divide-y divide-white/5">
+                            <!-- Pending actions injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Content goes here -->
+    </main>
+{% endblock %}

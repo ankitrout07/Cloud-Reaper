@@ -1,0 +1,78 @@
+{% extends "layouts/_base.html" if not request.headers.get("HX-Request") else "layouts/_empty.html" %}
+{% block content %}
+<main class="app-main flex-1 p-8 lg:p-10 overflow-y-auto">
+        <div class="max-w-5xl mx-auto">
+            <section id="kubernetes" class="glass-morph p-6 mb-8 border border-cyan-500/20 scroll-mt-24">
+                <div class="doc-header border-0 pb-0 mb-3">
+                    <i class="fas fa-dharmachakra text-cyan-400 text-xl"></i>
+                    <h2>Kubernetes Agent</h2>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    Deploy the in-cluster Cloud Reaper agent to scrape node utilization, correlate pod waste with the
+                    pricing cache, and stream telemetry into the FinOps intelligence layer. Enable the agent from
+                    <a href="/integrations" class="text-cyan-400 hover:underline">Integrations</a> and connect your cluster via Settings → Cloud Providers.
+                </p>
+            </section>
+
+            <header class="mb-10">
+                <h1 class="text-4xl font-black tracking-tighter glow-text-cyan uppercase">System <span
+                        class="text-cyan-400">Documentation</span></h1>
+                <p class="text-gray-500 text-xs mt-2 font-bold uppercase tracking-widest">
+                    Product Docs, Feature Guides, and Changelogs
+                </p>
+            </header>
+
+            <!-- Premium RAG Vector Search Bar -->
+            <div class="mb-8 max-w-2xl relative">
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-cyan-400"></i>
+                </div>
+                <input type="text" id="doc-search-input" placeholder="Search documentation contextually... (e.g. how do I fix idle compute)" 
+                       class="w-full pl-10 pr-24 py-3 bg-[#161a22] border border-cyan-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition text-sm">
+                <button onclick="triggerDocSearch()" class="absolute right-2 top-2 px-4 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-black text-xs font-black uppercase rounded-lg transition">
+                    Search
+                </button>
+            </div>
+
+            <!-- RAG Search Results Panel -->
+            <div id="search-results-panel" class="hidden mb-8 p-6 glass-morph border border-cyan-500/30" style="background: rgba(18, 21, 26, 0.95);">
+                <div class="flex justify-between items-center mb-4 pb-2 border-b border-white/5">
+                    <h3 class="text-cyan-400 text-xs font-black uppercase tracking-wider"><i class="fas fa-magic mr-2"></i> RAG Semantic Matches</h3>
+                    <button onclick="closeSearchResults()" class="text-gray-500 hover:text-white transition"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="search-results-content" class="space-y-4">
+                    <!-- Dynamic Results -->
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <!-- Navigation Sidebar -->
+                <div class="md:col-span-1 space-y-2" id="doc-nav-sidebar">
+                    {% for doc in docs_data %}
+                    <button onclick="showDoc('{{ doc.filename }}')" 
+                            id="nav-btn-{{ doc.filename }}" 
+                            class="w-full text-left block p-3.5 glass-morph {% if loop.first %}text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]{% else %}text-gray-400 border border-white/5{% endif %} text-xs font-black uppercase tracking-wider hover:bg-white/5 hover:text-white transition-all duration-300">
+                        <i class="far fa-file-alt mr-2 text-[10px] {% if loop.first %}text-cyan-400{% else %}text-gray-500{% endif %}" id="nav-icon-{{ doc.filename }}"></i>
+                        {{ doc.title }}
+                    </button>
+                    {% endfor %}
+                </div>
+
+                <!-- Main Content -->
+                <div class="md:col-span-3 space-y-8" id="doc-content-container">
+                    {% for doc in docs_data %}
+                    <section id="section-{{ doc.filename }}" class="glass-morph doc-section {% if not loop.first %}hidden{% endif %} transition-opacity duration-300">
+                        <div class="doc-header">
+                            <i class="fas fa-file-alt text-cyan-400 text-xl"></i>
+                            <h2>{{ doc.title }}</h2>
+                        </div>
+                        <div class="prose prose-invert max-w-none text-xs text-slate-300 doc-markdown-body" data-markdown-content="{{ doc.content | escape }}">
+                            <!-- Dynamic Markdown Rendered HTML goes here -->
+                        </div>
+                    </section>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </main>
+{% endblock %}

@@ -1,53 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <link rel="icon" href="/static/assets/favicon.png" type="image/png">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Reaper | Metrics Command</title>
-    <link rel="stylesheet" href="/static/css/main.css">
-    <link rel="stylesheet" href="/static/css/professional-dark.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-        crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/static/js/theme.js"></script>
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-
-        .glass-morph {
-            background: #12151a;
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            border-radius: 20px;
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
-        }
-
-        .card-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-
-        .card-header h3 {
-            font-size: 0.7rem;
-            font-weight: 900;
-            letter-spacing: 0.15em;
-            color: #8baef5;
-        }
-
-        .chart-tile {
-            min-height: 220px;
-        }
-    </style>
-</head>
-
-<body class="min-h-screen flex">
-    {% include "_sidebar.html" %}
-
-    <main class="app-main flex-1 p-8 lg:p-10">
+{% extends "layouts/_base.html" if not request.headers.get("HX-Request") else "layouts/_empty.html" %}
+{% block content %}
+<main class="app-main flex-1 p-8 lg:p-10">
         <div class="max-w-7xl mx-auto">
             <header class="mb-10">
                 <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Subscription • {{
@@ -116,10 +69,4 @@
             </div>
         </div>
     </main>
-
-    <script src="/static/js/setup.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
-</body>
-
-</html>
+{% endblock %}

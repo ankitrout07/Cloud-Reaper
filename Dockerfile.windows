@@ -1,0 +1,16 @@
+# Multi-stage: use xgo base image (has modern mingw-w64 + Windows SDK headers)
+# but invoke go build directly, bypassing the xgo wrapper script.
+FROM techknowlogick/xgo:latest
+
+WORKDIR /build
+COPY src/engine-go/ .
+
+ENV CGO_ENABLED=1 \
+    GOOS=windows \
+    GOARCH=amd64 \
+    GO111MODULE=on \
+    CC=x86_64-w64-mingw32-gcc \
+    CXX=x86_64-w64-mingw32-g++
+
+RUN go mod download && \
+    go build -ldflags="-w -s -H windowsgui" -o /output/CloudReaper.exe .
