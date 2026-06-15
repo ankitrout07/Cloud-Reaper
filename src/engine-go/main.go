@@ -28,7 +28,7 @@ func main() {
 	if appData == "" {
 		appData = os.Getenv("HOME")
 	}
-	
+
 	runtimeDir := filepath.Join(appData, "CloudReaper", "runtime")
 	pythonExe := filepath.Join(runtimeDir, "python", "python.exe")
 	appScript := filepath.Join(runtimeDir, "src", "reaper", "web", "app.py")
@@ -39,7 +39,7 @@ func main() {
 		fmt.Sprintf("PORT=%d", port),
 		"PRODUCTION_DESKTOP_MODE=TRUE",
 	)
-	
+
 	if err := cmd.Start(); err != nil {
 		log.Fatalf("Fatal: Failed to map internal worker infrastructure: %v", err)
 	}
