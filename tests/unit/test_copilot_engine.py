@@ -11,8 +11,10 @@ pytestmark = pytest.mark.usefixtures("mock_gemini_env")
 
 @pytest.fixture
 def mock_gemini_env():
-    with patch.dict(os.environ, {"GEMINI_API_KEY": "fake-api-key"}), \
-         patch("reaper.engine.models.resources.SessionLocal") as mock_session:
+    with (
+        patch.dict(os.environ, {"GEMINI_API_KEY": "fake-api-key"}),
+        patch("reaper.engine.models.resources.SessionLocal") as mock_session,
+    ):
         mock_db = MagicMock()
         # Mock query chain: query().filter().filter().first() -> None
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None

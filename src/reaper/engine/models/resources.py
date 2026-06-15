@@ -230,7 +230,6 @@ class CloudCommitment(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
-
 def get_desktop_engine():
     """Resolves zero-configuration database mapping inside native system APPDATA"""
     if os.name == "nt" or "PRODUCTION_DESKTOP_MODE" in os.environ:
