@@ -11,7 +11,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/static/js/theme.js"></script>
     <script src="/static/js/setup.js"></script>
+    <script src="/static/js/ui-interactions.js"></script>
+    <script src="/static/js/cloud-providers.js"></script>
+    <script src="/static/js/vault.js"></script>
+    <script src="/static/js/docs.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Marked library for rendering markdown docs -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- HTMX for SPA -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -105,6 +111,7 @@
         document.body.addEventListener('htmx:afterSwap', function(evt) {
             if(typeof initCharts === 'function') initCharts();
             if(typeof bindEventListeners === 'function') bindEventListeners();
+            if(typeof initializeSidebarHighlighting === 'function') initializeSidebarHighlighting();
         });
     </script>
 </body>

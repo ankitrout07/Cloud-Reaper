@@ -50,3 +50,4 @@ google-genai>=1.15.0
 # === RL Environment (optional, for advanced scheduling) ===
 gymnasium==0.29.1
 tenacity>=8.2.3
+flask-cors==4.0.0

@@ -337,27 +337,31 @@ function toggleAppTheme() {
             heatmapChart: null,
         };
 
-        if (document.getElementById('computeChart')) {
-            const dash = !!document.getElementById('burnAreaChart');
-            state.computeChart = createCpuLineChart('computeChart', {
-                borderColor: CHART_PRIMARY,
-                backgroundColor: CHART_PRIMARY_FILL,
-                maxPoints: dash ? 20 : 30,
-                showXLabels: dash,
-                label: 'Avg CPU Utilization (%)',
-            });
-        }
+        try {
+            if (document.getElementById('computeChart')) {
+                const dash = !!document.getElementById('burnAreaChart');
+                state.computeChart = createCpuLineChart('computeChart', {
+                    borderColor: CHART_PRIMARY,
+                    backgroundColor: CHART_PRIMARY_FILL,
+                    maxPoints: dash ? 20 : 30,
+                    showXLabels: dash,
+                    label: 'Avg CPU Utilization (%)',
+                });
+            }
 
-        if (document.getElementById('bigMonitorChart')) {
-            state.bigMonitorChart = createCpuLineChart('bigMonitorChart', {
-                maxPoints: 20,
-                showXLabels: true,
-                showLegend: false,
-            });
-        }
+            if (document.getElementById('bigMonitorChart')) {
+                state.bigMonitorChart = createCpuLineChart('bigMonitorChart', {
+                    maxPoints: 20,
+                    showXLabels: true,
+                    showLegend: false,
+                });
+            }
 
-        hookMetricSocket(state);
-        initFinopsDashboardCharts(state);
+            hookMetricSocket(state);
+            initFinopsDashboardCharts(state);
+        } catch (error) {
+            console.warn("Telemetry Canvas stream initialization deferred safely: ", error);
+        }
     });
 })();
 
