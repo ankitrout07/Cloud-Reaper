@@ -46,6 +46,14 @@ func Run() {
 		log.Fatalf("Fatal: Failed to map internal worker infrastructure: %v", err)
 	}
 
+	// Ensure subprocess cleanup on exit
+	defer func() {
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+		}
+	}()
+
 	// Active Health Check Polling Routine Loop
 	backendAddr := fmt.Sprintf("http://127.0.0.1:%d", port)
 	ready := false
@@ -56,21 +64,25 @@ func Run() {
 			resp.Body.Close()
 			break
 		}
+		if resp != nil {
+			resp.Body.Close()
+		}
 		time.Sleep(200 * time.Millisecond)
 	}
 
 	if !ready {
-		_ = cmd.Process.Kill()
 		log.Fatal("Fatal: Application worker initialization timeout exceeded.")
 	}
 
 	// Native Windows Desktop WebView Frame Initialization
 	w := webview.New(false)
+	if w == nil {
+		log.Fatal("Fatal: Failed to initialize webview")
+	}
 	w.SetTitle("Cloud-Reaper: FinOps Intelligence Suite")
 	w.SetSize(1280, 800, webview.HintNone)
 	w.Navigate(backendAddr)
 
 	// Intercept Window Execution Loop for Graceful Shutdown
 	w.Run()
-	_ = cmd.Process.Kill()
 }

@@ -211,8 +211,8 @@ class DocSearchEngine:
                 )
                 if response and response.text:
                     summary = response.text.strip()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[!] Error generating document summary: {e}")
 
         return f"Document: {file_name}\nTitle: {h1_title}\nSummary: {summary}"
 

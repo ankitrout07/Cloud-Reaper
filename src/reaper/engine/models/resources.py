@@ -1,5 +1,8 @@
 import os
+import time
+from contextlib import contextmanager
 from datetime import UTC, datetime
+from functools import wraps
 
 from dotenv import load_dotenv
 from sqlalchemy import (
@@ -14,6 +17,7 @@ from sqlalchemy import (
     String,
     create_engine,
 )
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
 load_dotenv()
@@ -264,3 +268,40 @@ def get_desktop_engine():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+
+
+@contextmanager
+def get_db_session():
+    """Context manager for database sessions to ensure proper cleanup."""
+    session = SessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def retry_on_db_error(max_retries=3, delay=1.0):
+    """Decorator to retry database operations on transient errors."""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except OperationalError as e:
+                    last_exception = e
+                    if attempt < max_retries - 1:
+                        time.sleep(delay * (attempt + 1))
+                    else:
+                        raise
+                except Exception as e:
+                    # Don't retry non-database errors
+                    raise
+            raise last_exception
+        return wrapper
+    return decorator

@@ -53,6 +53,10 @@ def get_cached_data(cache_key, fetch_fn, ttl_seconds=60):
 
     with _CACHE_LOCK:
         _GLOBAL_CACHE[cache_key] = (now, data)
+        # Cleanup expired entries to prevent memory leaks
+        expired_keys = [k for k, (ts, _) in _GLOBAL_CACHE.items() if now - ts > ttl_seconds * 2]
+        for k in expired_keys:
+            del _GLOBAL_CACHE[k]
 
     return data
 
@@ -188,8 +192,8 @@ class AzureCollector:
                                 "resource_group": resource_group,
                                 "average_cpu": round(avg_usage, 2),
                             }
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[!] Error checking idle VM {vm.name}: {e}")
             return None
 
         # Query in parallel using shared executor to eliminate long loading lag in dashboard
@@ -607,19 +611,59 @@ class AzureCollector:
         return empty_plans
 
     def get_sql_databases(self):
-        """Finds SQL Databases - TODO: Add idle check with metrics"""
+        """Finds SQL Databases with idle check using metrics"""
         servers = self.sql.servers.list()
         databases = []
         for server in servers:
             dbs = self.sql.databases.list_by_server(server.resource_group_name, server.name)
             for db in dbs:
                 if db.name != "master":
+                    # Check if database is idle using metrics
+                    is_idle = False
+                    avg_cpu = 0.0
+                    try:
+                        from azure.mgmt.monitor import MonitorManagementClient
+                        monitor_client = MonitorManagementClient(self.credentials, self.subscription_id)
+                        
+                        resource_id = f"/subscriptions/{self.subscription_id}/resourceGroups/{server.resource_group_name}/providers/Microsoft.Sql/servers/{server.name}/databases/{db.name}"
+                        
+                        # Get CPU metrics for the last 24 hours
+                        from datetime import datetime, timedelta
+                        end_time = datetime.utcnow()
+                        start_time = end_time - timedelta(hours=24)
+                        
+                        metrics_data = monitor_client.metrics.list(
+                            resource_id,
+                            timespan=f"{start_time.isoformat()}/{end_time.isoformat()}",
+                            interval="PT1H",
+                            metricnames="cpu_percent",
+                            aggregation="Average"
+                        )
+                        
+                        if metrics_data.value:
+                            data_points = []
+                            for item in metrics_data.value:
+                                for timeseries in item.timeseries:
+                                    for point in timeseries.data:
+                                        if point.average is not None:
+                                            data_points.append(point.average)
+                            
+                            if data_points:
+                                avg_cpu = sum(data_points) / len(data_points)
+                                is_idle = avg_cpu < 5.0  # Consider idle if average CPU < 5%
+                    except Exception as e:
+                        print(f"[!] Error checking SQL database metrics for {db.name}: {e}")
+                        # Default to not idle if metrics check fails
+                        is_idle = False
+                    
                     databases.append(
                         {
                             "name": db.name,
                             "server": server.name,
                             "location": db.location,
                             "sku": db.sku.name if db.sku else "Unknown",
+                            "is_idle": is_idle,
+                            "average_cpu": round(avg_cpu, 2),
                         }
                     )
         return databases
@@ -857,8 +901,8 @@ class AzureCollector:
                             "monthly_savings": 12.50,  # Delta savings based on hot->cool tier delta
                         }
                     )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[!] Error fetching cold storage candidates: {e}")
 
         if not candidates:
             # Authentic fallback examples representing real hot->cool tier optimization deltas
@@ -891,8 +935,8 @@ class AzureCollector:
                     candidates.append(
                         {"name": vm.name, "target": "Azure SQL (Managed)", "annual_savings": 2160.0}
                     )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[!] Error fetching modernization candidates: {e}")
 
         if not candidates:
             # High-fidelity realistic modernization targets based on VM sizing standards
@@ -1266,8 +1310,8 @@ class AzureCollector:
                             "savings_pct": savings_pct,
                         }
                     )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[!] Error fetching regional arbitrage recommendations: {e}")
 
         # Fallback to highly detailed grid savings examples if no live VMs or API connection fails
         if not recommendations:
@@ -1509,8 +1553,8 @@ class AzureCollector:
                         "actions": ["DISMISS", "KILL"],
                     }
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[!] Error fetching policy violations: {e}")
 
         try:
             # Get idle VMs
@@ -1528,8 +1572,8 @@ class AzureCollector:
                             "actions": ["DISMISS", "RIGHTSIZE"],
                         }
                     )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[!] Error fetching idle VMs: {e}")
 
         try:
             # Get orphaned disks
@@ -1547,8 +1591,8 @@ class AzureCollector:
                             "actions": ["DISMISS", "DELETE"],
                         }
                     )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[!] Error processing orphaned disks: {e}")
 
         # Fallback to simulated data if no issues found
         if not issues:

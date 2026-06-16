@@ -110,89 +110,140 @@ def run_reaper():
 
     print_banner()
 
-    calc = CostCalculator()
-    pusher = DataPusher()
+    try:
+        calc = CostCalculator()
+    except Exception as e:
+        print(f"[!] Error initializing CostCalculator: {e}")
+        return
+
+    try:
+        pusher = DataPusher()
+    except Exception as e:
+        print(f"[!] Error initializing DataPusher: {e}")
+        return
+
     total_monthly_saving = 0.0
 
     print("\n[+] AZURE: Initializing Resource Inventory...")
-    az = AzureCollector()
+    
+    try:
+        az = AzureCollector()
+    except Exception as e:
+        print(f"[!] Error initializing AzureCollector: {e}")
+        return
 
     # Load live prices from Go engine into calculator
     print("    - Fetching Live Prices (Go Scraper)...")
-    live_prices = az.get_live_prices()
-    calc.load_prices(live_prices)
-    print(f"    - Loaded {len(live_prices)} live price items.")
+    try:
+        live_prices = az.get_live_prices()
+        calc.load_prices(live_prices)
+        print(f"    - Loaded {len(live_prices)} live price items.")
+    except Exception as e:
+        print(f"[!] Error fetching live prices: {e}")
+        live_prices = []
 
     # 1. Compute Inventory
-    vms = az.get_vm_inventory()
-    print(f"    - Active VMs Found: {len(vms)}")
+    try:
+        vms = az.get_vm_inventory()
+        print(f"    - Active VMs Found: {len(vms)}")
+    except Exception as e:
+        print(f"[!] Error fetching VM inventory: {e}")
+        vms = []
 
     # 2. Storage Inventory (Reap Targets)
-    disks = az.get_orphaned_disks()
-    print(f"    - Orphaned Disks Found: {len(disks)}")
+    try:
+        disks = az.get_orphaned_disks()
+        print(f"    - Orphaned Disks Found: {len(disks)}")
+    except Exception as e:
+        print(f"[!] Error fetching orphaned disks: {e}")
+        disks = []
 
     for disk in disks:
-        # Dynamic pricing lookup - Normalize SKU for lookup
-        sku_lookup = disk["tier"].lower().replace(" ", "_")
-        cost = calc.calculate_monthly_cost("azure", "disk", sku_lookup)
+        try:
+            # Dynamic pricing lookup - Normalize SKU for lookup
+            sku_lookup = disk["tier"].lower().replace(" ", "_")
+            cost = calc.calculate_monthly_cost("azure", "disk", sku_lookup)
 
-        if cost == 0:
-            # Fallback for common tiers
-            cost = (
-                FALLBACK_PREMIUM_DISK_COST
-                if "premium" in sku_lookup
-                else FALLBACK_STANDARD_DISK_COST
-            )
+            if cost == 0:
+                # Fallback for common tiers
+                cost = (
+                    FALLBACK_PREMIUM_DISK_COST
+                    if "premium" in sku_lookup
+                    else FALLBACK_STANDARD_DISK_COST
+                )
 
-        total_monthly_saving += cost
-        print(f"      [!] REAP TARGET: {disk['name']} | Saving: ${cost:.2f}/mo")
+            total_monthly_saving += cost
+            print(f"      [!] REAP TARGET: {disk['name']} | Saving: ${cost:.2f}/mo")
+        except Exception as e:
+            print(f"      [!] Error processing disk {disk.get('name', 'unknown')}: {e}")
 
     # 3. Idle VM Discovery (Go Engine Powered)
-    idle_vms = az.get_idle_vms(cpu_threshold=ZOMBIE_CPU_THRESHOLD)
-    print(f"    - Idle VMs Detected: {len(idle_vms)}")
+    try:
+        idle_vms = az.get_idle_vms(cpu_threshold=ZOMBIE_CPU_THRESHOLD)
+        print(f"    - Idle VMs Detected: {len(idle_vms)}")
+    except Exception as e:
+        print(f"[!] Error detecting idle VMs: {e}")
+        idle_vms = []
 
     for vm in idle_vms:
         print(f"      [!] IDLE VM: {vm['name']} | Avg CPU: {vm['average_cpu']}%")
 
     # 4. Zombie Reaper (Heuristic Scoring)
     print("\n[+] ZOMBIE: Executing Heuristic Analysis...")
-    scorer = ZombieScorer()
+    try:
+        scorer = ZombieScorer()
+    except Exception as e:
+        print(f"[!] Error initializing ZombieScorer: {e}")
+        scorer = None
 
-    # Check VMs for Zombie behavior
-    for vm_name in [v["name"] for v in vms]:
-        vm_data = {
-            "name": vm_name,
-            "type": "VirtualMachine",
-            "is_unattached": False,
-            "iops_history": [],  # Real metrics would be fetched here or in Scorer
-        }
-        res = scorer.score_resource(vm_data)
-        if res["is_zombie"]:
-            print(f"      [🚨] ZOMBIE DETECTED: {vm_name} (Score: {res['score']})")
+    if scorer:
+        # Check VMs for Zombie behavior
+        for vm_name in [v["name"] for v in vms]:
+            try:
+                vm_data = {
+                    "name": vm_name,
+                    "type": "VirtualMachine",
+                    "is_unattached": False,
+                    "iops_history": [],  # Real metrics would be fetched here or in Scorer
+                }
+                res = scorer.score_resource(vm_data)
+                if res["is_zombie"]:
+                    print(f"      [🚨] ZOMBIE DETECTED: {vm_name} (Score: {res['score']})")
+            except Exception as e:
+                print(f"      [!] Error scoring VM {vm_name}: {e}")
 
-    # Check Disks
-    disks_data = disks.get("disks", []) if isinstance(disks, dict) else []
-    for disk in disks_data:
-        disk_data = {
-            "name": disk["name"],
-            "type": "Disk",
-            "is_unattached": True,
-            "iops_history": [],
-        }
-        res = scorer.score_resource(disk_data)
-        if res["is_zombie"]:
-            print(f"      [🚨] ZOMBIE DETECTED: {disk['name']} (Score: {res['score']})")
+        # Check Disks
+        disks_data = disks.get("disks", []) if isinstance(disks, dict) else []
+        for disk in disks_data:
+            try:
+                disk_data = {
+                    "name": disk["name"],
+                    "type": "Disk",
+                    "is_unattached": True,
+                    "iops_history": [],
+                }
+                res = scorer.score_resource(disk_data)
+                if res["is_zombie"]:
+                    print(f"      [🚨] ZOMBIE DETECTED: {disk['name']} (Score: {res['score']})")
+            except Exception as e:
+                print(f"      [!] Error scoring disk {disk.get('name', 'unknown')}: {e}")
 
     # 5. Persistence
     if total_monthly_saving > 0:
-        pusher.push_savings("azure", total_monthly_saving)
-        print("\n[+] Telemetry pushed to InfluxDB.")
+        try:
+            pusher.push_savings("azure", total_monthly_saving)
+            print("\n[+] Telemetry pushed to InfluxDB.")
+        except Exception as e:
+            print(f"[!] Error pushing telemetry: {e}")
 
     print("\n" + "=" * 50)
     print(f"TOTAL POTENTIAL AZURE SAVINGS: ${total_monthly_saving:.2f} / month")
     print("=" * 50 + "\n")
 
-    pusher.close()
+    try:
+        pusher.close()
+    except Exception as e:
+        print(f"[!] Error closing pusher: {e}")
 
 
 if __name__ == "__main__":

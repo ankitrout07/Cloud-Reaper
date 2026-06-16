@@ -757,13 +757,13 @@ window.switchProvider = (prov) => {
     
     // Update button styles
     document.querySelectorAll('.prov-btn').forEach(btn => {
-        btn.classList.remove('bg-cyan-500', 'text-[#0d1117]', 'shadow-lg', 'shadow-cyan-500/20');
-        btn.classList.add('text-slate-400');
+        btn.classList.remove('bg-[var(--accent-primary)]', 'text-[var(--bg-primary)]', 'shadow-lg');
+        btn.classList.add('hover:bg-[var(--bg-elevated)]', 'text-[var(--text-secondary)]');
     });
     const activeBtn = document.getElementById(`prov-${prov}`);
     if (activeBtn) {
-        activeBtn.classList.add('bg-cyan-500', 'text-[#0d1117]', 'shadow-lg', 'shadow-cyan-500/20');
-        activeBtn.classList.remove('text-slate-400');
+        activeBtn.classList.add('bg-[var(--accent-primary)]', 'text-[var(--bg-primary)]', 'shadow-lg');
+        activeBtn.classList.remove('hover:bg-[var(--bg-elevated)]', 'text-[var(--text-secondary)]');
     }
     
     // Load prices for the new provider
@@ -775,14 +775,14 @@ window.togglePricing = (type) => {
     priceCatalogState.pricingType = type;
     
     // Update button styles
-    document.getElementById('toggle-hourly').classList.remove('bg-cyan-500', 'text-[#0d1117]');
-    document.getElementById('toggle-hourly').classList.add('text-slate-400');
-    document.getElementById('toggle-monthly').classList.remove('bg-cyan-500', 'text-[#0d1117]');
-    document.getElementById('toggle-monthly').classList.add('text-slate-400');
-    
+    document.getElementById('toggle-hourly').classList.remove('bg-[var(--accent-primary)]', 'text-[var(--bg-primary)]');
+    document.getElementById('toggle-hourly').classList.add('hover:bg-[var(--bg-elevated)]', 'text-[var(--text-secondary)]');
+    document.getElementById('toggle-monthly').classList.remove('bg-[var(--accent-primary)]', 'text-[var(--bg-primary)]');
+    document.getElementById('toggle-monthly').classList.add('hover:bg-[var(--bg-elevated)]', 'text-[var(--text-secondary)]');
+
     const activeBtn = document.getElementById(`toggle-${type}`);
-    activeBtn.classList.add('bg-cyan-500', 'text-[#0d1117]');
-    activeBtn.classList.remove('text-slate-400');
+    activeBtn.classList.add('bg-[var(--accent-primary)]', 'text-[var(--bg-primary)]');
+    activeBtn.classList.remove('hover:bg-[var(--bg-elevated)]', 'text-[var(--text-secondary)]');
     
     // Re-render with new pricing type
     renderPrices();
@@ -893,10 +893,6 @@ window.addToArchitect = (sku) => {
 };
 
 // Toggle architect drawer (placeholder)
-window.toggleArchitectDrawer = () => {
-    notify("Architect drawer toggled.", "success");
-};
-
 window.toggleArchitectDrawer = () => {
     notify("Architect drawer toggled.", "success");
 };

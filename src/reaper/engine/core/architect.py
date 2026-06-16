@@ -332,8 +332,8 @@ def _resolve_azure_price(sku: str, mapped_region: str, region: str) -> float | N
                 db.add(new_cache)
                 db.commit()
                 db.close()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[!] Error caching price: {e}")
             return hourly_rate
     except Exception as e:
         print(f"[!] Real-time Azure pricing fetch failed: {e}")
@@ -380,8 +380,8 @@ def _resolve_aws_price(sku: str, mapped_region: str, region: str) -> float | Non
                 db.add(new_cache)
                 db.commit()
                 db.close()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[!] Error caching price: {e}")
             return hourly_rate
     except Exception as e:
         print(f"[!] Real-time AWS pricing fetch failed: {e}")
@@ -428,8 +428,8 @@ def _resolve_gcp_price(sku: str, mapped_region: str, region: str) -> float | Non
                 db.add(new_cache)
                 db.commit()
                 db.close()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[!] Error caching price: {e}")
             return hourly_rate
     except Exception as e:
         print(f"[!] Real-time GCP pricing fetch failed: {e}")

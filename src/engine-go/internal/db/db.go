@@ -50,6 +50,12 @@ func Connect() (*sql.DB, error) {
 		if err == nil {
 			err = pool.Ping()
 		}
+		if err == nil {
+			// Configure connection pool for better stability
+			pool.SetMaxOpenConns(25)
+			pool.SetMaxIdleConns(5)
+			pool.SetConnMaxLifetime(5 * time.Minute)
+		}
 	})
 	return pool, err
 }
@@ -86,7 +92,10 @@ func UpsertResources(resources []Resource) error {
 	defer stmt.Close()
 
 	for _, r := range resources {
-		tagsJSON, _ := json.Marshal(r.Tags)
+		tagsJSON, err := json.Marshal(r.Tags)
+		if err != nil {
+			return fmt.Errorf("error marshaling tags: %w", err)
+		}
 		_, err = stmt.Exec(r.ID, r.Name, r.Type, r.Region, string(tagsJSON), r.Active, r.IsProtected, r.IsUnallocated, r.LastSeen)
 		if err != nil {
 			return fmt.Errorf("error in batch exec: %w", err)
