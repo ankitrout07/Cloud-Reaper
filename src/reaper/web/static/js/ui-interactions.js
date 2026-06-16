@@ -269,6 +269,11 @@ window.updateWhatIfModel = async () => {
     }
 };
 
+// Initialize pricing page on load
+if (window.location.pathname === '/pricing') {
+    loadPrices('azure');
+}
+
 // Initialize financial intelligence data on page load
 window.initFinancialIntelligence = () => {
     loadBudgetData();
@@ -280,6 +285,9 @@ window.initFinancialIntelligence = () => {
 document.addEventListener('DOMContentLoaded', () => {
     if (window.location.pathname === '/financial') {
         initFinancialIntelligence();
+    }
+    if (window.location.pathname === '/pricing') {
+        loadPrices('azure');
     }
 });
 
@@ -602,20 +610,291 @@ window.openWebhookModal = (type) => {
 };
 
 // --- Pricing (pricing.html) & FinOps ---
-window.togglePricing = (type) => {
-    notify(`Switched pricing view to: ${type}`, "success");
+
+// Price catalog state
+let priceCatalogState = {
+    currentProvider: 'azure',
+    pricingType: 'hourly',
+    prices: [],
+    filteredPrices: [],
+    currentPage: 1,
+    itemsPerPage: 20,
+    sortBy: 'none'
 };
 
+// Load prices from API
+async function loadPrices(provider = 'azure') {
+    try {
+        const response = await fetch(`/api/prices?provider=${provider}`);
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.prices) {
+            priceCatalogState.prices = data.prices;
+            priceCatalogState.filteredPrices = [...data.prices];
+            renderPrices();
+        } else {
+            renderNoPrices();
+        }
+    } catch (e) {
+        console.error('Error loading prices:', e);
+        renderError();
+    }
+}
+
+// Render prices to table
+function renderPrices() {
+    const tbody = document.getElementById('priceTableBody');
+    if (!tbody) return;
+    
+    const { filteredPrices, currentPage, itemsPerPage, pricingType } = priceCatalogState;
+    
+    // Calculate pagination
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageItems = filteredPrices.slice(startIndex, endIndex);
+    
+    if (pageItems.length === 0) {
+        renderNoPrices();
+        return;
+    }
+    
+    // Generate table rows
+    tbody.innerHTML = pageItems.map(price => {
+        const priceValue = pricingType === 'hourly' 
+            ? (price.hourly_price || price.price || price.rate || 0)
+            : (price.monthly_price || (price.price || price.rate || 0) * 730);
+        
+        return `
+            <tr class="border-b border-white/5 hover:bg-white/5 transition">
+                <td class="p-4">
+                    <div class="text-white font-semibold text-sm">${price.sku || price.name || 'Unknown SKU'}</div>
+                    <div class="text-slate-500 text-xs mt-0.5">${price.description || price.category || ''}</div>
+                </td>
+                <td class="p-4 text-slate-300 text-sm">${price.service || price.product_name || 'Compute'}</td>
+                <td class="p-4">
+                    <span class="px-2 py-1 bg-cyan-500/10 text-cyan-400 text-xs rounded border border-cyan-500/20">${price.region || price.location || 'Unknown'}</span>
+                </td>
+                <td class="p-4">
+                    <span class="text-white font-mono text-sm metric-value">$${priceValue.toFixed(4)}</span>
+                    <span class="text-slate-500 text-xs ml-1">/ ${pricingType}</span>
+                </td>
+                <td class="p-4 text-right">
+                    <button onclick="addToArchitect('${price.sku || price.name}')" class="px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-xs font-semibold rounded-lg border border-cyan-500/20 transition">
+                        Add to Architect
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    // Update pagination
+    updatePagination(filteredPrices.length, startIndex, endIndex);
+}
+
+// Render no prices state
+function renderNoPrices() {
+    const tbody = document.getElementById('priceTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="p-12 text-center">
+                    <div class="flex flex-col items-center gap-4">
+                        <i class="fas fa-search text-4xl text-slate-600"></i>
+                        <p class="text-slate-500 font-bold">No prices found for this provider</p>
+                        <p class="text-slate-600 text-sm">Try switching to a different provider or check your cloud credentials</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+    document.getElementById('pagination-controls')?.classList.add('hidden');
+}
+
+// Render error state
+function renderError() {
+    const tbody = document.getElementById('priceTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="p-12 text-center">
+                    <div class="flex flex-col items-center gap-4">
+                        <i class="fas fa-exclamation-triangle text-4xl text-rose-400"></i>
+                        <p class="text-rose-400 font-bold">Error loading prices</p>
+                        <p class="text-slate-600 text-sm">Please check your cloud provider credentials</p>
+                        <button onclick="loadPrices('${priceCatalogState.currentProvider}')" class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold rounded-lg border border-rose-500/20 transition">
+                            Retry
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+    document.getElementById('pagination-controls')?.classList.add('hidden');
+}
+
+// Update pagination controls
+function updatePagination(totalItems, start, end) {
+    const paginationControls = document.getElementById('pagination-controls');
+    if (!paginationControls) return;
+    
+    paginationControls.classList.remove('hidden');
+    document.getElementById('page-start').textContent = start + 1;
+    document.getElementById('page-end').textContent = Math.min(end, totalItems);
+    document.getElementById('total-items').textContent = totalItems;
+    
+    // Update button states
+    document.getElementById('prev-btn').disabled = priceCatalogState.currentPage === 1;
+    document.getElementById('next-btn').disabled = end >= totalItems;
+}
+
+// Switch provider
 window.switchProvider = (prov) => {
-    notify(`Switched pricing provider to: ${prov}`, "success");
+    priceCatalogState.currentProvider = prov;
+    priceCatalogState.currentPage = 1;
+    
+    // Update provider label
+    document.getElementById('active-provider-label').textContent = prov.charAt(0).toUpperCase() + prov.slice(1);
+    
+    // Update button styles
+    document.querySelectorAll('.prov-btn').forEach(btn => {
+        btn.classList.remove('bg-cyan-500', 'text-[#0d1117]', 'shadow-lg', 'shadow-cyan-500/20');
+        btn.classList.add('text-slate-400');
+    });
+    const activeBtn = document.getElementById(`prov-${prov}`);
+    if (activeBtn) {
+        activeBtn.classList.add('bg-cyan-500', 'text-[#0d1117]', 'shadow-lg', 'shadow-cyan-500/20');
+        activeBtn.classList.remove('text-slate-400');
+    }
+    
+    // Load prices for the new provider
+    loadPrices(prov);
 };
 
+// Toggle pricing type (hourly/monthly)
+window.togglePricing = (type) => {
+    priceCatalogState.pricingType = type;
+    
+    // Update button styles
+    document.getElementById('toggle-hourly').classList.remove('bg-cyan-500', 'text-[#0d1117]');
+    document.getElementById('toggle-hourly').classList.add('text-slate-400');
+    document.getElementById('toggle-monthly').classList.remove('bg-cyan-500', 'text-[#0d1117]');
+    document.getElementById('toggle-monthly').classList.add('text-slate-400');
+    
+    const activeBtn = document.getElementById(`toggle-${type}`);
+    activeBtn.classList.add('bg-cyan-500', 'text-[#0d1117]');
+    activeBtn.classList.remove('text-slate-400');
+    
+    // Re-render with new pricing type
+    renderPrices();
+};
+
+// Search prices
+window.searchPrices = () => {
+    const searchTerm = document.getElementById('priceSearch').value.toLowerCase();
+    
+    if (!searchTerm) {
+        priceCatalogState.filteredPrices = [...priceCatalogState.prices];
+    } else {
+        priceCatalogState.filteredPrices = priceCatalogState.prices.filter(price => {
+            const sku = (price.sku || price.name || '').toLowerCase();
+            const region = (price.region || price.location || '').toLowerCase();
+            const service = (price.service || price.product_name || '').toLowerCase();
+            return sku.includes(searchTerm) || region.includes(searchTerm) || service.includes(searchTerm);
+        });
+    }
+    
+    priceCatalogState.currentPage = 1;
+    renderPrices();
+};
+
+// Sort prices
+window.sortPrices = () => {
+    const sortValue = document.getElementById('priceSort').value;
+    priceCatalogState.sortBy = sortValue;
+    
+    switch (sortValue) {
+        case 'price-asc':
+            priceCatalogState.filteredPrices.sort((a, b) => {
+                const priceA = a.price || a.rate || 0;
+                const priceB = b.price || b.rate || 0;
+                return priceA - priceB;
+            });
+            break;
+        case 'price-desc':
+            priceCatalogState.filteredPrices.sort((a, b) => {
+                const priceA = a.price || a.rate || 0;
+                const priceB = b.price || b.rate || 0;
+                return priceB - priceA;
+            });
+            break;
+        case 'sku-asc':
+            priceCatalogState.filteredPrices.sort((a, b) => {
+                const skuA = (a.sku || a.name || '').toLowerCase();
+                const skuB = (b.sku || b.name || '').toLowerCase();
+                return skuA.localeCompare(skuB);
+            });
+            break;
+        case 'sku-desc':
+            priceCatalogState.filteredPrices.sort((a, b) => {
+                const skuA = (a.sku || a.name || '').toLowerCase();
+                const skuB = (b.sku || b.name || '').toLowerCase();
+                return skuB.localeCompare(skuA);
+            });
+            break;
+        case 'region-asc':
+            priceCatalogState.filteredPrices.sort((a, b) => {
+                const regionA = (a.region || a.location || '').toLowerCase();
+                const regionB = (b.region || b.location || '').toLowerCase();
+                return regionA.localeCompare(regionB);
+            });
+            break;
+        case 'region-desc':
+            priceCatalogState.filteredPrices.sort((a, b) => {
+                const regionA = (a.region || a.location || '').toLowerCase();
+                const regionB = (b.region || b.location || '').toLowerCase();
+                return regionB.localeCompare(regionA);
+            });
+            break;
+        default:
+            // Keep original order
+            break;
+    }
+    
+    renderPrices();
+};
+
+// Pagination
 window.prevPage = () => {
-    notify("Previous page loaded.", "success");
+    if (priceCatalogState.currentPage > 1) {
+        priceCatalogState.currentPage--;
+        renderPrices();
+    }
 };
 
 window.nextPage = () => {
-    notify("Next page loaded.", "success");
+    const { filteredPrices, currentPage, itemsPerPage } = priceCatalogState;
+    const maxPage = Math.ceil(filteredPrices.length / itemsPerPage);
+    
+    if (currentPage < maxPage) {
+        priceCatalogState.currentPage++;
+        renderPrices();
+    }
+};
+
+// Add to architect (placeholder for now)
+window.addToArchitect = (sku) => {
+    notify(`Added ${sku} to architect blueprint`, "success");
+    // Update architect count if needed
+    const countEl = document.getElementById('architect-count');
+    if (countEl) {
+        const currentCount = parseInt(countEl.textContent);
+        countEl.textContent = currentCount + 1;
+    }
+};
+
+// Toggle architect drawer (placeholder)
+window.toggleArchitectDrawer = () => {
+    notify("Architect drawer toggled.", "success");
 };
 
 window.toggleArchitectDrawer = () => {
