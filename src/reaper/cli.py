@@ -171,7 +171,8 @@ def run_reaper():
             print(f"      [🚨] ZOMBIE DETECTED: {vm_name} (Score: {res['score']})")
 
     # Check Disks
-    for disk in disks.get("disks", []):
+    disks_data = disks.get("disks", []) if isinstance(disks, dict) else []
+    for disk in disks_data:
         disk_data = {
             "name": disk["name"],
             "type": "Disk",

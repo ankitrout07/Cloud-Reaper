@@ -29,9 +29,15 @@ if not DATABASE_URL:
     db_path = os.path.join(data_dir, "reaper.db")
     DATABASE_URL = f"sqlite:///{db_path}"
 
-engine = create_engine(
-    DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-)
+# Configure engine with connection pooling for better performance
+engine_config = {"connect_args": {"check_same_thread": False}} if "sqlite" in DATABASE_URL else {
+    "pool_size": 10,
+    "max_overflow": 20,
+    "pool_pre_ping": True,  # Verify connections before using
+    "pool_recycle": 3600,  # Recycle connections after 1 hour
+}
+
+engine = create_engine(DATABASE_URL, **engine_config)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -198,7 +204,7 @@ class CloudResource(Base):
     resource_type = Column(String, nullable=False)  # virtual_machines, disks
     region = Column(String, nullable=False)
     cost_attributes = Column(JSON, nullable=False)  # Engine-agnostic storage replacement for JSONB
-    last_scanned = Column(DateTime, default=datetime.utcnow)
+    last_scanned = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
 class Budget(Base):

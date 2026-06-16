@@ -6,6 +6,7 @@ import subprocess
 import threading
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,9 @@ load_dotenv()
 
 _GLOBAL_CACHE: dict[str, tuple[float, Any]] = {}
 _CACHE_LOCK = threading.Lock()
+
+# Shared thread pool for concurrent operations to avoid creating new executors repeatedly
+_SHARED_EXECUTOR = ThreadPoolExecutor(max_workers=10, thread_name_prefix="azure_collector")
 
 
 def get_cached_data(cache_key, fetch_fn, ttl_seconds=60):
@@ -152,8 +156,6 @@ class AzureCollector:
             f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
         )
 
-        from concurrent.futures import ThreadPoolExecutor
-
         idle_vms = []
 
         def _check_idle_vm(vm):
@@ -190,9 +192,8 @@ class AzureCollector:
                 pass
             return None
 
-        # Query in parallel to eliminate long loading lag in dashboard
-        with ThreadPoolExecutor(max_workers=min(len(vms), 10)) as executor:
-            results = list(executor.map(_check_idle_vm, vms))
+        # Query in parallel using shared executor to eliminate long loading lag in dashboard
+        results = list(_SHARED_EXECUTOR.map(_check_idle_vm, vms))
 
         for res in results:
             if res:
@@ -313,8 +314,6 @@ class AzureCollector:
         if not vms:
             return None
 
-        from concurrent.futures import ThreadPoolExecutor
-
         def _fetch_cpu(vm):
             try:
                 resource_group = vm.id.split("/")[4]
@@ -326,9 +325,8 @@ class AzureCollector:
             except Exception:
                 return 0.0
 
-        # Execute CPU checks in parallel (up to max_vms threads) to avoid sequential network delays
-        with ThreadPoolExecutor(max_workers=min(len(vms), max_vms)) as executor:
-            values = list(executor.map(_fetch_cpu, vms[:max_vms]))
+        # Execute CPU checks in parallel using shared executor to avoid sequential network delays
+        values = list(_SHARED_EXECUTOR.map(_fetch_cpu, vms[:max_vms]))
 
         if not values:
             return None

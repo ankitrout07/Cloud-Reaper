@@ -128,26 +128,44 @@ SOCKET_METRICS_INTERVAL_SEC = int(os.getenv("REAPER_METRICS_EMIT_SEC", "8"))
 
 def background_metrics_worker():
     """Fetches Azure Monitor CPU samples and pushes over WebSocket (throttled)."""
-
+    error_count = 0
+    max_errors = 5
+    
     while True:
-        socketio.sleep(SOCKET_METRICS_INTERVAL_SEC)
-        now = datetime.datetime.now(datetime.UTC).strftime("%H:%M:%S")
-        cpu_usage = None
         try:
-            if not is_first_run():
-                az = AzureCollector()
-                cpu_usage = az.get_live_subscription_cpu_average(max_vms=6)
-        except Exception as e:
-            print(f"[!] Metrics Worker Error: {e}")
-        if cpu_usage is not None:
-            cpu_usage = round(float(cpu_usage), 2)
+            socketio.sleep(SOCKET_METRICS_INTERVAL_SEC)
+            now = datetime.datetime.now(datetime.UTC).strftime("%H:%M:%S")
+            cpu_usage = None
+            
             try:
-                socketio.emit(
-                    "metric_update",
-                    {"time": now, "value": cpu_usage},
-                )
+                if not is_first_run():
+                    az = AzureCollector()
+                    cpu_usage = az.get_live_subscription_cpu_average(max_vms=6)
+                    error_count = 0  # Reset error count on success
             except Exception as e:
-                print(f"[!] Metrics emit error: {e}")
+                error_count += 1
+                print(f"[!] Metrics Worker Error ({error_count}/{max_errors}): {e}")
+                
+                # If too many consecutive errors, increase sleep interval to reduce load
+                if error_count >= max_errors:
+                    print("[!] Too many consecutive errors, backing off for 60 seconds")
+                    socketio.sleep(60)
+                    error_count = 0
+                    
+            if cpu_usage is not None:
+                cpu_usage = round(float(cpu_usage), 2)
+                try:
+                    socketio.emit(
+                        "metric_update",
+                        {"time": now, "value": cpu_usage},
+                    )
+                except Exception as e:
+                    print(f"[!] Metrics emit error: {e}")
+                    
+        except Exception as e:
+            print(f"[!] Critical error in metrics worker: {e}")
+            # Prevent rapid crash loops by sleeping longer on critical errors
+            socketio.sleep(30)
 
 
 # Start the worker after the app is ready

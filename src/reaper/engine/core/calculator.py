@@ -69,34 +69,70 @@ class CostCalculator:
 
         return round(total, 6)
 
+    def _validate_price_item(self, item):
+        """Validate and extract price item data. Returns (sku, price_float, category) or (None, None, None)."""
+        if not isinstance(item, dict):
+            logger.debug(f"Skipping non-dict price item: {type(item).__name__}")
+            return None, None, None
+
+        # Normalizing Azure Retail Prices API schema
+        service = item.get("serviceName", "").lower()
+        sku = item.get("armSkuName", item.get("meterName", "")).lower()
+        price = item.get("retailPrice", 0.0)
+
+        # Validate required fields
+        if not sku:
+            logger.debug("Skipping price item with missing SKU")
+            return None, None, None
+
+        # Validate price is a number
+        try:
+            price_float = float(price)
+            if price_float < 0:
+                logger.debug(f"Skipping price item with negative price: {price_float}")
+                return None, None, None
+        except (ValueError, TypeError):
+            logger.debug(f"Skipping price item with invalid price: {price}")
+            return None, None, None
+
+        # Internal mapping: Azure API 'Virtual Machines' -> 'compute'
+        category = None
+        if "virtual machines" in service:
+            category = "compute"
+        elif "storage" in service:
+            category = "storage"
+
+        return sku, price_float, category
+
     def load_prices(self, price_data):
         """
         Dynamically updates the price book with live data from the Go collector.
         Supports both raw list of price items and wrapped ScanResult dictionary.
         """
         if not price_data:
+            logger.warning("Empty price data received")
             return
 
         # Extract items if wrapped in 'prices' key
         items = price_data.get("prices", []) if isinstance(price_data, dict) else price_data
 
         if not isinstance(items, list):
-            logger.warning("Invalid price data format received.")
+            logger.warning(f"Invalid price data format: expected list, got {type(items).__name__}")
             return
+
+        if not items:
+            logger.warning("Empty price items list received")
+            return
+
+        processed_count = 0
+        skipped_count = 0
 
         for item in items:
             try:
-                # Normalizing Azure Retail Prices API schema
-                service = item.get("serviceName", "").lower()
-                sku = item.get("armSkuName", item.get("meterName", "")).lower()
-                price = item.get("retailPrice", 0.0)
-
-                # Internal mapping: Azure API 'Virtual Machines' -> 'compute'
-                category = None
-                if "virtual machines" in service:
-                    category = "compute"
-                elif "storage" in service:
-                    category = "storage"
+                sku, price_float, category = self._validate_price_item(item)
+                if sku is None:
+                    skipped_count += 1
+                    continue
 
                 if category and sku:
                     if "azure" not in self.prices["providers"]:
@@ -105,19 +141,24 @@ class CostCalculator:
                         self.prices["providers"]["azure"][category] = {}
 
                     # Store both SKU and normalized SKU
-                    self.prices["providers"]["azure"][category][sku] = price
+                    self.prices["providers"]["azure"][category][sku] = price_float
 
                     # Also map to 'disk' if it's storage for compatibility
                     if category == "storage":
                         if "disk" not in self.prices["providers"]["azure"]:
                             self.prices["providers"]["azure"]["disk"] = {}
-                        self.prices["providers"]["azure"]["disk"][sku] = price
+                        self.prices["providers"]["azure"]["disk"][sku] = price_float
+
+                    processed_count += 1
+                else:
+                    skipped_count += 1
 
             except Exception as e:
                 logger.debug(f"Error processing price item: {e}")
+                skipped_count += 1
                 continue
 
-        logger.info(f"Price Book synchronized with {len(items)} live entries.")
+        logger.info(f"Price Book synchronized: {processed_count} entries loaded, {skipped_count} skipped.")
 
     def reload_prices(self):
         """
