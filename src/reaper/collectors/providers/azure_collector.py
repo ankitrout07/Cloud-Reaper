@@ -623,23 +623,27 @@ class AzureCollector:
                     avg_cpu = 0.0
                     try:
                         from azure.mgmt.monitor import MonitorManagementClient
-                        monitor_client = MonitorManagementClient(self.credentials, self.subscription_id)
-                        
+
+                        monitor_client = MonitorManagementClient(
+                            self.credentials, self.subscription_id
+                        )
+
                         resource_id = f"/subscriptions/{self.subscription_id}/resourceGroups/{server.resource_group_name}/providers/Microsoft.Sql/servers/{server.name}/databases/{db.name}"
-                        
+
                         # Get CPU metrics for the last 24 hours
                         from datetime import datetime, timedelta
+
                         end_time = datetime.utcnow()
                         start_time = end_time - timedelta(hours=24)
-                        
+
                         metrics_data = monitor_client.metrics.list(
                             resource_id,
                             timespan=f"{start_time.isoformat()}/{end_time.isoformat()}",
                             interval="PT1H",
                             metricnames="cpu_percent",
-                            aggregation="Average"
+                            aggregation="Average",
                         )
-                        
+
                         if metrics_data.value:
                             data_points = []
                             for item in metrics_data.value:
@@ -647,7 +651,7 @@ class AzureCollector:
                                     for point in timeseries.data:
                                         if point.average is not None:
                                             data_points.append(point.average)
-                            
+
                             if data_points:
                                 avg_cpu = sum(data_points) / len(data_points)
                                 is_idle = avg_cpu < 5.0  # Consider idle if average CPU < 5%
@@ -655,7 +659,7 @@ class AzureCollector:
                         print(f"[!] Error checking SQL database metrics for {db.name}: {e}")
                         # Default to not idle if metrics check fails
                         is_idle = False
-                    
+
                     databases.append(
                         {
                             "name": db.name,

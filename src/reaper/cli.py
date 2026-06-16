@@ -125,7 +125,7 @@ def run_reaper():
     total_monthly_saving = 0.0
 
     print("\n[+] AZURE: Initializing Resource Inventory...")
-    
+
     try:
         az = AzureCollector()
     except Exception as e:

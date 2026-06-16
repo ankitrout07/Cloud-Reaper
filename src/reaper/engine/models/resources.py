@@ -286,6 +286,7 @@ def get_db_session():
 
 def retry_on_db_error(max_retries=3, delay=1.0):
     """Decorator to retry database operations on transient errors."""
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -299,9 +300,11 @@ def retry_on_db_error(max_retries=3, delay=1.0):
                         time.sleep(delay * (attempt + 1))
                     else:
                         raise
-                except Exception as e:
+                except Exception:
                     # Don't retry non-database errors
                     raise
             raise last_exception
+
         return wrapper
+
     return decorator

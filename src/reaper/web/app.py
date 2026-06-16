@@ -18,7 +18,6 @@ import subprocess
 import tempfile
 import threading
 import time
-import traceback
 from pathlib import Path
 from typing import Any, cast
 
@@ -79,38 +78,185 @@ from reaper.web.vault_crypto import (
 
 load_dotenv()
 
+
 # Sample price data fallbacks when API calls fail
 def get_azure_sample_prices():
     """Provide sample Azure pricing data for testing when API is unavailable."""
     return [
-        {"sku": "Standard_B2s", "name": "Standard_B2s", "service": "Virtual Machines", "region": "eastus", "price": 0.0528, "rate": 0.0528, "hourly_price": 0.0528},
-        {"sku": "Standard_D4s_v5", "name": "Standard_D4s_v5", "service": "Virtual Machines", "region": "eastus", "price": 0.367, "rate": 0.367, "hourly_price": 0.367},
-        {"sku": "Standard_D8s_v5", "name": "Standard_D8s_v5", "service": "Virtual Machines", "region": "eastus", "price": 0.704, "rate": 0.704, "hourly_price": 0.704},
-        {"sku": "Standard_D2s_v4", "name": "Standard_D2s_v4", "service": "Virtual Machines", "region": "westus2", "price": 0.0472, "rate": 0.0472, "hourly_price": 0.0472},
-        {"sku": "Standard_F4s", "name": "Standard_F4s", "service": "Virtual Machines", "region": "eastus", "price": 0.656, "rate": 0.656, "hourly_price": 0.656},
-        {"sku": "Standard_NC6s_v3", "name": "Standard_NC6s_v3", "service": "Virtual Machines", "region": "westeurope", "price": 2.673, "rate": 2.673, "hourly_price": 2.673},
+        {
+            "sku": "Standard_B2s",
+            "name": "Standard_B2s",
+            "service": "Virtual Machines",
+            "region": "eastus",
+            "price": 0.0528,
+            "rate": 0.0528,
+            "hourly_price": 0.0528,
+        },
+        {
+            "sku": "Standard_D4s_v5",
+            "name": "Standard_D4s_v5",
+            "service": "Virtual Machines",
+            "region": "eastus",
+            "price": 0.367,
+            "rate": 0.367,
+            "hourly_price": 0.367,
+        },
+        {
+            "sku": "Standard_D8s_v5",
+            "name": "Standard_D8s_v5",
+            "service": "Virtual Machines",
+            "region": "eastus",
+            "price": 0.704,
+            "rate": 0.704,
+            "hourly_price": 0.704,
+        },
+        {
+            "sku": "Standard_D2s_v4",
+            "name": "Standard_D2s_v4",
+            "service": "Virtual Machines",
+            "region": "westus2",
+            "price": 0.0472,
+            "rate": 0.0472,
+            "hourly_price": 0.0472,
+        },
+        {
+            "sku": "Standard_F4s",
+            "name": "Standard_F4s",
+            "service": "Virtual Machines",
+            "region": "eastus",
+            "price": 0.656,
+            "rate": 0.656,
+            "hourly_price": 0.656,
+        },
+        {
+            "sku": "Standard_NC6s_v3",
+            "name": "Standard_NC6s_v3",
+            "service": "Virtual Machines",
+            "region": "westeurope",
+            "price": 2.673,
+            "rate": 2.673,
+            "hourly_price": 2.673,
+        },
     ]
+
 
 def get_aws_sample_prices():
     """Provide sample AWS pricing data for testing when API is unavailable."""
     return [
-        {"sku": "t3.micro", "name": "t3.micro", "service": "Virtual Machines", "region": "us-east-1", "price": 0.0020, "rate": 0.0020, "hourly_price": 0.0020},
-        {"sku": "t3.small", "name": "t3.small", "service": "Virtual Machines", "region": "us-east-1", "price": 0.0104, "rate": 0.0104, "hourly_price": 0.0104},
-        {"sku": "t3.medium", "name": "t3.medium", "service": "Virtual Machines", "region": "us-east-1", "price": 0.0416, "rate": 0.0416, "hourly_price": 0.0416},
-        {"sku": "t3.large", "name": "t3.large", "service": "Virtual Machines", "region": "us-west-2", "price": 0.0832, "rate": 0.0832, "hourly_price": 0.0832},
-        {"sku": "m5.large", "name": "m5.large", "service": "Virtual Machines", "region": "us-east-1", "price": 0.115, "rate": 0.115, "hourly_price": 0.115},
-        {"sku": "c5.large", "name": "c5.large", "service": "Virtual Machines", "region": "us-west-2", "price": 0.210, "rate": 0.210, "hourly_price": 0.210},
+        {
+            "sku": "t3.micro",
+            "name": "t3.micro",
+            "service": "Virtual Machines",
+            "region": "us-east-1",
+            "price": 0.0020,
+            "rate": 0.0020,
+            "hourly_price": 0.0020,
+        },
+        {
+            "sku": "t3.small",
+            "name": "t3.small",
+            "service": "Virtual Machines",
+            "region": "us-east-1",
+            "price": 0.0104,
+            "rate": 0.0104,
+            "hourly_price": 0.0104,
+        },
+        {
+            "sku": "t3.medium",
+            "name": "t3.medium",
+            "service": "Virtual Machines",
+            "region": "us-east-1",
+            "price": 0.0416,
+            "rate": 0.0416,
+            "hourly_price": 0.0416,
+        },
+        {
+            "sku": "t3.large",
+            "name": "t3.large",
+            "service": "Virtual Machines",
+            "region": "us-west-2",
+            "price": 0.0832,
+            "rate": 0.0832,
+            "hourly_price": 0.0832,
+        },
+        {
+            "sku": "m5.large",
+            "name": "m5.large",
+            "service": "Virtual Machines",
+            "region": "us-east-1",
+            "price": 0.115,
+            "rate": 0.115,
+            "hourly_price": 0.115,
+        },
+        {
+            "sku": "c5.large",
+            "name": "c5.large",
+            "service": "Virtual Machines",
+            "region": "us-west-2",
+            "price": 0.210,
+            "rate": 0.210,
+            "hourly_price": 0.210,
+        },
     ]
+
 
 def get_gcp_sample_prices():
     """Provide sample GCP pricing data for testing when API is unavailable."""
     return [
-        {"sku": "e2-small", "name": "e2-small", "service": "Compute Engine", "region": "us-central1", "price": 0.020, "rate": 0.020, "hourly_price": 0.020},
-        {"sku": "e2-medium", "name": "e2-medium", "service": "Compute Engine", "region": "us-central1", "price": 0.032, "rate": 0.032, "hourly_price": 0.032},
-        {"sku": "n2-standard-2", "name": "n2-standard-2", "service": "Compute Engine", "region": "us-east4", "price": 0.068, "rate": 0.068, "hourly_price": 0.068},
-        {"sku": "n2-standard-4", "name": "n2-standard-4", "service": "Compute Engine", "region": "us-central1", "price": 0.136, "rate": 0.136, "hourly_price": 0.136},
-        {"sku": "n2-highmem-4", "name": "n2-highmem-4", "service": "Compute Engine", "region": "us-west1", "price": 0.161, "rate": 0.161, "hourly_price": 0.161},
-        {"sku": "n2-highcpu-4", "name": "n2-highcpu-4", "service": "Compute Engine", "region": "asia-south1", "price": 0.200, "rate": 0.200, "hourly_price": 0.200},
+        {
+            "sku": "e2-small",
+            "name": "e2-small",
+            "service": "Compute Engine",
+            "region": "us-central1",
+            "price": 0.020,
+            "rate": 0.020,
+            "hourly_price": 0.020,
+        },
+        {
+            "sku": "e2-medium",
+            "name": "e2-medium",
+            "service": "Compute Engine",
+            "region": "us-central1",
+            "price": 0.032,
+            "rate": 0.032,
+            "hourly_price": 0.032,
+        },
+        {
+            "sku": "n2-standard-2",
+            "name": "n2-standard-2",
+            "service": "Compute Engine",
+            "region": "us-east4",
+            "price": 0.068,
+            "rate": 0.068,
+            "hourly_price": 0.068,
+        },
+        {
+            "sku": "n2-standard-4",
+            "name": "n2-standard-4",
+            "service": "Compute Engine",
+            "region": "us-central1",
+            "price": 0.136,
+            "rate": 0.136,
+            "hourly_price": 0.136,
+        },
+        {
+            "sku": "n2-highmem-4",
+            "name": "n2-highmem-4",
+            "service": "Compute Engine",
+            "region": "us-west1",
+            "price": 0.161,
+            "rate": 0.161,
+            "hourly_price": 0.161,
+        },
+        {
+            "sku": "n2-highcpu-4",
+            "name": "n2-highcpu-4",
+            "service": "Compute Engine",
+            "region": "asia-south1",
+            "price": 0.200,
+            "rate": 0.200,
+            "hourly_price": 0.200,
+        },
     ]
 
 
@@ -467,7 +613,7 @@ def connect_azure():
     data = request.json
     if not data:
         return jsonify({"status": "error", "message": "Request body is required."}), 400
-    
+
     fields = ["subscription_id", "tenant_id", "client_id", "client_secret"]
     if not all(data.get(f) for f in fields):
         return jsonify({"status": "error", "message": "All fields are required."}), 400
@@ -567,9 +713,7 @@ def switch_context():
                 }
             )
 
-        db.query(CloudConnection).filter_by(provider_type=provider).update(
-            {"is_active": False}
-        )
+        db.query(CloudConnection).filter_by(provider_type=provider).update({"is_active": False})
         conn.is_active = True
         db.commit()
         _set_cloud_env(provider, conn.credentials)
@@ -625,9 +769,7 @@ def connect_cloud():
         _set_cloud_env(provider, credentials)
         db = SessionLocal()
         try:
-            db.query(CloudConnection).filter_by(provider_type=provider).update(
-                {"is_active": False}
-            )
+            db.query(CloudConnection).filter_by(provider_type=provider).update({"is_active": False})
 
             conn = CloudConnection(
                 provider_type=provider,
@@ -681,7 +823,7 @@ def vault_setup():
     data = request.json or {}
     if not data:
         return jsonify({"status": "error", "message": "Request body is required."}), 400
-    
+
     passcode = (data.get("passcode") or "").strip()
     confirm = (data.get("confirm") or "").strip()
     passcode_type = (data.get("passcode_type") or "password").strip().lower()
@@ -748,11 +890,11 @@ def vault_unlock():
     data = request.json or {}
     if not data:
         return jsonify({"status": "error", "message": "Request body is required."}), 400
-    
+
     passcode = (data.get("passcode") or "").strip()
     if not passcode:
         return jsonify({"status": "error", "message": "Passcode is required."}), 400
-    
+
     settings = _vault_settings_row()
     if not settings:
         return jsonify({"status": "error", "message": "Vault is not configured yet."}), 400
@@ -806,7 +948,7 @@ def vault_create_entry():
     data = request.json or {}
     if not data:
         return jsonify({"status": "error", "message": "Request body is required."}), 400
-    
+
     label = (data.get("label") or "").strip()
     entry_type = (data.get("entry_type") or "credential").strip().lower()
     value = (data.get("value") or "").strip()
@@ -822,7 +964,7 @@ def vault_create_entry():
     try:
         token = fernet.encrypt(json.dumps(payload).encode("utf-8")).decode("utf-8")
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Encryption failed: {str(e)}"}), 500
+        return jsonify({"status": "error", "message": f"Encryption failed: {e!s}"}), 500
 
     db = SessionLocal()
     try:
@@ -862,7 +1004,7 @@ def vault_get_entry(entry_id: int):
                 fernet.decrypt(row.encrypted_payload.encode("utf-8")).decode("utf-8")
             )
         except Exception as e:
-            return jsonify({"status": "error", "message": f"Unable to decrypt entry: {str(e)}"}), 500
+            return jsonify({"status": "error", "message": f"Unable to decrypt entry: {e!s}"}), 500
         return jsonify(
             {
                 "status": "success",
