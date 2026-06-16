@@ -158,7 +158,9 @@ class CostCalculator:
                 skipped_count += 1
                 continue
 
-        logger.info(f"Price Book synchronized: {processed_count} entries loaded, {skipped_count} skipped.")
+        logger.info(
+            f"Price Book synchronized: {processed_count} entries loaded, {skipped_count} skipped."
+        )
 
     def reload_prices(self):
         """

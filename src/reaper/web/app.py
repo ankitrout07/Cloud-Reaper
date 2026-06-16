@@ -130,13 +130,13 @@ def background_metrics_worker():
     """Fetches Azure Monitor CPU samples and pushes over WebSocket (throttled)."""
     error_count = 0
     max_errors = 5
-    
+
     while True:
         try:
             socketio.sleep(SOCKET_METRICS_INTERVAL_SEC)
             now = datetime.datetime.now(datetime.UTC).strftime("%H:%M:%S")
             cpu_usage = None
-            
+
             try:
                 if not is_first_run():
                     az = AzureCollector()
@@ -145,13 +145,13 @@ def background_metrics_worker():
             except Exception as e:
                 error_count += 1
                 print(f"[!] Metrics Worker Error ({error_count}/{max_errors}): {e}")
-                
+
                 # If too many consecutive errors, increase sleep interval to reduce load
                 if error_count >= max_errors:
                     print("[!] Too many consecutive errors, backing off for 60 seconds")
                     socketio.sleep(60)
                     error_count = 0
-                    
+
             if cpu_usage is not None:
                 cpu_usage = round(float(cpu_usage), 2)
                 try:
@@ -161,7 +161,7 @@ def background_metrics_worker():
                     )
                 except Exception as e:
                     print(f"[!] Metrics emit error: {e}")
-                    
+
         except Exception as e:
             print(f"[!] Critical error in metrics worker: {e}")
             # Prevent rapid crash loops by sleeping longer on critical errors

@@ -6,7 +6,7 @@ import requests
 def send_discord_alert(title, message, color=0x3B82F6, webhook_url=None, async_mode=True):
     """
     Sends a rich notification to Discord via Webhooks.
-    
+
     Args:
         title: Alert title
         message: Alert message content
@@ -49,7 +49,7 @@ def send_discord_alert(title, message, color=0x3B82F6, webhook_url=None, async_m
 def send_slack_alert(message, webhook_url=None, async_mode=True):
     """
     Sends a simple text alert to Slack.
-    
+
     Args:
         message: Alert message content
         webhook_url: Slack webhook URL
@@ -62,7 +62,7 @@ def send_slack_alert(message, webhook_url=None, async_mode=True):
         return False
 
     payload = {"text": message}
-    
+
     def _send_alert():
         try:
             response = requests.post(webhook_url, json=payload, timeout=10)
