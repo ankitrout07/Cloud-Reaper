@@ -1,78 +1,227 @@
 {% extends "layouts/_base.html" if not request.headers.get("HX-Request") else "layouts/_empty.html" %}
 {% block content %}
-<main class="app-main flex-1 p-8 lg:p-10 overflow-y-auto">
-        <div class="max-w-5xl mx-auto">
-            <section id="kubernetes" class="glass-morph p-6 mb-8 border border-cyan-500/20 scroll-mt-24">
-                <div class="doc-header border-0 pb-0 mb-3">
-                    <i class="fas fa-dharmachakra text-cyan-400 text-xl"></i>
-                    <h2>Kubernetes Agent</h2>
-                </div>
-                <p class="text-xs text-slate-400 leading-relaxed">
-                    Deploy the in-cluster Cloud Reaper agent to scrape node utilization, correlate pod waste with the
-                    pricing cache, and stream telemetry into the FinOps intelligence layer. Enable the agent from
-                    <a href="/integrations" class="text-cyan-400 hover:underline">Integrations</a> and connect your cluster via Settings → Cloud Providers.
-                </p>
-            </section>
+<main class="app-main flex-1 overflow-hidden">
+    <div class="flex h-full">
+        <!-- Mobile Sidebar Toggle -->
+        <button id="mobile-sidebar-toggle" class="lg:hidden fixed top-4 left-4 z-50 px-4 py-2 bg-[var(--accent-primary)] text-white rounded-lg shadow-lg">
+            <i class="fas fa-bars mr-2"></i>Menu
+        </button>
 
-            <header class="mb-10">
-                <h1 class="text-4xl font-black tracking-tighter glow-text-cyan uppercase">System <span
-                        class="text-cyan-400">Documentation</span></h1>
-                <p class="text-gray-500 text-xs mt-2 font-bold uppercase tracking-widest">
-                    Product Docs, Feature Guides, and Changelogs
-                </p>
-            </header>
-
-            <!-- Premium RAG Vector Search Bar -->
-            <div class="mb-8 max-w-2xl relative">
-                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <i class="fas fa-search text-cyan-400"></i>
-                </div>
-                <input type="text" id="doc-search-input" placeholder="Search documentation contextually... (e.g. how do I fix idle compute)" 
-                       class="w-full pl-10 pr-24 py-3 bg-[#161a22] border border-cyan-500/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition text-sm">
-                <button onclick="triggerDocSearch()" class="absolute right-2 top-2 px-4 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-black text-xs font-black uppercase rounded-lg transition">
-                    Search
-                </button>
-            </div>
-
-            <!-- RAG Search Results Panel -->
-            <div id="search-results-panel" class="hidden mb-8 p-6 glass-morph border border-cyan-500/30" style="background: rgba(18, 21, 26, 0.95);">
-                <div class="flex justify-between items-center mb-4 pb-2 border-b border-white/5">
-                    <h3 class="text-cyan-400 text-xs font-black uppercase tracking-wider"><i class="fas fa-magic mr-2"></i> RAG Semantic Matches</h3>
-                    <button onclick="closeSearchResults()" class="text-gray-500 hover:text-white transition"><i class="fas fa-times"></i></button>
-                </div>
-                <div id="search-results-content" class="space-y-4">
-                    <!-- Dynamic Results -->
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
-                <!-- Navigation Sidebar -->
-                <div class="md:col-span-1 space-y-2" id="doc-nav-sidebar">
-                    {% for doc in docs_data %}
-                    <button onclick="showDoc('{{ doc.filename }}')" 
-                            id="nav-btn-{{ doc.filename }}" 
-                            class="w-full text-left block p-3.5 glass-morph {% if loop.first %}text-cyan-400 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]{% else %}text-gray-400 border border-white/5{% endif %} text-xs font-black uppercase tracking-wider hover:bg-white/5 hover:text-white transition-all duration-300">
-                        <i class="far fa-file-alt mr-2 text-[10px] {% if loop.first %}text-cyan-400{% else %}text-gray-500{% endif %}" id="nav-icon-{{ doc.filename }}"></i>
-                        {{ doc.title }}
+        <!-- Documentation Sidebar -->
+        <aside id="docs-sidebar" class="w-72 flex-shrink-0 border-r border-[var(--border-default)] bg-[var(--bg-secondary)] overflow-y-auto fixed inset-y-0 left-0 z-40 transform -translate-x-full lg:translate-x-0 lg:relative transition-transform duration-300">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <a href="/" class="inline-flex items-center gap-3 text-[var(--text-primary)] hover:text-[var(--accent-primary)] transition">
+                            <i class="fas fa-arrow-left text-sm"></i>
+                            <span class="text-sm font-semibold">Back</span>
+                        </a>
+                    </div>
+                    <button id="close-sidebar-btn" class="lg:hidden text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                        <i class="fas fa-times text-xl"></i>
                     </button>
-                    {% endfor %}
+                </div>
+                
+                <div class="mb-8">
+                    <h1 class="text-2xl font-bold text-[var(--text-primary)] mb-2">
+                        <span class="text-[var(--accent-primary)]">Cloud</span> Reaper
+                    </h1>
+                    <p class="text-xs text-[var(--text-tertiary)]">
+                        Documentation & Guides
+                    </p>
                 </div>
 
-                <!-- Main Content -->
-                <div class="md:col-span-3 space-y-8" id="doc-content-container">
-                    {% for doc in docs_data %}
-                    <section id="section-{{ doc.filename }}" class="glass-morph doc-section {% if not loop.first %}hidden{% endif %} transition-opacity duration-300">
-                        <div class="doc-header">
-                            <i class="fas fa-file-alt text-cyan-400 text-xl"></i>
-                            <h2>{{ doc.title }}</h2>
+                <!-- Search -->
+                <div class="relative mb-6">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm"></i>
+                    <input type="text" id="doc-search-input" 
+                           placeholder="Search docs..." 
+                           class="w-full pl-10 pr-4 py-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-lg text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition">
+                </div>
+
+                <!-- Navigation -->
+                <nav class="space-y-6">
+                    <!-- Getting Started -->
+                    <div>
+                        <h3 class="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Getting Started</h3>
+                        <ul class="space-y-1">
+                            {% for doc in docs_data %}
+                            <li>
+                                <button onclick="showDoc('{{ doc.filename }}')" 
+                                        id="nav-btn-{{ doc.filename }}" 
+                                        class="w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 {% if loop.first %}bg-[var(--accent-subtle)] text-[var(--accent-primary)] border-l-2 border-[var(--accent-primary)]{% else %}text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]{% endif %}">
+                                    <i class="fas fa-file-alt mr-2 text-xs opacity-60"></i>
+                                    {{ doc.title }}
+                                </button>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    <!-- API Reference -->
+                    <div>
+                        <h3 class="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">API Reference</h3>
+                        <ul class="space-y-1">
+                            <li>
+                                <a href="#" class="block px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] transition">
+                                    <i class="fas fa-code mr-2 text-xs opacity-60"></i>
+                                    REST API
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="block px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] transition">
+                                    <i class="fas fa-plug mr-2 text-xs opacity-60"></i>
+                                    Webhooks
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Guides -->
+                    <div>
+                        <h3 class="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-3">Guides</h3>
+                        <ul class="space-y-1">
+                            <li>
+                                <a href="#" class="block px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] transition">
+                                    <i class="fas fa-book mr-2 text-xs opacity-60"></i>
+                                    Budget Management
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="block px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] transition">
+                                    <i class="fas fa-shield-alt mr-2 text-xs opacity-60"></i>
+                                    Security
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto">
+            <div class="max-w-5xl mx-auto px-8 py-10">
+                <!-- Breadcrumb -->
+                <div class="mb-6 flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                    <a href="/" class="hover:text-[var(--accent-primary)] transition">Home</a>
+                    <i class="fas fa-chevron-right text-xs"></i>
+                    <span class="text-[var(--text-primary)]">Documentation</span>
+                </div>
+
+                <!-- Page Header -->
+                <header class="mb-10">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-secondary)] flex items-center justify-center">
+                            <i class="fas fa-book text-white text-xl"></i>
                         </div>
-                        <div class="prose prose-invert max-w-none text-xs text-slate-300 doc-markdown-body" data-markdown-content="{{ doc.content | escape }}">
-                            <!-- Dynamic Markdown Rendered HTML goes here -->
+                        <div>
+                            <h1 class="text-4xl font-bold text-[var(--text-primary)]">
+                                System <span class="text-[var(--accent-primary)]">Documentation</span>
+                            </h1>
+                            <p class="text-[var(--text-tertiary] text-sm mt-1">
+                                Comprehensive guides, API reference, and feature documentation
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="flex gap-4 mt-6">
+                        <div class="px-4 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-lg">
+                            <span class="text-[var(--text-muted)] text-xs">{{ docs_data|length }} Docs</span>
+                        </div>
+                        <div class="px-4 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-lg">
+                            <span class="text-[var(--text-muted)] text-xs">REST API</span>
+                        </div>
+                        <div class="px-4 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-lg">
+                            <span class="text-[var(--text-muted)] text-xs">Guides</span>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Mobile Search -->
+                <div class="lg:hidden mb-6">
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm"></i>
+                        <input type="text" id="doc-search-input-mobile" 
+                               placeholder="Search documentation..." 
+                               class="w-full pl-10 pr-4 py-3 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-lg text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--accent-primary)] transition">
+                    </div>
+                </div>
+
+                <!-- Search Results Panel -->
+                <div id="search-results-panel" class="hidden mb-8 p-6 glass-card border-[var(--accent-primary)]">
+                    <div class="flex justify-between items-center mb-4 pb-3 border-b border-[var(--border-default)]">
+                        <h3 class="text-[var(--accent-primary)] text-sm font-bold uppercase tracking-wider">
+                            <i class="fas fa-magic mr-2"></i>Search Results
+                        </h3>
+                        <button onclick="closeSearchResults()" class="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div id="search-results-content" class="space-y-3">
+                        <!-- Dynamic Results -->
+                    </div>
+                </div>
+
+                <!-- Documentation Content -->
+                <div id="doc-content-container" class="space-y-8">
+                    {% for doc in docs_data %}
+                    <section id="section-{{ doc.filename }}" class="doc-section {% if not loop.first %}hidden{% endif %}">
+                        <div class="glass-card p-8 border-[var(--border-default)]">
+                            <!-- Section Header -->
+                            <div class="flex items-center gap-3 mb-6 pb-4 border-b border-[var(--border-default)]">
+                                <div class="w-10 h-10 rounded-lg bg-[var(--accent-subtle)] border border-[var(--accent-primary)] flex items-center justify-center">
+                                    <i class="fas fa-file-alt text-[var(--accent-primary)]"></i>
+                                </div>
+                                <div>
+                                    <h2 class="text-2xl font-bold text-[var(--text-primary)]">{{ doc.title }}</h2>
+                                    <p class="text-sm text-[var(--text-muted)] mt-0.5">{{ doc.filename }}</p>
+                                </div>
+                            </div>
+
+                            <!-- Markdown Content -->
+                            <div class="doc-markdown-body prose prose-invert max-w-none text-[var(--text-secondary)] leading-relaxed" 
+                                 data-markdown-content="{{ doc.content | escape }}"
+                                 style="
+                                    --prose-body: var(--text-secondary);
+                                    --prose-headings: var(--text-primary);
+                                    --prose-links: var(--accent-primary);
+                                    --prose-bold: var(--text-primary);
+                                    --prose-code: var(--text-primary);
+                                    --prose-pre-bg: var(--bg-tertiary);
+                                    --prose-pre-code: var(--text-primary);
+                                    --prose-quote-borders: var(--accent-primary);
+                                 ">
+                            </div>
+                        </div>
+
+                        <!-- Table of Contents (Generated dynamically) -->
+                        <div class="mt-6 p-6 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-xl">
+                            <h4 class="text-sm font-bold text-[var(--text-primary)] mb-4">
+                                <i class="fas fa-list mr-2 text-[var(--accent-primary)]"></i>On This Page
+                            </h4>
+                            <ul id="toc-{{ doc.filename }}" class="space-y-2 text-sm">
+                                <!-- Dynamic TOC -->
+                            </ul>
                         </div>
                     </section>
                     {% endfor %}
                 </div>
+
+                <!-- Footer -->
+                <footer class="mt-16 pt-8 border-t border-[var(--border-default)]">
+                    <div class="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-[var(--text-muted)]">
+                        <p>&copy; 2024 Cloud Reaper. All rights reserved.</p>
+                        <div class="flex gap-4">
+                            <a href="#" class="hover:text-[var(--accent-primary)] transition">GitHub</a>
+                            <a href="#" class="hover:text-[var(--accent-primary)] transition">Discord</a>
+                            <a href="#" class="hover:text-[var(--accent-primary)] transition">Support</a>
+                        </div>
+                    </div>
+                </footer>
             </div>
-        </div>
-    </main>
+        </main>
+    </div>
+</main>
 {% endblock %}
