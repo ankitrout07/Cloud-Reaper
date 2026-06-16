@@ -266,9 +266,7 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
             try:
                 # Try creating symlink (requires sudo)
                 subprocess.run(
-                    ["sudo", "ln", "-s", webkit_4_1, webkit_4_0],
-                    check=False,
-                    capture_output=True
+                    ["sudo", "ln", "-s", webkit_4_1, webkit_4_0], check=False, capture_output=True
                 )
                 if os.path.exists(webkit_4_0):
                     print(c("  ✓ pkg-config shim created", GREEN))
@@ -290,7 +288,7 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
     print(c(f"  Building → {output_path}", CYAN))
     build_env = os.environ.copy()
     # Add pkg-config path to environment if we set it earlier
-    if "PKG_CONFIG_PATH" in os.environ and os.environ["PKG_CONFIG_PATH"]:
+    if os.environ.get("PKG_CONFIG_PATH"):
         build_env["PKG_CONFIG_PATH"] = os.environ["PKG_CONFIG_PATH"]
 
     if not run_cmd([go_bin, "build", "-o", str(output_path), "."], cwd=engine_dir, env=build_env):
@@ -414,7 +412,7 @@ def _init_database() -> bool:
             env=env,
             capture_output=True,
             text=True,
-            check=False
+            check=False,
         )
 
         if result.returncode == 0:
@@ -423,10 +421,9 @@ def _init_database() -> bool:
             else:
                 print(c(f"  Database created: {db_path}", GREEN))
             return True
-        else:
-            print(c(f"  Database initialization warning: {result.stderr}", YELLOW))
-            # Don't fail - SQLite will auto-create on first use
-            return True
+        print(c(f"  Database initialization warning: {result.stderr}", YELLOW))
+        # Don't fail - SQLite will auto-create on first use
+        return True
     except Exception as e:
         print(c(f"  Database initialization: {e}", YELLOW))
         # Don't fail - SQLite will auto-create on first use
