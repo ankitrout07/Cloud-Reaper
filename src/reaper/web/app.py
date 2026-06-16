@@ -927,9 +927,11 @@ def simulate_commitment():
 def test_webhook():
     """Test webhook endpoint for alert integration testing."""
     from reaper.engine.notifications.notifier import send_discord_alert
-    
+
     try:
-        send_discord_alert("Test Alert", "This is a test notification from Cloud-Reaper.", color=0x3B82F6)
+        send_discord_alert(
+            "Test Alert", "This is a test notification from Cloud-Reaper.", color=0x3B82F6
+        )
         return jsonify({"status": "success", "message": "Test webhook triggered successfully"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -1091,21 +1093,17 @@ def auth_status():
 def docs_search():
     """Search endpoint for documentation using RAG engine."""
     from reaper.rag.engine import RAGEngine
-    
+
     try:
         query = request.json.get("query", "")
         if not query:
             return jsonify({"status": "error", "message": "Query is required"}), 400
-        
+
         # Initialize RAG engine
         rag_engine = RAGEngine()
         results = rag_engine.search(query)
-        
-        return jsonify({
-            "status": "success",
-            "results": results,
-            "query": query
-        })
+
+        return jsonify({"status": "success", "results": results, "query": query})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -1114,16 +1112,18 @@ def docs_search():
 def telemetry_insights():
     """Generate telemetry insights for the integrations page."""
     try:
-        return jsonify({
-            "status": "success",
-            "message": "Telemetry insights generated",
-            "insights": {
-                "total_requests": 15420,
-                "avg_response_time": "245ms",
-                "error_rate": "0.02%",
-                "active_connections": 42
+        return jsonify(
+            {
+                "status": "success",
+                "message": "Telemetry insights generated",
+                "insights": {
+                    "total_requests": 15420,
+                    "avg_response_time": "245ms",
+                    "error_rate": "0.02%",
+                    "active_connections": 42,
+                },
             }
-        })
+        )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
