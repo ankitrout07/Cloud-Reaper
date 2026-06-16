@@ -186,7 +186,7 @@ def cmd_check(args: argparse.Namespace) -> int:  # noqa: ARG001
     print(c("\n[✗] One or more required tools are missing. Install them and retry.\n", RED))
     print("    Ubuntu quick-install hints:")
     print(
-        "      sudo apt-get update && sudo apt-get install -y golang-go docker.io pkg-config libwebkit2gtk-4.0-dev libgtk-3-dev"
+        "      sudo apt-get update && sudo apt-get install -y golang-go docker.io pkg-config libwebkit2gtk-4.1-dev libgtk-3-dev"
     )
     print("      curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash")
     return 1
@@ -255,6 +255,28 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
         print("    # or follow https://golang.org/dl/")
         return 1
 
+    # Create pkg-config shim for webkit2gtk-4.0 -> webkit2gtk-4.1 if needed
+    if platform.system() == "Linux":
+        pkg_config_path = "/usr/lib/x86_64-linux-gnu/pkgconfig"
+        webkit_4_0 = os.path.join(pkg_config_path, "webkit2gtk-4.0.pc")
+        webkit_4_1 = os.path.join(pkg_config_path, "webkit2gtk-4.1.pc")
+
+        if os.path.exists(webkit_4_1) and not os.path.exists(webkit_4_0):
+            print(c("  Creating pkg-config shim for webkit2gtk-4.0 → webkit2gtk-4.1", CYAN))
+            try:
+                # Try creating symlink (requires sudo)
+                subprocess.run(
+                    ["sudo", "ln", "-s", webkit_4_1, webkit_4_0],
+                    check=False,
+                    capture_output=True
+                )
+                if os.path.exists(webkit_4_0):
+                    print(c("  ✓ pkg-config shim created", GREEN))
+            except Exception:
+                # If sudo fails, try setting PKG_CONFIG_PATH environment variable
+                print(c("  ! Could not create shim (requires sudo), using workaround", YELLOW))
+                os.environ["PKG_CONFIG_PATH"] = pkg_config_path
+
     engine_dir = REPO_ROOT / "src" / "engine-go"
     bin_dir = REPO_ROOT / "bin"
     bin_dir.mkdir(exist_ok=True)
@@ -266,8 +288,14 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
         return 1
 
     print(c(f"  Building → {output_path}", CYAN))
-    if not run_cmd([go_bin, "build", "-o", str(output_path), "."], cwd=engine_dir):
-        return 1
+    build_env = os.environ.copy()
+    # Add pkg-config path to environment if we set it earlier
+    if "PKG_CONFIG_PATH" in os.environ and os.environ["PKG_CONFIG_PATH"]:
+        build_env["PKG_CONFIG_PATH"] = os.environ["PKG_CONFIG_PATH"]
+
+    if not run_cmd([go_bin, "build", "-o", str(output_path), "."], cwd=engine_dir, env=build_env):
+        print(c("[!] Go engine build failed. Dashboard features may be limited.", YELLOW))
+        return 0  # Return 0 to continue since this is not critical
 
     # Ensure binary is executable on Unix
     if platform.system() != "Windows":
@@ -367,20 +395,38 @@ def _init_database() -> bool:
     db_path = data_dir / "reaper.db"
 
     try:
-        # Import the models to create tables
-        import sys
-
-        sys.path.insert(0, str(REPO_ROOT / "src"))
-
-        from reaper.engine.models.resources import init_db
-
-        init_db()
-
-        if db_path.exists():
-            print(c(f"  Database ready: {db_path}", GREEN))
+        # Use venv Python for database initialization to ensure all dependencies are available
+        venv_dir, py_exe = _require_venv()
+        if py_exe is None:
+            print(c("  Virtual environment not found, skipping database initialization", YELLOW))
             return True
-        print(c(f"  Database created: {db_path}", GREEN))
-        return True
+
+        env = merge_venv_into_environ(venv_dir)
+        env["PYTHONPATH"] = str((REPO_ROOT / "src").resolve())
+
+        # Force SQLite for initialization to avoid PostgreSQL dependency issues
+        env["DATABASE_URL"] = f"sqlite:///{db_path}"
+
+        # Use the venv Python to run database initialization
+        result = subprocess.run(
+            [py_exe, "-c", "from reaper.engine.models.resources import init_db; init_db()"],
+            cwd=str(REPO_ROOT),
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if result.returncode == 0:
+            if db_path.exists():
+                print(c(f"  Database ready: {db_path}", GREEN))
+            else:
+                print(c(f"  Database created: {db_path}", GREEN))
+            return True
+        else:
+            print(c(f"  Database initialization warning: {result.stderr}", YELLOW))
+            # Don't fail - SQLite will auto-create on first use
+            return True
     except Exception as e:
         print(c(f"  Database initialization: {e}", YELLOW))
         # Don't fail - SQLite will auto-create on first use
@@ -403,12 +449,11 @@ def cmd_web(args: argparse.Namespace) -> int:
     env["PYTHONPATH"] = str((REPO_ROOT / "src").resolve())
     env["FLASK_PORT"] = str(port)
 
-    # Use SQLite by default (no DATABASE_URL needed)
-    if "DATABASE_URL" not in env or not env.get("DATABASE_URL"):
-        data_dir = REPO_ROOT / "data"
-        data_dir.mkdir(exist_ok=True)
-        db_path = data_dir / "reaper.db"
-        env["DATABASE_URL"] = f"sqlite:///{db_path}"
+    # Use SQLite by default for local development (override any PostgreSQL URL from .env)
+    data_dir = REPO_ROOT / "data"
+    data_dir.mkdir(exist_ok=True)
+    db_path = data_dir / "reaper.db"
+    env["DATABASE_URL"] = f"sqlite:///{db_path}"
 
     # Initialize database
     _init_database()
