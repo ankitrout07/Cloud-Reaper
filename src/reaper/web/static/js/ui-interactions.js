@@ -259,8 +259,53 @@ window.runScan = async () => {
 };
 
 window.filterType = (type) => {
-    // In a real app, this would filter DOM elements or fetch filtered data
+    // Update tab styling
+    document.querySelectorAll('.type-tab').forEach(tab => {
+        tab.classList.remove('text-cyan-400', 'border-b-2', 'border-cyan-400');
+        tab.classList.add('text-gray-500');
+    });
+    
+    const activeTab = document.querySelector(`[data-filter="${type}"]`);
+    if (activeTab) {
+        activeTab.classList.remove('text-gray-500');
+        activeTab.classList.add('text-cyan-400', 'border-b-2', 'border-cyan-400');
+    }
+    
+    // Filter table rows
+    const tableBody = document.getElementById('target-list');
+    if (tableBody) {
+        const rows = tableBody.querySelectorAll('tr');
+        rows.forEach(row => {
+            if (type === 'ALL') {
+                row.style.display = '';
+            } else {
+                const rowType = row.getAttribute('data-type');
+                if (rowType === type) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+    }
+    
     notify(`Filtering dashboard by type: ${type}`, "success");
+};
+
+window.filterTable = () => {
+    const searchTerm = document.getElementById('resourceSearch')?.value.toLowerCase();
+    const tableBody = document.getElementById('target-list');
+    if (!tableBody) return;
+    
+    const rows = tableBody.querySelectorAll('tr');
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(searchTerm)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
 };
 
 window.fetchActivity = async () => {

@@ -131,3 +131,49 @@ function initializeSidebarHighlighting() {
 }
 
 document.addEventListener('DOMContentLoaded', initializeSidebarHighlighting);
+
+// Additional settings functions
+window.refreshSubs = async () => {
+    try {
+        const response = await fetch('/api/settings/subscriptions');
+        const data = await response.json();
+        if (data.status === 'success') {
+            if (typeof showToast === "function") {
+                showToast("Subscriptions refreshed.", "success");
+            }
+            // Update subscription list if element exists
+            const subList = document.getElementById('sub-checklist');
+            if (subList && data.subscriptions) {
+                subList.innerHTML = data.subscriptions.map(sub => `
+                    <label class="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10 hover:border-cyan-500/30 cursor-pointer transition">
+                        <input type="checkbox" value="${sub.id}" class="w-4 h-4 rounded border-white/20 bg-white/10 text-cyan-500 focus:ring-cyan-500/30">
+                        <span class="text-xs font-medium text-slate-300">${sub.name}</span>
+                    </label>
+                `).join('');
+            }
+        }
+    } catch (error) {
+        if (typeof showToast === "function") {
+            showToast("Failed to refresh subscriptions.", "error");
+        }
+    }
+};
+
+window.checkAuth = async () => {
+    try {
+        const response = await fetch('/api/settings/auth');
+        const data = await response.json();
+        if (data.status === 'success') {
+            const pulse = document.getElementById("auth-pulse");
+            if (pulse) {
+                if (data.authenticated) {
+                    pulse.className = "w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_15px_rgba(0,242,255,0.6)] animate-pulse";
+                } else {
+                    pulse.className = "w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.6)] animate-pulse";
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Auth check failed:", error);
+    }
+};
