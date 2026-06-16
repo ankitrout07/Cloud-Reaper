@@ -121,9 +121,189 @@ async function postApiUpdate(action, payload = {}) {
     }
 }
 
-window.saveBudgetCap = () => {
+// Budget data loading
+window.loadBudgetData = async () => {
+    try {
+        const response = await fetch('/api/finops/budget/data');
+        const data = await response.json();
+        if (data.status === 'success') {
+            const budget = data.data;
+            // Update UI elements
+            const capEl = document.getElementById('display-budget-cap');
+            if (capEl) capEl.textContent = `$${budget.budget_cap}`;
+            
+            const burnRateEl = document.getElementById('display-burn-rate');
+            if (burnRateEl) burnRateEl.textContent = `$${budget.burn_rate.toFixed(2)}`;
+            
+            const forecastEl = document.getElementById('display-forecast');
+            if (forecastEl) forecastEl.textContent = `$${budget.forecast.toFixed(2)}`;
+            
+            const percentText = document.getElementById('budget-percentage-text');
+            if (percentText) percentText.textContent = `${budget.utilization_percent.toFixed(1)}% used`;
+            
+            const progressBar = document.getElementById('budget-progress-bar');
+            if (progressBar) progressBar.style.width = `${Math.min(budget.utilization_percent, 100)}%`;
+        }
+    } catch (e) {
+        console.error('Failed to load budget data:', e);
+    }
+};
+
+// Load budget chart
+window.loadBudgetChart = async () => {
+    try {
+        const response = await fetch('/api/finops/budget/chart');
+        const data = await response.json();
+        if (data.status === 'success' && typeof Chart !== 'undefined') {
+            // Update or create budget chart
+            const ctx = document.getElementById('budgetChart');
+            if (ctx) {
+                // Chart update logic would go here
+                console.log('Budget chart data loaded:', data.chart);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load budget chart:', e);
+    }
+};
+
+// Load issues data
+window.loadIssuesData = async () => {
+    try {
+        const response = await fetch('/api/finops/issues/data');
+        const data = await response.json();
+        if (data.status === 'success') {
+            // Update issues list
+            const issuesList = document.getElementById('issues-list-container');
+            if (issuesList && data.data.issues) {
+                // Dynamic rendering would go here
+                console.log('Issues loaded:', data.data.issues);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load issues data:', e);
+    }
+};
+
+// Load commitments data
+window.loadCommitmentsData = async () => {
+    try {
+        const response = await fetch('/api/finops/commitments/data');
+        const data = await response.json();
+        if (data.status === 'success') {
+            const commitments = data.data.active_commitments;
+            const portfolio = document.getElementById('commitments-portfolio-container');
+            if (portfolio && commitments) {
+                // Update portfolio UI
+                console.log('Commitments loaded:', commitments);
+            }
+            
+            // Update coverage stats
+            const coverage = data.data.coverage_analysis;
+            if (coverage) {
+                console.log('Coverage analysis:', coverage);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load commitments data:', e);
+    }
+};
+
+// Enhanced commitment simulation
+window.updateSimSavings = async () => {
+    const provider = document.getElementById('sim-provider')?.value;
+    const type = document.getElementById('sim-type')?.value;
+    const term = document.getElementById('sim-term')?.value;
+    const hourly = document.getElementById('sim-hourly-spend')?.value;
+    
+    if (hourly) {
+        try {
+            const response = await fetch('/api/finops/commitment/simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    provider,
+                    type,
+                    term,
+                    payment: 'no_upfront',
+                    hourly_spend: hourly
+                })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                const sim = data.simulation;
+                document.getElementById('sim-est-annually').textContent = `$${sim.annual_savings}`;
+                document.getElementById('sim-est-rate').textContent = `${sim.discount_rate} discount`;
+            }
+        } catch (e) {
+            console.error('Simulation failed:', e);
+        }
+    }
+};
+
+// Enhanced policy simulation
+window.updateWhatIfModel = async () => {
+    const policyLevel = document.getElementById('input-policy-level')?.value;
+    const spotLevel = document.getElementById('input-spot-level')?.value;
+    
+    try {
+        const response = await fetch('/api/finops/policy/simulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                aggressiveness: policyLevel,
+                spot_adoption: spotLevel
+            })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+            const sim = data.simulation;
+            document.getElementById('val-policy-level').textContent = `${sim.policy_aggressiveness}%`;
+            document.getElementById('val-spot-level').textContent = `${sim.spot_adoption}%`;
+            document.getElementById('display-model-savings').textContent = `$${sim.monthly_savings}`;
+            document.getElementById('display-model-co2').textContent = `${sim.carbon_offset_kg} kg CO2e`;
+            document.getElementById('display-model-trees').textContent = `${sim.trees_equivalent} Trees / mo`;
+        }
+    } catch (e) {
+        console.error('Policy simulation failed:', e);
+    }
+};
+
+// Initialize financial intelligence data on page load
+window.initFinancialIntelligence = () => {
+    loadBudgetData();
+    loadBudgetChart();
+    loadIssuesData();
+    loadCommitmentsData();
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.location.pathname === '/financial') {
+        initFinancialIntelligence();
+    }
+});
+
+window.saveBudgetCap = async () => {
     const threshold = document.getElementById('budget-cap')?.value || document.getElementById('budget-threshold')?.value;
-    if(threshold) postApiUpdate('update_billing', { threshold: parseFloat(threshold) });
+    if(threshold) {
+        try {
+            const response = await fetch('/api/finops/budget/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ threshold: parseFloat(threshold) })
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                notify(data.message, "success");
+                // Refresh budget data
+                loadBudgetData();
+            } else {
+                notify(data.message || "Failed to update budget", "error");
+            }
+        } catch (e) {
+            notify("Error updating budget cap.", "error");
+        }
+    }
 };
 
 window.saveWebhooks = () => {
@@ -183,18 +363,23 @@ window.submitNewMetric = async () => {
 
 window.remediateIssue = async (id, action) => {
     try {
-        const response = await fetch('/api/finops/anomalies/triage', {
+        const response = await fetch('/api/finops/issues/remediate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ anomaly_id: id, action: action })
+            body: JSON.stringify({ issue_id: id, action: action })
         });
         const data = await response.json();
         if (data.status === 'success') {
             const el = document.getElementById(id);
-            if (el) el.style.opacity = '0.5';
-            notify(`Issue ${id} triaged: ${action}`, "success");
+            if (el) {
+                el.style.opacity = '0.5';
+                el.style.pointerEvents = 'none';
+            }
+            notify(`Issue ${id} remediated: ${action}`, "success");
+            // Refresh issues list
+            loadIssuesData();
         } else {
-            notify("Failed to triage issue.", "error");
+            notify("Failed to remediate issue.", "error");
         }
     } catch (e) {
         notify("Error triaging issue.", "error");
@@ -202,24 +387,74 @@ window.remediateIssue = async (id, action) => {
 };
 
 window.purchaseSimCommitment = async () => {
+    const provider = document.getElementById('sim-provider')?.value;
+    const type = document.getElementById('sim-type')?.value;
+    const term = document.getElementById('sim-term')?.value;
+    const payment = 'no_upfront';
+    const hourly_spend = document.getElementById('sim-hourly-spend')?.value;
+    
     try {
-        const response = await fetch('/api/v1/finops/simulate/commitment', { method: 'POST', headers: {'Content-Type': 'application/json'} });
+        const response = await fetch('/api/finops/commitment/simulate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider,
+                type,
+                term,
+                payment,
+                hourly_spend: parseFloat(hourly_spend)
+            })
+        });
         const data = await response.json();
-        if (data.status === 'success') {
-            notify(`Simulated commitment purchased. Est. Savings: $${data.savings_estimate}`, "success");
+        
+        // Purchase the commitment
+        const purchaseResponse = await fetch('/api/finops/commitment/purchase', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ simulation: data.simulation })
+        });
+        const purchaseData = await purchaseResponse.json();
+        
+        if (purchaseData.status === 'success') {
+            notify(`Simulated commitment purchased. Est. Savings: $${data.simulation.annual_savings}`, "success");
+            // Refresh commitments data
+            loadCommitmentsData();
         }
     } catch (e) {
         notify("Error simulating commitment.", "error");
     }
 };
-window.updateSimSavings = () => console.log("Sim savings updated visually");
-window.updateWhatIfModel = () => console.log("What-if model updated visually");
+
+// --- Dashboard (index.html) ---
 window.applyWhatIfPolicy = async () => {
+    const policyLevel = document.getElementById('input-policy-level')?.value;
+    const spotLevel = document.getElementById('input-spot-level')?.value;
+    
     try {
-        const response = await fetch('/api/v1/finops/simulate/policy', { method: 'POST', headers: {'Content-Type': 'application/json'} });
+        const response = await fetch('/api/finops/policy/apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                policy: {
+                    aggressiveness: policyLevel,
+                    spot_adoption: spotLevel
+                }
+            })
+        });
         const data = await response.json();
         if (data.status === 'success') {
-            notify(`Governance policy applied. Cost Impact: $${data.cost_impact}`, "success");
+            const simResponse = await fetch('/api/finops/policy/simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    aggressiveness: policyLevel,
+                    spot_adoption: spotLevel
+                })
+            });
+            const simData = await simResponse.json();
+            if (simData.status === 'success') {
+                notify(`Governance policy applied. Cost Impact: -$${simData.simulation.monthly_savings}/mo`, "success");
+            }
         }
     } catch (e) {
         notify("Error applying policy.", "error");
@@ -307,8 +542,7 @@ window.filterTable = () => {
 
 window.fetchActivity = async () => {
     try {
-        const response = await fetch('/api/finops/anomalies');
-        const data = await response.json();
+        await loadIssuesData();
         notify("Activity feed refreshed.", "success");
     } catch (e) {
         notify("Error fetching activity.", "error");
