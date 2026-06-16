@@ -1314,23 +1314,19 @@ class AzureCollector:
             # Use existing get_cost_vs_budget_series method
             budget = 5000.0  # Default budget
             data = self.get_cost_vs_budget_series(monthly_budget=budget)
-            
+
             cumulative_spend = data.get("cumulative_spend", 0)
             budget_pace = data.get("budget_pace", 0)
             daily_spend = data.get("daily_spend", [])
-            
+
             return {
                 "cumulative_spend": cumulative_spend,
                 "budget_pace": budget_pace,
-                "daily_spend": daily_spend
+                "daily_spend": daily_spend,
             }
-        except Exception as e:
+        except Exception:
             # Fallback to simulated data
-            return {
-                "cumulative_spend": 3420.50,
-                "budget_pace": 114.02,
-                "daily_spend": []
-            }
+            return {"cumulative_spend": 3420.50, "budget_pace": 114.02, "daily_spend": []}
 
     def get_cost_vs_budget_chart(self) -> dict:
         """
@@ -1339,21 +1335,22 @@ class AzureCollector:
         """
         try:
             import random
+
             # Generate simulated chart data
             labels = [f"Day {i}" for i in range(1, 31)]
             cumulative_spend = [random.uniform(100, 150) * i for i in range(1, 31)]
             budget_pace = [random.uniform(100, 150) * i * 0.95 for i in range(1, 31)]
-            
+
             return {
                 "labels": labels,
                 "cumulative_spend": cumulative_spend,
-                "budget_pace": budget_pace
+                "budget_pace": budget_pace,
             }
         except Exception:
             return {
                 "labels": [f"Day {i}" for i in range(1, 31)],
                 "cumulative_spend": [100 * i for i in range(1, 31)],
-                "budget_pace": [95 * i for i in range(1, 31)]
+                "budget_pace": [95 * i for i in range(1, 31)],
             }
 
     def get_active_commitments(self) -> list:
@@ -1363,30 +1360,56 @@ class AzureCollector:
         try:
             # Try to use existing RI data if available
             ri_candidates = self.get_ri_sp_candidates()
-            
+
             commitments = []
             # Convert RI candidates to commitment format
             for i, candidate in enumerate(ri_candidates.get("recommendations", [])[:2]):
-                commitments.append({
-                    "provider": "Azure",
-                    "type": "Reserved Instance",
-                    "commit": candidate.get("cost"),
-                    "savings": 40 + i * 5,
-                    "status": "active"
-                })
-            
+                commitments.append(
+                    {
+                        "provider": "Azure",
+                        "type": "Reserved Instance",
+                        "commit": candidate.get("cost"),
+                        "savings": 40 + i * 5,
+                        "status": "active",
+                    }
+                )
+
             # Add placeholder AWS commitment if no Azure data
             if not commitments:
                 commitments = [
-                    {"provider": "AWS", "type": "Savings Plan", "commit": "$2.50/hr", "savings": 32, "status": "active"},
-                    {"provider": "Azure", "type": "D4s_v5 RI", "quantity": 6, "savings": 41, "status": "active"}
+                    {
+                        "provider": "AWS",
+                        "type": "Savings Plan",
+                        "commit": "$2.50/hr",
+                        "savings": 32,
+                        "status": "active",
+                    },
+                    {
+                        "provider": "Azure",
+                        "type": "D4s_v5 RI",
+                        "quantity": 6,
+                        "savings": 41,
+                        "status": "active",
+                    },
                 ]
-            
+
             return commitments
         except Exception:
             return [
-                {"provider": "AWS", "type": "Savings Plan", "commit": "$2.50/hr", "savings": 32, "status": "active"},
-                {"provider": "Azure", "type": "D4s_v5 RI", "quantity": 6, "savings": 41, "status": "active"}
+                {
+                    "provider": "AWS",
+                    "type": "Savings Plan",
+                    "commit": "$2.50/hr",
+                    "savings": 32,
+                    "status": "active",
+                },
+                {
+                    "provider": "Azure",
+                    "type": "D4s_v5 RI",
+                    "quantity": 6,
+                    "savings": 41,
+                    "status": "active",
+                },
             ]
 
     def get_ri_coverage(self) -> dict:
@@ -1398,24 +1421,20 @@ class AzureCollector:
             # Try to get actual coverage from RI candidates
             ri_data = self.get_ri_sp_candidates()
             total_candidates = len(ri_data.get("recommendations", []))
-            
+
             # Calculate coverage based on candidates
             coverage = 62.4 if total_candidates < 5 else 75.0 + (total_candidates * 2)
             coverage = min(coverage, 95.0)  # Cap at 95%
-            
+
             waste_amount = 1185.00 if coverage < 70 else 500.00
-            
+
             return {
                 "overall_coverage": round(coverage, 1),
                 "waste_amount": round(waste_amount, 2),
-                "target_coverage": 90.0
+                "target_coverage": 90.0,
             }
         except Exception:
-            return {
-                "overall_coverage": 62.4,
-                "waste_amount": 1185.00,
-                "target_coverage": 90.0
-            }
+            return {"overall_coverage": 62.4, "waste_amount": 1185.00, "target_coverage": 90.0}
 
     def get_ri_recommendations(self) -> list:
         """
@@ -1424,26 +1443,46 @@ class AzureCollector:
         try:
             ri_data = self.get_ri_sp_candidates()
             recommendations = []
-            
+
             for candidate in ri_data.get("recommendations", [])[:3]:
-                recommendations.append({
-                    "sku": candidate.get("sku", "Unknown"),
-                    "region": candidate.get("region", "eastus"),
-                    "annual_savings": round(candidate.get("savings", 420.50), 2),
-                    "term": "1 year",
-                    "action": "Purchase RI"
-                })
-            
+                recommendations.append(
+                    {
+                        "sku": candidate.get("sku", "Unknown"),
+                        "region": candidate.get("region", "eastus"),
+                        "annual_savings": round(candidate.get("savings", 420.50), 2),
+                        "term": "1 year",
+                        "action": "Purchase RI",
+                    }
+                )
+
             if not recommendations:
                 recommendations = [
-                    {"sku": "Standard_D4s_v5", "region": "eastus", "annual_savings": 420.50, "term": "1 year", "action": "Purchase RI"},
-                    {"sku": "Standard_D2s_v3", "region": "westus2", "annual_savings": 280.00, "term": "3 years", "action": "Purchase RI"}
+                    {
+                        "sku": "Standard_D4s_v5",
+                        "region": "eastus",
+                        "annual_savings": 420.50,
+                        "term": "1 year",
+                        "action": "Purchase RI",
+                    },
+                    {
+                        "sku": "Standard_D2s_v3",
+                        "region": "westus2",
+                        "annual_savings": 280.00,
+                        "term": "3 years",
+                        "action": "Purchase RI",
+                    },
                 ]
-            
+
             return recommendations
         except Exception:
             return [
-                {"sku": "Standard_D4s_v5", "region": "eastus", "annual_savings": 420.50, "term": "3 years", "action": "Purchase RI"}
+                {
+                    "sku": "Standard_D4s_v5",
+                    "region": "eastus",
+                    "annual_savings": 420.50,
+                    "term": "3 years",
+                    "action": "Purchase RI",
+                }
             ]
 
     def get_cost_governance_issues(self) -> list:
@@ -1452,57 +1491,65 @@ class AzureCollector:
         Includes untagged resources, idle instances, orphaned resources, etc.
         """
         issues = []
-        
+
         try:
             # Get policy violations
             violations = self.get_policy_violations()
             for violation in violations.get("violations", [])[:3]:
-                issues.append({
-                    "id": f"issue-{len(issues) + 1}",
-                    "severity": "Critical" if violation.get("severity") == "high" else "Warning",
-                    "type": "Policy Violation",
-                    "title": violation.get("message", "Policy compliance issue"),
-                    "resource_id": violation.get("resource_id", "Unknown"),
-                    "daily_waste": violation.get("potential_savings", 22.40),
-                    "actions": ["DISMISS", "KILL"]
-                })
+                issues.append(
+                    {
+                        "id": f"issue-{len(issues) + 1}",
+                        "severity": "Critical"
+                        if violation.get("severity") == "high"
+                        else "Warning",
+                        "type": "Policy Violation",
+                        "title": violation.get("message", "Policy compliance issue"),
+                        "resource_id": violation.get("resource_id", "Unknown"),
+                        "daily_waste": violation.get("potential_savings", 22.40),
+                        "actions": ["DISMISS", "KILL"],
+                    }
+                )
         except Exception:
             pass
-        
+
         try:
             # Get idle VMs
             idle_vms = self.get_idle_vms()
             for vm in idle_vms[:2]:
                 if len(issues) < 5:
-                    issues.append({
-                        "id": f"issue-{len(issues) + 1}",
-                        "severity": "Warning",
-                        "type": "Idle Machine Alert",
-                        "title": f"Underutilized VM: {vm.get('name', 'Unknown')}",
-                        "resource_id": vm.get("resource_id", "Unknown"),
-                        "monthly_savings": 180.00,
-                        "actions": ["DISMISS", "RIGHTSIZE"]
-                    })
+                    issues.append(
+                        {
+                            "id": f"issue-{len(issues) + 1}",
+                            "severity": "Warning",
+                            "type": "Idle Machine Alert",
+                            "title": f"Underutilized VM: {vm.get('name', 'Unknown')}",
+                            "resource_id": vm.get("resource_id", "Unknown"),
+                            "monthly_savings": 180.00,
+                            "actions": ["DISMISS", "RIGHTSIZE"],
+                        }
+                    )
         except Exception:
             pass
-        
+
         try:
             # Get orphaned disks
             orphaned = self.get_orphaned_disks()
             for disk in orphaned[:2]:
                 if len(issues) < 5:
-                    issues.append({
-                        "id": f"issue-{len(issues) + 1}",
-                        "severity": "Info",
-                        "type": "Storage Optimization",
-                        "title": f"Orphaned Disk: {disk.get('name', 'Unknown')}",
-                        "resource_id": disk.get("resource_id", "Unknown"),
-                        "monthly_savings": 45.00,
-                        "actions": ["DISMISS", "DELETE"]
-                    })
+                    issues.append(
+                        {
+                            "id": f"issue-{len(issues) + 1}",
+                            "severity": "Info",
+                            "type": "Storage Optimization",
+                            "title": f"Orphaned Disk: {disk.get('name', 'Unknown')}",
+                            "resource_id": disk.get("resource_id", "Unknown"),
+                            "monthly_savings": 45.00,
+                            "actions": ["DISMISS", "DELETE"],
+                        }
+                    )
         except Exception:
             pass
-        
+
         # Fallback to simulated data if no issues found
         if not issues:
             issues = [
@@ -1513,7 +1560,7 @@ class AzureCollector:
                     "title": "Untagged Dev-Instance in EastUS",
                     "resource_id": "vm-az-dev-1052",
                     "daily_waste": 22.40,
-                    "actions": ["DISMISS", "KILL"]
+                    "actions": ["DISMISS", "KILL"],
                 },
                 {
                     "id": "issue-2",
@@ -1522,7 +1569,7 @@ class AzureCollector:
                     "title": "Underutilized compute core instances",
                     "resource_id": "vm-test-db-replica",
                     "monthly_savings": 180.00,
-                    "actions": ["DISMISS", "RIGHTSIZE"]
+                    "actions": ["DISMISS", "RIGHTSIZE"],
                 },
                 {
                     "id": "issue-3",
@@ -1531,10 +1578,10 @@ class AzureCollector:
                     "title": "Orphaned Snapshot Volumes",
                     "resource_id": "5 snapshots",
                     "monthly_savings": 45.00,
-                    "actions": ["DISMISS", "KILL"]
-                }
+                    "actions": ["DISMISS", "KILL"],
+                },
             ]
-        
+
         return issues
 
     def fetch_regional_prices(self, sku_id, region_name):
