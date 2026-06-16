@@ -10,8 +10,8 @@
                 <h1 class="text-4xl font-bold tracking-tight text-white uppercase">
                     Financial <span class="text-cyan-400">Intelligence</span>
                 </h1>
-                <p class="text-slate-400 mt-2 text-lg" id="header-subtitle">
-                    Manage budgets, unit economics, savings plans and policy configurations.
+                <p class="text-slate-400 mt-2 text-lg">
+                    Comprehensive budget management, cost analysis, and financial planning tools
                 </p>
             </div>
             
@@ -31,552 +31,412 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <!-- Sidebar Tab Navigation within Financial view -->
-            <div class="lg:col-span-1 flex flex-col gap-2">
-                <div class="glass-card p-4 border-white/5 flex flex-col gap-1">
-                    <p class="text-slate-500 text-xs font-bold uppercase tracking-widest px-3 mb-2">Category Views</p>
-                    
-                    <button onclick="switchTab('budget')" id="btn-budget" class="tab-btn w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-slate-300 font-semibold hover:bg-white/5">
+        <!-- Financial Intelligence Grid Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- SECTION 1: Budget Management -->
+            <div class="glass-card p-6 border-white/5">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                        Budget Pacing
-                    </button>
-                    
-                    <button onclick="switchTab('alerts')" id="btn-alerts" class="tab-btn w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-slate-300 font-semibold hover:bg-white/5">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                        Budget Alerts
-                    </button>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Budget Pacing & Alerts</h2>
+                        <p class="text-slate-400 text-sm">Track spending against budget and configure alert notifications</p>
+                    </div>
+                </div>
 
-                    <button onclick="switchTab('business-metrics')" id="btn-business-metrics" class="tab-btn w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-slate-300 font-semibold hover:bg-white/5">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                        Business Metrics
-                    </button>
+                <!-- Budget Overview -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
+                        <p class="text-slate-400 text-xs font-bold uppercase">Monthly Budget Cap</p>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <p class="text-2xl font-bold metric-value text-white" id="display-budget-cap">{{ settings.budget_threshold }}</p>
+                            <p class="text-slate-500 text-xs">USD</p>
+                        </div>
+                    </div>
+                    <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
+                        <p class="text-slate-400 text-xs font-bold uppercase">Current Burn Rate</p>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <p class="text-2xl font-bold metric-value text-cyan-400" id="display-burn-rate">$114.02</p>
+                            <p class="text-slate-500 text-xs">/ day</p>
+                        </div>
+                    </div>
+                    <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
+                        <p class="text-slate-400 text-xs font-bold uppercase">Month-End Forecast</p>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <p class="text-2xl font-bold metric-value text-emerald-400" id="display-forecast">$3,420.50</p>
+                            <p class="text-slate-500 text-xs">MTD</p>
+                        </div>
+                    </div>
+                </div>
 
-                    <button onclick="switchTab('commitment-reports')" id="btn-commitment-reports" class="tab-btn w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-slate-300 font-semibold hover:bg-white/5">
+                <!-- Budget Progress -->
+                <div class="mb-6">
+                    <div class="flex justify-between text-sm mb-2">
+                        <span class="text-slate-300 font-semibold">Spend Pacing Utilization</span>
+                        <span class="text-white font-bold metric-value" id="budget-percentage-text">0.0% used</span>
+                    </div>
+                    <div class="w-full h-3 bg-white/10 rounded-full overflow-hidden">
+                        <div id="budget-progress-bar" class="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="h-[220px] w-full relative">
+                    <canvas id="budgetChart"></canvas>
+                </div>
+            </div>
+
+            <!-- SECTION 2: Business Metrics -->
+            <div class="glass-card p-6 border-white/5">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    </div>
+                    <div class="flex-1">
+                        <h2 class="text-xl font-bold text-white">Business Metrics</h2>
+                        <p class="text-slate-400 text-sm">Align cloud expenditure with actual business drivers</p>
+                    </div>
+                    <button onclick="openAddMetricModal()" class="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-semibold transition">
+                        + Record Metric
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-white/10 text-slate-400">
+                                <th class="py-3 px-4">Metric Driver</th>
+                                <th class="py-3 px-4">Current Value</th>
+                                <th class="py-3 px-4">Allocated Spend</th>
+                                <th class="py-3 px-4">Unit Cost Ratio</th>
+                                <th class="py-3 px-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="metrics-table-tbody">
+                            {% for m in db_metrics %}
+                            <tr class="border-b border-white/5">
+                                <td class="py-3.5 px-4 font-semibold text-white uppercase tracking-wide">{{ m.metric_name.replace('_', ' ') }}</td>
+                                <td class="py-3.5 px-4 text-slate-300 metric-value">{{ "{:,.0f}".format(m.value) }} {{ m.unit }}</td>
+                                <td class="py-3.5 px-4 text-slate-300 metric-value">$855.12</td>
+                                <td class="py-3.5 px-4 text-cyan-400 font-bold metric-value">
+                                    {% if 'K' in m.unit %}
+                                        ${{ "{:.3f}".format(855.12 / (m.value / 1000)) }}
+                                    {% else %}
+                                        ${{ "{:.3f}".format(855.12 / m.value) }}
+                                    {% endif %}
+                                    <span class="text-slate-500 text-xs font-normal"> / {{ m.unit.split(' ')[-1] }}</span>
+                                </td>
+                                <td class="py-3.5 px-4"><span class="px-2 py-0.5 bg-emerald-400/10 text-emerald-400 text-xs rounded-full border border-emerald-400/20">Optimal</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECTION 3: Commitment Reports -->
+            <div class="glass-card p-6 border-white/5">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        Commitment Reports
-                    </button>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Commitment Reports</h2>
+                        <p class="text-slate-400 text-sm">RI and Savings Plan coverage analysis</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="h-[200px] w-full relative">
+                        <h4 class="text-slate-400 text-xs font-bold uppercase mb-4 text-center">Compute RI Coverage Profile</h4>
+                        <canvas id="coverageChart"></canvas>
+                    </div>
+                    <div class="flex flex-col justify-center gap-4">
+                        <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                            <span class="text-xs text-slate-400 block uppercase font-semibold">Overall Coverage Ratio</span>
+                            <span class="text-2xl font-bold text-cyan-400 metric-value">62.4%</span>
+                            <span class="text-slate-500 text-xs block mt-1">Goal target of 90.0% suggested</span>
+                        </div>
+                        <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                            <span class="text-xs text-slate-400 block uppercase font-semibold">Estimated Waste / On-Demand Premium</span>
+                            <span class="text-2xl font-bold text-rose-400 metric-value">$1,185.00 / mo</span>
+                            <span class="text-slate-500 text-xs block mt-1">Convertible to regional commitment coverage</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                    <button onclick="switchTab('issues')" id="btn-issues" class="tab-btn w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-slate-300 font-semibold hover:bg-white/5">
+            <!-- SECTION 4: Issues Inbox -->
+            <div class="glass-card p-6 border-white/5">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        Issues Inbox
-                    </button>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Issues Inbox</h2>
+                        <p class="text-slate-400 text-sm">Cost governance issues requiring optimization action</p>
+                    </div>
+                </div>
 
-                    <button onclick="switchTab('commitments')" id="btn-commitments" class="tab-btn w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-slate-300 font-semibold hover:bg-white/5">
+                <div class="flex flex-col gap-4">
+                    <!-- Issue 1 -->
+                    <div id="issue-1" class="border border-red-500/20 bg-red-500/5 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <span class="px-2.5 py-0.5 bg-red-500/10 text-red-400 text-xs font-bold rounded border border-red-500/20">Critical</span>
+                                <span class="text-slate-400 text-xs font-semibold">Compliance Tag Violation</span>
+                            </div>
+                            <h4 class="text-base font-bold text-white">Untagged Dev-Instance in EastUS</h4>
+                            <p class="text-xs text-slate-400 mt-1">Resource ID: <span class="metric-value">vm-az-dev-1052</span> | Daily waste: <span class="text-red-400 font-bold">$22.40/day</span></p>
+                        </div>
+                        <div class="flex gap-2 flex-wrap">
+                            <button onclick="remediateIssue('issue-1', 'DISMISS')" class="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold rounded-lg border border-white/10 transition">Bypass</button>
+                            <button onclick="remediateIssue('issue-1', 'KILL')" class="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-bold rounded-lg border border-red-500/30 transition">Authorize Kill</button>
+                        </div>
+                    </div>
+
+                    <!-- Issue 2 -->
+                    <div id="issue-2" class="border border-amber-500/20 bg-amber-500/5 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <span class="px-2.5 py-0.5 bg-amber-500/10 text-amber-400 text-xs font-bold rounded border border-amber-500/20">Warning</span>
+                                <span class="text-slate-400 text-xs font-semibold">Idle Machine Alert</span>
+                            </div>
+                            <h4 class="text-base font-bold text-white">Underutilized compute core instances (Average CPU < 2%)</h4>
+                            <p class="text-xs text-slate-400 mt-1">Resource ID: <span class="metric-value">vm-test-db-replica</span> | Potential monthly savings: <span class="text-amber-400 font-bold">$180.00</span></p>
+                        </div>
+                        <div class="flex gap-2 flex-wrap">
+                            <button onclick="remediateIssue('issue-2', 'DISMISS')" class="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold rounded-lg border border-white/10 transition">Dismiss</button>
+                            <button onclick="remediateIssue('issue-2', 'RIGHTSIZE')" class="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-bold rounded-lg border border-amber-500/30 transition">Rightsize SKU</button>
+                        </div>
+                    </div>
+
+                    <!-- Issue 3 -->
+                    <div id="issue-3" class="border border-blue-500/20 bg-blue-500/5 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <span class="px-2.5 py-0.5 bg-blue-500/10 text-blue-400 text-xs font-bold rounded border border-blue-500/20">Info</span>
+                                <span class="text-slate-400 text-xs font-semibold">Storage Optimization</span>
+                            </div>
+                            <h4 class="text-base font-bold text-white">Orphaned Snapshot Volumes (Unattached to any disks)</h4>
+                            <p class="text-xs text-slate-400 mt-1">Volume count: <span class="metric-value">5 snapshots</span> | Potential saving: <span class="text-cyan-400 font-bold">$45.00/mo</span></p>
+                        </div>
+                        <div class="flex gap-2 flex-wrap">
+                            <button onclick="remediateIssue('issue-3', 'DISMISS')" class="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold rounded-lg border border-white/10 transition">Keep snapshot</button>
+                            <button onclick="remediateIssue('issue-3', 'KILL')" class="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-xs font-bold rounded-lg border border-blue-500/30 transition">Clean Volumes</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 5: Commitments Manager -->
+            <div class="glass-card p-6 border-white/5">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        Commitments Manager
-                    </button>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Commitments Manager</h2>
+                        <p class="text-slate-400 text-sm">Active commitment portfolio and new commitment simulation</p>
+                    </div>
+                </div>
 
-                    <button onclick="switchTab('savings-models')" id="btn-savings-models" class="tab-btn w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 text-slate-300 font-semibold hover:bg-white/5">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Active Commitment List -->
+                    <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
+                        <h3 class="text-lg font-bold text-white mb-4">Active Commitment Portfolio</h3>
+                        
+                        <div class="flex flex-col gap-4">
+                            <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="px-2 py-0.5 bg-cyan-400/10 text-cyan-400 rounded text-[10px] font-bold">AWS</span>
+                                    <span class="text-slate-500 text-[10px] font-semibold">Active</span>
+                                </div>
+                                <h4 class="text-sm font-bold text-white">Compute Savings Plan</h4>
+                                <div class="flex justify-between text-xs mt-2 text-slate-400">
+                                    <span>Commit: <strong class="text-white font-normal metric-value">$2.50/hr</strong></span>
+                                    <span>Savings: <strong class="text-emerald-400 font-bold metric-value">32%</strong></span>
+                                </div>
+                            </div>
+
+                            <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="px-2 py-0.5 bg-blue-400/10 text-blue-400 rounded text-[10px] font-bold">Azure</span>
+                                    <span class="text-slate-500 text-[10px] font-semibold">Active</span>
+                                </div>
+                                <h4 class="text-sm font-bold text-white">D4s_v5 RI Reservation</h4>
+                                <div class="flex justify-between text-xs mt-2 text-slate-400">
+                                    <span>Quantity: <strong class="text-white font-normal metric-value">6 Instances</strong></span>
+                                    <span>Savings: <strong class="text-emerald-400 font-bold metric-value">41%</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Commitment Simulator -->
+                    <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
+                        <h3 class="text-lg font-bold text-white mb-4">Simulate New Commitment</h3>
+                        
+                        <div class="flex flex-col gap-3">
+                            <select id="sim-provider" class="glass-input w-full bg-slate-900 border-white/10 text-sm">
+                                <option value="AWS">Amazon Web Services</option>
+                                <option value="Azure">Microsoft Azure</option>
+                            </select>
+                            <select id="sim-type" class="glass-input w-full bg-slate-900 border-white/10 text-sm" onchange="updateSimSavings()">
+                                <option value="Savings Plan">Compute Savings Plan (Flexible)</option>
+                                <option value="RI">Reserved Instance SKU (Specific)</option>
+                            </select>
+                            <select id="sim-term" class="glass-input w-full bg-slate-900 border-white/10 text-sm" onchange="updateSimSavings()">
+                                <option value="1">1 Year Term (Standard)</option>
+                                <option value="3">3 Years Term (High discount)</option>
+                            </select>
+                            <input type="number" id="sim-hourly-spend" class="glass-input w-full metric-value" value="5.0" oninput="updateSimSavings()">
+                            
+                            <div class="bg-cyan-500/10 border border-cyan-400/20 p-3 rounded-xl flex justify-between items-center gap-4">
+                                <div>
+                                    <p class="text-cyan-400 text-xs uppercase font-bold">Est. Savings</p>
+                                    <p class="text-xl font-bold text-white metric-value" id="sim-est-annually">$12,264.00</p>
+                                </div>
+                                <button onclick="purchaseSimCommitment()" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-semibold transition text-sm">
+                                    Purchase
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 6: What-If Simulator -->
+            <div class="glass-card p-6 border-white/5">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-white">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-                        What-If Simulator
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">What-If Simulator</h2>
+                        <p class="text-slate-400 text-sm">Governance policy simulation with cost and carbon impact projections</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Policy Controls -->
+                    <div class="flex flex-col gap-6 justify-center">
+                        <div>
+                            <div class="flex justify-between text-sm mb-2 font-semibold">
+                                <span class="text-slate-300">Policy Aggressiveness Level</span>
+                                <span class="text-cyan-400 metric-value" id="val-policy-level">50%</span>
+                            </div>
+                            <input type="range" id="input-policy-level" min="0" max="100" value="50" oninput="updateWhatIfModel()">
+                            <p class="text-xs text-slate-500 mt-1">Adjust policy severity rules for shutting down unused assets.</p>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-sm mb-2 font-semibold">
+                                <span class="text-slate-300">Target Spot Instance Adoption</span>
+                                <span class="text-cyan-400 metric-value" id="val-spot-level">30%</span>
+                            </div>
+                            <input type="range" id="input-spot-level" min="0" max="100" value="30" oninput="updateWhatIfModel()">
+                            <p class="text-xs text-slate-500 mt-1">Replace standard production/development instances with cheaper spot cores.</p>
+                        </div>
+                    </div>
+
+                    <!-- Outcomes -->
+                    <div class="bg-white/5 p-6 rounded-2xl border border-white/10 flex flex-col justify-between gap-6 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl"></div>
+                        <div>
+                            <span class="text-slate-400 text-xs font-bold uppercase tracking-wider block">Projected Monthly Savings</span>
+                            <span class="text-4xl font-extrabold text-emerald-400 mt-1 block metric-value animate-pulse-soft" id="display-model-savings">$820.00</span>
+                            <span class="text-slate-500 text-xs block mt-1">Equivalent to 24.5% of total budget spend</span>
+                        </div>
+
+                        <div class="flex justify-between gap-4 border-t border-white/5 pt-4">
+                            <div>
+                                <span class="text-slate-400 text-xs font-bold uppercase tracking-wider block">Carbon Footprint Offsets</span>
+                                <span class="text-lg font-bold text-white mt-0.5 block metric-value" id="display-model-co2">184.2 kg CO2e</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-slate-400 text-xs font-bold uppercase tracking-wider block">Equivalent Tree Seeds</span>
+                                <span class="text-lg font-bold text-cyan-400 mt-0.5 block metric-value" id="display-model-trees">8.2 Trees / mo</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end">
+                    <button onclick="applyWhatIfPolicy()" class="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-bold transition">
+                        Apply governance policy
                     </button>
                 </div>
             </div>
 
-            <!-- Main Interactive Display Pane -->
-            <div class="lg:col-span-3">
+            <!-- Full-Width Alert Configuration Section -->
+            <div class="glass-card p-6 border-white/5 lg:col-span-2">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-500 to-gray-600 flex items-center justify-center text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Alert Configuration</h2>
+                        <p class="text-slate-400 text-sm">Configure webhook notifications for budget alerts and compliance warnings</p>
+                    </div>
+                </div>
                 
-                <!-- 1. BUDGET TAB -->
-                <div id="tab-content-budget" class="tab-pane hidden flex flex-col gap-6">
-                    <div class="glass-card p-6 border-white/5">
-                        <h2 class="text-2xl font-bold text-white mb-2">Budget Tracking & Forecasting</h2>
-                        <p class="text-slate-400 text-sm mb-6">Compare actual cumulative daily spend against configured threshold and baseline trajectory.</p>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                            <div class="bg-white/5 border border-white/5 p-5 rounded-2xl">
-                                <p class="text-slate-400 text-xs font-bold uppercase">Monthly Budget Cap</p>
-                                <div class="flex items-baseline gap-2 mt-2">
-                                    <p class="text-3xl font-bold metric-value text-white" id="display-budget-cap">${{ settings.budget_threshold }}</p>
-                                    <p class="text-slate-500 text-xs">USD</p>
-                                </div>
-                            </div>
-                            <div class="bg-white/5 border border-white/5 p-5 rounded-2xl">
-                                <p class="text-slate-400 text-xs font-bold uppercase">Current Burn Rate</p>
-                                <div class="flex items-baseline gap-2 mt-2">
-                                    <p class="text-3xl font-bold metric-value text-cyan-400" id="display-burn-rate">$114.02</p>
-                                    <p class="text-slate-500 text-xs">/ day</p>
-                                </div>
-                            </div>
-                            <div class="bg-white/5 border border-white/5 p-5 rounded-2xl">
-                                <p class="text-slate-400 text-xs font-bold uppercase">Month-End Forecast</p>
-                                <div class="flex items-baseline gap-2 mt-2">
-                                    <p class="text-3xl font-bold metric-value text-emerald-400" id="display-forecast">$3,420.50</p>
-                                    <p class="text-slate-500 text-xs">MTD</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Progress Bar -->
-                        <div class="mb-8">
-                            <div class="flex justify-between text-sm mb-2">
-                                <span class="text-slate-300 font-semibold">Spend Pacing Utilization</span>
-                                <span class="text-white font-bold metric-value" id="budget-percentage-text">0.0% used</span>
-                            </div>
-                            <div class="w-full h-3 bg-white/10 rounded-full overflow-hidden">
-                                <div id="budget-progress-bar" class="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500" style="width: 0%"></div>
-                            </div>
-                        </div>
-
-                        <div class="h-[320px] w-full relative mb-6">
-                            <canvas id="budgetChart"></canvas>
-                        </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="p-4 rounded-xl border border-[#5865F2]/25 bg-[#5865F2]/5">
+                        <label class="text-[#a5b4fc] text-xs uppercase font-bold flex items-center gap-2 mb-2">
+                            <i class="fab fa-discord text-[#5865F2] text-lg"></i> Discord Webhook URL
+                        </label>
+                        <input type="text" id="discord-webhook-url" class="glass-input w-full border-[#5865F2]/20 focus:border-[#5865F2]/50" placeholder="https://discord.com/api/webhooks/..." value="{{ settings.discord_webhook_url or '' }}">
                     </div>
-
-                    <!-- Manage Budget Cap -->
-                    <div class="glass-card p-6 border-white/5">
-                        <h3 class="text-lg font-bold text-white mb-2">Configure Budget Threshold Cap</h3>
-                        <p class="text-slate-400 text-sm mb-6">Update your monthly Cloud spend budget. An alert triggers when daily pacing indicates a threshold breach.</p>
-                        
-                        <div class="flex flex-col md:flex-row gap-4 items-end">
-                            <div class="flex-1">
-                                <label class="text-slate-400 text-xs uppercase font-bold block mb-2">Threshold Limit ($)</label>
-                                <input type="number" id="input-budget-cap" class="glass-input w-full metric-value" value="{{ settings.budget_threshold }}">
-                            </div>
-                            <button onclick="saveBudgetCap()" class="px-6 py-3.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-semibold transition shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                                Apply Changes
-                            </button>
-                        </div>
+                    
+                    <div class="p-4 rounded-xl border border-[#E01E5A]/25 bg-[#E01E5A]/5">
+                        <label class="text-[#fda4af] text-xs uppercase font-bold flex items-center gap-2 mb-2">
+                            <i class="fab fa-slack text-[#E01E5A] text-lg"></i> Slack Webhook URL
+                        </label>
+                        <input type="text" id="slack-webhook-url" class="glass-input w-full border-[#E01E5A]/20 focus:border-[#E01E5A]/50" placeholder="https://hooks.slack.com/services/..." value="{{ settings.slack_webhook_url or '' }}">
                     </div>
                 </div>
 
-                <!-- 2. BUDGET ALERTS TAB -->
-                <div id="tab-content-alerts" class="tab-pane hidden flex flex-col gap-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="glass-card p-5 border-white/5 border-l-4 border-l-rose-500/60">
-                            <div class="flex items-start justify-between gap-3 mb-3">
-                                <div>
-                                    <h3 class="text-sm font-bold text-white uppercase tracking-wide">Cost Alerts</h3>
-                                    <p class="text-slate-400 text-xs mt-1">Threshold notifications when daily pacing breaches your budget envelope.</p>
-                                </div>
-                                <span class="px-2 py-0.5 bg-rose-500/10 text-rose-400 text-[10px] font-bold uppercase rounded-full border border-rose-500/20">Active</span>
-                            </div>
-                            <button type="button" class="text-cyan-400 text-[10px] font-bold uppercase tracking-wider hover:text-cyan-300 transition">Learn More →</button>
-                        </div>
-                        <div class="glass-card p-5 border-white/5 border-l-4 border-l-blue-500/60">
-                            <div class="flex items-start justify-between gap-3 mb-3">
-                                <div>
-                                    <h3 class="text-sm font-bold text-white uppercase tracking-wide">Report Notifications</h3>
-                                    <p class="text-slate-400 text-xs mt-1">Scheduled FinOps report dispatches to your configured channels.</p>
-                                </div>
-                                <span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase rounded-full border border-blue-500/20">Weekly</span>
-                            </div>
-                            <p class="text-[10px] text-slate-500 font-mono">Next dispatch: Mon 09:00 UTC</p>
-                        </div>
-                        <div class="glass-card p-5 border-white/5 border-l-4 border-l-emerald-500/60">
-                            <div class="flex items-start justify-between gap-3 mb-3">
-                                <div>
-                                    <h3 class="text-sm font-bold text-white uppercase tracking-wide">All Costs Weekly</h3>
-                                    <p class="text-slate-400 text-xs mt-1">Consolidated weekly spend summary across all connected providers.</p>
-                                </div>
-                                <span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase rounded-full border border-emerald-500/20">Enabled</span>
-                            </div>
-                            <p class="text-[10px] text-slate-500">Includes MTD burn, forecast delta, and top waste drivers.</p>
-                        </div>
-                        <div class="glass-card p-5 border-white/5 border-l-4 border-l-purple-500/60">
-                            <h3 class="text-sm font-bold text-white uppercase tracking-wide mb-3">Integrations</h3>
-                            <div class="flex flex-wrap gap-2">
-                                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5865F2]/15 border border-[#5865F2]/30 text-[#a5b4fc] text-[10px] font-bold uppercase"><i class="fab fa-discord"></i> Discord</span>
-                                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#E01E5A]/15 border border-[#E01E5A]/30 text-[#fda4af] text-[10px] font-bold uppercase"><i class="fab fa-slack"></i> Slack</span>
-                                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#5059C9]/15 border border-[#5059C9]/30 text-[#93c5fd] text-[10px] font-bold uppercase"><i class="fab fa-microsoft"></i> Teams</span>
-                            </div>
-                            <p class="text-slate-400 text-xs mt-3">Broadcast hubs for cost, report, and dashboard notifications.</p>
-                        </div>
+                <div class="flex gap-4">
+                    <button onclick="saveWebhooks()" class="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-semibold transition">
+                        Save Configurations
+                    </button>
+                    <button onclick="triggerTestAlert()" class="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-semibold transition text-slate-300">
+                        Trigger Test Alert
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for Adding Metric -->
+        <div id="add-metric-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm hidden">
+            <div class="glass-card p-6 border-white/10 w-full max-w-md">
+                <h3 class="text-xl font-bold text-white mb-4">Record Business Metric Driver</h3>
+                
+                <div class="flex flex-col gap-4 mb-6">
+                    <div>
+                        <label class="text-slate-400 text-xs font-bold block mb-1">Metric Identifier Name</label>
+                        <input type="text" id="modal-metric-name" class="glass-input w-full" placeholder="e.g. ACTIVE_USERS or API_REQUESTS">
                     </div>
-
-                    <div class="glass-card p-6 border-white/5">
-                        <h2 class="text-2xl font-bold text-white mb-2">Webhook Broadcast Settings</h2>
-                        <p class="text-slate-400 text-sm mb-6">Configure instant multi-channel webhook notifications when spending surges.</p>
-                        
-                        <div class="flex flex-col gap-6 mb-8">
-                            <div class="p-4 rounded-xl border border-[#5865F2]/25 bg-[#5865F2]/5">
-                                <label class="text-[#a5b4fc] text-xs uppercase font-bold flex items-center gap-2 mb-2">
-                                    <i class="fab fa-discord text-[#5865F2] text-lg"></i> Discord Webhook URL
-                                </label>
-                                <input type="text" id="discord-webhook-url" class="glass-input w-full border-[#5865F2]/20 focus:border-[#5865F2]/50" placeholder="https://discord.com/api/webhooks/..." value="{{ settings.discord_webhook_url or '' }}">
-                            </div>
-                            
-                            <div class="p-4 rounded-xl border border-[#E01E5A]/25 bg-[#E01E5A]/5">
-                                <label class="text-[#fda4af] text-xs uppercase font-bold flex items-center gap-2 mb-2">
-                                    <i class="fab fa-slack text-[#E01E5A] text-lg"></i> Slack Webhook URL
-                                </label>
-                                <input type="text" id="slack-webhook-url" class="glass-input w-full border-[#E01E5A]/20 focus:border-[#E01E5A]/50" placeholder="https://hooks.slack.com/services/..." value="{{ settings.slack_webhook_url or '' }}">
-                            </div>
-
-                            <div class="flex flex-wrap gap-4">
-                                <button onclick="saveWebhooks()" class="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-semibold transition shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                                    Save Configurations
-                                </button>
-                                <button onclick="triggerTestAlert()" class="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-semibold transition text-slate-300">
-                                    Trigger Simulated Test Alert
-                                </button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 class="text-lg font-bold text-white mb-4">Alert Trigger Log History</h3>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-left text-sm">
-                                    <thead>
-                                        <tr class="border-b border-white/10 text-slate-400">
-                                            <th class="py-3 px-4">Timestamp</th>
-                                            <th class="py-3 px-4">Channel</th>
-                                            <th class="py-3 px-4">Alert Message</th>
-                                            <th class="py-3 px-4">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="alert-logs-tbody">
-                                        <tr class="border-b border-white/5">
-                                            <td class="py-3 px-4 text-slate-400 metric-value">2026-05-20 12:00</td>
-                                            <td class="py-3 px-4"><span class="px-2 py-1 bg-indigo-500/10 text-indigo-400 rounded-lg text-xs font-semibold">Discord</span></td>
-                                            <td class="py-3 px-4 text-white">Daily pacing alert triggered - Estimated burn is 114% of budget pace.</td>
-                                            <td class="py-3 px-4"><span class="text-emerald-400 font-semibold flex items-center gap-1.5"><span class="h-2 w-2 bg-emerald-400 rounded-full"></span> Delivered</span></td>
-                                        </tr>
-                                        <tr class="border-b border-white/5">
-                                            <td class="py-3 px-4 text-slate-400 metric-value">2026-05-18 10:15</td>
-                                            <td class="py-3 px-4"><span class="px-2 py-1 bg-emerald-500/10 text-emerald-400 rounded-lg text-xs font-semibold">Slack</span></td>
-                                            <td class="py-3 px-4 text-white">Warning threshold reached - MTD spend reached 80% of budget cap.</td>
-                                            <td class="py-3 px-4"><span class="text-emerald-400 font-semibold flex items-center gap-1.5"><span class="h-2 w-2 bg-emerald-400 rounded-full"></span> Delivered</span></td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                    <div>
+                        <label class="text-slate-400 text-xs font-bold block mb-1">Total Unit Volume</label>
+                        <input type="number" id="modal-metric-value" class="glass-input w-full metric-value" placeholder="e.g. 15000">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 text-xs font-bold block mb-1">Unit Term</label>
+                        <input type="text" id="modal-metric-unit" class="glass-input w-full" placeholder="e.g. 1 User or 1K Requests">
                     </div>
                 </div>
 
-                <!-- 3. BUSINESS METRICS TAB -->
-                <div id="tab-content-business-metrics" class="tab-pane hidden flex flex-col gap-6">
-                    <div class="glass-card p-6 border-white/5">
-                        <div class="flex justify-between items-center gap-4 mb-6">
-                            <div>
-                                <h2 class="text-2xl font-bold text-white mb-2">Unit Economics Cost Allocations</h2>
-                                <p class="text-slate-400 text-sm">Align cloud expenditure directly with actual business drivers.</p>
-                            </div>
-                            <button onclick="openAddMetricModal()" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-semibold transition">
-                                + Record Metric
-                            </button>
-                        </div>
-                        
-                        <div class="overflow-x-auto mb-6">
-                            <table class="w-full text-left text-sm">
-                                <thead>
-                                    <tr class="border-b border-white/10 text-slate-400">
-                                        <th class="py-3 px-4">Metric Driver</th>
-                                        <th class="py-3 px-4">Current Value</th>
-                                        <th class="py-3 px-4">Allocated Spend</th>
-                                        <th class="py-3 px-4">Unit Cost Ratio</th>
-                                        <th class="py-3 px-4">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="metrics-table-tbody">
-                                    {% for m in db_metrics %}
-                                    <tr class="border-b border-white/5">
-                                        <td class="py-3.5 px-4 font-semibold text-white uppercase tracking-wide">{{ m.metric_name.replace('_', ' ') }}</td>
-                                        <td class="py-3.5 px-4 text-slate-300 metric-value">{{ "{:,.0f}".format(m.value) }} {{ m.unit }}</td>
-                                        <td class="py-3.5 px-4 text-slate-300 metric-value">$855.12</td>
-                                        <td class="py-3.5 px-4 text-cyan-400 font-bold metric-value">
-                                            {% if 'K' in m.unit %}
-                                                ${{ "{:.3f}".format(855.12 / (m.value / 1000)) }}
-                                            {% else %}
-                                                ${{ "{:.3f}".format(855.12 / m.value) }}
-                                            {% endif %}
-                                            <span class="text-slate-500 text-xs font-normal"> / {{ m.unit.split(' ')[-1] }}</span>
-                                        </td>
-                                        <td class="py-3.5 px-4"><span class="px-2 py-0.5 bg-emerald-400/10 text-emerald-400 text-xs rounded-full border border-emerald-400/20">Optimal</span></td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Modal for Adding Metric -->
-                    <div id="add-metric-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm hidden">
-                        <div class="glass-card p-6 border-white/10 w-full max-w-md">
-                            <h3 class="text-xl font-bold text-white mb-4">Record Business Metric Driver</h3>
-                            
-                            <div class="flex flex-col gap-4 mb-6">
-                                <div>
-                                    <label class="text-slate-400 text-xs font-bold block mb-1">Metric Identifier Name</label>
-                                    <input type="text" id="modal-metric-name" class="glass-input w-full" placeholder="e.g. ACTIVE_USERS or API_REQUESTS">
-                                </div>
-                                <div>
-                                    <label class="text-slate-400 text-xs font-bold block mb-1">Total Unit Volume</label>
-                                    <input type="number" id="modal-metric-value" class="glass-input w-full metric-value" placeholder="e.g. 15000">
-                                </div>
-                                <div>
-                                    <label class="text-slate-400 text-xs font-bold block mb-1">Unit Term</label>
-                                    <input type="text" id="modal-metric-unit" class="glass-input w-full" placeholder="e.g. 1 User or 1K Requests">
-                                </div>
-                            </div>
-
-                            <div class="flex justify-end gap-3">
-                                <button onclick="closeAddMetricModal()" class="px-4 py-2 border border-white/10 rounded-lg font-semibold text-slate-400 hover:bg-white/5 transition text-sm">
-                                    Cancel
-                                </button>
-                                <button onclick="submitNewMetric()" class="px-5 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-semibold transition text-sm">
-                                    Add Driver
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                <div class="flex justify-end gap-3">
+                    <button onclick="closeAddMetricModal()" class="px-4 py-2 border border-white/10 rounded-lg font-semibold text-slate-400 hover:bg-white/5 transition text-sm">
+                        Cancel
+                    </button>
+                    <button onclick="submitNewMetric()" class="px-5 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-semibold transition text-sm">
+                        Add Driver
+                    </button>
                 </div>
-
-                <!-- 4. COMMITMENT REPORTS TAB -->
-                <div id="tab-content-commitment-reports" class="tab-pane hidden flex flex-col gap-6">
-                    <div class="glass-card p-6 border-white/5">
-                        <h2 class="text-2xl font-bold text-white mb-2">Reserved Instances & Savings Plan Coverage</h2>
-                        <p class="text-slate-400 text-sm mb-6">Examine coverage ratios and target baseline capacity to unlock massive cost discounts.</p>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                            <div class="h-[280px] w-full relative">
-                                <h4 class="text-slate-400 text-xs font-bold uppercase mb-4 text-center">Compute RI Coverage Profile</h4>
-                                <canvas id="coverageChart"></canvas>
-                            </div>
-                            <div class="flex flex-col justify-center gap-4">
-                                <div class="bg-white/5 p-4 rounded-xl border border-white/5">
-                                    <span class="text-xs text-slate-400 block uppercase font-semibold">Overall Coverage Ratio</span>
-                                    <span class="text-2xl font-bold text-cyan-400 metric-value">62.4%</span>
-                                    <span class="text-slate-500 text-xs block mt-1">Goal target of 90.0% suggested</span>
-                                </div>
-                                <div class="bg-white/5 p-4 rounded-xl border border-white/5">
-                                    <span class="text-xs text-slate-400 block uppercase font-semibold">Estimated Waste / On-Demand Premium</span>
-                                    <span class="text-2xl font-bold text-rose-400 metric-value">$1,185.00 / mo</span>
-                                    <span class="text-slate-500 text-xs block mt-1">Convertible to regional commitment coverage</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 class="text-lg font-bold text-white mb-4">RI / Savings Plan Recommendations</h3>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-left text-sm">
-                                    <thead>
-                                        <tr class="border-b border-white/10 text-slate-400">
-                                            <th class="py-3 px-4">SKU Series Recommendation</th>
-                                            <th class="py-3 px-4">Target Region</th>
-                                            <th class="py-3 px-4">Estimated Annual Savings</th>
-                                            <th class="py-3 px-4">Term</th>
-                                            <th class="py-3 px-4">Remediation Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="ri-recommendations-tbody">
-                                        <!-- Will load dynamically via API -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 5. ISSUES TAB -->
-                <div id="tab-content-issues" class="tab-pane hidden flex flex-col gap-6">
-                    <div class="glass-card p-6 border-white/5">
-                        <h2 class="text-2xl font-bold text-white mb-2">Cost Governance Issues Inbox</h2>
-                        <p class="text-slate-400 text-sm mb-6">List of compliance breaches, idle virtual machines, and zombie storage units requiring direct optimization action.</p>
-                        
-                        <div class="flex flex-col gap-4" id="issues-list-container">
-                            <!-- High Fidelity Simulated Issues -->
-                            <div id="issue-1" class="border border-red-500/20 bg-red-500/5 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
-                                <div>
-                                    <div class="flex items-center gap-2 mb-1.5">
-                                        <span class="px-2.5 py-0.5 bg-red-500/10 text-red-400 text-xs font-bold rounded border border-red-500/20">Critical</span>
-                                        <span class="text-slate-400 text-xs font-semibold">Compliance Tag Violation</span>
-                                    </div>
-                                    <h4 class="text-base font-bold text-white">Untagged Dev-Instance in EastUS</h4>
-                                    <p class="text-xs text-slate-400 mt-1">Resource ID: <span class="metric-value">vm-az-dev-1052</span> | Daily waste: <span class="text-red-400 font-bold">$22.40/day</span></p>
-                                </div>
-                                <div class="flex gap-2 flex-wrap">
-                                    <button onclick="remediateIssue('issue-1', 'DISMISS')" class="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold rounded-lg border border-white/10 transition">Bypass</button>
-                                    <button onclick="remediateIssue('issue-1', 'KILL')" class="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-bold rounded-lg border border-red-500/30 transition">Authorize Kill</button>
-                                </div>
-                            </div>
-
-                            <div id="issue-2" class="border border-amber-500/20 bg-amber-500/5 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
-                                <div>
-                                    <div class="flex items-center gap-2 mb-1.5">
-                                        <span class="px-2.5 py-0.5 bg-amber-500/10 text-amber-400 text-xs font-bold rounded border border-amber-500/20">Warning</span>
-                                        <span class="text-slate-400 text-xs font-semibold">Idle Machine Alert</span>
-                                    </div>
-                                    <h4 class="text-base font-bold text-white">Underutilized compute core instances (Average CPU &lt; 2%)</h4>
-                                    <p class="text-xs text-slate-400 mt-1">Resource ID: <span class="metric-value">vm-test-db-replica</span> | Potential monthly savings: <span class="text-amber-400 font-bold">$180.00</span></p>
-                                </div>
-                                <div class="flex gap-2 flex-wrap">
-                                    <button onclick="remediateIssue('issue-2', 'DISMISS')" class="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold rounded-lg border border-white/10 transition">Dismiss</button>
-                                    <button onclick="remediateIssue('issue-2', 'RIGHTSIZE')" class="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-bold rounded-lg border border-amber-500/30 transition">Rightsize SKU</button>
-                                </div>
-                            </div>
-
-                            <div id="issue-3" class="border border-blue-500/20 bg-blue-500/5 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
-                                <div>
-                                    <div class="flex items-center gap-2 mb-1.5">
-                                        <span class="px-2.5 py-0.5 bg-blue-500/10 text-blue-400 text-xs font-bold rounded border border-blue-500/20">Info</span>
-                                        <span class="text-slate-400 text-xs font-semibold">Storage Optimization</span>
-                                    </div>
-                                    <h4 class="text-base font-bold text-white">Orphaned Snapshot Volumes (Unattached to any disks)</h4>
-                                    <p class="text-xs text-slate-400 mt-1">Volume count: <span class="metric-value">5 snapshots</span> | Potential saving: <span class="text-cyan-400 font-bold">$45.00/mo</span></p>
-                                </div>
-                                <div class="flex gap-2 flex-wrap">
-                                    <button onclick="remediateIssue('issue-3', 'DISMISS')" class="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold rounded-lg border border-white/10 transition">Keep snapshot</button>
-                                    <button onclick="remediateIssue('issue-3', 'KILL')" class="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-xs font-bold rounded-lg border border-blue-500/30 transition">Clean Volumes</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 6. COMMITMENTS TAB -->
-                <div id="tab-content-commitments" class="tab-pane hidden flex flex-col gap-6">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <!-- Commitment Purchase Simulator -->
-                        <div class="glass-card p-6 border-white/5 md:col-span-2">
-                            <h2 class="text-xl font-bold text-white mb-2">Simulate New Commitment Savings Plan</h2>
-                            <p class="text-slate-400 text-sm mb-6">Estimate hourly pricing discount scales based on target provider, term periods, and upfront pricing parameters.</p>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                <div>
-                                    <label class="text-slate-400 text-xs font-bold block mb-1">Cloud Provider</label>
-                                    <select id="sim-provider" class="glass-input w-full bg-slate-900 border-white/10 text-sm">
-                                        <option value="AWS">Amazon Web Services</option>
-                                        <option value="Azure">Microsoft Azure</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="text-slate-400 text-xs font-bold block mb-1">Commitment Type</label>
-                                    <select id="sim-type" class="glass-input w-full bg-slate-900 border-white/10 text-sm" onchange="updateSimSavings()">
-                                        <option value="Savings Plan">Compute Savings Plan (Flexible)</option>
-                                        <option value="RI">Reserved Instance SKU (Specific)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="text-slate-400 text-xs font-bold block mb-1">Term Option</label>
-                                    <select id="sim-term" class="glass-input w-full bg-slate-900 border-white/10 text-sm" onchange="updateSimSavings()">
-                                        <option value="1">1 Year Term (Standard)</option>
-                                        <option value="3">3 Years Term (High discount)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="text-slate-400 text-xs font-bold block mb-1">Payment Strategy</label>
-                                    <select id="sim-upfront" class="glass-input w-full bg-slate-900 border-white/10 text-sm">
-                                        <option value="no">No Upfront (Monthly)</option>
-                                        <option value="partial">Partial Upfront</option>
-                                        <option value="all">All Upfront Payment</option>
-                                    </select>
-                                </div>
-                                <div class="md:col-span-2">
-                                    <label class="text-slate-400 text-xs font-bold block mb-1">Hourly Commit ($ / hr)</label>
-                                    <input type="number" id="sim-hourly-spend" class="glass-input w-full metric-value" value="5.0" oninput="updateSimSavings()">
-                                </div>
-                            </div>
-
-                            <div class="bg-cyan-500/10 border border-cyan-400/20 p-4 rounded-xl flex justify-between items-center gap-4 mb-6">
-                                <div>
-                                    <p class="text-cyan-400 text-xs uppercase font-bold">Estimated Savings Rate</p>
-                                    <p class="text-2xl font-bold text-white metric-value" id="sim-est-rate">28% discount</p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-cyan-400 text-xs uppercase font-bold">Annual Target Savings</p>
-                                    <p class="text-2xl font-bold text-emerald-400 metric-value" id="sim-est-annually">$12,264.00</p>
-                                </div>
-                            </div>
-
-                            <button onclick="purchaseSimCommitment()" class="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-semibold transition w-full shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                                Purchase simulated commitment plan
-                            </button>
-                        </div>
-
-                        <!-- Active Commitment List -->
-                        <div class="glass-card p-6 border-white/5 flex flex-col gap-4">
-                            <h3 class="text-lg font-bold text-white mb-2">Active Commitment Portfolio</h3>
-                            
-                            <div class="flex flex-col gap-4" id="commitments-portfolio-container">
-                                <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
-                                    <div class="flex justify-between items-center mb-1">
-                                        <span class="px-2 py-0.5 bg-cyan-400/10 text-cyan-400 rounded text-[10px] font-bold">AWS</span>
-                                        <span class="text-slate-500 text-[10px] font-semibold">Active</span>
-                                    </div>
-                                    <h4 class="text-sm font-bold text-white">Compute Savings Plan</h4>
-                                    <div class="flex justify-between text-xs mt-2 text-slate-400">
-                                        <span>Commit: <strong class="text-white font-normal metric-value">$2.50/hr</strong></span>
-                                        <span>Savings: <strong class="text-emerald-400 font-bold metric-value">32%</strong></span>
-                                    </div>
-                                </div>
-
-                                <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
-                                    <div class="flex justify-between items-center mb-1">
-                                        <span class="px-2 py-0.5 bg-blue-400/10 text-blue-400 rounded text-[10px] font-bold">Azure</span>
-                                        <span class="text-slate-500 text-[10px] font-semibold">Active</span>
-                                    </div>
-                                    <h4 class="text-sm font-bold text-white">D4s_v5 RI Reservation</h4>
-                                    <div class="flex justify-between text-xs mt-2 text-slate-400">
-                                        <span>Quantity: <strong class="text-white font-normal metric-value">6 Instances</strong></span>
-                                        <span>Savings: <strong class="text-emerald-400 font-bold metric-value">41%</strong></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 7. SAVINGS MODELS TAB -->
-                <div id="tab-content-savings-models" class="tab-pane hidden flex flex-col gap-6">
-                    <div class="glass-card p-6 border-white/5">
-                        <h2 class="text-2xl font-bold text-white mb-2">"What-If" Governance Policy Simulator</h2>
-                        <p class="text-slate-400 text-sm mb-8">Slide target indicators to project monthly cost reductions and target carbon offset footprints.</p>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                            <!-- Slider Controls -->
-                            <div class="flex flex-col gap-6 justify-center">
-                                <div>
-                                    <div class="flex justify-between text-sm mb-2 font-semibold">
-                                        <span class="text-slate-300">Policy Aggressiveness Level</span>
-                                        <span class="text-cyan-400 metric-value" id="val-policy-level">50%</span>
-                                    </div>
-                                    <input type="range" id="input-policy-level" min="0" max="100" value="50" oninput="updateWhatIfModel()">
-                                    <p class="text-xs text-slate-500 mt-1">Adjust policy severity rules for shutting down unused assets.</p>
-                                </div>
-
-                                <div>
-                                    <div class="flex justify-between text-sm mb-2 font-semibold">
-                                        <span class="text-slate-300">Target Spot Instance Adoption</span>
-                                        <span class="text-cyan-400 metric-value" id="val-spot-level">30%</span>
-                                    </div>
-                                    <input type="range" id="input-spot-level" min="0" max="100" value="30" oninput="updateWhatIfModel()">
-                                    <p class="text-xs text-slate-500 mt-1">Replace standard production/development instances with cheaper spot cores.</p>
-                                </div>
-                            </div>
-
-                            <!-- Outcomes Display Card -->
-                            <div class="bg-white/5 p-6 rounded-2xl border border-white/10 flex flex-col justify-between gap-6 relative overflow-hidden">
-                                <div class="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl"></div>
-                                <div>
-                                    <span class="text-slate-400 text-xs font-bold uppercase tracking-wider block">Projected Monthly Savings</span>
-                                    <span class="text-4xl font-extrabold text-emerald-400 mt-1 block metric-value animate-pulse-soft" id="display-model-savings">$820.00</span>
-                                    <span class="text-slate-500 text-xs block mt-1">Equivalent to 24.5% of total budget spend</span>
-                                </div>
-
-                                <div class="flex justify-between gap-4 border-t border-white/5 pt-4">
-                                    <div>
-                                        <span class="text-slate-400 text-xs font-bold uppercase tracking-wider block">Carbon Footprint Offsets</span>
-                                        <span class="text-lg font-bold text-white mt-0.5 block metric-value" id="display-model-co2">184.2 kg CO2e</span>
-                                    </div>
-                                    <div class="text-right">
-                                        <span class="text-slate-400 text-xs font-bold uppercase tracking-wider block">Equivalent Tree Seeds</span>
-                                        <span class="text-lg font-bold text-cyan-400 mt-0.5 block metric-value" id="display-model-trees">8.2 Trees / mo</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="flex justify-end">
-                            <button onclick="applyWhatIfPolicy()" class="px-8 py-3.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-bold transition shadow-[0_0_20px_rgba(6,182,212,0.4)]">
-                                Apply governance policy
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
             </div>
         </div>
     </main>

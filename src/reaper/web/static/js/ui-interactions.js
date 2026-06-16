@@ -81,15 +81,12 @@ function loadInitialTabs() {
     if (tab) {
         if (window.location.pathname.includes('/settings')) {
             showTab(tab);
-        } else if (window.location.pathname.includes('/financial')) {
-            switchTab(tab);
         }
+        // Note: Financial page now uses grid layout, no tab switching needed
     } else {
         // default tabs
         if (window.location.pathname.includes('/settings')) {
             showTab('general');
-        } else if (window.location.pathname.includes('/financial')) {
-            switchTab('budget');
         }
     }
 }
