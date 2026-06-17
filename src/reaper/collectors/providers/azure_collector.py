@@ -38,6 +38,7 @@ def _reaper_engine_binary() -> Path | None:
             return candidate
     return None
 
+
 load_dotenv()
 
 _GLOBAL_CACHE: dict[str, tuple[float, Any]] = {}
@@ -303,9 +304,7 @@ class AzureCollector:
                 and metrics.value[0].timeseries[0].data
             ):
                 data_points = [
-                    p.average
-                    for p in metrics.value[0].timeseries[0].data
-                    if p.average is not None
+                    p.average for p in metrics.value[0].timeseries[0].data if p.average is not None
                 ]
                 if data_points:
                     cpu_avg = float(sum(data_points) / len(data_points))
@@ -371,7 +370,9 @@ class AzureCollector:
                     f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
                     f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
                 )
-                return float(self.get_vm_metrics(resource_id).get("cpu_percent", {}).get("average", 0.0))
+                return float(
+                    self.get_vm_metrics(resource_id).get("cpu_percent", {}).get("average", 0.0)
+                )
             except Exception:
                 return 0.0
 
@@ -1127,7 +1128,9 @@ class AzureCollector:
             if go_binary is None:
                 repo_root = Path(__file__).resolve().parents[4]
                 expected = repo_root / "bin" / "reaper-engine"
-                print(f"[-] Error: Go binary not found at {expected}. Run ./scripts/reap.sh to build.")
+                print(
+                    f"[-] Error: Go binary not found at {expected}. Run ./scripts/reap.sh to build."
+                )
                 return {}
 
             try:
@@ -1582,8 +1585,12 @@ class AzureCollector:
                         if violation.get("severity", "").upper() == "HIGH"
                         else "Warning",
                         "type": "Policy Violation",
-                        "title": violation.get("violation", violation.get("message", "Policy compliance issue")),
-                        "resource_id": violation.get("resource", violation.get("resource_id", "Unknown")),
+                        "title": violation.get(
+                            "violation", violation.get("message", "Policy compliance issue")
+                        ),
+                        "resource_id": violation.get(
+                            "resource", violation.get("resource_id", "Unknown")
+                        ),
                         "daily_waste": violation.get("potential_savings", 22.40),
                         "actions": ["DISMISS", "KILL"],
                     }

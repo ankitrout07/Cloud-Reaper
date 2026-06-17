@@ -53,8 +53,12 @@ from reaper.collectors.utils.auth_check import check_azure_status
 from reaper.collectors.utils.config_manager import save_config
 from reaper.engine.core.architect import AIArchitectManager, resolve_component_costs
 from reaper.engine.core.calculator import CostCalculator, SpotEvictionPredictor
-from reaper.engine.core.cost_optimizer import ComprehensiveCostOptimizer, ResourceMetrics, OptimizationCategory, Priority, RiskLevel
-from reaper.engine.core.cost_reporter import AutomatedCostReporter, ReportPeriod, ReportFormat
+from reaper.engine.core.cost_optimizer import (
+    ComprehensiveCostOptimizer,
+    Priority,
+    ResourceMetrics,
+)
+from reaper.engine.core.cost_reporter import AutomatedCostReporter, ReportFormat, ReportPeriod
 from reaper.engine.core.economics import RegionalArbitrage
 from reaper.engine.core.logic import RightSizer
 from reaper.engine.models.resources import (
@@ -2441,21 +2445,28 @@ def analyze_cost_optimization():
     try:
         data = request.json or {}
         provider = data.get("provider", "azure").lower()
-        
+
         if is_first_run():
-            return jsonify({"status": "unconfigured", "message": "Please configure cloud credentials first"}), 200
-        
+            return jsonify(
+                {"status": "unconfigured", "message": "Please configure cloud credentials first"}
+            ), 200
+
         # Initialize collector based on provider
         if provider == "azure":
             collector = AzureCollector()
         else:
-            return jsonify({"status": "error", "message": f"Provider {provider} not yet supported in comprehensive analysis"}), 400
+            return jsonify(
+                {
+                    "status": "error",
+                    "message": f"Provider {provider} not yet supported in comprehensive analysis",
+                }
+            ), 400
 
         cost_optimizer.recommendations.clear()
 
         # Get resource inventory
         resources = []
-        
+
         # Get compute resources (VMs)
         try:
             vms = collector.get_vm_inventory()
@@ -2492,7 +2503,9 @@ def analyze_cost_optimization():
                     "region": vm.get("location", ""),
                     "tags": vm.get("tags", {}),
                 }
-                recommendations = cost_optimizer.analyze_resource(resource_data, metrics, current_cost)
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
                 return recommendations, {
                     "id": vm_id,
                     "name": vm.get("name", ""),
@@ -2509,7 +2522,7 @@ def analyze_cost_optimization():
                     resources.append(resource)
         except Exception as e:
             print(f"[!] Error analyzing VMs: {e}")
-        
+
         # Get storage resources (disks)
         try:
             orphaned_disks = collector.get_orphaned_disks()
@@ -2527,10 +2540,10 @@ def analyze_cost_optimization():
                     peak_cpu_utilization=0,
                     peak_memory_utilization=0,
                 )
-                
+
                 current_sku = disk.get("tier", "premium_ssd")
                 current_cost = calc.calculate_monthly_cost(provider, "storage", current_sku)
-                
+
                 resource_data = {
                     "id": disk.get("id", ""),
                     "name": disk.get("name", ""),
@@ -2540,20 +2553,24 @@ def analyze_cost_optimization():
                     "region": disk.get("location", ""),
                     "tags": disk.get("tags", {}),
                 }
-                
-                recommendations = cost_optimizer.analyze_resource(resource_data, metrics, current_cost)
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
                 cost_optimizer.recommendations.extend(recommendations)
-                
-                resources.append({
-                    "id": disk.get("id", ""),
-                    "name": disk.get("name", ""),
-                    "type": "storage",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+
+                resources.append(
+                    {
+                        "id": disk.get("id", ""),
+                        "name": disk.get("name", ""),
+                        "type": "storage",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing storage: {e}")
-        
+
         # Get idle resources
         try:
             idle_vms = collector.get_idle_vms(cpu_threshold=5.0)
@@ -2571,10 +2588,10 @@ def analyze_cost_optimization():
                     peak_cpu_utilization=10,
                     peak_memory_utilization=30,
                 )
-                
+
                 current_sku = vm.get("sku", "Standard_D2s_v3")
                 current_cost = calc.calculate_monthly_cost(provider, "compute", current_sku)
-                
+
                 resource_data = {
                     "id": vm.get("id", ""),
                     "name": vm.get("name", ""),
@@ -2584,23 +2601,27 @@ def analyze_cost_optimization():
                     "region": vm.get("location", ""),
                     "tags": vm.get("tags", {}),
                 }
-                
-                recommendations = cost_optimizer.analyze_resource(resource_data, metrics, current_cost)
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
                 cost_optimizer.recommendations.extend(recommendations)
         except Exception as e:
             print(f"[!] Error analyzing idle resources: {e}")
-        
+
         # Prioritize and generate summary
         prioritized_recommendations = cost_optimizer.prioritize_recommendations()
         summary = cost_optimizer.generate_summary_report()
-        
-        return jsonify({
-            "status": "success",
-            "summary": summary,
-            "recommendations": [rec.to_dict() for rec in prioritized_recommendations],
-            "analyzed_resources": len(resources),
-        })
-    
+
+        return jsonify(
+            {
+                "status": "success",
+                "summary": summary,
+                "recommendations": [rec.to_dict() for rec in prioritized_recommendations],
+                "analyzed_resources": len(resources),
+            }
+        )
+
     except Exception as e:
         print(f"[!] Error in cost optimization analysis: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -2611,10 +2632,7 @@ def get_optimization_summary():
     """Get a quick summary of cost optimization opportunities"""
     try:
         summary = cost_optimizer.generate_summary_report()
-        return jsonify({
-            "status": "success",
-            "summary": summary
-        })
+        return jsonify({"status": "success", "summary": summary})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -2629,7 +2647,7 @@ def get_optimization_categories():
             if cat not in by_category:
                 by_category[cat] = []
             by_category[cat].append(rec.to_dict())
-        
+
         # Calculate savings per category
         category_summary = {}
         for cat, recs in by_category.items():
@@ -2637,13 +2655,10 @@ def get_optimization_categories():
             category_summary[cat] = {
                 "recommendation_count": len(recs),
                 "total_savings": total_savings,
-                "recommendations": recs
+                "recommendations": recs,
             }
-        
-        return jsonify({
-            "status": "success",
-            "categories": category_summary
-        })
+
+        return jsonify({"status": "success", "categories": category_summary})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -2654,19 +2669,20 @@ def get_optimization_by_priority(priority):
     try:
         priority_enum = Priority(priority.lower())
         filtered_recs = [
-            rec.to_dict() for rec in cost_optimizer.recommendations
-            if rec.priority == priority_enum
+            rec.to_dict() for rec in cost_optimizer.recommendations if rec.priority == priority_enum
         ]
-        
+
         total_savings = sum(rec["estimated_monthly_savings"] for rec in filtered_recs)
-        
-        return jsonify({
-            "status": "success",
-            "priority": priority,
-            "count": len(filtered_recs),
-            "total_savings": total_savings,
-            "recommendations": filtered_recs
-        })
+
+        return jsonify(
+            {
+                "status": "success",
+                "priority": priority,
+                "count": len(filtered_recs),
+                "total_savings": total_savings,
+                "recommendations": filtered_recs,
+            }
+        )
     except ValueError:
         return jsonify({"status": "error", "message": f"Invalid priority: {priority}"}), 400
     except Exception as e:
@@ -2678,22 +2694,30 @@ def get_resource_optimizations(resource_id):
     """Get all optimization recommendations for a specific resource"""
     try:
         resource_recs = [
-            rec.to_dict() for rec in cost_optimizer.recommendations
+            rec.to_dict()
+            for rec in cost_optimizer.recommendations
             if rec.resource_id == resource_id
         ]
-        
+
         if not resource_recs:
-            return jsonify({"status": "error", "message": f"No recommendations found for resource {resource_id}"}), 404
-        
+            return jsonify(
+                {
+                    "status": "error",
+                    "message": f"No recommendations found for resource {resource_id}",
+                }
+            ), 404
+
         total_savings = sum(rec["estimated_monthly_savings"] for rec in resource_recs)
-        
-        return jsonify({
-            "status": "success",
-            "resource_id": resource_id,
-            "recommendation_count": len(resource_recs),
-            "total_savings": total_savings,
-            "recommendations": resource_recs
-        })
+
+        return jsonify(
+            {
+                "status": "success",
+                "resource_id": resource_id,
+                "recommendation_count": len(resource_recs),
+                "total_savings": total_savings,
+                "recommendations": resource_recs,
+            }
+        )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -2703,7 +2727,7 @@ def get_optimization_dashboard():
     """Get dashboard data for cost optimization visualization"""
     try:
         summary = cost_optimizer.generate_summary_report()
-        
+
         # Prepare dashboard data
         dashboard_data = {
             "total_recommendations": summary["total_recommendations"],
@@ -2711,42 +2735,56 @@ def get_optimization_dashboard():
             "by_priority": summary["by_priority"],
             "by_category": summary["by_category"],
             "top_recommendations": [
-                rec.to_dict() for rec in 
-                cost_optimizer.prioritize_recommendations()[:10]
+                rec.to_dict() for rec in cost_optimizer.prioritize_recommendations()[:10]
             ],
             "savings_potential": {
                 "critical": sum(
-                    rec.estimated_monthly_savings 
-                    for rec in cost_optimizer.recommendations 
+                    rec.estimated_monthly_savings
+                    for rec in cost_optimizer.recommendations
                     if rec.priority == Priority.CRITICAL
                 ),
                 "high": sum(
-                    rec.estimated_monthly_savings 
-                    for rec in cost_optimizer.recommendations 
+                    rec.estimated_monthly_savings
+                    for rec in cost_optimizer.recommendations
                     if rec.priority == Priority.HIGH
                 ),
                 "medium": sum(
-                    rec.estimated_monthly_savings 
-                    for rec in cost_optimizer.recommendations 
+                    rec.estimated_monthly_savings
+                    for rec in cost_optimizer.recommendations
                     if rec.priority == Priority.MEDIUM
                 ),
                 "low": sum(
-                    rec.estimated_monthly_savings 
-                    for rec in cost_optimizer.recommendations 
+                    rec.estimated_monthly_savings
+                    for rec in cost_optimizer.recommendations
                     if rec.priority == Priority.LOW
                 ),
             },
             "implementation_effort_breakdown": {
-                "low": len([rec for rec in cost_optimizer.recommendations if rec.implementation_effort == "low"]),
-                "medium": len([rec for rec in cost_optimizer.recommendations if rec.implementation_effort == "medium"]),
-                "high": len([rec for rec in cost_optimizer.recommendations if rec.implementation_effort == "high"]),
+                "low": len(
+                    [
+                        rec
+                        for rec in cost_optimizer.recommendations
+                        if rec.implementation_effort == "low"
+                    ]
+                ),
+                "medium": len(
+                    [
+                        rec
+                        for rec in cost_optimizer.recommendations
+                        if rec.implementation_effort == "medium"
+                    ]
+                ),
+                "high": len(
+                    [
+                        rec
+                        for rec in cost_optimizer.recommendations
+                        if rec.implementation_effort == "high"
+                    ]
+                ),
             },
         }
-        
-        return jsonify({
-            "status": "success",
-            "dashboard": dashboard_data
-        })
+
+        return jsonify({"status": "success", "dashboard": dashboard_data})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -2763,9 +2801,9 @@ def get_executive_summary():
     try:
         provider = request.args.get("provider", "azure").lower()
         period = request.args.get("period", "monthly").lower()
-        
+
         period_enum = ReportPeriod[period.upper()]
-        
+
         summary = cost_reporter.generate_executive_summary(period_enum, provider)
         return jsonify({"status": "success", "summary": summary})
     except Exception as e:
@@ -2780,22 +2818,24 @@ def generate_cost_report():
         provider = data.get("provider", "azure").lower()
         period = data.get("period", "monthly").lower()
         format_type = data.get("format", "json").lower()
-        
+
         period_enum = ReportPeriod[period.upper()]
         format_enum = ReportFormat[format_type.upper()]
-        
+
         # Update recommendations history from latest analysis
         recommendations = cost_optimizer.prioritize_recommendations()
         cost_reporter.update_recommendation_history([rec.to_dict() for rec in recommendations])
-        
+
         report_content = cost_reporter.generate_detailed_report(period_enum, provider, format_enum)
-        
-        return jsonify({
-            "status": "success",
-            "format": format_type,
-            "report": report_content,
-            "generated_at": datetime.utcnow().isoformat()
-        })
+
+        return jsonify(
+            {
+                "status": "success",
+                "format": format_type,
+                "report": report_content,
+                "generated_at": datetime.utcnow().isoformat(),
+            }
+        )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -2808,22 +2848,23 @@ def download_cost_report():
         provider = data.get("provider", "azure").lower()
         period = data.get("period", "monthly").lower()
         format_type = data.get("format", "json").lower()
-        
+
         period_enum = ReportPeriod[period.upper()]
         format_enum = ReportFormat[format_type.upper()]
-        
+
         report_content = cost_reporter.generate_detailed_report(period_enum, provider, format_enum)
-        
+
         # Create appropriate response based on format
         if format_type == "json":
             return jsonify({"status": "success", "report": report_content})
-        else:
-            return jsonify({
+        return jsonify(
+            {
                 "status": "success",
                 "report": report_content,
                 "format": format_type,
-                "filename": f"cost-optimization-report-{period}-{provider}.{format_type}"
-            })
+                "filename": f"cost-optimization-report-{period}-{provider}.{format_type}",
+            }
+        )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -2836,16 +2877,15 @@ def track_recommendation_status():
         recommendation_id = data.get("recommendation_id")
         status = data.get("status", "planned")
         notes = data.get("notes", "")
-        
+
         if not recommendation_id:
             return jsonify({"status": "error", "message": "recommendation_id is required"}), 400
-        
+
         success = cost_reporter.track_recommendation_status(recommendation_id, status, notes)
-        
+
         if success:
             return jsonify({"status": "success", "message": "Status tracked successfully"})
-        else:
-            return jsonify({"status": "error", "message": "Failed to track status"}), 500
+        return jsonify({"status": "error", "message": "Failed to track status"}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -2866,7 +2906,7 @@ def get_cost_trends():
     try:
         trends_data = {
             "trends": [trend.to_dict() for trend in cost_reporter.cost_trends],
-            "analysis": cost_reporter._generate_trend_analysis()
+            "analysis": cost_reporter._generate_trend_analysis(),
         }
         return jsonify({"status": "success", "trends_data": trends_data})
     except Exception as e:

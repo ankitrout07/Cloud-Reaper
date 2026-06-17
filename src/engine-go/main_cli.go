@@ -17,16 +17,16 @@ import (
 )
 
 type vmReport struct {
-	Name           string             `json:"name"`
-	Size           string             `json:"size"`
-	Usage          float64            `json:"usage"`
-	UsageHistory   []float64          `json:"usage_history"`
-	NetworkIn      float64            `json:"network_in"`
-	NetworkOut     float64            `json:"network_out"`
-	DiskIOPS       float64            `json:"disk_iops"`
-	ID             string             `json:"id"`
-	Tags           map[string]string  `json:"tags"`
-	IsUnallocated  bool               `json:"is_unallocated"`
+	Name          string            `json:"name"`
+	Size          string            `json:"size"`
+	Usage         float64           `json:"usage"`
+	UsageHistory  []float64         `json:"usage_history"`
+	NetworkIn     float64           `json:"network_in"`
+	NetworkOut    float64           `json:"network_out"`
+	DiskIOPS      float64           `json:"disk_iops"`
+	ID            string            `json:"id"`
+	Tags          map[string]string `json:"tags"`
+	IsUnallocated bool              `json:"is_unallocated"`
 }
 
 type orphanedResource struct {
