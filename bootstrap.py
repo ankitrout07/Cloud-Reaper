@@ -291,7 +291,7 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
     if os.environ.get("PKG_CONFIG_PATH"):
         build_env["PKG_CONFIG_PATH"] = os.environ["PKG_CONFIG_PATH"]
 
-    if not run_cmd([go_bin, "build", "-o", str(output_path), "."], cwd=engine_dir, env=build_env):
+    if not run_cmd([go_bin, "build", "-tags", "cli", "-o", str(output_path), "."], cwd=engine_dir, env=build_env):
         print(c("[!] Go engine build failed. Dashboard features may be limited.", YELLOW))
         return 0  # Return 0 to continue since this is not critical
 

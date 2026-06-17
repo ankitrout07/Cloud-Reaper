@@ -4,7 +4,7 @@ FROM golang:1.25-alpine AS go-builder
 WORKDIR /app
 COPY src/engine-go/ .
 # Build with headless tag to skip webview dependency
-RUN CGO_ENABLED=0 go build -tags=headless -o /reaper-engine main.go
+RUN CGO_ENABLED=0 go build -tags=cli -o /reaper-engine .
 
 # 2. Build Python Intelligence Layer & Dashboard
 FROM python:3.12-slim

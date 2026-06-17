@@ -1,0 +1,13 @@
+{# Usage: set breadcrumb_items = [{"label": "Home", "href": "/"}, {"label": "Current", "current": true}] #}
+{% if breadcrumb_items %}
+<nav class="breadcrumb" aria-label="Breadcrumb">
+    {% for item in breadcrumb_items %}
+        {% if not loop.first %}<span class="breadcrumb__sep">/</span>{% endif %}
+        {% if item.current %}
+            <span class="breadcrumb__current">{{ item.label }}</span>
+        {% else %}
+            <a href="{{ item.href }}">{{ item.label }}</a>
+        {% endif %}
+    {% endfor %}
+</nav>
+{% endif %}

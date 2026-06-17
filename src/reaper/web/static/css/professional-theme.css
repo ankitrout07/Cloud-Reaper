@@ -29,6 +29,7 @@
     --accent-primary-light: #22d3ee;
     --accent-primary-dark: #0891b2;
     --accent-primary-gradient: linear-gradient(135deg, #06b6d4, #3b82f6);
+    --accent-subtle: rgba(6, 182, 212, 0.12);
     
     /* Secondary Accent - Purple-Indigo */
     --accent-secondary: #8b5cf6;
@@ -127,6 +128,7 @@
     --accent-primary-light: #06b6d4;
     --accent-primary-dark: #0e7490;
     --accent-primary-gradient: linear-gradient(135deg, #0891b2, #2563eb);
+    --accent-subtle: rgba(8, 145, 178, 0.12);
     
     /* Secondary Accent */
     --accent-secondary: #7c3aed;

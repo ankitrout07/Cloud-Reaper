@@ -52,3 +52,10 @@ func FetchAWSPrice(sku string, region string) (float64, error) {
 	// Real implementation would use the AWS Price List Query API.
 	return 0.1, nil
 }
+
+func FetchGCPPrice(sku string, region string) (float64, error) {
+	// GCP billing catalog API requires OAuth; use retail heuristic until wired.
+	_ = region
+	_ = sku
+	return 0.08, nil
+}

@@ -88,28 +88,57 @@ body {
     width: var(--sidebar-expanded);
 }
 
+#main-content {
+    box-sizing: border-box;
+    flex: 1;
+    min-width: 0;
+    margin-left: var(--sidebar-collapsed);
+    width: calc(100% - var(--sidebar-collapsed));
+    transition: margin-left 0.3s ease, width 0.3s ease;
+}
+
+.app-sidebar:hover ~ #main-content {
+    margin-left: var(--sidebar-expanded);
+    width: calc(100% - var(--sidebar-expanded));
+}
+
 .app-main {
     box-sizing: border-box;
     min-height: 100vh;
-    margin-left: var(--sidebar-collapsed);
-    width: calc(100% - var(--sidebar-collapsed));
-    padding: 2rem;
-    transition: margin-left 0.3s ease, width 0.3s ease;
+    width: 100%;
     border-left: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.app-sidebar:hover ~ .app-main {
-    margin-left: var(--sidebar-expanded);
-    width: calc(100% - var(--sidebar-expanded));
 }
 
 .sidebar-brand {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 0.625rem;
     margin-bottom: 1.5rem;
     padding: 0 1rem;
     min-height: 2.5rem;
+}
+
+.sidebar-brand-name {
+    font-size: 0.9375rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text-primary, #e5e7eb);
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    transition: opacity 0.25s ease, width 0.25s ease;
+}
+
+.app-sidebar:hover .sidebar-brand-name {
+    opacity: 1;
+    width: auto;
+}
+
+.theme-toggle-btn:hover,
+.sidebar-theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #e5e7eb;
 }
 
 .sidebar-brand-mark {

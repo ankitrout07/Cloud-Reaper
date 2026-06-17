@@ -1,4 +1,4 @@
-//go:build !headless
+//go:build !headless && !cli
 
 package main
 

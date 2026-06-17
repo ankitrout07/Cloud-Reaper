@@ -1,0 +1,6 @@
+{# Required: label, value_id. Optional: hint, accent (default|success|warning|error|accent), initial_value #}
+<div class="stat-card stat-card--{{ accent | default('info') }}">
+    <div class="stat-card__label">{{ label }}</div>
+    <div class="stat-card__value stat-card__value--{{ accent | default('default') }}" id="{{ value_id }}">{{ initial_value | default('—') }}</div>
+    {% if hint %}<div class="stat-card__hint">{{ hint }}</div>{% endif %}
+</div>

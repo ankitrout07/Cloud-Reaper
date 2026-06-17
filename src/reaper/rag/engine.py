@@ -83,6 +83,7 @@ class DocSearchEngine:
         # Circuit-breaker: set True when the API quota is exhausted (HTTP 429).
         # Prevents hammering the API with thousands of doomed requests per session.
         self._quota_exhausted: bool = False
+        self._summary_quota_exhausted: bool = False
 
     # ------------------------------------------------------------------
     # Embedding helper with retry / circuit-breaker logic
@@ -197,6 +198,9 @@ class DocSearchEngine:
         summary = f"This document details the {h1_title} within Cloud-Reaper. {first_para}"
 
         # Try generating situational context via Gemini for production richness
+        if self._summary_quota_exhausted:
+            return f"Document: {file_name}\nTitle: {h1_title}\nSummary: {summary}"
+
         try:
             # Only generate via API if client looks real and has models
             if hasattr(self.client, "models") and not isinstance(
@@ -212,7 +216,21 @@ class DocSearchEngine:
                 if response and response.text:
                     summary = response.text.strip()
         except Exception as e:
-            print(f"[!] Error generating document summary: {e}")
+            exc_str = str(e)
+            if "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str:
+                if not self._summary_quota_exhausted:
+                    print(
+                        "WARN: Gemini summary quota exhausted (429). "
+                        "Using deterministic summaries for remaining docs."
+                    )
+                self._summary_quota_exhausted = True
+            elif "503" in exc_str or "UNAVAILABLE" in exc_str:
+                print(
+                    "WARN: Gemini summary unavailable (503). "
+                    "Using deterministic summary for this document."
+                )
+            else:
+                print(f"WARN: Error generating document summary: {e}")
 
         return f"Document: {file_name}\nTitle: {h1_title}\nSummary: {summary}"
 
@@ -226,6 +244,7 @@ class DocSearchEngine:
         self.docs_index = []
         # Reset circuit-breaker at the start of every fresh indexing run
         self._quota_exhausted = False
+        self._summary_quota_exhausted = False
 
         search_path = Path(docs_dir)
         if not search_path.exists():

@@ -298,6 +298,7 @@ func (a *AzureScraper) scanVMs(ctx context.Context) ([]models.Resource, error) {
 				LastSeen:      time.Now().UTC(),
 				Provider:      ProviderAzure,
 				SKU:           sku,
+				Usage:         usage,
 			})
 		}
 	}

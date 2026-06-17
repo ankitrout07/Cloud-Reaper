@@ -27,7 +27,7 @@ venv:
 
 build:
 	mkdir -p bin
-	cd src/engine-go && go build -o ../../bin/reaper-engine main.go
+	cd src/engine-go && go build -tags cli -o ../../bin/reaper-engine .
 
 test: test-python test-go
 

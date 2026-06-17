@@ -55,7 +55,7 @@ fi
 if [ -d "src/engine-go" ]; then
     echo "[*] Building Go Core..."
     mkdir -p bin
-    (cd src/engine-go && go build -o ../../bin/reaper-engine main.go)
+    (cd src/engine-go && go build -tags cli -o ../../bin/reaper-engine .)
     echo "[+] Go engine built successfully: bin/reaper-engine"
 else
     echo "[!] src/engine-go directory not found!"

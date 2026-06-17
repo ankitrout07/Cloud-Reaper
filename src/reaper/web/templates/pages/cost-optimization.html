@@ -1,0 +1,205 @@
+{% extends "layouts/_base.html" if not request.headers.get("HX-Request") else "layouts/_empty.html" %}
+
+{% block content %}
+<main class="app-main flex-1 p-8 lg:p-10">
+    <div class="page-shell page-shell--wide animate-fade-in">
+        {% set breadcrumb_items = [
+            {"label": "Home", "href": "/"},
+            {"label": "Financial Intelligence", "href": "/financial"},
+            {"label": "Cost Optimization", "current": true}
+        ] %}
+        {% include "components/_breadcrumb.html" %}
+
+        <header class="page-header">
+            <div class="page-header__row">
+                <div class="page-header__intro">
+                    <h1 class="page-header__title">
+                        Cost <span class="page-header__title-accent">Optimization</span>
+                        <span class="page-header__badge">AI-Powered</span>
+                    </h1>
+                    <p class="page-header__subtitle">
+                        Discover savings across compute, storage, and architecture — with prioritized recommendations and implementation tracking.
+                    </p>
+                </div>
+                <div class="page-header__actions">
+                    <button type="button" onclick="runAnalysis()" class="btn btn-primary">
+                        <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        Run Analysis
+                    </button>
+                    <button type="button" onclick="showReports()" class="btn btn-ghost">
+                        <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        Reports
+                    </button>
+                    <button type="button" onclick="exportReport()" class="btn btn-ghost">
+                        <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Export
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div id="summary-cards" class="stat-grid">
+            {% with label="Total Recommendations", value_id="total-recs", initial_value="0", hint="Savings opportunities", accent="info" %}
+            {% include "components/_stat_card.html" %}
+            {% endwith %}
+            {% with label="Monthly Savings", value_id="monthly-savings", initial_value="$0", hint="Potential reduction", accent="success" %}
+            {% include "components/_stat_card.html" %}
+            {% endwith %}
+            {% with label="High Priority", value_id="high-priority", initial_value="0", hint="Critical items", accent="error" %}
+            {% include "components/_stat_card.html" %}
+            {% endwith %}
+            {% with label="Avg. Savings", value_id="savings-percent", initial_value="0%", hint="Per recommendation", accent="accent" %}
+            {% include "components/_stat_card.html" %}
+            {% endwith %}
+        </div>
+
+        <nav class="tab-nav" role="tablist" aria-label="Cost optimization views">
+            <button type="button" id="tab-recommendations" class="tab-nav__btn active" role="tab" aria-selected="true" onclick="showRecommendations()">Recommendations</button>
+            <button type="button" id="tab-reports" class="tab-nav__btn" role="tab" onclick="showReports()">Reports &amp; Trends</button>
+            <button type="button" id="tab-implementation" class="tab-nav__btn" role="tab" onclick="showImplementation()">Implementation</button>
+        </nav>
+
+        <div id="content-recommendations" class="tab-pane" role="tabpanel">
+            <section class="section-card">
+                <div class="filter-bar">
+                    <span class="filter-bar__title">Filters</span>
+                    <select id="priority-filter" onchange="filterRecommendations()" class="glass-input" aria-label="Priority filter">
+                        <option value="all">All Priorities</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <select id="category-filter" onchange="filterRecommendations()" class="glass-input" aria-label="Category filter">
+                        <option value="all">All Categories</option>
+                        <option value="compute">Compute</option>
+                        <option value="storage">Storage</option>
+                        <option value="network">Network</option>
+                        <option value="database">Database</option>
+                        <option value="architecture">Architecture</option>
+                    </select>
+                    <select id="risk-filter" onchange="filterRecommendations()" class="glass-input" aria-label="Risk filter">
+                        <option value="all">All Risk Levels</option>
+                        <option value="safe">Safe</option>
+                        <option value="low">Low Risk</option>
+                        <option value="medium">Medium Risk</option>
+                        <option value="high">High Risk</option>
+                    </select>
+                </div>
+            </section>
+
+            <div id="recommendations-container">
+                {% with title="Run your first analysis", description="Evaluate cloud resources for right-sizing, idle cleanup, reserved instances, spot opportunities, and more.", icon="search" %}
+                {% include "components/_empty_state.html" %}
+                {% endwith %}
+            </div>
+        </div>
+
+        <div id="content-reports" class="tab-pane hidden" role="tabpanel">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <section class="section-card mb-0">
+                    <div class="section-card__header">
+                        <div class="section-card__icon" aria-hidden="true">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="section-card__title">Generate Cost Report</h2>
+                            <p class="section-card__desc">Export analysis for stakeholders</p>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="data-cell__label block mb-2" for="report-period">Report Period</label>
+                            <select id="report-period" class="glass-input">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly" selected>Monthly</option>
+                                <option value="quarterly">Quarterly</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="data-cell__label block mb-2" for="report-format">Format</label>
+                            <select id="report-format" class="glass-input">
+                                <option value="json">JSON</option>
+                                <option value="html">HTML</option>
+                                <option value="markdown">Markdown</option>
+                                <option value="csv">CSV</option>
+                            </select>
+                        </div>
+                        <button type="button" onclick="generateReport()" class="btn btn-primary w-full">Generate Report</button>
+                    </div>
+                </section>
+
+                <section class="section-card mb-0">
+                    <div class="section-card__header">
+                        <div class="section-card__icon" aria-hidden="true">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="section-card__title">Executive Summary</h2>
+                            <p class="section-card__desc">High-level savings overview</p>
+                        </div>
+                    </div>
+                    <div id="executive-summary-content">
+                        <p class="text-muted">Generate a report or run analysis to populate this section.</p>
+                    </div>
+                </section>
+            </div>
+
+            <section class="section-card">
+                <div class="section-card__header">
+                    <div class="section-card__icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                    </div>
+                    <div>
+                        <h2 class="section-card__title">Cost Trends</h2>
+                        <p class="section-card__desc">Historical optimization performance</p>
+                    </div>
+                </div>
+                <div id="trends-content" data-loaded="false">
+                    <p class="text-muted">Run analysis to generate trend data.</p>
+                </div>
+            </section>
+
+            <section class="section-card">
+                <h2 class="section-card__title mb-4">Category Analysis</h2>
+                <div id="category-analysis-content">
+                    <p class="text-muted">Run analysis to generate category breakdown.</p>
+                </div>
+            </section>
+
+            <section class="section-card">
+                <h2 class="section-card__title mb-4">Risk Assessment</h2>
+                <div id="risk-assessment-content">
+                    <p class="text-muted">Run analysis to generate risk assessment.</p>
+                </div>
+            </section>
+
+            <section class="section-card">
+                <h2 class="section-card__title mb-4">Recommended Next Steps</h2>
+                <div id="next-steps-content">
+                    <p class="text-muted">Run analysis to get actionable next steps.</p>
+                </div>
+            </section>
+        </div>
+
+        <div id="content-implementation" class="tab-pane hidden" role="tabpanel">
+            <section class="section-card">
+                <div class="section-card__header">
+                    <div class="section-card__icon" aria-hidden="true">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    </div>
+                    <div>
+                        <h2 class="section-card__title">Implementation Progress</h2>
+                        <p class="section-card__desc">Track status of optimization recommendations</p>
+                    </div>
+                </div>
+                <div id="implementation-progress-content" data-loaded="false">
+                    <p class="text-muted">Track implementation status after running analysis.</p>
+                </div>
+            </section>
+        </div>
+    </div>
+</main>
+<script src="/static/js/cost-optimization.js"></script>
+{% endblock %}

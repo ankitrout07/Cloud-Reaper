@@ -1,6 +1,7 @@
 <nav id="sidebar" class="app-sidebar group" aria-label="Main navigation" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML transition:true">
     <div class="sidebar-brand">
-        <img src="/static/img/logo.png" alt="Cloud Reaper Logo" class="w-10 h-10 object-contain">
+        <img src="/static/img/logo.png" alt="Cloud Reaper Logo" class="w-10 h-10 object-contain flex-shrink-0">
+        <span class="sidebar-label sidebar-brand-name">Cloud Reaper</span>
     </div>
 
     <div class="sidebar-nav">
@@ -17,6 +18,10 @@
             <span class="sidebar-label">Build with AI</span>
         </a>
         <p class="sidebar-section-title sidebar-label">Financial Intelligence</p>
+        <a href="/cost-optimization" class="sidebar-link nav-link" data-nav-path="/cost-optimization">
+            <svg class="sidebar-icon text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M15 17h.01M9 4h12a2 2 0 002-2V6a2 2 0 00-2-2H9a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            <span class="sidebar-label">Cost Optimization</span>
+        </a>
         <a href="/financial" class="sidebar-link nav-link" data-nav-path="/financial">
             <svg class="sidebar-icon text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
             <span class="sidebar-label">Financial Intelligence</span>
@@ -56,6 +61,10 @@
             <span id="health-pulse" class="sidebar-status-dot"></span>
             <span class="sidebar-status-text">GO ENGINE LIVE</span>
         </div>
+        <button type="button" class="sidebar-link sidebar-theme-toggle w-full text-left border-0 bg-transparent cursor-pointer" onclick="toggleAppTheme()" title="Switch theme" aria-label="Toggle light or dark theme">
+            <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            <span class="sidebar-label">Theme</span>
+        </button>
         <a href="/settings" id="sidebar-settings-link" class="sidebar-link nav-link" data-nav-path="/settings">
             <svg class="sidebar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             <span class="sidebar-label">Settings</span>

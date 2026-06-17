@@ -15,4 +15,5 @@ type Resource struct {
 	LastSeen      time.Time
 	Provider      string // azure, aws, gcp, k8s
 	SKU           string // instance type / VM size / node pool SKU
+	Usage         float64 // latest CPU % (VMs) or utilization signal
 }

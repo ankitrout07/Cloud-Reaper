@@ -28,19 +28,27 @@ from reaper.collectors.prices.azure import AzurePriceClient
 from reaper.engine.core.logic import BudgetForecaster
 from reaper.engine.models.resources import CostHistory, RegionPriceCache, SessionLocal
 
+
+def _reaper_engine_binary() -> Path | None:
+    """Resolve the Go engine binary (bootstrap builds to repo ``bin/``)."""
+    repo_root = Path(__file__).resolve().parents[4]
+    name = "reaper-engine.exe" if platform.system() == "Windows" else "reaper-engine"
+    for candidate in (repo_root / "bin" / name, repo_root / "src" / "engine-go" / name):
+        if candidate.is_file():
+            return candidate
+    return None
+
 load_dotenv()
 
 _GLOBAL_CACHE: dict[str, tuple[float, Any]] = {}
 _CACHE_LOCK = threading.Lock()
-
-# Shared thread pool for concurrent operations to avoid creating new executors repeatedly
-_SHARED_EXECUTOR = ThreadPoolExecutor(max_workers=10, thread_name_prefix="azure_collector")
+_FETCH_LOCKS: dict[str, threading.Lock] = {}
 
 
 def get_cached_data(cache_key, fetch_fn, ttl_seconds=60):
     """
     Get data from global memory cache or fetch it if missing/expired.
-    Thread-safe and high-performance.
+    Thread-safe with per-key fetch deduplication to prevent cache stampedes.
     """
     now = time.time()
     with _CACHE_LOCK:
@@ -48,17 +56,31 @@ def get_cached_data(cache_key, fetch_fn, ttl_seconds=60):
             timestamp, data = _GLOBAL_CACHE[cache_key]
             if now - timestamp < ttl_seconds:
                 return data
+        if cache_key not in _FETCH_LOCKS:
+            _FETCH_LOCKS[cache_key] = threading.Lock()
+        fetch_lock = _FETCH_LOCKS[cache_key]
 
-    data = fetch_fn()
+    with fetch_lock:
+        now = time.time()
+        with _CACHE_LOCK:
+            if cache_key in _GLOBAL_CACHE:
+                timestamp, data = _GLOBAL_CACHE[cache_key]
+                if now - timestamp < ttl_seconds:
+                    return data
 
-    with _CACHE_LOCK:
-        _GLOBAL_CACHE[cache_key] = (now, data)
-        # Cleanup expired entries to prevent memory leaks
-        expired_keys = [k for k, (ts, _) in _GLOBAL_CACHE.items() if now - ts > ttl_seconds * 2]
-        for k in expired_keys:
-            del _GLOBAL_CACHE[k]
+        data = fetch_fn()
 
-    return data
+        with _CACHE_LOCK:
+            _GLOBAL_CACHE[cache_key] = (now, data)
+            expired_keys = [k for k, (ts, _) in _GLOBAL_CACHE.items() if now - ts > ttl_seconds * 2]
+            for k in expired_keys:
+                del _GLOBAL_CACHE[k]
+
+        return data
+
+
+# Shared thread pool for concurrent Azure Monitor / API fan-out
+_SHARED_EXECUTOR = ThreadPoolExecutor(max_workers=10, thread_name_prefix="azure_collector")
 
 
 class ThreadSafeList:
@@ -135,6 +157,8 @@ class AzureCollector:
                         "size": vm.hardware_profile.vm_size,
                         "location": vm.location,
                         "status": "Managed",
+                        "id": vm.id,
+                        "tags": dict(vm.tags) if vm.tags else {},
                     }
                 )
             return inventory
@@ -249,7 +273,21 @@ class AzureCollector:
     def get_vm_metrics(self, resource_id):
         """
         Fetches real-time Percentage CPU metrics from Azure Monitor for a specific resource.
+        Returns a structured dict for cost-optimization pipelines.
         """
+        empty = {
+            "cpu_percent": {"average": 0.0, "max": 0.0},
+            "memory_percent": {"average": 0.0, "max": 0.0},
+            "disk_percent": {"average": 0.0, "max": 0.0},
+            "network_in_mbps": 0.0,
+            "network_out_mbps": 0.0,
+            "iops": 0.0,
+            "latency_ms": 0.0,
+            "error_rate": 0.0,
+            "uptime_percentage": 99.0,
+        }
+        if not resource_id:
+            return empty
         try:
             metrics = self.monitor.metrics.list(
                 resource_id,
@@ -258,17 +296,25 @@ class AzureCollector:
                 metricnames="Percentage CPU",
                 aggregation="Average",
             )
+            cpu_avg = 0.0
             if (
                 metrics.value
                 and metrics.value[0].timeseries
                 and metrics.value[0].timeseries[0].data
             ):
-                latest_data = metrics.value[0].timeseries[0].data[-1]
-                return latest_data.average if latest_data.average is not None else 0.0
-            return 0.0
+                data_points = [
+                    p.average
+                    for p in metrics.value[0].timeseries[0].data
+                    if p.average is not None
+                ]
+                if data_points:
+                    cpu_avg = float(sum(data_points) / len(data_points))
+            empty["cpu_percent"] = {"average": cpu_avg, "max": cpu_avg}
+            empty["peak_cpu_utilization"] = cpu_avg
+            return empty
         except Exception as e:
             print(f"[-] Error fetching metrics for {resource_id}: {e}")
-            return 0.0
+            return empty
 
     def get_vm_metric_latest(
         self, resource_id: str, metric_name: str, timespan: str = "PT1H", interval: str = "PT1M"
@@ -325,7 +371,7 @@ class AzureCollector:
                     f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
                     f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
                 )
-                return float(self.get_vm_metrics(resource_id))
+                return float(self.get_vm_metrics(resource_id).get("cpu_percent", {}).get("average", 0.0))
             except Exception:
                 return 0.0
 
@@ -738,12 +784,18 @@ class AzureCollector:
 
     def get_utilization_report(self):
         """Generate a summarized utilization report for all VMs (24h CPU average)."""
-        vms = self.compute.virtual_machines.list_all()
-        report = []
+        try:
+            vms = list(self.compute.virtual_machines.list_all())
+        except Exception:
+            return []
+
         end_time = datetime.datetime.now(datetime.UTC)
         start_time = end_time - datetime.timedelta(days=1)
+        timespan = (
+            f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+        )
 
-        for vm in vms:
+        def _vm_usage(vm):
             resource_group = vm.id.split("/")[4] if "/" in vm.id else "Unknown"
             resource_id = (
                 f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
@@ -752,7 +804,7 @@ class AzureCollector:
             try:
                 metrics = self.monitor.metrics.list(
                     resource_id,
-                    timespan=f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}",
+                    timespan=timespan,
                     interval="PT1H",
                     metricnames="Percentage CPU",
                     aggregation="Average",
@@ -763,18 +815,11 @@ class AzureCollector:
                         data_points = [p.average for p in timeseries.data if p.average is not None]
                         if data_points:
                             avg_usage = sum(data_points) / len(data_points)
+                return {"name": vm.name, "usage": round(avg_usage, 1), "rg": resource_group}
+            except Exception:
+                return None
 
-                report.append(
-                    {
-                        "name": vm.name,
-                        "usage": round(avg_usage, 1),
-                        "rg": resource_group,
-                    }
-                )
-            except Exception:  # noqa: S112
-                continue
-
-        # Sort by highest usage
+        report = [r for r in _SHARED_EXECUTOR.map(_vm_usage, vms) if r]
         report.sort(key=lambda x: x["usage"], reverse=True)
         return report
 
@@ -1048,13 +1093,11 @@ class AzureCollector:
         """
         Executes the Go Performance Core to fetch real-time Azure pricing data.
         """
-        # Path to the Go binary in the root bin/ directory
-        is_windows = platform.system() == "Windows"
-        binary_name = "reaper-engine.exe" if is_windows else "reaper-engine"
-        go_binary = Path(__file__).resolve().parents[3] / "bin" / binary_name
-
-        if not go_binary.exists():
-            print(f"[-] Error: Go binary not found at {go_binary}. Run ./reap.sh to build.")
+        go_binary = _reaper_engine_binary()
+        if go_binary is None:
+            repo_root = Path(__file__).resolve().parents[4]
+            expected = repo_root / "bin" / "reaper-engine"
+            print(f"[-] Error: Go binary not found at {expected}. Run ./scripts/reap.sh to build.")
             return {}
 
         try:
@@ -1080,12 +1123,11 @@ class AzureCollector:
         cache_key = f"go_scan_{self.subscription_id}"
 
         def fetch():
-            is_windows = platform.system() == "Windows"
-            binary_name = "reaper-engine.exe" if is_windows else "reaper-engine"
-            go_binary = Path(__file__).resolve().parents[3] / "bin" / binary_name
-
-            if not go_binary.exists():
-                print(f"[-] Error: Go binary not found at {go_binary}. Run ./reap.sh to build.")
+            go_binary = _reaper_engine_binary()
+            if go_binary is None:
+                repo_root = Path(__file__).resolve().parents[4]
+                expected = repo_root / "bin" / "reaper-engine"
+                print(f"[-] Error: Go binary not found at {expected}. Run ./scripts/reap.sh to build.")
                 return {}
 
             try:
@@ -1109,11 +1151,8 @@ class AzureCollector:
         """
         Calls the Go engine in arbitrage mode to fetch prices in parallel across regions.
         """
-        is_windows = platform.system() == "Windows"
-        binary_name = "reaper-engine.exe" if is_windows else "reaper-engine"
-        go_binary = Path(__file__).resolve().parents[3] / "bin" / binary_name
-
-        if not go_binary.exists():
+        go_binary = _reaper_engine_binary()
+        if go_binary is None:
             return {"error": "Go binary not found"}
 
         try:
@@ -1378,28 +1417,20 @@ class AzureCollector:
 
     def get_cost_vs_budget_chart(self) -> dict:
         """
-        Get chart data for budget pacing visualization.
-        Returns labels, cumulative spend series, and budget pace series.
+        Get chart data for budget pacing visualization from real cost history when available.
         """
         try:
-            import random
-
-            # Generate simulated chart data
-            labels = [f"Day {i}" for i in range(1, 31)]
-            cumulative_spend = [random.uniform(100, 150) * i for i in range(1, 31)]
-            budget_pace = [random.uniform(100, 150) * i * 0.95 for i in range(1, 31)]
-
+            budget = float(os.getenv("MONTHLY_BUDGET", "5000"))
+            series = self.get_cost_vs_budget_series(monthly_budget=budget)
             return {
-                "labels": labels,
-                "cumulative_spend": cumulative_spend,
-                "budget_pace": budget_pace,
+                "labels": series.get("labels", []),
+                "cumulative_spend": series.get("cumulative_spend", []),
+                "budget_pace": series.get("budget_pace", []),
+                "source": "live" if series.get("cumulative_spend") else "empty",
             }
-        except Exception:
-            return {
-                "labels": [f"Day {i}" for i in range(1, 31)],
-                "cumulative_spend": [100 * i for i in range(1, 31)],
-                "budget_pace": [95 * i for i in range(1, 31)],
-            }
+        except Exception as e:
+            print(f"[!] Cost vs budget chart error: {e}")
+            return {"labels": [], "cumulative_spend": [], "budget_pace": [], "source": "error"}
 
     def get_active_commitments(self) -> list:
         """
@@ -1410,15 +1441,14 @@ class AzureCollector:
             ri_candidates = self.get_ri_sp_candidates()
 
             commitments = []
-            # Convert RI candidates to commitment format
-            for i, candidate in enumerate(ri_candidates.get("recommendations", [])[:2]):
+            for i, candidate in enumerate(ri_candidates[:2]):
                 commitments.append(
                     {
                         "provider": "Azure",
                         "type": "Reserved Instance",
-                        "commit": candidate.get("cost"),
-                        "savings": 40 + i * 5,
-                        "status": "active",
+                        "commit": candidate.get("sku", "Unknown"),
+                        "savings": round(candidate.get("annual_savings", 0) / 12, 2),
+                        "status": "recommended",
                     }
                 )
 
@@ -1467,14 +1497,15 @@ class AzureCollector:
         """
         try:
             # Try to get actual coverage from RI candidates
-            ri_data = self.get_ri_sp_candidates()
-            total_candidates = len(ri_data.get("recommendations", []))
+            ri_candidates = self.get_ri_sp_candidates()
+            total_candidates = len(ri_candidates)
 
-            # Calculate coverage based on candidates
-            coverage = 62.4 if total_candidates < 5 else 75.0 + (total_candidates * 2)
-            coverage = min(coverage, 95.0)  # Cap at 95%
+            inventory = self.get_vm_inventory()
+            vm_count = max(len(inventory), 1)
+            covered_estimate = max(0, vm_count - total_candidates)
+            coverage = min(95.0, round((covered_estimate / vm_count) * 100, 1))
 
-            waste_amount = 1185.00 if coverage < 70 else 500.00
+            waste_amount = sum(c.get("annual_savings", 0) for c in ri_candidates) / 12
 
             return {
                 "overall_coverage": round(coverage, 1),
@@ -1489,15 +1520,15 @@ class AzureCollector:
         Get RI/Savings Plan purchase recommendations.
         """
         try:
-            ri_data = self.get_ri_sp_candidates()
+            ri_candidates = self.get_ri_sp_candidates()
             recommendations = []
 
-            for candidate in ri_data.get("recommendations", [])[:3]:
+            for candidate in ri_candidates[:3]:
                 recommendations.append(
                     {
                         "sku": candidate.get("sku", "Unknown"),
                         "region": candidate.get("region", "eastus"),
-                        "annual_savings": round(candidate.get("savings", 420.50), 2),
+                        "annual_savings": round(candidate.get("annual_savings", 0), 2),
                         "term": "1 year",
                         "action": "Purchase RI",
                     }
@@ -1543,16 +1574,16 @@ class AzureCollector:
         try:
             # Get policy violations
             violations = self.get_policy_violations()
-            for violation in violations.get("violations", [])[:3]:
+            for violation in violations[:3]:
                 issues.append(
                     {
                         "id": f"issue-{len(issues) + 1}",
                         "severity": "Critical"
-                        if violation.get("severity") == "high"
+                        if violation.get("severity", "").upper() == "HIGH"
                         else "Warning",
                         "type": "Policy Violation",
-                        "title": violation.get("message", "Policy compliance issue"),
-                        "resource_id": violation.get("resource_id", "Unknown"),
+                        "title": violation.get("violation", violation.get("message", "Policy compliance issue")),
+                        "resource_id": violation.get("resource", violation.get("resource_id", "Unknown")),
                         "daily_waste": violation.get("potential_savings", 22.40),
                         "actions": ["DISMISS", "KILL"],
                     }
@@ -1582,7 +1613,7 @@ class AzureCollector:
         try:
             # Get orphaned disks
             orphaned = self.get_orphaned_disks()
-            for disk in orphaned[:2]:
+            for disk in orphaned.get("disks", [])[:2]:
                 if len(issues) < 5:
                     issues.append(
                         {
