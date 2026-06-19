@@ -1,105 +1,15 @@
-// Enhanced theme management with better persistence and UI updates
-function applyTheme(theme) {
-    // Validate theme value
-    if (!theme || !['dark', 'light'].includes(theme)) {
-        theme = 'dark';
-    }
-    
-    // Apply to document
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('reaper-theme', theme);
-    
-    // Update theme-specific UI elements
-    const themeStatus = document.getElementById('theme-status-text');
-    if (themeStatus) themeStatus.innerText = theme.toUpperCase() + ' MODE';
-    
-    const themeToggleBtn = document.querySelector('.theme-toggle-btn');
-    if (themeToggleBtn) {
-        if (theme === 'dark') {
-            themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
-            themeToggleBtn.title = 'Switch to Light Mode';
-        } else {
-            themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
-            themeToggleBtn.title = 'Switch to Dark Mode';
-        }
-    }
-    
-    // Update chart colors if Chart.js is loaded
-    if (typeof Chart !== 'undefined') {
-        updateChartColors(theme);
-    }
-}
-
-// Update Chart.js colors based on theme
-function updateChartColors(theme) {
-    const colors = theme === 'dark' ? {
-        grid: 'rgba(255, 255, 255, 0.08)',
-        tick: '#94a3b8',
-        primary: '#06b6d4',
-        secondary: '#8b5cf6',
-        success: '#10b981',
-        warning: '#f59e0b',
-        error: '#ef4444'
-    } : {
-        grid: 'rgba(15, 23, 42, 0.08)',
-        tick: '#64748b',
-        primary: '#0891b2',
-        secondary: '#7c3aed',
-        success: '#059669',
-        warning: '#d97706',
-        error: '#dc2626'
-    };
-    
-    // Store globally for use by other scripts
-    window.__chartColors = colors;
-}
-
-// Initial check on page load
-(function() {
-    const savedTheme = localStorage.getItem('reaper-theme') || 'dark';
-    applyTheme(savedTheme);
-})();
-
-// Toggle function for the button in Settings
-function toggleAppTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    applyTheme(newTheme);
-    
-    // Show toast notification
-    if (typeof showToast === 'function') {
-        showToast(`Switched to ${newTheme} mode`, 'success');
-    }
-}
-
-// Auto-detect system preference on first visit
-(function detectSystemTheme() {
-    if (!localStorage.getItem('reaper-theme')) {
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        applyTheme(prefersDark ? 'dark' : 'light');
-    }
-})();
-
-// Listen for system theme changes
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-    if (!localStorage.getItem('reaper-theme')) {
-        applyTheme(e.matches ? 'dark' : 'light');
-    }
-});
-
 /**
  * Shared Socket.IO client + Chart.js live metrics (FinOps dashboard, home, monitor).
  * Emissions are throttled server-side (see REAPER_METRICS_EMIT_SEC / Azure Monitor cadence).
  */
 (function () {
-    // Use theme-aware colors or fallback to dark theme colors
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const GRID = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)';
-    const TICK = isDark ? '#94a3b8' : '#64748b';
-    const CHART_PRIMARY = isDark ? '#06b6d4' : '#0891b2';
-    const CHART_PRIMARY_FILL = isDark ? 'rgba(6, 182, 212, 0.15)' : 'rgba(8, 145, 178, 0.15)';
-    const CHART_SECONDARY = isDark ? '#8b5cf6' : '#7c3aed';
-    const CHART_WARNING = isDark ? '#f59e0b' : '#d97706';
+    // Use dark theme colors by default (theme functionality removed)
+    const GRID = 'rgba(255, 255, 255, 0.08)';
+    const TICK = '#94a3b8';
+    const CHART_PRIMARY = '#06b6d4';
+    const CHART_PRIMARY_FILL = 'rgba(6, 182, 212, 0.15)';
+    const CHART_SECONDARY = '#8b5cf6';
+    const CHART_WARNING = '#f59e0b';
     
     window.__reaperEnsureSocket = function () {
         if (typeof io === 'undefined') {
@@ -552,31 +462,6 @@ window.startLogStream = function() {
     }
     
     sock.emit('start_log_stream');
-};
-
-window.toggleConsole = function(forceOpen = false) {
-    const terminal = document.getElementById('console-terminal');
-    if (!terminal) {
-        console.error('Console terminal element not found');
-        return;
-    }
-    
-    if (forceOpen) {
-        terminal.style.display = 'block';
-    } else {
-        terminal.style.display = (terminal.style.display === 'none') ? 'block' : 'none';
-    }
-
-    if (terminal.style.display === 'block') {
-        const output = document.getElementById('log-output');
-        if (output) {
-            output.innerHTML = '<p class="log-line system-msg">> Initializing terminal...</p>';
-        }
-        // Small delay to ensure DOM is ready before starting log stream
-        setTimeout(() => {
-            window.startLogStream();
-        }, 100);
-    }
 };
 
 window.logToConsole = function(msg, type = 'info') {

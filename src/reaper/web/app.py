@@ -3067,13 +3067,10 @@ def handle_connect():
 def handle_start_log_stream():
     """Handle real-time log streaming with actual Cloud-Reaper logs."""
     import time
-<<<<<<< HEAD
 
-=======
     import logging
     import sys
     import platform
->>>>>>> 39cf39b (Golang Stabilise)
     from reaper.services.log_streamer import fetch_azure_logs
 
     socketio.emit("new_log", {"data": "🚀 Initializing Cloud-Reaper Log Stream..."})
@@ -3111,11 +3108,7 @@ def handle_start_log_stream():
             )
             socketio.sleep(0.3)
             for i, log in enumerate(azure_logs):
-<<<<<<< HEAD
-                socketio.emit("new_log", {"data": f"[Azure #{i + 1}] {log}"})
-=======
                 socketio.emit("new_log", {"data": f"[Azure #{i+1}] {str(log)}"})
->>>>>>> 39cf39b (Golang Stabilise)
                 # pyrefly: ignore [bad-argument-type]
                 socketio.sleep(0.3)
         else:
@@ -3128,30 +3121,6 @@ def handle_start_log_stream():
     # Stream actual Cloud-Reaper system information
     socketio.emit("new_log", {"data": "🔄 Streaming Cloud-Reaper system information..."})
     socketio.sleep(0.2)
-<<<<<<< HEAD
-
-    # Stream some simulated system logs for demonstration
-    system_logs = [
-        "🔍 Scanning Azure subscription for cost anomalies...",
-        "💰 Analyzing resource utilization patterns...",
-        "⚡ Computing optimization recommendations...",
-        "📊 Generating cost forecast for next 30 days...",
-        "🎯 Identifying idle resources for potential shutdown...",
-        "🔧 Checking compliance with tagging policies...",
-        "📈 Processing real-time telemetry data...",
-        "🌐 Monitoring network bandwidth usage...",
-        "💾 Evaluating storage tier optimization...",
-        "🚀 Finalizing analysis report...",
-    ]
-
-    for i, log in enumerate(system_logs):
-        timestamp = time.strftime("%H:%M:%S")
-        socketio.emit("new_log", {"data": f"[{timestamp}] {log}"})
-        # pyrefly: ignore [bad-argument-type]
-        socketio.sleep(0.5)
-
-    socketio.emit("new_log", {"data": "✅ Log stream complete. System operating normally."})
-=======
     
     try:
         # Get actual system information
@@ -3227,7 +3196,6 @@ def handle_start_log_stream():
         socketio.sleep(0.2)
     
     socketio.emit("new_log", {"data": "✅ Real-time log stream complete - System operating normally"})
->>>>>>> 39cf39b (Golang Stabilise)
 
 
 if __name__ == "__main__":
