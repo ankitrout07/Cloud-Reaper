@@ -89,7 +89,8 @@ class CostCalculator:
                     row["provider"], row["resource_type"], row["sku"], row["quantity"]
                 ),
                 axis=1,
-            ) / 730.0,
+            )
+            / 730.0,
             df["rate"],
         )
 
@@ -337,10 +338,7 @@ class RightsizingAgent:
         # Build state tuples and resolve Q-values --------------------------------
         states = list(zip(cpu_d, mem_d, iops_d, net_d))
         q_vals = np.array(
-            [
-                self.q_table.get(s, np.zeros(len(self.actions)))
-                for s in states
-            ],
+            [self.q_table.get(s, np.zeros(len(self.actions))) for s in states],
             dtype=np.float64,
         )  # shape: (N, num_actions)
 

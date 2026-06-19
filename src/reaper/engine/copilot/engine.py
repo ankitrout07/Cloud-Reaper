@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 # src/reaper/engine/copilot_engine.py
 import copy
 import os

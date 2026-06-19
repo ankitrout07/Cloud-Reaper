@@ -1,5 +1,5 @@
 # src/reaper/web/metrics_router.py
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -53,7 +53,7 @@ async def get_telemetry_driven_insights():
 
 
 @telemetry_router.post("/api/v1/finops/test-webhook")
-async def test_alert_webhook(payload: Optional[Dict[str, Any]] = None):
+async def test_alert_webhook(payload: dict[str, Any] | None = None):
     data = payload or {}
     platform = data.get("platform", "").lower()
     webhook_url = data.get("webhook_url", "").strip()

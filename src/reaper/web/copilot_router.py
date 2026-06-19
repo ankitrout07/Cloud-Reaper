@@ -1,6 +1,6 @@
 # src/reaper/web/copilot_router.py
 from functools import lru_cache
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -16,7 +16,7 @@ def get_engine():
 
 
 @copilot_router.post("/api/v1/copilot/optimize")
-async def process_optimization_request(payload: Optional[Dict[str, Any]] = None):
+async def process_optimization_request(payload: dict[str, Any] | None = None):
     payload = payload or {}
     provider = payload.get("provider", "azure").strip().lower()
     user_intent = payload.get("intent", "").strip()

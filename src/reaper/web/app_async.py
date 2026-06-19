@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 import base64
 import contextlib
 import datetime
@@ -20,17 +19,14 @@ from azure.identity import DefaultAzureCredential
 from azure.mgmt.subscription import SubscriptionClient
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv, set_key
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse, FileResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-from flask_compress import Compress
-from flask_cors import CORS
-from flask_socketio import SocketIO
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
+from starlette.middleware.sessions import SessionMiddleware
 
 try:
     from weasyprint import HTML
@@ -108,7 +104,13 @@ app = FastAPI(title="Cloud-Reaper", docs_url=None, redoc_url=None)
 templates = Jinja2Templates(directory=str(_web_dir / "templates"))
 app.mount("/static", StaticFiles(directory=str(_web_dir / "static")), name="static")
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Enable response compression for better performance
 app.add_middleware(GZipMiddleware, minimum_size=500)
@@ -122,14 +124,18 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 app.add_middleware(SessionMiddleware, secret_key=secret_key, max_age=31536000)
 import socketio
+
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
 from reaper.web.copilot_router import copilot_router
+
 app.include_router(copilot_router)
 from reaper.web.search_router import search_router
+
 app.include_router(search_router)
 from reaper.web.metrics_router import telemetry_router
+
 app.include_router(telemetry_router)
 
 VAULT_UNLOCK_TTL_SEC = int(os.getenv("VAULT_UNLOCK_TTL_SEC", "3600"))
@@ -149,7 +155,9 @@ async def background_metrics_worker():
 
     while True:
         try:
-            import asyncio; await asyncio.sleep(backoff_time)
+            import asyncio
+
+            await asyncio.sleep(backoff_time)
             now = datetime.datetime.now(datetime.UTC).strftime("%H:%M:%S")
             cpu_usage = None
 
@@ -185,14 +193,18 @@ async def background_metrics_worker():
             print(f"[!] Critical error in metrics worker: {e}")
             # Prevent rapid crash loops by sleeping longer on critical errors
             backoff_time = min(backoff_time * 2, max_backoff)
-            import asyncio; await asyncio.sleep(backoff_time)
+            import asyncio
+
+            await asyncio.sleep(backoff_time)
 
 
 # Start the worker after the app is ready
 @app.on_event("startup")
 async def startup_event():
     import asyncio
+
     asyncio.create_task(background_metrics_worker())
+
 
 init_db()
 start_catalog_warmup()
@@ -227,7 +239,9 @@ async def sync_settings(request: Request):
         # 2. Reload the environment variables for the current running process
         load_dotenv(ENV_PATH, override=True)
 
-        return JSONResponse(status_code=200, content={"status": "success", "message": "Credentials Sync Complete"})
+        return JSONResponse(
+            status_code=200, content={"status": "success", "message": "Credentials Sync Complete"}
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -294,7 +308,9 @@ def _get_cached_user_info() -> tuple[str, str]:
 @app.get("/")
 async def index(request: Request):
     user_name, sub_name = _get_cached_user_info()
-    return templates.TemplateResponse("pages/index.html", {"request": request, "user_name": user_name, "sub_name": sub_name})
+    return templates.TemplateResponse(
+        "pages/index.html", {"request": request, "user_name": user_name, "sub_name": sub_name}
+    )
 
 
 def _cloud_connections_summary() -> tuple[dict[str, dict[str, Any]], str]:
@@ -412,7 +428,9 @@ def handle_set_currency(data):
     if calc.set_currency(code):
         settings_state["currency"] = code
         return {"status": "success", "msg": f"Currency set to {code}"}
-    return JSONResponse(status_code=400, content={"status": "error", "msg": "Invalid currency code"})
+    return JSONResponse(
+        status_code=400, content={"status": "error", "msg": "Invalid currency code"}
+    )
 
 
 def handle_sync_pricebook(_data):
@@ -479,18 +497,24 @@ def handle_initial_setup(data):
     val = data.get("value")
     if save_config(sub_id=val):
         return {"status": "success", "msg": "Environment configured"}
-    return JSONResponse(status_code=500, content={"status": "error", "msg": "Could not write to .env"})
+    return JSONResponse(
+        status_code=500, content={"status": "error", "msg": "Could not write to .env"}
+    )
 
 
 @app.post("/api/settings/connect-azure")
 async def connect_azure(request: Request):
-    data = (await request.json() if await request.body() else {})
+    data = await request.json() if await request.body() else {}
     if not data:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Request body is required."})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": "Request body is required."}
+        )
 
     fields = ["subscription_id", "tenant_id", "client_id", "client_secret"]
     if not all(data.get(f) for f in fields):
-        return JSONResponse(status_code=400, content={"status": "error", "message": "All fields are required."})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": "All fields are required."}
+        )
 
     old_env = {f"AZURE_{f.upper()}": os.getenv(f"AZURE_{f.upper()}") for f in fields}
 
@@ -512,7 +536,9 @@ async def connect_azure(request: Request):
                 os.environ[k] = v
             else:
                 os.environ.pop(k, None)
-        return JSONResponse(status_code=500, content={"status": "error", "message": f"Connection Failed: {e!s}"})
+        return JSONResponse(
+            status_code=500, content={"status": "error", "message": f"Connection Failed: {e!s}"}
+        )
 
 
 def _write_gcp_service_account_file(service_json: str) -> str:
@@ -723,7 +749,9 @@ def _validate_cloud_credentials(provider: str, credentials: dict[str, Any]) -> d
 async def switch_context(request: Request):
     provider = (request.query_params.get("provider") or "").lower()
     if provider not in {"aws", "azure", "gcp", "k8s"}:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Unsupported provider."})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": "Unsupported provider."}
+        )
 
     db = SessionLocal()
     try:
@@ -776,7 +804,9 @@ async def connect_cloud(request: Request):
     }
 
     if provider not in required_fields:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Unsupported provider."})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": "Unsupported provider."}
+        )
 
     missing = [f for f in required_fields[provider] if not credentials.get(f)]
     if provider == "gcp" and not credentials.get("service_account_json"):
@@ -862,7 +892,9 @@ async def vault_status(request: Request):
 async def vault_setup(request: Request):
     data = (await request.json() if await request.body() else {}) or {}
     if not data:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Request body is required."})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": "Request body is required."}
+        )
 
     passcode = (data.get("passcode") or "").strip()
     confirm = (data.get("confirm") or "").strip()
@@ -879,12 +911,17 @@ async def vault_setup(request: Request):
         ), 400
 
     if passcode != confirm:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Passcodes do not match."})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": "Passcodes do not match."}
+        )
 
     db = SessionLocal()
     try:
         if db.query(VaultSettings).first():
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Vault is already configured."})
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "Vault is already configured."},
+            )
 
         salt = generate_salt()
         settings = VaultSettings(
@@ -929,17 +966,25 @@ async def vault_reset(request: Request):
 async def vault_unlock(request: Request):
     data = (await request.json() if await request.body() else {}) or {}
     if not data:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Request body is required."})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": "Request body is required."}
+        )
 
     passcode = (data.get("passcode") or "").strip()
     if not passcode:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Passcode is required."})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": "Passcode is required."}
+        )
 
     settings = _vault_settings_row()
     if not settings:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Vault is not configured yet."})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": "Vault is not configured yet."}
+        )
     if not _unlock_vault_session(passcode, settings):
-        return JSONResponse(status_code=401, content={"status": "error", "message": "Incorrect passcode."})
+        return JSONResponse(
+            status_code=401, content={"status": "error", "message": "Incorrect passcode."}
+        )
     return {"status": "success", "message": "Vault unlocked."}
 
 
@@ -954,7 +999,9 @@ async def vault_lock(request: Request):
 @app.get("/api/vault/entries")
 async def vault_list_entries(request: Request):
     if not _is_vault_unlocked():
-        return JSONResponse(status_code=403, content={"status": "error", "message": "Vault is locked."})
+        return JSONResponse(
+            status_code=403, content={"status": "error", "message": "Vault is locked."}
+        )
 
     db = SessionLocal()
     try:
@@ -979,15 +1026,21 @@ async def vault_list_entries(request: Request):
 @app.post("/api/vault/entries")
 async def vault_create_entry(request: Request):
     if not _is_vault_unlocked():
-        return JSONResponse(status_code=403, content={"status": "error", "message": "Vault is locked."})
+        return JSONResponse(
+            status_code=403, content={"status": "error", "message": "Vault is locked."}
+        )
 
     fernet = _session_fernet()
     if not fernet:
-        return JSONResponse(status_code=403, content={"status": "error", "message": "Vault session expired."})
+        return JSONResponse(
+            status_code=403, content={"status": "error", "message": "Vault session expired."}
+        )
 
     data = (await request.json() if await request.body() else {}) or {}
     if not data:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Request body is required."})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": "Request body is required."}
+        )
 
     label = (data.get("label") or "").strip()
     entry_type = (data.get("entry_type") or "credential").strip().lower()
@@ -996,15 +1049,22 @@ async def vault_create_entry(request: Request):
     notes = (data.get("notes") or "").strip()
 
     if not label or not value:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Label and secret value are required."})
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": "Label and secret value are required."},
+        )
     if entry_type not in {"credential", "passcode", "note"}:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid entry type."})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": "Invalid entry type."}
+        )
 
     payload = {"value": value, "username": username, "notes": notes}
     try:
         token = fernet.encrypt(json.dumps(payload).encode("utf-8")).decode("utf-8")
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": f"Encryption failed: {e!s}"})
+        return JSONResponse(
+            status_code=500, content={"status": "error", "message": f"Encryption failed: {e!s}"}
+        )
 
     db = SessionLocal()
     try:
@@ -1028,23 +1088,32 @@ async def vault_create_entry(request: Request):
 @app.get("/api/vault/entries/<int:entry_id>")
 async def vault_get_entry(request: Request, entry_id: int):
     if not _is_vault_unlocked():
-        return JSONResponse(status_code=403, content={"status": "error", "message": "Vault is locked."})
+        return JSONResponse(
+            status_code=403, content={"status": "error", "message": "Vault is locked."}
+        )
 
     fernet = _session_fernet()
     if not fernet:
-        return JSONResponse(status_code=403, content={"status": "error", "message": "Vault session expired."})
+        return JSONResponse(
+            status_code=403, content={"status": "error", "message": "Vault session expired."}
+        )
 
     db = SessionLocal()
     try:
         row = db.query(VaultEntry).filter_by(id=entry_id).first()
         if not row:
-            return JSONResponse(status_code=404, content={"status": "error", "message": "Entry not found."})
+            return JSONResponse(
+                status_code=404, content={"status": "error", "message": "Entry not found."}
+            )
         try:
             payload = json.loads(
                 fernet.decrypt(row.encrypted_payload.encode("utf-8")).decode("utf-8")
             )
         except Exception as e:
-            return JSONResponse(status_code=500, content={"status": "error", "message": f"Unable to decrypt entry: {e!s}"})
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "message": f"Unable to decrypt entry: {e!s}"},
+            )
         return jsonify(
             {
                 "status": "success",
@@ -1067,13 +1136,17 @@ async def vault_get_entry(request: Request, entry_id: int):
 @app.delete("/api/vault/entries/<int:entry_id>")
 async def vault_delete_entry(request: Request, entry_id: int):
     if not _is_vault_unlocked():
-        return JSONResponse(status_code=403, content={"status": "error", "message": "Vault is locked."})
+        return JSONResponse(
+            status_code=403, content={"status": "error", "message": "Vault is locked."}
+        )
 
     db = SessionLocal()
     try:
         row = db.query(VaultEntry).filter_by(id=entry_id).first()
         if not row:
-            return JSONResponse(status_code=404, content={"status": "error", "message": "Entry not found."})
+            return JSONResponse(
+                status_code=404, content={"status": "error", "message": "Entry not found."}
+            )
         db.delete(row)
         db.commit()
         return {"status": "success", "message": "Entry deleted."}
@@ -1257,7 +1330,9 @@ async def update_budget_threshold(request: Request):
         data = (await request.json() if await request.body() else {}) or {}
         threshold = data.get("threshold")
         if not threshold:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Threshold is required"})
+            return JSONResponse(
+                status_code=400, content={"status": "error", "message": "Threshold is required"}
+            )
 
         settings_state["budget_threshold"] = float(threshold)
         return jsonify(
@@ -1411,7 +1486,10 @@ async def remediate_issue(request: Request):
         action = data.get("action")
 
         if not issue_id or not action:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Issue ID and action are required"})
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "Issue ID and action are required"},
+            )
 
         # In a real implementation, this would call Azure SDK to perform the action
         # For now, return success
@@ -1481,7 +1559,9 @@ async def purchase_commitment_api(request: Request):
         simulation = data.get("simulation")
 
         if not simulation:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Simulation data required"})
+            return JSONResponse(
+                status_code=400, content={"status": "error", "message": "Simulation data required"}
+            )
 
         # In a real implementation, this would call Azure/AWS API to purchase
         # For now, simulate success
@@ -1562,7 +1642,9 @@ async def add_business_metric(request: Request):
         unit = data.get("unit")
 
         if not name or value is None or not unit:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "All fields are required."})
+            return JSONResponse(
+                status_code=400, content={"status": "error", "message": "All fields are required."}
+            )
 
         db = SessionLocal()
         try:
@@ -1608,7 +1690,9 @@ async def api_architect_estimate(request: Request):
     model_provider = data.get("model_provider", "openai")
 
     if not user_prompt:
-        return JSONResponse(status_code=400, content={"error": "Infrastructure requirements prompt is required."})
+        return JSONResponse(
+            status_code=400, content={"error": "Infrastructure requirements prompt is required."}
+        )
 
     try:
         # Step 1: Run Cognitive Extraction Contract
@@ -1622,7 +1706,9 @@ async def api_architect_estimate(request: Request):
         return JSONResponse(status_code=200, content=calculated_payload)
 
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": f"Failed to compile AI architecture: {e!s}"})
+        return JSONResponse(
+            status_code=500, content={"error": f"Failed to compile AI architecture: {e!s}"}
+        )
 
 
 @app.get("/about")
@@ -1643,12 +1729,16 @@ async def docs(request: Request):
             with file_path.open(encoding="utf-8") as f:
                 content = f.read()
             docs_data.append({"filename": filename, "title": title, "content": content})
-    return templates.TemplateResponse("pages/docs.html", {"request": request, "docs_data": docs_data})
+    return templates.TemplateResponse(
+        "pages/docs.html", {"request": request, "docs_data": docs_data}
+    )
 
 
 @app.get("/integrations")
 async def integrations(request: Request):
-    return templates.TemplateResponse("pages/integrations.html", {"request": request, "settings": settings_state})
+    return templates.TemplateResponse(
+        "pages/integrations.html", {"request": request, "settings": settings_state}
+    )
 
 
 @app.get("/monitor")
@@ -1696,7 +1786,9 @@ async def api_dashboard_finops_charts(request: Request):
 
         return {"status": "ok", "charts": charts, "cached": False}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e), "charts": None})
+        return JSONResponse(
+            status_code=500, content={"status": "error", "message": str(e), "charts": None}
+        )
 
 
 def cache_response(max_age=300):
@@ -1730,7 +1822,9 @@ async def docs_search(request: Request):
         data = (await request.json() if await request.body() else {}) or {}
         query = data.get("query", "")
         if not query:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Query is required"})
+            return JSONResponse(
+                status_code=400, content={"status": "error", "message": "Query is required"}
+            )
 
         results = search_engine.query_docs(user_query=query, top_k=3)
         return {"status": "success", "results": results, "query": query}
@@ -1763,7 +1857,9 @@ async def get_rightsizing(request: Request):
     az = AzureCollector()
     go_binary = _reaper_engine_binary()
     if not go_binary:
-        return JSONResponse(status_code=500, content={"status": "error", "message": "Go Engine binary not found"})
+        return JSONResponse(
+            status_code=500, content={"status": "error", "message": "Go Engine binary not found"}
+        )
 
     try:
         # pyrefly: ignore [no-matching-overload]
@@ -1774,7 +1870,9 @@ async def get_rightsizing(request: Request):
             check=False,
         )
         if result.returncode != 0:
-            return JSONResponse(status_code=500, content={"status": "error", "message": result.stderr})
+            return JSONResponse(
+                status_code=500, content={"status": "error", "message": result.stderr}
+            )
 
         vm_reports = json.loads(result.stdout).get("vm_reports", [])
         recommendations = RightSizer().calculate_recommendation(vm_reports)
@@ -1799,7 +1897,10 @@ async def scan(request: Request):
         ]
         # pyrefly: ignore [bad-index, unsupported-operation]
         if not target_subs[0]:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "No subscription ID configured."})
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "No subscription ID configured."},
+            )
 
         scan_results = perform_subscription_scan(target_subs, events)
         formatted_results = format_scan_results(scan_results)
@@ -2045,7 +2146,11 @@ async def get_prices_filters(request: Request):
 
 @app.post("/api/prices/refresh")
 async def refresh_prices(request: Request):
-    provider = ((await request.json() if await request.body() else {}) or {}).get("provider") if request.is_json else None
+    provider = (
+        ((await request.json() if await request.body() else {}) or {}).get("provider")
+        if request.is_json
+        else None
+    )
     providers = [provider] if provider else ["azure", "aws", "gcp"]
     for prov in providers:
         threading.Thread(
@@ -2154,7 +2259,9 @@ async def anomalies_triage(request: Request):
         deviation = data.get("deviation", "Unknown")
 
         if not service:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Missing service name"})
+            return JSONResponse(
+                status_code=400, content={"status": "error", "message": "Missing service name"}
+            )
 
         from reaper.engine.copilot.engine import AnomalyTriager
 
@@ -2342,7 +2449,9 @@ async def approve_reap(request: Request):
         data = (await request.json() if await request.body() else {}) or {}
         res_id, res_type = data.get("resource_id"), data.get("resource_type")
         if not res_id:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Missing resource_id"})
+            return JSONResponse(
+                status_code=400, content={"status": "error", "message": "Missing resource_id"}
+            )
         return AzureCollector().execute_reap(res_id, res_type)
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -2354,13 +2463,18 @@ async def get_regional_prices(request: Request):
         sku = request.query_params.get("sku")
         region = request.query_params.get("region")
         if not sku or not region:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Missing sku or region parameter"})
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "Missing sku or region parameter"},
+            )
 
         az = AzureCollector()
         prices = az.fetch_regional_prices(sku, region)
         if prices:
             return {"status": "success", "price": prices[0]}
-        return JSONResponse(status_code=404, content={"status": "error", "message": "Price not found"})
+        return JSONResponse(
+            status_code=404, content={"status": "error", "message": "Price not found"}
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -2373,7 +2487,9 @@ async def get_arbitrage(request: Request):
         price = float(request.query_params.get("price", 0.0))
 
         if not sku or not region or not price:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Missing parameters"})
+            return JSONResponse(
+                status_code=400, content={"status": "error", "message": "Missing parameters"}
+            )
 
         arb = RegionalArbitrage()
         result = arb.analyze_arbitrage(sku, region, price)
@@ -2778,7 +2894,9 @@ async def get_optimization_by_priority(request: Request, priority):
             }
         )
     except ValueError:
-        return JSONResponse(status_code=400, content={"status": "error", "message": f"Invalid priority: {priority}"})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": f"Invalid priority: {priority}"}
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -2973,13 +3091,18 @@ async def track_recommendation_status(request: Request):
         notes = data.get("notes", "")
 
         if not recommendation_id:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "recommendation_id is required"})
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "recommendation_id is required"},
+            )
 
         success = cost_reporter.track_recommendation_status(recommendation_id, status, notes)
 
         if success:
             return {"status": "success", "message": "Status tracked successfully"}
-        return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to track status"})
+        return JSONResponse(
+            status_code=500, content={"status": "error", "message": "Failed to track status"}
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -3052,9 +3175,13 @@ async def handle_start_log_stream():
     from reaper.services.log_streamer import fetch_azure_logs
 
     await sio.emit("new_log", {"data": "🚀 Initializing Cloud-Reaper Log Stream..."})
-    import asyncio; await asyncio.sleep(0.2)
+    import asyncio
+
+    await asyncio.sleep(0.2)
     await sio.emit("new_log", {"data": "📡 Connecting to log sources..."})
-    import asyncio; await asyncio.sleep(0.2)
+    import asyncio
+
+    await asyncio.sleep(0.2)
 
     # Try to get actual Python application logs
     try:
@@ -3069,17 +3196,23 @@ async def handle_start_log_stream():
                     "data": f"✅ Connected to application logger - {len(logger.handlers)} handler(s) found"
                 },
             )
-            import asyncio; await asyncio.sleep(0.3)
+            import asyncio
+
+            await asyncio.sleep(0.3)
 
             # Try to get recent log records if available
             # Note: This is a simplified approach - in production you'd want a proper log aggregation system
             await sio.emit("new_log", {"data": "📊 Application logger connection established"})
         else:
             await sio.emit("new_log", {"data": "⚠️  No application log handlers configured"})
-            import asyncio; await asyncio.sleep(0.3)
+            import asyncio
+
+            await asyncio.sleep(0.3)
     except Exception as e:
         await sio.emit("new_log", {"data": f"❌ Application logger error: {e!s}"})
-        import asyncio; await asyncio.sleep(0.3)
+        import asyncio
+
+        await asyncio.sleep(0.3)
 
     # Try Azure logs
     try:
@@ -3089,31 +3222,45 @@ async def handle_start_log_stream():
                 "new_log",
                 {"data": f"✅ Connected to Azure Monitor - Found {len(azure_logs)} recent logs"},
             )
-            import asyncio; await asyncio.sleep(0.3)
+            import asyncio
+
+            await asyncio.sleep(0.3)
             for i, log in enumerate(azure_logs):
                 await sio.emit("new_log", {"data": f"[Azure #{i + 1}] {log!s}"})
                 # pyrefly: ignore [bad-argument-type]
-                import asyncio; await asyncio.sleep(0.3)
+                import asyncio
+
+                await asyncio.sleep(0.3)
         else:
             await sio.emit(
                 "new_log", {"data": "⚠️  No Azure logs found - workspace may not be configured"}
             )
-            import asyncio; await asyncio.sleep(0.3)
+            import asyncio
+
+            await asyncio.sleep(0.3)
     except Exception as e:
         await sio.emit("new_log", {"data": f"❌ Azure logs error: {e!s}"})
-        import asyncio; await asyncio.sleep(0.3)
+        import asyncio
+
+        await asyncio.sleep(0.3)
 
     # Stream actual Cloud-Reaper system information
     await sio.emit("new_log", {"data": "🔄 Streaming Cloud-Reaper system information..."})
-    import asyncio; await asyncio.sleep(0.2)
+    import asyncio
+
+    await asyncio.sleep(0.2)
 
     try:
         # Get actual system information
         await sio.emit("new_log", {"data": f"💻 System: {platform.system()} {platform.release()}"})
-        import asyncio; await asyncio.sleep(0.1)
+        import asyncio
+
+        await asyncio.sleep(0.1)
 
         await sio.emit("new_log", {"data": f"🐍 Python: {platform.python_version()}"})
-        import asyncio; await asyncio.sleep(0.1)
+        import asyncio
+
+        await asyncio.sleep(0.1)
 
         # Check Azure connection status
         from reaper.collectors.utils.auth_check import check_azure_status
@@ -3122,7 +3269,9 @@ async def handle_start_log_stream():
         await sio.emit(
             "new_log", {"data": f"🔗 Azure Status: {azure_status.get('status', 'unknown')}"}
         )
-        import asyncio; await asyncio.sleep(0.2)
+        import asyncio
+
+        await asyncio.sleep(0.2)
 
         # Get subscription info if available
         sub_id = os.getenv("AZURE_SUBSCRIPTION_ID", "Not configured")
@@ -3130,48 +3279,68 @@ async def handle_start_log_stream():
             await sio.emit("new_log", {"data": f"📋 Subscription: {sub_id[:8]}...{sub_id[-4:]}"})
         else:
             await sio.emit("new_log", {"data": "⚠️  Subscription ID not configured"})
-        import asyncio; await asyncio.sleep(0.2)
+        import asyncio
+
+        await asyncio.sleep(0.2)
 
     except Exception as e:
         await sio.emit("new_log", {"data": f"❌ System info error: {e!s}"})
-        import asyncio; await asyncio.sleep(0.2)
+        import asyncio
+
+        await asyncio.sleep(0.2)
 
     # Stream actual collector information
     try:
         await sio.emit("new_log", {"data": "🔍 Checking Cloud-Reaper collectors..."})
-        import asyncio; await asyncio.sleep(0.2)
+        import asyncio
+
+        await asyncio.sleep(0.2)
 
         from reaper.collectors.providers.azure_collector import AzureCollector
 
         az = AzureCollector()
         await sio.emit("new_log", {"data": "✅ AzureCollector initialized successfully"})
-        import asyncio; await asyncio.sleep(0.2)
+        import asyncio
+
+        await asyncio.sleep(0.2)
 
         # Try to get actual resource counts
         try:
             vms = list(az.compute.virtual_machines.list_all())
             await sio.emit("new_log", {"data": f"🖥️  Virtual Machines found: {len(vms)}"})
-            import asyncio; await asyncio.sleep(0.2)
+            import asyncio
+
+            await asyncio.sleep(0.2)
         except Exception as vm_error:
             await sio.emit("new_log", {"data": f"⚠️  Could not fetch VMs: {vm_error!s}"})
-            import asyncio; await asyncio.sleep(0.2)
+            import asyncio
+
+            await asyncio.sleep(0.2)
 
         try:
             disks = list(az.compute.disks.list())
             await sio.emit("new_log", {"data": f"💾 Disks found: {len(disks)}"})
-            import asyncio; await asyncio.sleep(0.2)
+            import asyncio
+
+            await asyncio.sleep(0.2)
         except Exception as disk_error:
             await sio.emit("new_log", {"data": f"⚠️  Could not fetch disks: {disk_error!s}"})
-            import asyncio; await asyncio.sleep(0.2)
+            import asyncio
+
+            await asyncio.sleep(0.2)
 
     except Exception as collector_error:
         await sio.emit("new_log", {"data": f"❌ Collector error: {collector_error!s}"})
-        import asyncio; await asyncio.sleep(0.2)
+        import asyncio
+
+        await asyncio.sleep(0.2)
 
     # Stream engine information if available
     try:
         await sio.emit("new_log", {"data": "⚙️  Checking Cloud-Reaper engine status..."})
-        import asyncio; await asyncio.sleep(0.2)
+        import asyncio
+
+        await asyncio.sleep(0.2)
 
         binary_path = _reaper_engine_binary()
         if binary_path and binary_path.exists():
@@ -3180,11 +3349,15 @@ async def handle_start_log_stream():
             await sio.emit(
                 "new_log", {"data": "⚠️  Go engine binary not found - using Python engine"}
             )
-        import asyncio; await asyncio.sleep(0.2)
+        import asyncio
+
+        await asyncio.sleep(0.2)
 
     except Exception as engine_error:
         await sio.emit("new_log", {"data": f"❌ Engine check error: {engine_error!s}"})
-        import asyncio; await asyncio.sleep(0.2)
+        import asyncio
+
+        await asyncio.sleep(0.2)
 
     await sio.emit(
         "new_log", {"data": "✅ Real-time log stream complete - System operating normally"}
@@ -3201,40 +3374,54 @@ if __name__ == "__main__":
         print(f"\n[+] Cloud-Reaper Dashboard Active via IPC Pipe: {ipc_path}")
     else:
         print(f"\n[+] Cloud-Reaper Dashboard Active at http://{host}:{port}")
-        
+
     print("[*] Engine: gevent | Real-Time Monitoring: ENABLED\n")
 
     try:
         if ipc_path:
             import socket
+
             try:
                 import gevent.pywsgi
+
                 has_gevent = True
             except ImportError:
                 has_gevent = False
-                
+
             if os.path.exists(ipc_path):
                 try:
                     os.remove(ipc_path)
                 except OSError:
                     pass
-            
+
             listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             listener.bind(ipc_path)
             listener.listen(128)
-            
+
             if has_gevent:
                 server = gevent.pywsgi.WSGIServer(listener, app)
                 server.serve_forever()
             else:
                 # Fallback if gevent is not available (werkzeug doesn't easily support UDS)
-                print("[!] Gevent is required for Unix Domain Socket IPC. Falling back to loopback.")
+                print(
+                    "[!] Gevent is required for Unix Domain Socket IPC. Falling back to loopback."
+                )
                 socketio.run(
-                    app, host=host, port=port, debug=True, use_reloader=False, allow_unsafe_werkzeug=True
+                    app,
+                    host=host,
+                    port=port,
+                    debug=True,
+                    use_reloader=False,
+                    allow_unsafe_werkzeug=True,
                 )
         else:
             socketio.run(
-                app, host=host, port=port, debug=True, use_reloader=False, allow_unsafe_werkzeug=True
+                app,
+                host=host,
+                port=port,
+                debug=True,
+                use_reloader=False,
+                allow_unsafe_werkzeug=True,
             )
     except KeyboardInterrupt:
         print("\n[!] Dashboard server stopped by user.")

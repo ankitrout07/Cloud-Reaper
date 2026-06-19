@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -24,14 +24,17 @@ except Exception as e:
 
 
 @search_router.post("/api/v1/docs/search")
-async def handle_docs_search(payload: Optional[Dict[str, Any]] = None):
+async def handle_docs_search(payload: dict[str, Any] | None = None):
     payload = payload or {}
     query_string = payload.get("query", "").strip()
 
     if not query_string:
         return JSONResponse(
             status_code=400,
-            content={"status": "error", "message": "Search query string parameter cannot be blank."},
+            content={
+                "status": "error",
+                "message": "Search query string parameter cannot be blank.",
+            },
         )
 
     try:

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 Formalized JSON schemas for the Go-Python data handoff.
 

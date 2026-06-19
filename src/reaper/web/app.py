@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 # gevent monkey-patching is optional; use threading fallback if unavailable.
 try:
     from gevent import monkey
@@ -3215,40 +3216,54 @@ if __name__ == "__main__":
         print(f"\n[+] Cloud-Reaper Dashboard Active via IPC Pipe: {ipc_path}")
     else:
         print(f"\n[+] Cloud-Reaper Dashboard Active at http://{host}:{port}")
-        
+
     print("[*] Engine: gevent | Real-Time Monitoring: ENABLED\n")
 
     try:
         if ipc_path:
             import socket
+
             try:
                 import gevent.pywsgi
+
                 has_gevent = True
             except ImportError:
                 has_gevent = False
-                
+
             if os.path.exists(ipc_path):
                 try:
                     os.remove(ipc_path)
                 except OSError:
                     pass
-            
+
             listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             listener.bind(ipc_path)
             listener.listen(128)
-            
+
             if has_gevent:
                 server = gevent.pywsgi.WSGIServer(listener, app)
                 server.serve_forever()
             else:
                 # Fallback if gevent is not available (werkzeug doesn't easily support UDS)
-                print("[!] Gevent is required for Unix Domain Socket IPC. Falling back to loopback.")
+                print(
+                    "[!] Gevent is required for Unix Domain Socket IPC. Falling back to loopback."
+                )
                 socketio.run(
-                    app, host=host, port=port, debug=True, use_reloader=False, allow_unsafe_werkzeug=True
+                    app,
+                    host=host,
+                    port=port,
+                    debug=True,
+                    use_reloader=False,
+                    allow_unsafe_werkzeug=True,
                 )
         else:
             socketio.run(
-                app, host=host, port=port, debug=True, use_reloader=False, allow_unsafe_werkzeug=True
+                app,
+                host=host,
+                port=port,
+                debug=True,
+                use_reloader=False,
+                allow_unsafe_werkzeug=True,
             )
     except KeyboardInterrupt:
         print("\n[!] Dashboard server stopped by user.")

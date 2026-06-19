@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 # src/reaper/rag/engine.py
 import math
 import random

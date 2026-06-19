@@ -3,7 +3,6 @@ import re
 
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.seasonal import seasonal_decompose
 
@@ -261,9 +260,11 @@ class RightSizer:
             # np.maximum(0, ...) avoids Python max() call for the savings floor
             current_price = self.price_book.get(r["size"], 0.1)
             new_price = self.price_book.get(recommended_size, current_price * 0.5)
-            potential_saving = float(
-                np.maximum(0.0, (current_price - new_price) * 730)
-            ) if recommended_size != r["size"] else 0.0
+            potential_saving = (
+                float(np.maximum(0.0, (current_price - new_price) * 730))
+                if recommended_size != r["size"]
+                else 0.0
+            )
 
             personality = personality_analyzer.analyze(r["usage"])
 
