@@ -5,11 +5,6 @@ import requests
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-PRICES_CACHE = {
-    "aws": None,
-    "gcp": None,
-}
-
 
 # Define the strict structure for each infrastructure component
 class CloudComponent(BaseModel):
@@ -343,46 +338,29 @@ def _resolve_azure_price(sku: str, mapped_region: str, region: str) -> float | N
 def _resolve_aws_price(sku: str, mapped_region: str, region: str) -> float | None:
     """Helper to query live AWS pricing with database caching."""
     try:
-        aws_prices = PRICES_CACHE["aws"]
-        if aws_prices is None:
-            from reaper.collectors.prices.aws import AWSPriceClient
+        from reaper.collectors.prices.catalog import lookup_price
 
-            aws_client = AWSPriceClient()
-            aws_prices = aws_client.get_live_prices()
-            PRICES_CACHE["aws"] = aws_prices
-
-        if aws_prices is None:
+        hourly_rate = lookup_price("aws", sku, mapped_region)
+        if hourly_rate is None:
             return None
 
-        match = next(
-            (
-                p
-                for p in aws_prices
-                if p["skuName"].lower() == sku.lower() and p["armRegionName"] == mapped_region
-            ),
-            None,
-        )
-        if match:
-            hourly_rate = float(match["retailPrice"])
+        try:
+            from reaper.engine.models.resources import RegionPriceCache, SessionLocal
 
-            # Cache in DB
-            try:
-                from reaper.engine.models.resources import RegionPriceCache, SessionLocal
-
-                db = SessionLocal()
-                db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
-                new_cache = RegionPriceCache(
-                    sku_id=sku,
-                    region_name=region,
-                    price=hourly_rate,
-                    currency="USD",
-                )
-                db.add(new_cache)
-                db.commit()
-                db.close()
-            except Exception as e:
-                print(f"[!] Error caching price: {e}")
-            return hourly_rate
+            db = SessionLocal()
+            db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
+            new_cache = RegionPriceCache(
+                sku_id=sku,
+                region_name=region,
+                price=hourly_rate,
+                currency="USD",
+            )
+            db.add(new_cache)
+            db.commit()
+            db.close()
+        except Exception as e:
+            print(f"[!] Error caching price: {e}")
+        return hourly_rate
     except Exception as e:
         print(f"[!] Real-time AWS pricing fetch failed: {e}")
     return None
@@ -391,46 +369,29 @@ def _resolve_aws_price(sku: str, mapped_region: str, region: str) -> float | Non
 def _resolve_gcp_price(sku: str, mapped_region: str, region: str) -> float | None:
     """Helper to query live GCP pricing with database caching."""
     try:
-        gcp_prices = PRICES_CACHE["gcp"]
-        if gcp_prices is None:
-            from reaper.collectors.prices.gcp import GCPPriceClient
+        from reaper.collectors.prices.catalog import lookup_price
 
-            gcp_client = GCPPriceClient()
-            gcp_prices = gcp_client.get_live_prices()
-            PRICES_CACHE["gcp"] = gcp_prices
-
-        if gcp_prices is None:
+        hourly_rate = lookup_price("gcp", sku, mapped_region)
+        if hourly_rate is None:
             return None
 
-        match = next(
-            (
-                p
-                for p in gcp_prices
-                if p["skuName"].lower() == sku.lower() and p["armRegionName"] == mapped_region
-            ),
-            None,
-        )
-        if match:
-            hourly_rate = float(match["retailPrice"])
+        try:
+            from reaper.engine.models.resources import RegionPriceCache, SessionLocal
 
-            # Cache in DB
-            try:
-                from reaper.engine.models.resources import RegionPriceCache, SessionLocal
-
-                db = SessionLocal()
-                db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
-                new_cache = RegionPriceCache(
-                    sku_id=sku,
-                    region_name=region,
-                    price=hourly_rate,
-                    currency="USD",
-                )
-                db.add(new_cache)
-                db.commit()
-                db.close()
-            except Exception as e:
-                print(f"[!] Error caching price: {e}")
-            return hourly_rate
+            db = SessionLocal()
+            db.query(RegionPriceCache).filter_by(sku_id=sku, region_name=region).delete()
+            new_cache = RegionPriceCache(
+                sku_id=sku,
+                region_name=region,
+                price=hourly_rate,
+                currency="USD",
+            )
+            db.add(new_cache)
+            db.commit()
+            db.close()
+        except Exception as e:
+            print(f"[!] Error caching price: {e}")
+        return hourly_rate
     except Exception as e:
         print(f"[!] Real-time GCP pricing fetch failed: {e}")
     return None

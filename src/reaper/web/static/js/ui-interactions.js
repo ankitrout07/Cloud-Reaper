@@ -269,11 +269,6 @@ window.updateWhatIfModel = async () => {
     }
 };
 
-// Initialize pricing page on load
-if (window.location.pathname === '/pricing') {
-    loadPrices('azure');
-}
-
 // Initialize financial intelligence data on page load
 window.initFinancialIntelligence = () => {
     loadBudgetData();
@@ -287,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initFinancialIntelligence();
     }
     if (window.location.pathname === '/pricing') {
-        loadPrices('azure');
+        loadPrices('azure', 1);
     }
 });
 
@@ -558,41 +553,302 @@ window.fetchActivity = async () => {
 };
 
 // --- AI Copilot (build_with_ai.html) ---
+
+// Store architect results globally for export
+let architectResults = null;
+
 window.triggerArchitectEstimation = async () => {
+    console.log('triggerArchitectEstimation called');
+
     const btn = document.getElementById('btn-compile');
     if (btn) {
         btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Compiling...';
     }
-    
-    // Mock payload
+
+    // Get form values
     const payload = {
-        cloud_provider: document.getElementById('cloud-provider')?.value || 'aws',
-        environment_tier: document.getElementById('env-tier')?.value || 'production',
-        components: []
+        prompt: document.getElementById('ai-prompt')?.value || '',
+        provider: document.getElementById('ai-provider')?.value || 'azure',
+        region: document.getElementById('ai-region')?.value || 'eastus',
+        model_provider: document.getElementById('ai-model-provider')?.value || 'openai'
     };
-    
+
+    console.log('Architect payload:', payload);
+
+    if (!payload.prompt) {
+        console.error('No prompt provided');
+        notify("Please provide an infrastructure description.", "error");
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-brain mr-2"></i> Generate Architecture';
+        }
+        return;
+    }
+
     try {
+        console.log('Sending architect estimation request...');
         const response = await fetch('/api/v1/architect/estimate', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
         });
         const data = await response.json();
-        const codeBlock = document.getElementById('architect-code');
-        if (codeBlock && data.status === 'success') {
-            codeBlock.innerText = JSON.stringify(data.architecture, null, 2);
-            notify("Architecture compiled.", "success");
-        } else if (data.status === 'error') {
-            notify("Error compiling architecture.", "error");
+
+        console.log('Architect response:', data);
+
+        if (data.error) {
+            console.error('Architect API error:', data.error);
+            notify("Error compiling architecture: " + data.error, "error");
+            return;
         }
+
+        // Store results for export
+        architectResults = data;
+        console.log('Stored architect results:', architectResults);
+
+        // Update UI with results
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const resultsOutput = document.getElementById('architecture-results-output');
+
+        console.log('Updating UI - hiding spinner, showing results');
+        if (loadingSpinner) loadingSpinner.style.display = 'none';
+        if (resultsOutput) {
+            resultsOutput.style.display = 'block';
+            console.log('Results panel is now visible');
+        }
+
+        // Update summary
+        const summaryEl = document.getElementById('lbl-arch-summary');
+        if (summaryEl && data.architecture_summary) {
+            summaryEl.textContent = data.architecture_summary;
+        }
+
+        // Update total cost
+        const totalCostEl = document.getElementById('lbl-total-cost');
+        if (totalCostEl && data.total_monthly_cost !== undefined) {
+            totalCostEl.textContent = '$' + data.total_monthly_cost.toFixed(2);
+        }
+
+        // Update components table
+        const componentsList = document.getElementById('list-components');
+        if (componentsList && data.components) {
+            console.log('Updating components table with:', data.components);
+            componentsList.innerHTML = data.components.map(comp => `
+                <tr class="border-b border-slate-800/40">
+                    <td class="pb-3 px-2 text-slate-300">${comp.category || 'Compute'}</td>
+                    <td class="pb-3 px-2 text-white font-semibold">${comp.sku || comp.name || 'Unknown'}</td>
+                    <td class="pb-3 px-2 text-center text-slate-300">${comp.count || 1}</td>
+                    <td class="pb-3 px-2 text-right text-cyan-400 font-mono">$${(comp.monthly_cost || 0).toFixed(2)}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Update topology grid
+        const topologyGrid = document.getElementById('topology-grid');
+        if (topologyGrid && data.components) {
+            topologyGrid.innerHTML = data.components.slice(0, 4).map(comp => `
+                <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                    <div class="text-xs text-slate-500 uppercase tracking-wider mb-1">${comp.category || 'Compute'}</div>
+                    <div class="text-white font-semibold text-sm">${comp.sku || comp.name || 'Unknown'}</div>
+                    <div class="text-cyan-400 text-xs mt-1">$${(comp.monthly_cost || 0).toFixed(2)}/mo</div>
+                </div>
+            `).join('');
+        }
+
+        // Show security warning if present
+        const warningWrapper = document.getElementById('security-warning-wrapper');
+        const warningText = document.getElementById('lbl-security-warning');
+        if (warningWrapper && warningText && data.security_warning) {
+            warningText.textContent = data.security_warning;
+            warningWrapper.style.display = 'block';
+        }
+
+        notify("Architecture compiled successfully.", "success");
+
     } catch (e) {
-        notify("Failed to trigger architect.", "error");
+        console.error('Architect estimation error:', e);
+        notify("Failed to trigger architect: " + e.message, "error");
     } finally {
         if (btn) {
-            btn.innerHTML = '<i class="fas fa-cube mr-2"></i> Compile Infrastructure';
+            btn.innerHTML = '<i class="fas fa-brain mr-2"></i> Generate Architecture';
         }
     }
 };
+
+window.exportArchitectBOM = async () => {
+    console.log('exportArchitectBOM called');
+    console.log('architectResults:', architectResults);
+    console.log('architectResults.components:', architectResults?.components);
+
+    if (!architectResults || !architectResults.components || architectResults.components.length === 0) {
+        console.error('No architect results available');
+        notify("No architect results to export. Please generate an architecture first.", "error");
+        return;
+    }
+
+    try {
+        const btn = document.getElementById('btn-export-bom');
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Exporting...';
+            btn.disabled = true;
+        }
+
+        console.log('Preparing BOM payload with components:', architectResults.components);
+
+        // Prepare BOM payload
+        const bomPayload = {
+            resources: architectResults.components.map(comp => ({
+                sku: comp.sku || comp.name || 'Unknown',
+                service: comp.category || 'Compute',
+                count: comp.count || 1,
+                hourly: comp.hourly_cost || (comp.monthly_cost / 730) || 0
+            })),
+            totalHourly: architectResults.total_hourly_cost || 0,
+            totalMonthly: architectResults.total_monthly_cost || 0
+        };
+
+        console.log('BOM payload:', bomPayload);
+
+        const response = await fetch('/api/export/bom', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(bomPayload)
+        });
+
+        console.log('BOM export response status:', response.status);
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Cloud_Reaper_Architect_BOM_${new Date().toISOString().slice(0,10)}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            notify("BOM PDF exported successfully.", "success");
+        } else {
+            const errorData = await response.json();
+            console.error('BOM export failed:', errorData);
+            notify("Failed to export BOM: " + (errorData.message || "Unknown error"), "error");
+        }
+    } catch (e) {
+        console.error('BOM export error:', e);
+        notify("Error exporting BOM: " + e.message, "error");
+    } finally {
+        const btn = document.getElementById('btn-export-bom');
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-file-pdf"></i> Export BOM PDF';
+            btn.disabled = false;
+        }
+    }
+};
+
+// Add a backup click handler for the button
+function attachExportButtonListener() {
+    const exportBtn = document.getElementById('btn-export-bom');
+    if (exportBtn) {
+        // Remove existing listener to avoid duplicates
+        exportBtn.removeEventListener('click', handleExportClick);
+        exportBtn.addEventListener('click', handleExportClick);
+        console.log('Export button listener attached');
+    } else {
+        console.log('Export button not found');
+    }
+}
+
+function handleExportClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('Button clicked via event listener');
+    if (typeof window.exportArchitectBOM === 'function') {
+        window.exportArchitectBOM();
+    } else {
+        console.error('exportArchitectBOM function not found');
+        notify('Export function not available. Please refresh the page.', 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', attachExportButtonListener);
+document.addEventListener('htmx:afterSwap', attachExportButtonListener);
+
+// Add event listeners for pricing page cart buttons
+function attachPricingCartListeners() {
+    const cartButton = document.querySelector('button[onclick*="openCartModal"]');
+    if (cartButton) {
+        cartButton.removeEventListener('click', handleCartButtonClick);
+        cartButton.addEventListener('click', handleCartButtonClick);
+        console.log('Pricing cart button listener attached');
+    }
+
+    const clearCartButton = document.querySelector('button[onclick*="clearCart"]');
+    if (clearCartButton) {
+        clearCartButton.removeEventListener('click', handleClearCartClick);
+        clearCartButton.addEventListener('click', handleClearCartClick);
+        console.log('Clear cart button listener attached');
+    }
+
+    const exportCartButton = document.querySelector('button[onclick*="exportCartBOM"]');
+    if (exportCartButton) {
+        exportCartButton.removeEventListener('click', handleExportCartClick);
+        exportCartButton.addEventListener('click', handleExportCartClick);
+        console.log('Export cart button listener attached');
+    }
+
+    const closeCartButton = document.querySelector('button[onclick*="closeCartModal"]');
+    if (closeCartButton) {
+        closeCartButton.removeEventListener('click', handleCloseCartClick);
+        closeCartButton.addEventListener('click', handleCloseCartClick);
+        console.log('Close cart button listener attached');
+    }
+}
+
+function handleCartButtonClick(e) {
+    e.preventDefault();
+    console.log('Cart button clicked via event listener');
+    if (typeof openCartModal === 'function') {
+        openCartModal();
+    } else {
+        console.error('openCartModal function not found');
+        notify('Cart function not available. Please refresh the page.', 'error');
+    }
+}
+
+function handleClearCartClick(e) {
+    e.preventDefault();
+    console.log('Clear cart button clicked via event listener');
+    if (typeof clearCart === 'function') {
+        clearCart();
+    } else {
+        console.error('clearCart function not found');
+        notify('Clear cart function not available. Please refresh the page.', 'error');
+    }
+}
+
+function handleExportCartClick(e) {
+    e.preventDefault();
+    console.log('Export cart button clicked via event listener');
+    if (typeof exportCartBOM === 'function') {
+        exportCartBOM();
+    } else {
+        console.error('exportCartBOM function not found');
+        notify('Export cart function not available. Please refresh the page.', 'error');
+    }
+}
+
+function handleCloseCartClick(e) {
+    e.preventDefault();
+    console.log('Close cart button clicked via event listener');
+    if (typeof closeCartModal === 'function') {
+        closeCartModal();
+    } else {
+        console.error('closeCartModal function not found');
+        notify('Close cart function not available. Please refresh the page.', 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', attachPricingCartListeners);
+document.addEventListener('htmx:afterSwap', attachPricingCartListeners);
 
 // --- Integrations (integrations.html) ---
 window.fetchTelemetryInsights = async () => {
@@ -609,35 +865,308 @@ window.openWebhookModal = (type) => {
     notify(`Opening ${type} webhook modal.`, "success");
 };
 
-// --- Pricing (pricing.html) & FinOps ---
+// --- Pricing (pricing.html) ---
 
-// Price catalog state
 let priceCatalogState = {
     currentProvider: 'azure',
     pricingType: 'hourly',
     prices: [],
-    filteredPrices: [],
     currentPage: 1,
-    itemsPerPage: 20,
-    sortBy: 'none'
+    itemsPerPage: 50,
+    totalItems: 0,
+    totalPages: 1,
+    sortBy: 'sku-asc',
+    searchTerm: '',
+    serviceFilter: '',
+    regionFilter: '',
+    isLoading: false,
+    searchDebounceTimer: null,
+    pollTimer: null,
+    hasLoadedOnce: false,
 };
 
-// Load prices from API
-async function loadPrices(provider = 'azure') {
-    try {
-        const response = await fetch(`/api/prices?provider=${provider}`);
-        const data = await response.json();
-        
-        if (data.status === 'success' && data.prices) {
-            priceCatalogState.prices = data.prices;
-            priceCatalogState.filteredPrices = [...data.prices];
-            renderPrices();
+// Cart state management
+let cartState = {
+    items: [],
+    isOpen: false
+};
+
+function updateCartCount() {
+    const cartCountEl = document.getElementById('cart-count');
+    if (cartCountEl) {
+        if (cartState.items.length > 0) {
+            cartCountEl.textContent = cartState.items.length;
+            cartCountEl.classList.remove('hidden');
         } else {
-            renderNoPrices();
+            cartCountEl.classList.add('hidden');
+        }
+    }
+}
+
+function addToCart(priceItem) {
+    // Check if item already exists in cart
+    const existingIndex = cartState.items.findIndex(item =>
+        item.sku === priceItem.sku && item.region === priceItem.region
+    );
+
+    if (existingIndex >= 0) {
+        // Update quantity if exists
+        cartState.items[existingIndex].count += 1;
+    } else {
+        // Add new item
+        cartState.items.push({
+            sku: priceItem.sku || priceItem.name || 'Unknown SKU',
+            service: priceItem.service || 'Compute',
+            region: priceItem.region || 'Unknown',
+            hourly: priceCatalogState.pricingType === 'hourly'
+                ? (priceItem.hourly_price || priceItem.price || priceItem.rate || 0)
+                : (priceItem.monthly_price || (priceItem.price || priceItem.rate || 0) / 730),
+            count: 1,
+            description: priceItem.description || ''
+        });
+    }
+
+    updateCartCount();
+    notify(`Added ${priceItem.sku || priceItem.name} to cart`, 'success');
+}
+
+function removeFromCart(index) {
+    cartState.items.splice(index, 1);
+    updateCartCount();
+    renderCartItems();
+}
+
+function clearCart() {
+    cartState.items = [];
+    updateCartCount();
+    renderCartItems();
+    notify('Cart cleared', 'success');
+}
+
+function openCartModal() {
+    console.log('openCartModal called');
+    const modal = document.getElementById('cart-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        cartState.isOpen = true;
+        renderCartItems();
+        console.log('Cart modal opened');
+    } else {
+        console.error('Cart modal element not found');
+    }
+}
+
+function closeCartModal() {
+    console.log('closeCartModal called');
+    const modal = document.getElementById('cart-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        cartState.isOpen = false;
+        console.log('Cart modal closed');
+    } else {
+        console.error('Cart modal element not found');
+    }
+}
+
+function renderCartItems() {
+    const cartItemsContainer = document.getElementById('cart-items');
+    if (!cartItemsContainer) return;
+
+    if (cartState.items.length === 0) {
+        cartItemsContainer.innerHTML = '<p class="text-[var(--text-muted)] text-center py-8">Your cart is empty</p>';
+        document.getElementById('cart-total-hourly').textContent = '$0.0000';
+        document.getElementById('cart-total-monthly').textContent = '$0.00';
+        return;
+    }
+
+    let totalHourly = 0;
+    cartItemsContainer.innerHTML = cartState.items.map((item, index) => {
+        const itemHourly = item.hourly * item.count;
+        totalHourly += itemHourly;
+        return `
+            <div class="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-lg">
+                <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-[var(--text-primary)] text-sm truncate">${item.sku}</div>
+                    <div class="text-xs text-[var(--text-secondary)]">${item.service} • ${item.region}</div>
+                    <div class="text-xs text-[var(--accent-primary)] font-mono">$${item.hourly.toFixed(4)}/hr × ${item.count}</div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="text-right">
+                        <div class="font-mono font-bold text-[var(--text-primary)]">$${itemHourly.toFixed(4)}/hr</div>
+                        <div class="text-xs text-[var(--text-secondary)]">$${(itemHourly * 730).toFixed(2)}/mo</div>
+                    </div>
+                    <button onclick="removeFromCart(${index})" class="text-red-500 hover:text-red-400 transition p-2">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('cart-total-hourly').textContent = `$${totalHourly.toFixed(4)}`;
+    document.getElementById('cart-total-monthly').textContent = `$${(totalHourly * 730).toFixed(2)}`;
+}
+
+async function exportCartBOM() {
+    console.log('exportCartBOM called');
+    console.log('Cart state items:', cartState.items);
+
+    if (cartState.items.length === 0) {
+        notify('Your cart is empty. Add items to export.', 'error');
+        return;
+    }
+
+    try {
+        const totalHourly = cartState.items.reduce((sum, item) => sum + (item.hourly * item.count), 0);
+        const totalMonthly = totalHourly * 730;
+
+        const bomPayload = {
+            resources: cartState.items.map(item => ({
+                sku: item.sku,
+                service: item.service,
+                count: item.count,
+                hourly: item.hourly
+            })),
+            totalHourly: totalHourly,
+            totalMonthly: totalMonthly
+        };
+
+        console.log('Cart BOM payload:', bomPayload);
+
+        const response = await fetch('/api/export/bom', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(bomPayload)
+        });
+
+        console.log('Cart BOM export response status:', response.status);
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Cloud_Reaper_BOM_${new Date().toISOString().slice(0,10)}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            notify('BOM PDF exported successfully', 'success');
+            closeCartModal();
+        } else {
+            const errorData = await response.json();
+            console.error('Cart BOM export failed:', errorData);
+            notify('Failed to export BOM: ' + (errorData.message || 'Unknown error'), 'error');
+        }
+    } catch (e) {
+        console.error('Cart BOM export error:', e);
+        notify('Error exporting BOM: ' + e.message, 'error');
+    }
+}
+
+function updateCatalogStatus(data) {
+    const statusEl = document.getElementById('price-catalog-status');
+    if (!statusEl) return;
+
+    if (data?.status === 'warming' || data?.catalog_status === 'warming') {
+        statusEl.textContent = `Syncing live on-demand rates from ${data.source || 'cloud API'}...`;
+        return;
+    }
+
+    const total = data?.sku_count || data?.total || 0;
+    const source = data?.source || 'live API';
+    statusEl.textContent = `${total.toLocaleString()} on-demand SKUs • ${source}`;
+}
+
+function showPriceLoading(full = false) {
+    if (!full && priceCatalogState.hasLoadedOnce) return;
+    const tbody = document.getElementById('priceTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="4" class="p-12 text-center">
+                <div class="flex flex-col items-center gap-4">
+                    <div class="w-8 h-8 border-4 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin"></div>
+                    <p class="text-[var(--text-muted)] font-bold animate-pulse">Loading live prices...</p>
+                </div>
+            </td>
+        </tr>
+    `;
+    if (full) {
+        document.getElementById('pagination-controls')?.classList.add('hidden');
+    }
+}
+
+async function loadPriceFilters(provider) {
+    try {
+        const response = await fetch(`/api/prices/filters?provider=${provider}`);
+        const data = await response.json();
+        if (data.status !== 'success') return;
+
+        const serviceSelect = document.getElementById('priceServiceFilter');
+        const regionSelect = document.getElementById('priceRegionFilter');
+        if (!serviceSelect || !regionSelect) return;
+
+        serviceSelect.innerHTML = '<option value="">All Services</option>' +
+            (data.services || []).map(s => `<option value="${s}">${s}</option>`).join('');
+        regionSelect.innerHTML = '<option value="">All Regions</option>' +
+            (data.regions || []).map(r => `<option value="${r}">${r}</option>`).join('');
+    } catch (e) {
+        console.error('Error loading price filters:', e);
+    }
+}
+
+function scheduleCatalogPoll(provider) {
+    clearTimeout(priceCatalogState.pollTimer);
+    priceCatalogState.pollTimer = setTimeout(() => loadPrices(provider, priceCatalogState.currentPage, true), 2500);
+}
+
+async function loadPrices(provider = 'azure', page = 1, isPoll = false) {
+    if (priceCatalogState.isLoading && !isPoll) return;
+    priceCatalogState.isLoading = true;
+    showPriceLoading(!priceCatalogState.hasLoadedOnce);
+
+    const params = new URLSearchParams({
+        provider,
+        page: String(page),
+        per_page: String(priceCatalogState.itemsPerPage),
+        sort: priceCatalogState.sortBy,
+    });
+    if (priceCatalogState.searchTerm) params.set('search', priceCatalogState.searchTerm);
+    if (priceCatalogState.serviceFilter) params.set('service', priceCatalogState.serviceFilter);
+    if (priceCatalogState.regionFilter) params.set('region', priceCatalogState.regionFilter);
+
+    try {
+        const response = await fetch(`/api/prices?${params.toString()}`);
+        const data = await response.json();
+        updateCatalogStatus(data);
+
+        if (data.status === 'warming') {
+            renderWarming();
+            scheduleCatalogPoll(provider);
+            return;
+        }
+
+        clearTimeout(priceCatalogState.pollTimer);
+
+        if (data.status === 'success' && Array.isArray(data.prices)) {
+            priceCatalogState.prices = data.prices;
+            priceCatalogState.currentPage = data.page || page;
+            priceCatalogState.totalItems = data.total || data.prices.length;
+            priceCatalogState.totalPages = data.total_pages || 1;
+            priceCatalogState.hasLoadedOnce = true;
+            renderPrices();
+            if (page === 1 && !priceCatalogState.serviceFilter && !priceCatalogState.regionFilter) {
+                loadPriceFilters(provider);
+            }
+        } else {
+            renderError(data.message || 'Failed to load live price catalog');
         }
     } catch (e) {
         console.error('Error loading prices:', e);
-        renderError();
+        renderError('Network error while loading live prices');
+    } finally {
+        priceCatalogState.isLoading = false;
     }
 }
 
@@ -645,50 +1174,45 @@ async function loadPrices(provider = 'azure') {
 function renderPrices() {
     const tbody = document.getElementById('priceTableBody');
     if (!tbody) return;
-    
-    const { filteredPrices, currentPage, itemsPerPage, pricingType } = priceCatalogState;
-    
-    // Calculate pagination
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const pageItems = filteredPrices.slice(startIndex, endIndex);
-    
-    if (pageItems.length === 0) {
+
+    const { prices, currentPage, itemsPerPage, pricingType, totalItems } = priceCatalogState;
+
+    if (prices.length === 0) {
         renderNoPrices();
         return;
     }
-    
-    // Generate table rows
-    tbody.innerHTML = pageItems.map(price => {
-        const priceValue = pricingType === 'hourly' 
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+
+    tbody.innerHTML = prices.map(price => {
+        const priceValue = pricingType === 'hourly'
             ? (price.hourly_price || price.price || price.rate || 0)
             : (price.monthly_price || (price.price || price.rate || 0) * 730);
-        
+
         return `
             <tr class="border-b border-white/5 hover:bg-white/5 transition">
                 <td class="p-4">
                     <div class="text-white font-semibold text-sm">${price.sku || price.name || 'Unknown SKU'}</div>
-                    <div class="text-slate-500 text-xs mt-0.5">${price.description || price.category || ''}</div>
+                    <div class="text-slate-500 text-xs mt-0.5">${price.description || ''}</div>
                 </td>
-                <td class="p-4 text-slate-300 text-sm">${price.service || price.product_name || 'Compute'}</td>
+                <td class="p-4 text-slate-300 text-sm">${price.service || 'Compute'}</td>
                 <td class="p-4">
-                    <span class="px-2 py-1 bg-cyan-500/10 text-cyan-400 text-xs rounded border border-cyan-500/20">${price.region || price.location || 'Unknown'}</span>
+                    <span class="px-2 py-1 bg-cyan-500/10 text-cyan-400 text-xs rounded border border-cyan-500/20">${price.region || 'Unknown'}</span>
                 </td>
                 <td class="p-4">
-                    <span class="text-white font-mono text-sm metric-value">$${priceValue.toFixed(4)}</span>
+                    <span class="text-white font-mono text-sm metric-value">$${Number(priceValue).toFixed(4)}</span>
                     <span class="text-slate-500 text-xs ml-1">/ ${pricingType}</span>
                 </td>
-                <td class="p-4 text-right">
-                    <button onclick="addToArchitect('${price.sku || price.name}')" class="px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-xs font-semibold rounded-lg border border-cyan-500/20 transition">
-                        Add to Architect
+                <td class="p-4">
+                    <button onclick='addToCart(${JSON.stringify(price).replace(/'/g, "\\'")})' class="px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+                        <i class="fas fa-plus mr-1"></i> Add
                     </button>
                 </td>
             </tr>
         `;
     }).join('');
-    
-    // Update pagination
-    updatePagination(filteredPrices.length, startIndex, endIndex);
+
+    updatePagination(totalItems, startIndex, startIndex + prices.length);
 }
 
 // Render no prices state
@@ -700,8 +1224,8 @@ function renderNoPrices() {
                 <td colspan="5" class="p-12 text-center">
                     <div class="flex flex-col items-center gap-4">
                         <i class="fas fa-search text-4xl text-slate-600"></i>
-                        <p class="text-slate-500 font-bold">No prices found for this provider</p>
-                        <p class="text-slate-600 text-sm">Try switching to a different provider or check your cloud credentials</p>
+                        <p class="text-slate-500 font-bold">No matching SKUs found</p>
+                        <p class="text-slate-600 text-sm">Adjust your search or filters</p>
                     </div>
                 </td>
             </tr>
@@ -710,8 +1234,25 @@ function renderNoPrices() {
     document.getElementById('pagination-controls')?.classList.add('hidden');
 }
 
-// Render error state
-function renderError() {
+function renderWarming() {
+    const tbody = document.getElementById('priceTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="p-12 text-center">
+                    <div class="flex flex-col items-center gap-4">
+                        <div class="w-8 h-8 border-4 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin"></div>
+                        <p class="text-[var(--text-muted)] font-bold">Syncing live catalog from cloud API...</p>
+                        <p class="text-slate-600 text-sm">First sync may take up to a minute for Azure</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+    document.getElementById('pagination-controls')?.classList.add('hidden');
+}
+
+function renderError(message = 'Failed to load live price catalog') {
     const tbody = document.getElementById('priceTableBody');
     if (tbody) {
         tbody.innerHTML = `
@@ -719,9 +1260,8 @@ function renderError() {
                 <td colspan="5" class="p-12 text-center">
                     <div class="flex flex-col items-center gap-4">
                         <i class="fas fa-exclamation-triangle text-4xl text-rose-400"></i>
-                        <p class="text-rose-400 font-bold">Error loading prices</p>
-                        <p class="text-slate-600 text-sm">Please check your cloud provider credentials</p>
-                        <button onclick="loadPrices('${priceCatalogState.currentProvider}')" class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold rounded-lg border border-rose-500/20 transition">
+                        <p class="text-rose-400 font-bold">${message}</p>
+                        <button onclick="loadPrices('${priceCatalogState.currentProvider}', 1, true)" class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold rounded-lg border border-rose-500/20 transition">
                             Retry
                         </button>
                     </div>
@@ -736,26 +1276,35 @@ function renderError() {
 function updatePagination(totalItems, start, end) {
     const paginationControls = document.getElementById('pagination-controls');
     if (!paginationControls) return;
-    
+
     paginationControls.classList.remove('hidden');
-    document.getElementById('page-start').textContent = start + 1;
+    document.getElementById('page-start').textContent = totalItems === 0 ? 0 : start + 1;
     document.getElementById('page-end').textContent = Math.min(end, totalItems);
     document.getElementById('total-items').textContent = totalItems;
-    
-    // Update button states
+
     document.getElementById('prev-btn').disabled = priceCatalogState.currentPage === 1;
-    document.getElementById('next-btn').disabled = end >= totalItems;
+    document.getElementById('next-btn').disabled = priceCatalogState.currentPage >= priceCatalogState.totalPages;
 }
 
 // Switch provider
 window.switchProvider = (prov) => {
     priceCatalogState.currentProvider = prov;
     priceCatalogState.currentPage = 1;
-    
-    // Update provider label
+    priceCatalogState.searchTerm = '';
+    priceCatalogState.serviceFilter = '';
+    priceCatalogState.regionFilter = '';
+    priceCatalogState.hasLoadedOnce = false;
+    clearTimeout(priceCatalogState.pollTimer);
+
+    const searchInput = document.getElementById('priceSearch');
+    if (searchInput) searchInput.value = '';
+    const serviceSelect = document.getElementById('priceServiceFilter');
+    if (serviceSelect) serviceSelect.value = '';
+    const regionSelect = document.getElementById('priceRegionFilter');
+    if (regionSelect) regionSelect.value = '';
+
     document.getElementById('active-provider-label').textContent = prov.charAt(0).toUpperCase() + prov.slice(1);
-    
-    // Update button styles
+
     document.querySelectorAll('.prov-btn').forEach(btn => {
         btn.classList.remove('bg-[var(--accent-primary)]', 'text-[var(--bg-primary)]', 'shadow-lg');
         btn.classList.add('hover:bg-[var(--bg-elevated)]', 'text-[var(--text-secondary)]');
@@ -765,9 +1314,8 @@ window.switchProvider = (prov) => {
         activeBtn.classList.add('bg-[var(--accent-primary)]', 'text-[var(--bg-primary)]', 'shadow-lg');
         activeBtn.classList.remove('hover:bg-[var(--bg-elevated)]', 'text-[var(--text-secondary)]');
     }
-    
-    // Load prices for the new provider
-    loadPrices(prov);
+
+    loadPrices(prov, 1);
 };
 
 // Toggle pricing type (hourly/monthly)
@@ -788,113 +1336,44 @@ window.togglePricing = (type) => {
     renderPrices();
 };
 
-// Search prices
-window.searchPrices = () => {
-    const searchTerm = document.getElementById('priceSearch').value.toLowerCase();
-    
-    if (!searchTerm) {
-        priceCatalogState.filteredPrices = [...priceCatalogState.prices];
-    } else {
-        priceCatalogState.filteredPrices = priceCatalogState.prices.filter(price => {
-            const sku = (price.sku || price.name || '').toLowerCase();
-            const region = (price.region || price.location || '').toLowerCase();
-            const service = (price.service || price.product_name || '').toLowerCase();
-            return sku.includes(searchTerm) || region.includes(searchTerm) || service.includes(searchTerm);
-        });
-    }
-    
+// Search prices (server-side, debounced)
+window.filterPrices = () => {
+    priceCatalogState.serviceFilter = document.getElementById('priceServiceFilter')?.value || '';
+    priceCatalogState.regionFilter = document.getElementById('priceRegionFilter')?.value || '';
     priceCatalogState.currentPage = 1;
-    renderPrices();
+    loadPrices(priceCatalogState.currentProvider, 1);
 };
 
-// Sort prices
+window.searchPrices = () => {
+    const searchTerm = document.getElementById('priceSearch')?.value.trim() || '';
+    priceCatalogState.searchTerm = searchTerm;
+    priceCatalogState.currentPage = 1;
+
+    clearTimeout(priceCatalogState.searchDebounceTimer);
+    priceCatalogState.searchDebounceTimer = setTimeout(() => {
+        loadPrices(priceCatalogState.currentProvider, 1);
+    }, 300);
+};
+
+// Sort prices (server-side)
 window.sortPrices = () => {
-    const sortValue = document.getElementById('priceSort').value;
-    priceCatalogState.sortBy = sortValue;
-    
-    switch (sortValue) {
-        case 'price-asc':
-            priceCatalogState.filteredPrices.sort((a, b) => {
-                const priceA = a.price || a.rate || 0;
-                const priceB = b.price || b.rate || 0;
-                return priceA - priceB;
-            });
-            break;
-        case 'price-desc':
-            priceCatalogState.filteredPrices.sort((a, b) => {
-                const priceA = a.price || a.rate || 0;
-                const priceB = b.price || b.rate || 0;
-                return priceB - priceA;
-            });
-            break;
-        case 'sku-asc':
-            priceCatalogState.filteredPrices.sort((a, b) => {
-                const skuA = (a.sku || a.name || '').toLowerCase();
-                const skuB = (b.sku || b.name || '').toLowerCase();
-                return skuA.localeCompare(skuB);
-            });
-            break;
-        case 'sku-desc':
-            priceCatalogState.filteredPrices.sort((a, b) => {
-                const skuA = (a.sku || a.name || '').toLowerCase();
-                const skuB = (b.sku || b.name || '').toLowerCase();
-                return skuB.localeCompare(skuA);
-            });
-            break;
-        case 'region-asc':
-            priceCatalogState.filteredPrices.sort((a, b) => {
-                const regionA = (a.region || a.location || '').toLowerCase();
-                const regionB = (b.region || b.location || '').toLowerCase();
-                return regionA.localeCompare(regionB);
-            });
-            break;
-        case 'region-desc':
-            priceCatalogState.filteredPrices.sort((a, b) => {
-                const regionA = (a.region || a.location || '').toLowerCase();
-                const regionB = (b.region || b.location || '').toLowerCase();
-                return regionB.localeCompare(regionA);
-            });
-            break;
-        default:
-            // Keep original order
-            break;
-    }
-    
-    renderPrices();
+    const sortValue = document.getElementById('priceSort')?.value || 'sku-asc';
+    priceCatalogState.sortBy = sortValue === 'none' ? 'sku-asc' : sortValue;
+    priceCatalogState.currentPage = 1;
+    loadPrices(priceCatalogState.currentProvider, 1);
 };
 
 // Pagination
 window.prevPage = () => {
     if (priceCatalogState.currentPage > 1) {
-        priceCatalogState.currentPage--;
-        renderPrices();
+        loadPrices(priceCatalogState.currentProvider, priceCatalogState.currentPage - 1);
     }
 };
 
 window.nextPage = () => {
-    const { filteredPrices, currentPage, itemsPerPage } = priceCatalogState;
-    const maxPage = Math.ceil(filteredPrices.length / itemsPerPage);
-    
-    if (currentPage < maxPage) {
-        priceCatalogState.currentPage++;
-        renderPrices();
+    if (priceCatalogState.currentPage < priceCatalogState.totalPages) {
+        loadPrices(priceCatalogState.currentProvider, priceCatalogState.currentPage + 1);
     }
-};
-
-// Add to architect (placeholder for now)
-window.addToArchitect = (sku) => {
-    notify(`Added ${sku} to architect blueprint`, "success");
-    // Update architect count if needed
-    const countEl = document.getElementById('architect-count');
-    if (countEl) {
-        const currentCount = parseInt(countEl.textContent);
-        countEl.textContent = currentCount + 1;
-    }
-};
-
-// Toggle architect drawer (placeholder)
-window.toggleArchitectDrawer = () => {
-    notify("Architect drawer toggled.", "success");
 };
 
 window.refreshAll = () => {

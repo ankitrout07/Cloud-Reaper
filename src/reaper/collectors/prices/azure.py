@@ -16,7 +16,7 @@ class AzurePriceClient:
         )
         self.logger = logging.getLogger(__name__)
 
-    def get_prices(self, filter_query=None):
+    def get_prices(self, filter_query=None, max_pages=None):
         """
         Fetches prices from the Azure Retail Prices API with pagination support.
         """
@@ -26,15 +26,24 @@ class AzurePriceClient:
 
         prices = []
         url = self.BASE_URL
+        page_count = 0
 
         while url:
             try:
-                response = self.session.get(url, params=params if url == self.BASE_URL else None)
+                response = self.session.get(
+                    url,
+                    params=params if url == self.BASE_URL else None,
+                    timeout=30,
+                )
                 response.raise_for_status()
                 data = response.json()
 
                 items = data.get("Items", [])
                 prices.extend(items)
+                page_count += 1
+
+                if max_pages is not None and page_count >= max_pages:
+                    break
 
                 url = data.get("NextPageLink")
                 # Once we have NextPageLink, params are already included in the URL
@@ -45,6 +54,14 @@ class AzurePriceClient:
                 break
 
         return prices
+
+    def get_catalog_prices(self):
+        """Fetch full Linux VM on-demand catalog from the Azure Retail Prices API."""
+        filter_query = (
+            "serviceName eq 'Virtual Machines' and priceType eq 'Consumption' "
+            "and contains(productName,'Linux') and isPrimaryMeterRegion eq true"
+        )
+        return self.get_prices(filter_query=filter_query)
 
     def get_prices_by_service(self, service_name):
         filter_query = f"serviceName eq '{service_name}' and priceType eq 'Consumption'"

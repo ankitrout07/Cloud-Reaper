@@ -2,7 +2,6 @@
 {% block content %}
 <main class="app-main flex-1 p-8">
         <div class="max-w-6xl mx-auto">
-            <!-- Breadcrumbs -->
             <div class="flex items-center gap-2 text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-8">
                 <a href="/" class="hover:text-[var(--accent-primary)] transition">Home</a>
                 <span>/</span>
@@ -10,19 +9,18 @@
             </div>
 
             <div class="glass-card p-8 animate-slide-in">
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-6">
                     <div>
-                        <h2 class="text-3xl font-bold text-[var(--text-primary)]"><span id="active-provider-label">Azure</span> <span class="text-[var(--accent-primary)]">Resource</span> Catalog</h2>
-                        <p class="text-[var(--text-tertiary)] text-xs mt-1 font-bold uppercase tracking-widest">Real-time reference for multi-cloud resource cost projection</p>
+                        <h2 class="text-3xl font-bold text-[var(--text-primary)]"><span id="active-provider-label">Azure</span> <span class="text-[var(--accent-primary)]">Compute</span> Pricing</h2>
+                        <p id="price-catalog-status" class="text-[var(--text-tertiary)] text-xs mt-1 font-bold uppercase tracking-widest">Syncing live on-demand rates...</p>
                     </div>
                     <div class="flex gap-4 items-center">
                         <div class="relative group">
-                            <select id="priceSort" onchange="sortPrices()" 
+                            <select id="priceSort" onchange="sortPrices()"
                                 class="bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-widest text-[var(--accent-primary)] focus:outline-none focus:border-[var(--accent-primary)] transition-all appearance-none cursor-pointer pr-10">
-                                <option value="none">Sort By: Default</option>
+                                <option value="sku-asc">Sort: SKU A-Z</option>
                                 <option value="price-asc">Price: Low to High</option>
                                 <option value="price-desc">Price: High to Low</option>
-                                <option value="sku-asc">SKU: A-Z</option>
                                 <option value="sku-desc">SKU: Z-A</option>
                                 <option value="region-asc">Region: A-Z</option>
                                 <option value="region-desc">Region: Z-A</option>
@@ -34,44 +32,52 @@
                         <div class="flex gap-2 bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)]">
                             <button id="toggle-hourly" onclick="togglePricing('hourly')" class="toggle-btn px-6 py-2 bg-[var(--accent-primary)] rounded-lg text-[var(--bg-primary)] text-xs font-bold uppercase tracking-widest shadow-lg transition-all">Hourly</button>
                             <button id="toggle-monthly" onclick="togglePricing('monthly')" class="toggle-btn px-6 py-2 hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-secondary)] text-xs font-bold uppercase tracking-widest transition-all">Monthly</button>
-                            <button onclick="toggleArchitectDrawer()" class="ml-4 px-6 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg text-[var(--accent-primary)] text-xs font-bold uppercase tracking-widest transition flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                                Architect <span id="architect-count" class="bg-[var(--accent-primary)] text-[var(--bg-primary)] px-1.5 rounded-sm ml-1">0</span>
-                            </button>
                         </div>
+                        <button type="button" onclick="event.preventDefault(); openCartModal();" class="relative px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2">
+                            <i class="fas fa-shopping-cart"></i>
+                            <span>Cart</span>
+                            <span id="cart-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center hidden">0</span>
+                        </button>
                     </div>
                 </div>
 
-                <div class="flex gap-2 bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] mb-8 w-fit">
+                <div class="flex gap-2 bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] mb-6 w-fit">
                     <button id="prov-azure" onclick="switchProvider('azure')" class="prov-btn px-6 py-2 bg-[var(--accent-primary)] rounded-lg text-[var(--bg-primary)] text-xs font-bold uppercase tracking-widest shadow-lg transition-all flex items-center justify-center gap-2"><i class="fab fa-microsoft text-sm"></i> Azure</button>
                     <button id="prov-aws" onclick="switchProvider('aws')" class="prov-btn px-6 py-2 hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-secondary)] text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2"><i class="fab fa-aws text-sm"></i> AWS</button>
                     <button id="prov-gcp" onclick="switchProvider('gcp')" class="prov-btn px-6 py-2 hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-secondary)] text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2"><i class="fab fa-google text-sm"></i> GCP</button>
                 </div>
 
-                <div class="mb-6 relative">
-                    <input type="text" id="priceSearch" onkeyup="searchPrices()" placeholder="Filter by SKU or Region..." 
-                        class="w-full bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-xl px-12 py-3 focus:outline-none focus:border-[var(--accent-primary)] transition text-[var(--text-primary)]">
-                    <svg class="absolute left-4 top-3.5 h-5 w-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="relative md:col-span-1">
+                        <input type="text" id="priceSearch" onkeyup="searchPrices()" placeholder="Search SKU, region, service..." 
+                            class="w-full bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-xl px-12 py-3 focus:outline-none focus:border-[var(--accent-primary)] transition text-[var(--text-primary)]">
+                        <svg class="absolute left-4 top-3.5 h-5 w-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </div>
+                    <select id="priceServiceFilter" onchange="filterPrices()" class="bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-xl px-4 py-3 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]">
+                        <option value="">All Services</option>
+                    </select>
+                    <select id="priceRegionFilter" onchange="filterPrices()" class="bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-xl px-4 py-3 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]">
+                        <option value="">All Regions</option>
+                    </select>
                 </div>
                 
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-separate border-spacing-y-2" id="priceTable">
                         <thead class="text-[var(--text-muted)] text-xs uppercase sticky top-0 bg-[var(--bg-card)] backdrop-blur-md z-10">
                             <tr>
-                                <th class="p-4 font-bold">SKU Name</th>
+                                <th class="p-4 font-bold">SKU</th>
                                 <th class="p-4 font-bold">Service</th>
                                 <th class="p-4 font-bold">Region</th>
-                                <th class="p-4 font-bold">Price Rate</th>
-                                <th class="p-4 font-bold text-right">Action</th>
+                                <th class="p-4 font-bold">On-Demand Rate</th>
+                                <th class="p-4 font-bold">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="priceTableBody" class="space-y-2">
-                            <!-- Dynamic Content -->
                             <tr>
                                 <td colspan="5" class="p-12 text-center">
                                     <div class="flex flex-col items-center gap-4">
                                         <div class="w-8 h-8 border-4 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin"></div>
-                                        <p class="text-[var(--text-muted)] font-bold animate-pulse">Loading prices...</p>
+                                        <p class="text-[var(--text-muted)] font-bold animate-pulse">Loading live prices...</p>
                                     </div>
                                 </td>
                             </tr>
@@ -79,7 +85,6 @@
                     </table>
                 </div>
 
-                <!-- Pagination Controls -->
                 <div id="pagination-controls" class="mt-8 flex justify-between items-center bg-[var(--bg-tertiary)] p-4 rounded-2xl border border-[var(--border-default)] hidden">
                     <div class="text-xs text-[var(--text-muted)] font-bold uppercase tracking-widest">
                         Showing <span id="page-start" class="text-[var(--text-primary)]">0</span> - <span id="page-end" class="text-[var(--text-primary)]">0</span> of <span id="total-items" class="text-[var(--text-primary)]">0</span>
@@ -92,4 +97,37 @@
             </div>
         </div>
     </main>
+
+    <!-- Cart Modal -->
+    <div id="cart-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[var(--bg-card)] border border-[var(--border-default)] rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden shadow-2xl">
+            <div class="flex justify-between items-center p-6 border-b border-[var(--border-default)]">
+                <h3 class="text-xl font-bold text-[var(--text-primary)]">Bill of Materials Cart</h3>
+                <button type="button" onclick="event.preventDefault(); closeCartModal();" class="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto max-h-[50vh]">
+                <div id="cart-items" class="space-y-3">
+                    <p class="text-[var(--text-muted)] text-center py-8">Your cart is empty</p>
+                </div>
+            </div>
+            <div class="p-6 border-t border-[var(--border-default)] bg-[var(--bg-tertiary)]">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-[var(--text-secondary)] font-bold uppercase text-xs">Total Hourly</span>
+                    <span id="cart-total-hourly" class="text-[var(--text-primary)] font-mono font-bold">$0.0000</span>
+                </div>
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-[var(--text-secondary)] font-bold uppercase text-xs">Est. Monthly</span>
+                    <span id="cart-total-monthly" class="text-[var(--accent-primary)] font-mono font-bold text-lg">$0.00</span>
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="event.preventDefault(); clearCart();" class="flex-1 px-4 py-3 bg-[var(--bg-elevated)] hover:bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl text-[var(--text-secondary)] font-bold uppercase text-xs transition">Clear Cart</button>
+                    <button type="button" onclick="event.preventDefault(); exportCartBOM();" class="flex-1 px-4 py-3 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] rounded-xl font-bold uppercase text-xs transition flex items-center justify-center gap-2">
+                        <i class="fas fa-file-pdf"></i> Export BOM PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}

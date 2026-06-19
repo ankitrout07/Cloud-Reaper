@@ -1091,31 +1091,12 @@ class AzureCollector:
         }
 
     def get_live_prices(self):
-        """
-        Executes the Go Performance Core to fetch real-time Azure pricing data.
-        """
-        go_binary = _reaper_engine_binary()
-        if go_binary is None:
-            repo_root = Path(__file__).resolve().parents[4]
-            expected = repo_root / "bin" / "reaper-engine"
-            print(f"[-] Error: Go binary not found at {expected}. Run ./scripts/reap.sh to build.")
-            return {}
-
+        """Fetch live Azure VM prices from the Azure Retail Prices API."""
         try:
-            # Run the Go scraper and capture JSON output
-            result = subprocess.run(
-                [str(go_binary), "--mode", "prices"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if result.returncode == 0:
-                return json.loads(result.stdout)
-            print(f"[-] Go Engine Error: {result.stderr}")
-            return {}
+            return AzurePriceClient().get_catalog_prices()
         except Exception as e:
-            print(f"[-] Failed to execute Go Scraper: {e}")
-            return {}
+            print(f"[-] Failed to fetch Azure prices: {e}")
+            return []
 
     def get_go_scan_results(self):
         """

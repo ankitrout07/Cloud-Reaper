@@ -46,8 +46,13 @@ except Exception as e:
     HTML = None
     print(f"[*] WeasyPrint could not be loaded: {e}")
 
-from reaper.collectors.prices.aws import AWSPriceClient
-from reaper.collectors.prices.gcp import GCPPriceClient
+from reaper.collectors.prices.catalog import (
+    get_catalog_filters,
+    get_catalog_status,
+    query_catalog_prices,
+    start_catalog_warmup,
+    warm_catalog,
+)
 from reaper.collectors.providers.azure_collector import AzureCollector
 from reaper.collectors.utils.auth_check import check_azure_status
 from reaper.collectors.utils.config_manager import save_config
@@ -83,187 +88,6 @@ from reaper.web.vault_crypto import (
 )
 
 load_dotenv()
-
-
-# Sample price data fallbacks when API calls fail
-def get_azure_sample_prices():
-    """Provide sample Azure pricing data for testing when API is unavailable."""
-    return [
-        {
-            "sku": "Standard_B2s",
-            "name": "Standard_B2s",
-            "service": "Virtual Machines",
-            "region": "eastus",
-            "price": 0.0528,
-            "rate": 0.0528,
-            "hourly_price": 0.0528,
-        },
-        {
-            "sku": "Standard_D4s_v5",
-            "name": "Standard_D4s_v5",
-            "service": "Virtual Machines",
-            "region": "eastus",
-            "price": 0.367,
-            "rate": 0.367,
-            "hourly_price": 0.367,
-        },
-        {
-            "sku": "Standard_D8s_v5",
-            "name": "Standard_D8s_v5",
-            "service": "Virtual Machines",
-            "region": "eastus",
-            "price": 0.704,
-            "rate": 0.704,
-            "hourly_price": 0.704,
-        },
-        {
-            "sku": "Standard_D2s_v4",
-            "name": "Standard_D2s_v4",
-            "service": "Virtual Machines",
-            "region": "westus2",
-            "price": 0.0472,
-            "rate": 0.0472,
-            "hourly_price": 0.0472,
-        },
-        {
-            "sku": "Standard_F4s",
-            "name": "Standard_F4s",
-            "service": "Virtual Machines",
-            "region": "eastus",
-            "price": 0.656,
-            "rate": 0.656,
-            "hourly_price": 0.656,
-        },
-        {
-            "sku": "Standard_NC6s_v3",
-            "name": "Standard_NC6s_v3",
-            "service": "Virtual Machines",
-            "region": "westeurope",
-            "price": 2.673,
-            "rate": 2.673,
-            "hourly_price": 2.673,
-        },
-    ]
-
-
-def get_aws_sample_prices():
-    """Provide sample AWS pricing data for testing when API is unavailable."""
-    return [
-        {
-            "sku": "t3.micro",
-            "name": "t3.micro",
-            "service": "Virtual Machines",
-            "region": "us-east-1",
-            "price": 0.0020,
-            "rate": 0.0020,
-            "hourly_price": 0.0020,
-        },
-        {
-            "sku": "t3.small",
-            "name": "t3.small",
-            "service": "Virtual Machines",
-            "region": "us-east-1",
-            "price": 0.0104,
-            "rate": 0.0104,
-            "hourly_price": 0.0104,
-        },
-        {
-            "sku": "t3.medium",
-            "name": "t3.medium",
-            "service": "Virtual Machines",
-            "region": "us-east-1",
-            "price": 0.0416,
-            "rate": 0.0416,
-            "hourly_price": 0.0416,
-        },
-        {
-            "sku": "t3.large",
-            "name": "t3.large",
-            "service": "Virtual Machines",
-            "region": "us-west-2",
-            "price": 0.0832,
-            "rate": 0.0832,
-            "hourly_price": 0.0832,
-        },
-        {
-            "sku": "m5.large",
-            "name": "m5.large",
-            "service": "Virtual Machines",
-            "region": "us-east-1",
-            "price": 0.115,
-            "rate": 0.115,
-            "hourly_price": 0.115,
-        },
-        {
-            "sku": "c5.large",
-            "name": "c5.large",
-            "service": "Virtual Machines",
-            "region": "us-west-2",
-            "price": 0.210,
-            "rate": 0.210,
-            "hourly_price": 0.210,
-        },
-    ]
-
-
-def get_gcp_sample_prices():
-    """Provide sample GCP pricing data for testing when API is unavailable."""
-    return [
-        {
-            "sku": "e2-small",
-            "name": "e2-small",
-            "service": "Compute Engine",
-            "region": "us-central1",
-            "price": 0.020,
-            "rate": 0.020,
-            "hourly_price": 0.020,
-        },
-        {
-            "sku": "e2-medium",
-            "name": "e2-medium",
-            "service": "Compute Engine",
-            "region": "us-central1",
-            "price": 0.032,
-            "rate": 0.032,
-            "hourly_price": 0.032,
-        },
-        {
-            "sku": "n2-standard-2",
-            "name": "n2-standard-2",
-            "service": "Compute Engine",
-            "region": "us-east4",
-            "price": 0.068,
-            "rate": 0.068,
-            "hourly_price": 0.068,
-        },
-        {
-            "sku": "n2-standard-4",
-            "name": "n2-standard-4",
-            "service": "Compute Engine",
-            "region": "us-central1",
-            "price": 0.136,
-            "rate": 0.136,
-            "hourly_price": 0.136,
-        },
-        {
-            "sku": "n2-highmem-4",
-            "name": "n2-highmem-4",
-            "service": "Compute Engine",
-            "region": "us-west1",
-            "price": 0.161,
-            "rate": 0.161,
-            "hourly_price": 0.161,
-        },
-        {
-            "sku": "n2-highcpu-4",
-            "name": "n2-highcpu-4",
-            "service": "Compute Engine",
-            "region": "asia-south1",
-            "price": 0.200,
-            "rate": 0.200,
-            "hourly_price": 0.200,
-        },
-    ]
 
 
 def _repo_root() -> Path:
@@ -358,6 +182,7 @@ def background_metrics_worker():
 socketio.start_background_task(background_metrics_worker)
 
 init_db()
+start_catalog_warmup()
 calc = CostCalculator()
 architect_manager = AIArchitectManager()
 settings_state = {
@@ -630,13 +455,9 @@ def connect_azure():
         for f in fields:
             os.environ[f"AZURE_{f.upper()}"] = data.get(f)
 
-        az = AzureCollector()
-        prices = az.get_live_prices()
-
-        if not prices or (isinstance(prices, dict) and not prices.get("prices")):
-            cred = DefaultAzureCredential()
-            sub_client = SubscriptionClient(cred)
-            list(sub_client.subscriptions.list())
+        cred = DefaultAzureCredential()
+        sub_client = SubscriptionClient(cred)
+        list(sub_client.subscriptions.list())
 
         if save_config(*[data.get(f) for f in fields]):
             return jsonify({"status": "success", "message": "Azure Cloud Connected Successfully!"})
@@ -1924,42 +1745,65 @@ def format_scan_results(raw):
 @app.route("/api/prices")
 def get_prices():
     provider = request.args.get("provider", "azure").lower()
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 50, type=int)
+    search = request.args.get("search", "").strip()
+    service = request.args.get("service", "").strip()
+    region = request.args.get("region", "").strip()
+    sort_by = request.args.get("sort", "sku-asc")
+
     try:
-        if provider == "azure":
-            az = AzureCollector()
-            data = az.get_live_prices()
-            prices = []
-            if isinstance(data, dict):
-                # Try multiple possible key names
-                prices = data.get("prices") or data.get("Prices") or []
-                # If still empty, try to extract from nested structure
-                if not prices:
-                    prices = data.get("data", [])
-            elif isinstance(data, list):
-                prices = data
-            # If still empty, provide sample data for testing
-            if not prices:
-                prices = get_azure_sample_prices()
-
-            return jsonify({"status": "success", "prices": prices})
-        if provider == "aws":
-            try:
-                prices = AWSPriceClient().get_live_prices()
-            except Exception as e:
-                print(f"Error fetching AWS prices: {e}")
-                prices = get_aws_sample_prices()
-            return jsonify({"status": "success", "prices": prices})
-        if provider == "gcp":
-            try:
-                prices = GCPPriceClient().get_live_prices()
-            except Exception as e:
-                print(f"Error fetching GCP prices: {e}")
-                prices = get_gcp_sample_prices()
-            return jsonify({"status": "success", "prices": prices})
-
-        return jsonify({"status": "success", "prices": []})
+        result = query_catalog_prices(
+            provider,
+            page=page,
+            per_page=per_page,
+            search=search,
+            service=service,
+            region=region,
+            sort_by=sort_by,
+        )
+        if result.get("catalog_status") == "warming":
+            return jsonify({"status": "warming", **result}), 202
+        if not result["prices"] and result.get("catalog_status") == "error":
+            meta = get_catalog_status(provider)
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": meta.get("error", "Failed to load live price catalog"),
+                        **result,
+                    }
+                ),
+                503,
+            )
+        return jsonify({"status": "success", **result})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/prices/status")
+def get_prices_status():
+    provider = request.args.get("provider")
+    return jsonify({"status": "success", "catalogs": get_catalog_status(provider)})
+
+
+@app.route("/api/prices/filters")
+def get_prices_filters():
+    provider = request.args.get("provider", "azure").lower()
+    try:
+        filters = get_catalog_filters(provider)
+        return jsonify({"status": "success", "provider": provider, **filters})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/prices/refresh", methods=["POST"])
+def refresh_prices():
+    provider = (request.json or {}).get("provider") if request.is_json else None
+    providers = [provider] if provider else ["azure", "aws", "gcp"]
+    for prov in providers:
+        threading.Thread(target=warm_catalog, args=(prov,), kwargs={"force": True}, daemon=True).start()
+    return jsonify({"status": "success", "message": "Price catalog refresh started", "providers": providers})
 
 
 @app.route("/api/export/bom", methods=["POST"])

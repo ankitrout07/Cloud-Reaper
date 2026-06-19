@@ -133,7 +133,7 @@ def run_reaper():
         return
 
     # Load live prices from Go engine into calculator
-    print("    - Fetching Live Prices (Go Scraper)...")
+    print("    - Fetching Live Prices (Azure Retail API)...")
     try:
         live_prices = az.get_live_prices()
         calc.load_prices(live_prices)

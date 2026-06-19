@@ -106,7 +106,7 @@ class CostCalculator:
 
     def load_prices(self, price_data):
         """
-        Dynamically updates the price book with live data from the Go collector.
+        Dynamically updates the price book with live data from cloud retail APIs.
         Supports both raw list of price items and wrapped ScanResult dictionary.
         """
         if not price_data:
