@@ -1,12 +1,5 @@
 from __future__ import annotations
-# gevent monkey-patching is optional; use threading fallback if unavailable.
-try:
-    from gevent import monkey
 
-    monkey.patch_all()
-    async_mode = "gevent"
-except ImportError:
-    async_mode = "threading"
 
 import base64
 import contextlib
@@ -27,17 +20,13 @@ from azure.identity import DefaultAzureCredential
 from azure.mgmt.subscription import SubscriptionClient
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv, set_key
-from flask import (
-    Flask,
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    send_file,
-    send_from_directory,
-    session,
-    url_for,
-)
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse, FileResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from flask_compress import Compress
 from flask_cors import CORS
 from flask_socketio import SocketIO
@@ -80,9 +69,6 @@ from reaper.engine.models.resources import (
     VaultSettings,
     init_db,
 )
-from reaper.web.copilot_routes import copilot_api
-from reaper.web.metrics_routes import telemetry_bp
-from reaper.web.search_routes import search_bp
 from reaper.web.vault_crypto import (
     derive_fernet_key,
     generate_salt,
@@ -118,36 +104,33 @@ def is_first_run():
 
 
 _web_dir = Path(__file__).resolve().parent
-app = Flask(
-    __name__,
-    template_folder=str(_web_dir / "templates"),
-    static_folder=str(_web_dir / "static"),
-)
-CORS(app)
+app = FastAPI(title="Cloud-Reaper", docs_url=None, redoc_url=None)
+templates = Jinja2Templates(directory=str(_web_dir / "templates"))
+app.mount("/static", StaticFiles(directory=str(_web_dir / "static")), name="static")
+
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # Enable response compression for better performance
-Compress(app)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Configure compression settings
-app.config["COMPRESS_ALGORITHM"] = "gzip"
-app.config["COMPRESS_LEVEL"] = 6
-app.config["COMPRESS_MIN_SIZE"] = 500  # Only compress responses > 500 bytes
 
 # Performance optimizations
-app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 31536000  # 1 year for static files
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = os.getenv("FLASK_SECURE_COOKIES", "false").lower() == "true"
 
 # Enable threading for better performance
-app.config["THREADING"] = True
 
-app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
+secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
+app.add_middleware(SessionMiddleware, secret_key=secret_key, max_age=31536000)
+import socketio
+sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
-app.register_blueprint(copilot_api)
-app.register_blueprint(search_bp)
-app.register_blueprint(telemetry_bp)
+from reaper.web.copilot_router import copilot_router
+app.include_router(copilot_router)
+from reaper.web.search_router import search_router
+app.include_router(search_router)
+from reaper.web.metrics_router import telemetry_router
+app.include_router(telemetry_router)
 
 VAULT_UNLOCK_TTL_SEC = int(os.getenv("VAULT_UNLOCK_TTL_SEC", "3600"))
 thread = None
@@ -157,7 +140,7 @@ thread_lock = threading.Lock()
 SOCKET_METRICS_INTERVAL_SEC = int(os.getenv("REAPER_METRICS_EMIT_SEC", "8"))
 
 
-def background_metrics_worker():
+async def background_metrics_worker():
     """Fetches Azure Monitor CPU samples and pushes over WebSocket (throttled)."""
     error_count = 0
     max_errors = 5
@@ -166,7 +149,7 @@ def background_metrics_worker():
 
     while True:
         try:
-            socketio.sleep(backoff_time)
+            import asyncio; await asyncio.sleep(backoff_time)
             now = datetime.datetime.now(datetime.UTC).strftime("%H:%M:%S")
             cpu_usage = None
 
@@ -191,7 +174,7 @@ def background_metrics_worker():
             if cpu_usage is not None:
                 cpu_usage = round(float(cpu_usage), 2)
                 try:
-                    socketio.emit(
+                    await sio.emit(
                         "metric_update",
                         {"time": now, "value": cpu_usage},
                     )
@@ -202,11 +185,14 @@ def background_metrics_worker():
             print(f"[!] Critical error in metrics worker: {e}")
             # Prevent rapid crash loops by sleeping longer on critical errors
             backoff_time = min(backoff_time * 2, max_backoff)
-            socketio.sleep(backoff_time)
+            import asyncio; await asyncio.sleep(backoff_time)
 
 
 # Start the worker after the app is ready
-socketio.start_background_task(background_metrics_worker)
+@app.on_event("startup")
+async def startup_event():
+    import asyncio
+    asyncio.create_task(background_metrics_worker())
 
 init_db()
 start_catalog_warmup()
@@ -228,9 +214,9 @@ settings_state = {
 ENV_PATH = str(_repo_root() / ".env")
 
 
-@app.route("/api/settings/sync", methods=["POST"])
-def sync_settings():
-    data = request.json or {}
+@app.post("/api/settings/sync")
+async def sync_settings(request: Request):
+    data = (await request.json() if await request.body() else {}) or {}
     try:
         # 1. Update the .env file physically
         set_key(ENV_PATH, "AZURE_SUBSCRIPTION_ID", data.get("subscriptionId"))
@@ -241,9 +227,9 @@ def sync_settings():
         # 2. Reload the environment variables for the current running process
         load_dotenv(ENV_PATH, override=True)
 
-        return jsonify({"status": "success", "message": "Credentials Sync Complete"}), 200
+        return JSONResponse(status_code=200, content={"status": "success", "message": "Credentials Sync Complete"})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
 @app.before_request
@@ -259,15 +245,15 @@ def check_setup():
     return None
 
 
-@app.route("/favicon.ico")
-def favicon_ico():
+@app.get("/favicon.ico")
+async def favicon_ico(request: Request):
     return send_from_directory(
         str(_web_dir / "static" / "assets"), "favicon.ico", mimetype="image/x-icon"
     )
 
 
-@app.route("/favicon.png")
-def favicon_png():
+@app.get("/favicon.png")
+async def favicon_png(request: Request):
     return send_from_directory(
         str(_web_dir / "static" / "assets"), "favicon.png", mimetype="image/png"
     )
@@ -279,9 +265,9 @@ def _get_cached_user_info() -> tuple[str, str]:
     cache_ttl = 300  # 5 minutes
 
     # Check session cache first
-    user_name = session.get(f"{cache_key_prefix}_user")
-    sub_name = session.get(f"{cache_key_prefix}_sub")
-    timestamp = session.get(f"{cache_key_prefix}_timestamp")
+    user_name = request.session.get(f"{cache_key_prefix}_user")
+    sub_name = request.session.get(f"{cache_key_prefix}_sub")
+    timestamp = request.session.get(f"{cache_key_prefix}_timestamp")
 
     # Return cached data if valid
     if user_name and sub_name and timestamp:
@@ -295,9 +281,9 @@ def _get_cached_user_info() -> tuple[str, str]:
         sub_name = az.get_subscription_name()
 
         # Cache in session
-        session[f"{cache_key_prefix}_user"] = user_name
-        session[f"{cache_key_prefix}_sub"] = sub_name
-        session[f"{cache_key_prefix}_timestamp"] = str(time.time())
+        request.session[f"{cache_key_prefix}_user"] = user_name
+        request.session[f"{cache_key_prefix}_sub"] = sub_name
+        request.session[f"{cache_key_prefix}_timestamp"] = str(time.time())
 
         return user_name, sub_name
     except Exception as e:
@@ -305,10 +291,10 @@ def _get_cached_user_info() -> tuple[str, str]:
         return "Azure User", "Azure Subscription"
 
 
-@app.route("/")
-def index():
+@app.get("/")
+async def index(request: Request):
     user_name, sub_name = _get_cached_user_info()
-    return render_template("pages/index.html", user_name=user_name, sub_name=sub_name)
+    return templates.TemplateResponse("pages/index.html", {"request": request, "user_name": user_name, "sub_name": sub_name})
 
 
 def _cloud_connections_summary() -> tuple[dict[str, dict[str, Any]], str]:
@@ -357,19 +343,19 @@ def _vault_salt_bytes(settings: VaultSettings) -> bytes:
 
 
 def _is_vault_unlocked() -> bool:
-    if not session.get("vault_unlocked"):
+    if not request.session.get("vault_unlocked"):
         return False
-    expires = session.get("vault_unlock_expires", 0)
+    expires = request.session.get("vault_unlock_expires", 0)
     if time.time() > float(expires):
-        session.pop("vault_unlocked", None)
-        session.pop("vault_unlock_expires", None)
-        session.pop("vault_fernet_key", None)
+        request.session.pop("vault_unlocked", None)
+        request.session.pop("vault_unlock_expires", None)
+        request.session.pop("vault_fernet_key", None)
         return False
-    return bool(session.get("vault_fernet_key"))
+    return bool(request.session.get("vault_fernet_key"))
 
 
 def _session_fernet() -> Fernet | None:
-    key = session.get("vault_fernet_key")
+    key = request.session.get("vault_fernet_key")
     if not key or not _is_vault_unlocked():
         return None
     return Fernet(key.encode("utf-8"))
@@ -379,14 +365,14 @@ def _unlock_vault_session(passcode: str, settings: VaultSettings) -> bool:
     salt = _vault_salt_bytes(settings)
     if not verify_passcode(passcode, salt, cast(str, settings.passcode_verifier)):
         return False
-    session["vault_fernet_key"] = derive_fernet_key(passcode, salt).decode("utf-8")
-    session["vault_unlocked"] = True
-    session["vault_unlock_expires"] = time.time() + VAULT_UNLOCK_TTL_SEC
+    request.session["vault_fernet_key"] = derive_fernet_key(passcode, salt).decode("utf-8")
+    request.session["vault_unlocked"] = True
+    request.session["vault_unlock_expires"] = time.time() + VAULT_UNLOCK_TTL_SEC
     return True
 
 
-@app.route("/settings")
-def settings():
+@app.get("/settings")
+async def settings(request: Request):
     cloud_summary, active_provider = _cloud_connections_summary()
     vault_configured = _vault_settings_row() is not None
     return render_template(
@@ -397,9 +383,9 @@ def settings():
     )
 
 
-@app.route("/api/settings/update", methods=["POST"])
-def update_settings():
-    data = request.json or {}
+@app.post("/api/settings/update")
+async def update_settings(request: Request):
+    data = (await request.json() if await request.body() else {}) or {}
     action = data.get("action")
 
     handlers = {
@@ -418,45 +404,45 @@ def update_settings():
     if handler:
         return handler(data)
 
-    return jsonify({"status": "error", "msg": "Invalid action"}), 400
+    return JSONResponse(status_code=400, content={"status": "error", "msg": "Invalid action"})
 
 
 def handle_set_currency(data):
     code = data.get("value")
     if calc.set_currency(code):
         settings_state["currency"] = code
-        return jsonify({"status": "success", "msg": f"Currency set to {code}"})
-    return jsonify({"status": "error", "msg": "Invalid currency code"}), 400
+        return {"status": "success", "msg": f"Currency set to {code}"}
+    return JSONResponse(status_code=400, content={"status": "error", "msg": "Invalid currency code"})
 
 
 def handle_sync_pricebook(_data):
     if calc.reload_prices():
-        return jsonify({"status": "success", "msg": "Price book reloaded from YAML"})
-    return jsonify({"status": "error", "msg": "File not found"}), 404
+        return {"status": "success", "msg": "Price book reloaded from YAML"}
+    return JSONResponse(status_code=404, content={"status": "error", "msg": "File not found"})
 
 
 def handle_set_strategy(data):
     strategy = data.get("value")
     settings_state["idle_strategy"] = strategy
-    return jsonify({"status": "success", "msg": f"Strategy set to {strategy}"})
+    return {"status": "success", "msg": f"Strategy set to {strategy}"}
 
 
 def handle_save_subscriptions(data):
     subs = data.get("value", [])
     settings_state["selected_subscriptions"] = subs
-    return jsonify({"status": "success", "msg": f"Target scope updated: {len(subs)} subscriptions"})
+    return {"status": "success", "msg": f"Target scope updated: {len(subs)} subscriptions"}
 
 
 def handle_set_sleep_schedule(data):
     settings_state["scheduled_sleep"] = data.get("value")
-    return jsonify({"status": "success", "msg": "Scheduled Sleep updated"})
+    return {"status": "success", "msg": "Scheduled Sleep updated"}
 
 
 def handle_update_compliance(data):
     tags = data.get("tags", "").split(",")
     settings_state["mandatory_tags"] = [t.strip().lower() for t in tags if t.strip()]
     settings_state["auto_flag_compliance"] = data.get("auto_flag", True)
-    return jsonify({"status": "success", "msg": "Compliance Policy updated"})
+    return {"status": "success", "msg": "Compliance Policy updated"}
 
 
 def handle_update_integrations(data):
@@ -481,30 +467,30 @@ def handle_update_integrations(data):
         elif "slack" in legacy_url:
             settings_state["slack_webhook_url"] = legacy_url
 
-    return jsonify({"status": "success", "msg": "Integrations updated"})
+    return {"status": "success", "msg": "Integrations updated"}
 
 
 def handle_update_billing(data):
     settings_state["budget_threshold"] = float(data.get("threshold", 1000.0))
-    return jsonify({"status": "success", "msg": "Billing thresholds updated"})
+    return {"status": "success", "msg": "Billing thresholds updated"}
 
 
 def handle_initial_setup(data):
     val = data.get("value")
     if save_config(sub_id=val):
-        return jsonify({"status": "success", "msg": "Environment configured"})
-    return jsonify({"status": "error", "msg": "Could not write to .env"}), 500
+        return {"status": "success", "msg": "Environment configured"}
+    return JSONResponse(status_code=500, content={"status": "error", "msg": "Could not write to .env"})
 
 
-@app.route("/api/settings/connect-azure", methods=["POST"])
-def connect_azure():
-    data = request.json
+@app.post("/api/settings/connect-azure")
+async def connect_azure(request: Request):
+    data = (await request.json() if await request.body() else {})
     if not data:
-        return jsonify({"status": "error", "message": "Request body is required."}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Request body is required."})
 
     fields = ["subscription_id", "tenant_id", "client_id", "client_secret"]
     if not all(data.get(f) for f in fields):
-        return jsonify({"status": "error", "message": "All fields are required."}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": "All fields are required."})
 
     old_env = {f"AZURE_{f.upper()}": os.getenv(f"AZURE_{f.upper()}") for f in fields}
 
@@ -517,7 +503,7 @@ def connect_azure():
         list(sub_client.subscriptions.list())
 
         if save_config(*[data.get(f) for f in fields]):
-            return jsonify({"status": "success", "message": "Azure Cloud Connected Successfully!"})
+            return {"status": "success", "message": "Azure Cloud Connected Successfully!"}
         raise Exception("Failed to write to .env file")
 
     except Exception as e:
@@ -526,7 +512,7 @@ def connect_azure():
                 os.environ[k] = v
             else:
                 os.environ.pop(k, None)
-        return jsonify({"status": "error", "message": f"Connection Failed: {e!s}"}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": f"Connection Failed: {e!s}"})
 
 
 def _write_gcp_service_account_file(service_json: str) -> str:
@@ -733,11 +719,11 @@ def _validate_cloud_credentials(provider: str, credentials: dict[str, Any]) -> d
         return {"valid": False, "message": f"Validation error: {e!s}", "details": ""}
 
 
-@app.route("/api/context/switch")
-def switch_context():
-    provider = (request.args.get("provider") or "").lower()
+@app.get("/api/context/switch")
+async def switch_context(request: Request):
+    provider = (request.query_params.get("provider") or "").lower()
     if provider not in {"aws", "azure", "gcp", "k8s"}:
-        return jsonify({"status": "error", "message": "Unsupported provider."}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Unsupported provider."})
 
     db = SessionLocal()
     try:
@@ -769,15 +755,15 @@ def switch_context():
         )
     except Exception as e:
         db.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
     finally:
         db.close()
 
 
-@app.route("/api/settings/connect-cloud", methods=["POST"])
-def connect_cloud():
+@app.post("/api/settings/connect-cloud")
+async def connect_cloud(request: Request):
     """Connect to cloud provider with credential validation."""
-    data = request.json or {}
+    data = (await request.json() if await request.body() else {}) or {}
     provider = (data.get("provider") or "").lower()
     credentials = data.get("credentials") or {}
     connection_name = data.get("connection_name") or f"{provider.capitalize()} Connection"
@@ -790,7 +776,7 @@ def connect_cloud():
     }
 
     if provider not in required_fields:
-        return jsonify({"status": "error", "message": "Unsupported provider."}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Unsupported provider."})
 
     missing = [f for f in required_fields[provider] if not credentials.get(f)]
     if provider == "gcp" and not credentials.get("service_account_json"):
@@ -841,15 +827,15 @@ def connect_cloud():
             )
         except Exception as e:
             db.rollback()
-            return jsonify({"status": "error", "message": str(e)}), 500
+            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
         finally:
             db.close()
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/settings/cloud-connections")
-def list_cloud_connections():
+@app.get("/api/settings/cloud-connections")
+async def list_cloud_connections(request: Request):
     summary, active_provider = _cloud_connections_summary()
     return jsonify(
         {
@@ -860,8 +846,8 @@ def list_cloud_connections():
     )
 
 
-@app.route("/api/vault/status")
-def vault_status():
+@app.get("/api/vault/status")
+async def vault_status(request: Request):
     configured = _vault_settings_row() is not None
     return jsonify(
         {
@@ -872,11 +858,11 @@ def vault_status():
     )
 
 
-@app.route("/api/vault/setup", methods=["POST"])
-def vault_setup():
-    data = request.json or {}
+@app.post("/api/vault/setup")
+async def vault_setup(request: Request):
+    data = (await request.json() if await request.body() else {}) or {}
     if not data:
-        return jsonify({"status": "error", "message": "Request body is required."}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Request body is required."})
 
     passcode = (data.get("passcode") or "").strip()
     confirm = (data.get("confirm") or "").strip()
@@ -893,12 +879,12 @@ def vault_setup():
         ), 400
 
     if passcode != confirm:
-        return jsonify({"status": "error", "message": "Passcodes do not match."}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Passcodes do not match."})
 
     db = SessionLocal()
     try:
         if db.query(VaultSettings).first():
-            return jsonify({"status": "error", "message": "Vault is already configured."}), 400
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Vault is already configured."})
 
         salt = generate_salt()
         settings = VaultSettings(
@@ -908,16 +894,16 @@ def vault_setup():
         db.add(settings)
         db.commit()
         _unlock_vault_session(passcode, settings)
-        return jsonify({"status": "success", "message": "Vault created and unlocked."})
+        return {"status": "success", "message": "Vault created and unlocked."}
     except Exception as e:
         db.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
     finally:
         db.close()
 
 
-@app.route("/api/vault/reset", methods=["POST"])
-def vault_reset():
+@app.post("/api/vault/reset")
+async def vault_reset(request: Request):
     """Erases all stored vault entries and resets the passcode setup status."""
     db = SessionLocal()
     try:
@@ -925,50 +911,50 @@ def vault_reset():
         db.query(VaultSettings).delete()
         db.commit()
 
-        session.pop("vault_unlocked", None)
-        session.pop("vault_unlock_expires", None)
-        session.pop("vault_fernet_key", None)
+        request.session.pop("vault_unlocked", None)
+        request.session.pop("vault_unlock_expires", None)
+        request.session.pop("vault_fernet_key", None)
 
         return jsonify(
             {"status": "success", "message": "Vault successfully reset. All stored secrets erased."}
         )
     except Exception as e:
         db.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
     finally:
         db.close()
 
 
-@app.route("/api/vault/unlock", methods=["POST"])
-def vault_unlock():
-    data = request.json or {}
+@app.post("/api/vault/unlock")
+async def vault_unlock(request: Request):
+    data = (await request.json() if await request.body() else {}) or {}
     if not data:
-        return jsonify({"status": "error", "message": "Request body is required."}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Request body is required."})
 
     passcode = (data.get("passcode") or "").strip()
     if not passcode:
-        return jsonify({"status": "error", "message": "Passcode is required."}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Passcode is required."})
 
     settings = _vault_settings_row()
     if not settings:
-        return jsonify({"status": "error", "message": "Vault is not configured yet."}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Vault is not configured yet."})
     if not _unlock_vault_session(passcode, settings):
-        return jsonify({"status": "error", "message": "Incorrect passcode."}), 401
-    return jsonify({"status": "success", "message": "Vault unlocked."})
+        return JSONResponse(status_code=401, content={"status": "error", "message": "Incorrect passcode."})
+    return {"status": "success", "message": "Vault unlocked."}
 
 
-@app.route("/api/vault/lock", methods=["POST"])
-def vault_lock():
-    session.pop("vault_unlocked", None)
-    session.pop("vault_unlock_expires", None)
-    session.pop("vault_fernet_key", None)
-    return jsonify({"status": "success", "message": "Vault locked."})
+@app.post("/api/vault/lock")
+async def vault_lock(request: Request):
+    request.session.pop("vault_unlocked", None)
+    request.session.pop("vault_unlock_expires", None)
+    request.session.pop("vault_fernet_key", None)
+    return {"status": "success", "message": "Vault locked."}
 
 
-@app.route("/api/vault/entries", methods=["GET"])
-def vault_list_entries():
+@app.get("/api/vault/entries")
+async def vault_list_entries(request: Request):
     if not _is_vault_unlocked():
-        return jsonify({"status": "error", "message": "Vault is locked."}), 403
+        return JSONResponse(status_code=403, content={"status": "error", "message": "Vault is locked."})
 
     db = SessionLocal()
     try:
@@ -983,25 +969,25 @@ def vault_list_entries():
             }
             for row in rows
         ]
-        return jsonify({"status": "success", "entries": entries})
+        return {"status": "success", "entries": entries}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
     finally:
         db.close()
 
 
-@app.route("/api/vault/entries", methods=["POST"])
-def vault_create_entry():
+@app.post("/api/vault/entries")
+async def vault_create_entry(request: Request):
     if not _is_vault_unlocked():
-        return jsonify({"status": "error", "message": "Vault is locked."}), 403
+        return JSONResponse(status_code=403, content={"status": "error", "message": "Vault is locked."})
 
     fernet = _session_fernet()
     if not fernet:
-        return jsonify({"status": "error", "message": "Vault session expired."}), 403
+        return JSONResponse(status_code=403, content={"status": "error", "message": "Vault session expired."})
 
-    data = request.json or {}
+    data = (await request.json() if await request.body() else {}) or {}
     if not data:
-        return jsonify({"status": "error", "message": "Request body is required."}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Request body is required."})
 
     label = (data.get("label") or "").strip()
     entry_type = (data.get("entry_type") or "credential").strip().lower()
@@ -1010,15 +996,15 @@ def vault_create_entry():
     notes = (data.get("notes") or "").strip()
 
     if not label or not value:
-        return jsonify({"status": "error", "message": "Label and secret value are required."}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Label and secret value are required."})
     if entry_type not in {"credential", "passcode", "note"}:
-        return jsonify({"status": "error", "message": "Invalid entry type."}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid entry type."})
 
     payload = {"value": value, "username": username, "notes": notes}
     try:
         token = fernet.encrypt(json.dumps(payload).encode("utf-8")).decode("utf-8")
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Encryption failed: {e!s}"}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": f"Encryption failed: {e!s}"})
 
     db = SessionLocal()
     try:
@@ -1034,31 +1020,31 @@ def vault_create_entry():
         )
     except Exception as e:
         db.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
     finally:
         db.close()
 
 
-@app.route("/api/vault/entries/<int:entry_id>", methods=["GET"])
-def vault_get_entry(entry_id: int):
+@app.get("/api/vault/entries/<int:entry_id>")
+async def vault_get_entry(request: Request, entry_id: int):
     if not _is_vault_unlocked():
-        return jsonify({"status": "error", "message": "Vault is locked."}), 403
+        return JSONResponse(status_code=403, content={"status": "error", "message": "Vault is locked."})
 
     fernet = _session_fernet()
     if not fernet:
-        return jsonify({"status": "error", "message": "Vault session expired."}), 403
+        return JSONResponse(status_code=403, content={"status": "error", "message": "Vault session expired."})
 
     db = SessionLocal()
     try:
         row = db.query(VaultEntry).filter_by(id=entry_id).first()
         if not row:
-            return jsonify({"status": "error", "message": "Entry not found."}), 404
+            return JSONResponse(status_code=404, content={"status": "error", "message": "Entry not found."})
         try:
             payload = json.loads(
                 fernet.decrypt(row.encrypted_payload.encode("utf-8")).decode("utf-8")
             )
         except Exception as e:
-            return jsonify({"status": "error", "message": f"Unable to decrypt entry: {e!s}"}), 500
+            return JSONResponse(status_code=500, content={"status": "error", "message": f"Unable to decrypt entry: {e!s}"})
         return jsonify(
             {
                 "status": "success",
@@ -1073,48 +1059,48 @@ def vault_get_entry(entry_id: int):
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
     finally:
         db.close()
 
 
-@app.route("/api/vault/entries/<int:entry_id>", methods=["DELETE"])
-def vault_delete_entry(entry_id: int):
+@app.delete("/api/vault/entries/<int:entry_id>")
+async def vault_delete_entry(request: Request, entry_id: int):
     if not _is_vault_unlocked():
-        return jsonify({"status": "error", "message": "Vault is locked."}), 403
+        return JSONResponse(status_code=403, content={"status": "error", "message": "Vault is locked."})
 
     db = SessionLocal()
     try:
         row = db.query(VaultEntry).filter_by(id=entry_id).first()
         if not row:
-            return jsonify({"status": "error", "message": "Entry not found."}), 404
+            return JSONResponse(status_code=404, content={"status": "error", "message": "Entry not found."})
         db.delete(row)
         db.commit()
-        return jsonify({"status": "success", "message": "Entry deleted."})
+        return {"status": "success", "message": "Entry deleted."}
     except Exception as e:
         db.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
     finally:
         db.close()
 
 
-@app.route("/api/settings/auth")
-def check_auth():
+@app.get("/api/settings/auth")
+async def check_auth(request: Request):
     try:
         subprocess.run(["az", "account", "show"], capture_output=True, check=True)
         return jsonify(
             {"status": "healthy", "message": "Connected: Azure CLI (Active Subscription)"}
         )
     except Exception:
-        return jsonify({"status": "expired", "message": "Disconnected: Please run 'az login'"})
+        return {"status": "expired", "message": "Disconnected: Please run 'az login'"}
 
 
-@app.route("/api/settings/subscriptions")
-def list_subscriptions():
+@app.get("/api/settings/subscriptions")
+async def list_subscriptions(request: Request):
     try:
         binary_path = _reaper_engine_binary()
         if not binary_path:
-            return jsonify([])
+            return []
 
         result = subprocess.run(
             [str(binary_path), "--list-subs"],
@@ -1123,25 +1109,25 @@ def list_subscriptions():
             check=False,
         )
         if result.returncode == 0:
-            return jsonify(json.loads(result.stdout))
-        return jsonify({"error": result.stderr}), 500
+            return json.loads(result.stdout)
+        return JSONResponse(status_code=500, content={"error": result.stderr})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
-@app.route("/pricing")
-def pricing():
-    return render_template("pages/pricing.html")
+@app.get("/pricing")
+async def pricing(request: Request):
+    return templates.TemplateResponse("pages/pricing.html", {"request": request})
 
 
-@app.route("/finops")
-def finops():
-    return render_template("pages/finops.html")
+@app.get("/finops")
+async def finops(request: Request):
+    return templates.TemplateResponse("pages/finops.html", {"request": request})
 
 
-@app.route("/financial")
-def financial():
-    tab = request.args.get("tab", "budget")
+@app.get("/financial")
+async def financial(request: Request):
+    tab = request.query_params.get("tab", "budget")
     allowed_tabs = [
         "budget",
         "alerts",
@@ -1168,10 +1154,10 @@ def financial():
     )
 
 
-@app.route("/api/v1/finops/simulate/commitment", methods=["POST"])
-def simulate_commitment():
+@app.post("/api/v1/finops/simulate/commitment")
+async def simulate_commitment(request: Request):
     # Placeholder simulator logic.
-    data = request.json or {}
+    data = (await request.json() if await request.body() else {}) or {}
     return jsonify(
         {
             "status": "success",
@@ -1182,8 +1168,8 @@ def simulate_commitment():
     )
 
 
-@app.route("/api/v1/finops/test-webhook", methods=["POST"])
-def test_webhook():
+@app.post("/api/v1/finops/test-webhook")
+async def test_webhook(request: Request):
     """Test webhook endpoint for alert integration testing."""
     from reaper.engine.notifications.notifier import send_discord_alert
 
@@ -1191,22 +1177,22 @@ def test_webhook():
         send_discord_alert(
             "Test Alert", "This is a test notification from Cloud-Reaper.", color=0x3B82F6
         )
-        return jsonify({"status": "success", "message": "Test webhook triggered successfully"})
+        return {"status": "success", "message": "Test webhook triggered successfully"}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/v1/finops/simulate/policy", methods=["POST"])
-def simulate_policy():
+@app.post("/api/v1/finops/simulate/policy")
+async def simulate_policy(request: Request):
     # Placeholder logic for what-if policy application.
-    data = request.json or {}
+    data = (await request.json() if await request.body() else {}) or {}
     return jsonify(
         {"status": "success", "message": "Policy simulation applied", "cost_impact": -250.00}
     )
 
 
-@app.route("/api/metrics")
-def get_dashboard_metrics():
+@app.get("/api/metrics")
+async def get_dashboard_metrics(request: Request):
     """Provides valid default metrics to satisfy the real-time telemetry canvases"""
     return jsonify(
         {
@@ -1221,8 +1207,8 @@ def get_dashboard_metrics():
 # ========== FINANCIAL INTELLIGENCE API ENDPOINTS ==========
 
 
-@app.route("/api/finops/budget/data")
-def get_budget_data():
+@app.get("/api/finops/budget/data")
+async def get_budget_data(request: Request):
     """Get comprehensive budget pacing data for the financial dashboard."""
     try:
         budget_threshold = float(settings_state.get("budget_threshold", 1000.0))
@@ -1261,17 +1247,17 @@ def get_budget_data():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/budget/update", methods=["POST"])
-def update_budget_threshold():
+@app.post("/api/finops/budget/update")
+async def update_budget_threshold(request: Request):
     """Direct endpoint to update budget threshold."""
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         threshold = data.get("threshold")
         if not threshold:
-            return jsonify({"status": "error", "message": "Threshold is required"}), 400
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Threshold is required"})
 
         settings_state["budget_threshold"] = float(threshold)
         return jsonify(
@@ -1282,11 +1268,11 @@ def update_budget_threshold():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/budget/chart")
-def get_budget_chart_data():
+@app.get("/api/finops/budget/chart")
+async def get_budget_chart_data(request: Request):
     """Get chart data for budget pacing visualization."""
     try:
         az = AzureCollector()
@@ -1302,13 +1288,13 @@ def get_budget_chart_data():
                 "budget_pace": [random.uniform(100, 150) * i * 0.95 for i in range(1, 31)],
             }
 
-        return jsonify({"status": "success", "chart": chart_data})
+        return {"status": "success", "chart": chart_data}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/commitments/data")
-def get_commitments_data():
+@app.get("/api/finops/commitments/data")
+async def get_commitments_data(request: Request):
     """Get active commitment portfolio and recommendations."""
     try:
         az = AzureCollector()
@@ -1356,11 +1342,11 @@ def get_commitments_data():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/issues/data")
-def get_issues_data():
+@app.get("/api/finops/issues/data")
+async def get_issues_data(request: Request):
     """Get cost governance issues requiring action."""
     try:
         az = AzureCollector()
@@ -1413,19 +1399,19 @@ def get_issues_data():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/issues/remediate", methods=["POST"])
-def remediate_issue():
+@app.post("/api/finops/issues/remediate")
+async def remediate_issue(request: Request):
     """Execute remediation action on a cost governance issue."""
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         issue_id = data.get("issue_id")
         action = data.get("action")
 
         if not issue_id or not action:
-            return jsonify({"status": "error", "message": "Issue ID and action are required"}), 400
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Issue ID and action are required"})
 
         # In a real implementation, this would call Azure SDK to perform the action
         # For now, return success
@@ -1438,14 +1424,14 @@ def remediate_issue():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/commitment/simulate", methods=["POST"])
-def simulate_commitment_api():
+@app.post("/api/finops/commitment/simulate")
+async def simulate_commitment_api(request: Request):
     """Enhanced commitment simulation with real calculations."""
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         provider = data.get("provider", "AWS")
         commitment_type = data.get("type", "Savings Plan")
         term = int(data.get("term", 1))  # years
@@ -1484,18 +1470,18 @@ def simulate_commitment_api():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/commitment/purchase", methods=["POST"])
-def purchase_commitment_api():
+@app.post("/api/finops/commitment/purchase")
+async def purchase_commitment_api(request: Request):
     """Purchase a commitment based on simulation results."""
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         simulation = data.get("simulation")
 
         if not simulation:
-            return jsonify({"status": "error", "message": "Simulation data required"}), 400
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Simulation data required"})
 
         # In a real implementation, this would call Azure/AWS API to purchase
         # For now, simulate success
@@ -1510,14 +1496,14 @@ def purchase_commitment_api():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/policy/simulate", methods=["POST"])
-def simulate_policy_api():
+@app.post("/api/finops/policy/simulate")
+async def simulate_policy_api(request: Request):
     """Simulate policy application with cost impact."""
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         aggressiveness = int(data.get("aggressiveness", 50))
         spot_adoption = int(data.get("spot_adoption", 30))
 
@@ -1545,14 +1531,14 @@ def simulate_policy_api():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/policy/apply", methods=["POST"])
-def apply_policy_api():
+@app.post("/api/finops/policy/apply")
+async def apply_policy_api(request: Request):
     """Apply a governance policy."""
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         policy_config = data.get("policy")
 
         # In a real implementation, this would save policy configuration
@@ -1564,19 +1550,19 @@ def apply_policy_api():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/business-metrics", methods=["POST"])
-def add_business_metric():
+@app.post("/api/finops/business-metrics")
+async def add_business_metric(request: Request):
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         name = data.get("metric_name")
         value = data.get("value")
         unit = data.get("unit")
 
         if not name or value is None or not unit:
-            return jsonify({"status": "error", "message": "All fields are required."}), 400
+            return JSONResponse(status_code=400, content={"status": "error", "message": "All fields are required."})
 
         db = SessionLocal()
         try:
@@ -1590,21 +1576,21 @@ def add_business_metric():
             ), 201
         except Exception as e:
             db.rollback()
-            return jsonify({"status": "error", "message": str(e)}), 500
+            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
         finally:
             db.close()
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/build-with-ai", methods=["GET"])
-def build_with_ai():
+@app.get("/build-with-ai")
+async def build_with_ai(request: Request):
     """Renders the AI Multi-Cloud Architect Estimator workspace dashboard."""
-    return render_template("pages/build_with_ai.html")
+    return templates.TemplateResponse("pages/build_with_ai.html", {"request": request})
 
 
-@app.route("/api/v1/architect/status", methods=["GET"])
-def api_architect_status():
+@app.get("/api/v1/architect/status")
+async def api_architect_status(request: Request):
     """Returns the validation state of the configured OpenAI and Gemini API keys."""
     status = architect_manager.verify_api_status()
     return jsonify(
@@ -1612,17 +1598,17 @@ def api_architect_status():
     ), 200
 
 
-@app.route("/api/v1/architect/estimate", methods=["POST"])
-def api_architect_estimate():
+@app.post("/api/v1/architect/estimate")
+async def api_architect_estimate(request: Request):
     """Asynchronously processes user prompt, extracts architecture requirements and compiles a financial BOM."""
-    data = request.get_json() or {}
+    data = (await request.json() if await request.body() else {}) or {}
     user_prompt = data.get("prompt")
     provider = data.get("provider", "azure")
     region = data.get("region", "eastus")
     model_provider = data.get("model_provider", "openai")
 
     if not user_prompt:
-        return jsonify({"error": "Infrastructure requirements prompt is required."}), 400
+        return JSONResponse(status_code=400, content={"error": "Infrastructure requirements prompt is required."})
 
     try:
         # Step 1: Run Cognitive Extraction Contract
@@ -1633,19 +1619,19 @@ def api_architect_estimate():
         # Step 2: Resolve financial cost metrics against PostgreSQL cache
         calculated_payload = resolve_component_costs(blueprint, provider, region)
 
-        return jsonify(calculated_payload), 200
+        return JSONResponse(status_code=200, content=calculated_payload)
 
     except Exception as e:
-        return jsonify({"error": f"Failed to compile AI architecture: {e!s}"}), 500
+        return JSONResponse(status_code=500, content={"error": f"Failed to compile AI architecture: {e!s}"})
 
 
-@app.route("/about")
-def about():
-    return render_template("pages/about.html")
+@app.get("/about")
+async def about(request: Request):
+    return templates.TemplateResponse("pages/about.html", {"request": request})
 
 
-@app.route("/docs")
-def docs():
+@app.get("/docs")
+async def docs(request: Request):
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
     docs_dir = base_dir / "docs"
     docs_data = []
@@ -1657,21 +1643,21 @@ def docs():
             with file_path.open(encoding="utf-8") as f:
                 content = f.read()
             docs_data.append({"filename": filename, "title": title, "content": content})
-    return render_template("pages/docs.html", docs_data=docs_data)
+    return templates.TemplateResponse("pages/docs.html", {"request": request, "docs_data": docs_data})
 
 
-@app.route("/integrations")
-def integrations():
-    return render_template("pages/integrations.html", settings=settings_state)
+@app.get("/integrations")
+async def integrations(request: Request):
+    return templates.TemplateResponse("pages/integrations.html", {"request": request, "settings": settings_state})
 
 
-@app.route("/monitor")
-def monitor():
-    return render_template("pages/monitor.html")
+@app.get("/monitor")
+async def monitor(request: Request):
+    return templates.TemplateResponse("pages/monitor.html", {"request": request})
 
 
-@app.route("/dashboard")
-def dashboard():
+@app.get("/dashboard")
+async def dashboard(request: Request):
     user_name, sub_name = _get_cached_user_info()
     return render_template(
         "pages/dashboard.html",
@@ -1681,23 +1667,23 @@ def dashboard():
     )
 
 
-@app.route("/api/dashboard/finops-charts")
-def api_dashboard_finops_charts():
+@app.get("/api/dashboard/finops-charts")
+async def api_dashboard_finops_charts(request: Request):
     """HTTP snapshot for heavier FinOps charts (refreshed periodically from the client)."""
     if is_first_run():
-        return jsonify({"status": "unconfigured", "charts": None}), 200
+        return JSONResponse(status_code=200, content={"status": "unconfigured", "charts": None})
 
     cache_key = "finops_charts_data"
     cache_ttl = 60  # 60 seconds cache for chart data
 
     # Check session cache first
-    cached_charts = session.get(cache_key)
-    cached_timestamp = session.get(f"{cache_key}_timestamp")
+    cached_charts = request.session.get(cache_key)
+    cached_timestamp = request.session.get(f"{cache_key}_timestamp")
 
     # Return cached data if valid
     if cached_charts and cached_timestamp:
         if time.time() - float(cached_timestamp) < cache_ttl:
-            return jsonify({"status": "ok", "charts": cached_charts, "cached": True})
+            return {"status": "ok", "charts": cached_charts, "cached": True}
 
     try:
         az = AzureCollector()
@@ -1705,12 +1691,12 @@ def api_dashboard_finops_charts():
         charts = az.get_finops_dashboard_snapshot(monthly_budget=budget)
 
         # Cache in session
-        session[cache_key] = charts
-        session[f"{cache_key}_timestamp"] = str(time.time())
+        request.session[cache_key] = charts
+        request.session[f"{cache_key}_timestamp"] = str(time.time())
 
-        return jsonify({"status": "ok", "charts": charts, "cached": False})
+        return {"status": "ok", "charts": charts, "cached": False}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e), "charts": None}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e), "charts": None})
 
 
 def cache_response(max_age=300):
@@ -1729,31 +1715,31 @@ def cache_response(max_age=300):
     return decorator
 
 
-@app.route("/api/auth/status")
+@app.get("/api/auth/status")
 @cache_response(max_age=60)  # Cache for 1 minute
 def auth_status():
-    return jsonify(check_azure_status())
+    return check_azure_status()
 
 
-@app.route("/api/v1/docs/search", methods=["POST"])
-def docs_search():
+@app.post("/api/v1/docs/search")
+async def docs_search(request: Request):
     """Search endpoint for documentation using RAG engine."""
     from reaper.web.search_routes import search_engine
 
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         query = data.get("query", "")
         if not query:
-            return jsonify({"status": "error", "message": "Query is required"}), 400
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Query is required"})
 
         results = search_engine.query_docs(user_query=query, top_k=3)
-        return jsonify({"status": "success", "results": results, "query": query})
+        return {"status": "success", "results": results, "query": query}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/v1/finops/telemetry-insights", methods=["POST"])
-def telemetry_insights():
+@app.post("/api/v1/finops/telemetry-insights")
+async def telemetry_insights(request: Request):
     """Generate telemetry insights for the integrations page."""
     try:
         return jsonify(
@@ -1769,15 +1755,15 @@ def telemetry_insights():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/rightsizing")
-def get_rightsizing():
+@app.get("/api/rightsizing")
+async def get_rightsizing(request: Request):
     az = AzureCollector()
     go_binary = _reaper_engine_binary()
     if not go_binary:
-        return jsonify({"status": "error", "message": "Go Engine binary not found"}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Go Engine binary not found"})
 
     try:
         # pyrefly: ignore [no-matching-overload]
@@ -1788,7 +1774,7 @@ def get_rightsizing():
             check=False,
         )
         if result.returncode != 0:
-            return jsonify({"status": "error", "message": result.stderr}), 500
+            return JSONResponse(status_code=500, content={"status": "error", "message": result.stderr})
 
         vm_reports = json.loads(result.stdout).get("vm_reports", [])
         recommendations = RightSizer().calculate_recommendation(vm_reports)
@@ -1801,11 +1787,11 @@ def get_rightsizing():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/scan")
-def scan():
+@app.get("/api/scan")
+async def scan(request: Request):
     events = [{"msg": "Authenticating with Azure Identity...", "type": "info"}]
     try:
         target_subs = settings_state.get("selected_subscriptions", []) or [
@@ -1813,7 +1799,7 @@ def scan():
         ]
         # pyrefly: ignore [bad-index, unsupported-operation]
         if not target_subs[0]:
-            return jsonify({"status": "error", "message": "No subscription ID configured."}), 400
+            return JSONResponse(status_code=400, content={"status": "error", "message": "No subscription ID configured."})
 
         scan_results = perform_subscription_scan(target_subs, events)
         formatted_results = format_scan_results(scan_results)
@@ -1825,9 +1811,9 @@ def scan():
             }
         )
 
-        return jsonify({"status": "success", "events": events, **formatted_results})
+        return {"status": "success", "events": events, **formatted_results}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
 def perform_subscription_scan(target_subs, events):
@@ -2002,15 +1988,15 @@ def format_scan_results(raw):
     return formatted
 
 
-@app.route("/api/prices")
-def get_prices():
-    provider = request.args.get("provider", "azure").lower()
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 50, type=int)
-    search = request.args.get("search", "").strip()
-    service = request.args.get("service", "").strip()
-    region = request.args.get("region", "").strip()
-    sort_by = request.args.get("sort", "sku-asc")
+@app.get("/api/prices")
+async def get_prices(request: Request):
+    provider = request.query_params.get("provider", "azure").lower()
+    page = request.query_params.get("page", 1, type=int)
+    per_page = request.query_params.get("per_page", 50, type=int)
+    search = request.query_params.get("search", "").strip()
+    service = request.query_params.get("service", "").strip()
+    region = request.query_params.get("region", "").strip()
+    sort_by = request.query_params.get("sort", "sku-asc")
 
     try:
         result = query_catalog_prices(
@@ -2023,7 +2009,7 @@ def get_prices():
             sort_by=sort_by,
         )
         if result.get("catalog_status") == "warming":
-            return jsonify({"status": "warming", **result}), 202
+            return JSONResponse(status_code=202, content={"status": "warming", **result})
         if not result["prices"] and result.get("catalog_status") == "error":
             meta = get_catalog_status(provider)
             return (
@@ -2036,30 +2022,30 @@ def get_prices():
                 ),
                 503,
             )
-        return jsonify({"status": "success", **result})
+        return {"status": "success", **result}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/prices/status")
-def get_prices_status():
-    provider = request.args.get("provider")
-    return jsonify({"status": "success", "catalogs": get_catalog_status(provider)})
+@app.get("/api/prices/status")
+async def get_prices_status(request: Request):
+    provider = request.query_params.get("provider")
+    return {"status": "success", "catalogs": get_catalog_status(provider)}
 
 
-@app.route("/api/prices/filters")
-def get_prices_filters():
-    provider = request.args.get("provider", "azure").lower()
+@app.get("/api/prices/filters")
+async def get_prices_filters(request: Request):
+    provider = request.query_params.get("provider", "azure").lower()
     try:
         filters = get_catalog_filters(provider)
-        return jsonify({"status": "success", "provider": provider, **filters})
+        return {"status": "success", "provider": provider, **filters}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/prices/refresh", methods=["POST"])
-def refresh_prices():
-    provider = (request.json or {}).get("provider") if request.is_json else None
+@app.post("/api/prices/refresh")
+async def refresh_prices(request: Request):
+    provider = ((await request.json() if await request.body() else {}) or {}).get("provider") if request.is_json else None
     providers = [provider] if provider else ["azure", "aws", "gcp"]
     for prov in providers:
         threading.Thread(
@@ -2070,10 +2056,10 @@ def refresh_prices():
     )
 
 
-@app.route("/api/export/bom", methods=["POST"])
-def export_bom():
+@app.post("/api/export/bom")
+async def export_bom(request: Request):
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         items = data.get("resources", [])
         total_hourly = data.get("totalHourly", 0.0)
         total_monthly = data.get("totalMonthly", 0.0)
@@ -2106,11 +2092,11 @@ def export_bom():
             download_name="Cloud_Reaper_BOM.pdf",
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/tag-health")
-def tag_health():
+@app.get("/api/finops/tag-health")
+async def tag_health(request: Request):
     try:
         session = SessionLocal()
         try:
@@ -2137,15 +2123,15 @@ def tag_health():
             )
         except Exception as e:
             session.rollback()
-            return jsonify({"status": "error", "message": str(e)}), 500
+            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
         finally:
             session.close()
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/anomalies")
-def anomalies():
+@app.get("/api/finops/anomalies")
+async def anomalies(request: Request):
     try:
         data = AzureCollector().get_anomaly_data()
         return jsonify(
@@ -2156,32 +2142,32 @@ def anomalies():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/anomalies/triage", methods=["POST"])
-def anomalies_triage():
+@app.post("/api/finops/anomalies/triage")
+async def anomalies_triage(request: Request):
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         service = data.get("service", "Unknown")
         cost = float(data.get("cost", 0.0))
         deviation = data.get("deviation", "Unknown")
 
         if not service:
-            return jsonify({"status": "error", "message": "Missing service name"}), 400
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Missing service name"})
 
         from reaper.engine.copilot.engine import AnomalyTriager
 
         triager = AnomalyTriager()
         playbook = triager.generate_triage_playbook(service, cost, deviation)
 
-        return jsonify({"status": "success", "playbook": playbook})
+        return {"status": "success", "playbook": playbook}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/unit-economics")
-def unit_economics():
+@app.get("/api/finops/unit-economics")
+async def unit_economics(request: Request):
     try:
         session = SessionLocal()
         try:
@@ -2228,15 +2214,15 @@ def unit_economics():
             )
         except Exception as e:
             session.rollback()
-            return jsonify({"status": "error", "message": str(e)}), 500
+            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
         finally:
             session.close()
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/ri-advisor")
-def ri_advisor():
+@app.get("/api/finops/ri-advisor")
+async def ri_advisor(request: Request):
     try:
         candidates = AzureCollector().get_ri_sp_candidates()
         return jsonify(
@@ -2247,11 +2233,11 @@ def ri_advisor():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/cold-storage")
-def cold_storage():
+@app.get("/api/finops/cold-storage")
+async def cold_storage(request: Request):
     try:
         buckets = AzureCollector().get_cold_storage_candidates()
         return jsonify(
@@ -2262,11 +2248,11 @@ def cold_storage():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/modernization")
-def modernization():
+@app.get("/api/finops/modernization")
+async def modernization(request: Request):
     try:
         suggestions = AzureCollector().get_modernization_candidates()
         return jsonify(
@@ -2277,11 +2263,11 @@ def modernization():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/policy-violations")
-def policy_violations():
+@app.get("/api/finops/policy-violations")
+async def policy_violations(request: Request):
     try:
         violations = AzureCollector().get_policy_violations()
         return jsonify(
@@ -2292,21 +2278,21 @@ def policy_violations():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/budget-status")
-def budget_status():
+@app.get("/api/finops/budget-status")
+async def budget_status(request: Request):
     try:
-        return jsonify({"status": "success", "budgets": AzureCollector().get_budget_status()})
+        return {"status": "success", "budgets": AzureCollector().get_budget_status()}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/budget-killswitch", methods=["POST"])
-def budget_killswitch():
+@app.post("/api/finops/budget-killswitch")
+async def budget_killswitch(request: Request):
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         sub_name = data.get("subscription", "Unknown")
         time.sleep(0.5)
         return jsonify(
@@ -2318,27 +2304,27 @@ def budget_killswitch():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/burn-rate-forecast")
-def burn_rate_forecast():
+@app.get("/api/finops/burn-rate-forecast")
+async def burn_rate_forecast(request: Request):
     try:
-        return jsonify({"status": "success", "forecast": AzureCollector().get_burn_rate_forecast()})
+        return {"status": "success", "forecast": AzureCollector().get_burn_rate_forecast()}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/virtual-tags")
-def virtual_tags():
+@app.get("/api/finops/virtual-tags")
+async def virtual_tags(request: Request):
     try:
-        return jsonify({"status": "success", "virtual_tags": AzureCollector().get_virtual_tags()})
+        return {"status": "success", "virtual_tags": AzureCollector().get_virtual_tags()}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/greenops")
-def greenops():
+@app.get("/api/finops/greenops")
+async def greenops(request: Request):
     try:
         return jsonify(
             {
@@ -2347,57 +2333,57 @@ def greenops():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/approve-reap", methods=["POST"])
-def approve_reap():
+@app.post("/api/finops/approve-reap")
+async def approve_reap(request: Request):
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         res_id, res_type = data.get("resource_id"), data.get("resource_type")
         if not res_id:
-            return jsonify({"status": "error", "message": "Missing resource_id"}), 400
-        return jsonify(AzureCollector().execute_reap(res_id, res_type))
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Missing resource_id"})
+        return AzureCollector().execute_reap(res_id, res_type)
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/prices/regional")
-def get_regional_prices():
+@app.get("/api/prices/regional")
+async def get_regional_prices(request: Request):
     try:
-        sku = request.args.get("sku")
-        region = request.args.get("region")
+        sku = request.query_params.get("sku")
+        region = request.query_params.get("region")
         if not sku or not region:
-            return jsonify({"status": "error", "message": "Missing sku or region parameter"}), 400
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Missing sku or region parameter"})
 
         az = AzureCollector()
         prices = az.fetch_regional_prices(sku, region)
         if prices:
-            return jsonify({"status": "success", "price": prices[0]})
-        return jsonify({"status": "error", "message": "Price not found"}), 404
+            return {"status": "success", "price": prices[0]}
+        return JSONResponse(status_code=404, content={"status": "error", "message": "Price not found"})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/arbitrage")
-def get_arbitrage():
+@app.get("/api/finops/arbitrage")
+async def get_arbitrage(request: Request):
     try:
-        sku = request.args.get("sku")
-        region = request.args.get("region")
-        price = float(request.args.get("price", 0.0))
+        sku = request.query_params.get("sku")
+        region = request.query_params.get("region")
+        price = float(request.query_params.get("price", 0.0))
 
         if not sku or not region or not price:
-            return jsonify({"status": "error", "message": "Missing parameters"}), 400
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Missing parameters"})
 
         arb = RegionalArbitrage()
         result = arb.analyze_arbitrage(sku, region, price)
-        return jsonify({"status": "success", "recommendation": result})
+        return {"status": "success", "recommendation": result}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/activity")
-def get_activity():
+@app.get("/api/activity")
+async def get_activity(request: Request):
     try:
         session = SessionLocal()
         try:
@@ -2411,18 +2397,18 @@ def get_activity():
                 }
                 for log in logs
             ]
-            return jsonify({"status": "success", "activity": result})
+            return {"status": "success", "activity": result}
         except Exception as e:
             session.rollback()
-            return jsonify({"status": "error", "message": str(e)}), 500
+            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
         finally:
             session.close()
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/utilization")
-def utilization():
+@app.get("/api/finops/utilization")
+async def utilization(request: Request):
     try:
         report = AzureCollector().get_utilization_report()
         formatted_report = []
@@ -2438,16 +2424,16 @@ def utilization():
                     "status": "CRITICAL" if waste > 0.9 else "NORMAL",
                 }
             )
-        return jsonify({"status": "success", "report": formatted_report})
+        return {"status": "success", "report": formatted_report}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/spot-prediction")
-def spot_prediction():
+@app.get("/api/finops/spot-prediction")
+async def spot_prediction(request: Request):
     try:
-        instance_id = request.args.get("instance_id", "vm-spot-worker-01")
-        region = request.args.get("region", "eastus")
+        instance_id = request.query_params.get("instance_id", "vm-spot-worker-01")
+        region = request.query_params.get("region", "eastus")
 
         predictor = SpotEvictionPredictor()
 
@@ -2465,35 +2451,35 @@ def spot_prediction():
             "region_capacity": float(val3),
         }
         result = predictor.monitor_and_trigger(instance_id, region, telemetry)
-        return jsonify({"status": "success", "prediction": result})
+        return {"status": "success", "prediction": result}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/k8s/bin-packing")
-def k8s_bin_packing():
+@app.get("/api/finops/k8s/bin-packing")
+async def k8s_bin_packing(request: Request):
     try:
         from reaper.engine.core.workload import KubernetesOptimizer
 
         optimizer = KubernetesOptimizer()
-        return jsonify({"status": "success", "bin_packing": optimizer.get_bin_packing_assessment()})
+        return {"status": "success", "bin_packing": optimizer.get_bin_packing_assessment()}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/k8s/hibernation")
-def k8s_hibernation():
+@app.get("/api/finops/k8s/hibernation")
+async def k8s_hibernation(request: Request):
     try:
         from reaper.engine.core.workload import KubernetesOptimizer
 
         optimizer = KubernetesOptimizer()
-        return jsonify({"status": "success", "hibernation": optimizer.get_hibernation_status()})
+        return {"status": "success", "hibernation": optimizer.get_hibernation_status()}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/finops/ai-token-tracking")
-def ai_token_tracking():
+@app.get("/api/finops/ai-token-tracking")
+async def ai_token_tracking(request: Request):
     try:
         allocations = [
             {
@@ -2537,7 +2523,7 @@ def ai_token_tracking():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
 # Initialize the comprehensive cost optimizer
@@ -2547,11 +2533,11 @@ cost_optimizer = ComprehensiveCostOptimizer()
 cost_reporter = AutomatedCostReporter()
 
 
-@app.route("/api/cost-optimization/analyze", methods=["POST"])
-def analyze_cost_optimization():
+@app.post("/api/cost-optimization/analyze")
+async def analyze_cost_optimization(request: Request):
     """Comprehensive cost optimization analysis for all cloud resources"""
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         provider = data.get("provider", "azure").lower()
 
         if is_first_run():
@@ -2732,21 +2718,21 @@ def analyze_cost_optimization():
 
     except Exception as e:
         print(f"[!] Error in cost optimization analysis: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-optimization/summary")
-def get_optimization_summary():
+@app.get("/api/cost-optimization/summary")
+async def get_optimization_summary(request: Request):
     """Get a quick summary of cost optimization opportunities"""
     try:
         summary = cost_optimizer.generate_summary_report()
-        return jsonify({"status": "success", "summary": summary})
+        return {"status": "success", "summary": summary}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-optimization/categories")
-def get_optimization_categories():
+@app.get("/api/cost-optimization/categories")
+async def get_optimization_categories(request: Request):
     """Get recommendations grouped by optimization category"""
     try:
         by_category = {}
@@ -2766,13 +2752,13 @@ def get_optimization_categories():
                 "recommendations": recs,
             }
 
-        return jsonify({"status": "success", "categories": category_summary})
+        return {"status": "success", "categories": category_summary}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-optimization/priority/<priority>")
-def get_optimization_by_priority(priority):
+@app.get("/api/cost-optimization/priority/<priority>")
+async def get_optimization_by_priority(request: Request, priority):
     """Get recommendations filtered by priority level"""
     try:
         priority_enum = Priority(priority.lower())
@@ -2792,13 +2778,13 @@ def get_optimization_by_priority(priority):
             }
         )
     except ValueError:
-        return jsonify({"status": "error", "message": f"Invalid priority: {priority}"}), 400
+        return JSONResponse(status_code=400, content={"status": "error", "message": f"Invalid priority: {priority}"})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-optimization/resource/<resource_id>")
-def get_resource_optimizations(resource_id):
+@app.get("/api/cost-optimization/resource/<resource_id>")
+async def get_resource_optimizations(request: Request, resource_id):
     """Get all optimization recommendations for a specific resource"""
     try:
         resource_recs = [
@@ -2827,11 +2813,11 @@ def get_resource_optimizations(resource_id):
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-optimization/dashboard")
-def get_optimization_dashboard():
+@app.get("/api/cost-optimization/dashboard")
+async def get_optimization_dashboard(request: Request):
     """Get dashboard data for cost optimization visualization"""
     try:
         summary = cost_optimizer.generate_summary_report()
@@ -2892,37 +2878,37 @@ def get_optimization_dashboard():
             },
         }
 
-        return jsonify({"status": "success", "dashboard": dashboard_data})
+        return {"status": "success", "dashboard": dashboard_data}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/cost-optimization")
-def cost_optimization_page():
+@app.get("/cost-optimization")
+async def cost_optimization_page(request: Request):
     """Render the cost optimization dashboard page"""
-    return render_template("pages/cost-optimization.html")
+    return templates.TemplateResponse("pages/cost-optimization.html", {"request": request})
 
 
-@app.route("/api/cost-reports/executive-summary", methods=["GET"])
-def get_executive_summary():
+@app.get("/api/cost-reports/executive-summary")
+async def get_executive_summary(request: Request):
     """Generate executive summary of cost optimization efforts"""
     try:
-        provider = request.args.get("provider", "azure").lower()
-        period = request.args.get("period", "monthly").lower()
+        provider = request.query_params.get("provider", "azure").lower()
+        period = request.query_params.get("period", "monthly").lower()
 
         period_enum = ReportPeriod[period.upper()]
 
         summary = cost_reporter.generate_executive_summary(period_enum, provider)
-        return jsonify({"status": "success", "summary": summary})
+        return {"status": "success", "summary": summary}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-reports/generate", methods=["POST"])
-def generate_cost_report():
+@app.post("/api/cost-reports/generate")
+async def generate_cost_report(request: Request):
     """Generate detailed cost optimization report"""
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         provider = data.get("provider", "azure").lower()
         period = data.get("period", "monthly").lower()
         format_type = data.get("format", "json").lower()
@@ -2945,14 +2931,14 @@ def generate_cost_report():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-reports/download", methods=["POST"])
-def download_cost_report():
+@app.post("/api/cost-reports/download")
+async def download_cost_report(request: Request):
     """Download cost optimization report"""
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         provider = data.get("provider", "azure").lower()
         period = data.get("period", "monthly").lower()
         format_type = data.get("format", "json").lower()
@@ -2964,7 +2950,7 @@ def download_cost_report():
 
         # Create appropriate response based on format
         if format_type == "json":
-            return jsonify({"status": "success", "report": report_content})
+            return {"status": "success", "report": report_content}
         return jsonify(
             {
                 "status": "success",
@@ -2974,90 +2960,90 @@ def download_cost_report():
             }
         )
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-reports/track-status", methods=["POST"])
-def track_recommendation_status():
+@app.post("/api/cost-reports/track-status")
+async def track_recommendation_status(request: Request):
     """Track implementation status of a recommendation"""
     try:
-        data = request.json or {}
+        data = (await request.json() if await request.body() else {}) or {}
         recommendation_id = data.get("recommendation_id")
         status = data.get("status", "planned")
         notes = data.get("notes", "")
 
         if not recommendation_id:
-            return jsonify({"status": "error", "message": "recommendation_id is required"}), 400
+            return JSONResponse(status_code=400, content={"status": "error", "message": "recommendation_id is required"})
 
         success = cost_reporter.track_recommendation_status(recommendation_id, status, notes)
 
         if success:
-            return jsonify({"status": "success", "message": "Status tracked successfully"})
-        return jsonify({"status": "error", "message": "Failed to track status"}), 500
+            return {"status": "success", "message": "Status tracked successfully"}
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to track status"})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-reports/implementation-progress")
-def get_implementation_progress():
+@app.get("/api/cost-reports/implementation-progress")
+async def get_implementation_progress(request: Request):
     """Get implementation progress of all recommendations"""
     try:
         progress = cost_reporter._get_implementation_progress()
-        return jsonify({"status": "success", "progress": progress})
+        return {"status": "success", "progress": progress}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-reports/trends")
-def get_cost_trends():
+@app.get("/api/cost-reports/trends")
+async def get_cost_trends(request: Request):
     """Get cost optimization trends over time"""
     try:
         trends_data = {
             "trends": [trend.to_dict() for trend in cost_reporter.cost_trends],
             "analysis": cost_reporter._generate_trend_analysis(),
         }
-        return jsonify({"status": "success", "trends_data": trends_data})
+        return {"status": "success", "trends_data": trends_data}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-reports/category-analysis")
-def get_category_analysis():
+@app.get("/api/cost-reports/category-analysis")
+async def get_category_analysis(request: Request):
     """Get category-wise cost optimization analysis"""
     try:
         category_analysis = cost_reporter._generate_category_analysis()
-        return jsonify({"status": "success", "category_analysis": category_analysis})
+        return {"status": "success", "category_analysis": category_analysis}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-reports/risk-assessment")
-def get_risk_assessment():
+@app.get("/api/cost-reports/risk-assessment")
+async def get_risk_assessment(request: Request):
     """Get risk assessment for all recommendations"""
     try:
         risk_assessment = cost_reporter._generate_risk_assessment()
-        return jsonify({"status": "success", "risk_assessment": risk_assessment})
+        return {"status": "success", "risk_assessment": risk_assessment}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.route("/api/cost-reports/next-steps")
-def get_next_steps():
+@app.get("/api/cost-reports/next-steps")
+async def get_next_steps(request: Request):
     """Get recommended next steps for cost optimization"""
     try:
         next_steps = cost_reporter._generate_next_steps()
-        return jsonify({"status": "success", "next_steps": next_steps})
+        return {"status": "success", "next_steps": next_steps}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@socketio.on("connect")
-def handle_connect():
+@sio.on("connect")
+async def handle_connect():
     print("[+] Client Connected to Cloud-Reaper Engine")
 
 
-@socketio.on("start_log_stream")
-def handle_start_log_stream():
+@sio.on("start_log_stream")
+async def handle_start_log_stream():
     """Handle real-time log streaming with actual Cloud-Reaper logs."""
 
     import logging
@@ -3065,10 +3051,10 @@ def handle_start_log_stream():
 
     from reaper.services.log_streamer import fetch_azure_logs
 
-    socketio.emit("new_log", {"data": "🚀 Initializing Cloud-Reaper Log Stream..."})
-    socketio.sleep(0.2)
-    socketio.emit("new_log", {"data": "📡 Connecting to log sources..."})
-    socketio.sleep(0.2)
+    await sio.emit("new_log", {"data": "🚀 Initializing Cloud-Reaper Log Stream..."})
+    import asyncio; await asyncio.sleep(0.2)
+    await sio.emit("new_log", {"data": "📡 Connecting to log sources..."})
+    import asyncio; await asyncio.sleep(0.2)
 
     # Try to get actual Python application logs
     try:
@@ -3077,130 +3063,130 @@ def handle_start_log_stream():
 
         # Check if there are any handlers with logs
         if logger.handlers:
-            socketio.emit(
+            await sio.emit(
                 "new_log",
                 {
                     "data": f"✅ Connected to application logger - {len(logger.handlers)} handler(s) found"
                 },
             )
-            socketio.sleep(0.3)
+            import asyncio; await asyncio.sleep(0.3)
 
             # Try to get recent log records if available
             # Note: This is a simplified approach - in production you'd want a proper log aggregation system
-            socketio.emit("new_log", {"data": "📊 Application logger connection established"})
+            await sio.emit("new_log", {"data": "📊 Application logger connection established"})
         else:
-            socketio.emit("new_log", {"data": "⚠️  No application log handlers configured"})
-            socketio.sleep(0.3)
+            await sio.emit("new_log", {"data": "⚠️  No application log handlers configured"})
+            import asyncio; await asyncio.sleep(0.3)
     except Exception as e:
-        socketio.emit("new_log", {"data": f"❌ Application logger error: {e!s}"})
-        socketio.sleep(0.3)
+        await sio.emit("new_log", {"data": f"❌ Application logger error: {e!s}"})
+        import asyncio; await asyncio.sleep(0.3)
 
     # Try Azure logs
     try:
         azure_logs = fetch_azure_logs()
         if azure_logs and len(azure_logs) > 0:
-            socketio.emit(
+            await sio.emit(
                 "new_log",
                 {"data": f"✅ Connected to Azure Monitor - Found {len(azure_logs)} recent logs"},
             )
-            socketio.sleep(0.3)
+            import asyncio; await asyncio.sleep(0.3)
             for i, log in enumerate(azure_logs):
-                socketio.emit("new_log", {"data": f"[Azure #{i + 1}] {log!s}"})
+                await sio.emit("new_log", {"data": f"[Azure #{i + 1}] {log!s}"})
                 # pyrefly: ignore [bad-argument-type]
-                socketio.sleep(0.3)
+                import asyncio; await asyncio.sleep(0.3)
         else:
-            socketio.emit(
+            await sio.emit(
                 "new_log", {"data": "⚠️  No Azure logs found - workspace may not be configured"}
             )
-            socketio.sleep(0.3)
+            import asyncio; await asyncio.sleep(0.3)
     except Exception as e:
-        socketio.emit("new_log", {"data": f"❌ Azure logs error: {e!s}"})
-        socketio.sleep(0.3)
+        await sio.emit("new_log", {"data": f"❌ Azure logs error: {e!s}"})
+        import asyncio; await asyncio.sleep(0.3)
 
     # Stream actual Cloud-Reaper system information
-    socketio.emit("new_log", {"data": "🔄 Streaming Cloud-Reaper system information..."})
-    socketio.sleep(0.2)
+    await sio.emit("new_log", {"data": "🔄 Streaming Cloud-Reaper system information..."})
+    import asyncio; await asyncio.sleep(0.2)
 
     try:
         # Get actual system information
-        socketio.emit("new_log", {"data": f"💻 System: {platform.system()} {platform.release()}"})
-        socketio.sleep(0.1)
+        await sio.emit("new_log", {"data": f"💻 System: {platform.system()} {platform.release()}"})
+        import asyncio; await asyncio.sleep(0.1)
 
-        socketio.emit("new_log", {"data": f"🐍 Python: {platform.python_version()}"})
-        socketio.sleep(0.1)
+        await sio.emit("new_log", {"data": f"🐍 Python: {platform.python_version()}"})
+        import asyncio; await asyncio.sleep(0.1)
 
         # Check Azure connection status
         from reaper.collectors.utils.auth_check import check_azure_status
 
         azure_status = check_azure_status()
-        socketio.emit(
+        await sio.emit(
             "new_log", {"data": f"🔗 Azure Status: {azure_status.get('status', 'unknown')}"}
         )
-        socketio.sleep(0.2)
+        import asyncio; await asyncio.sleep(0.2)
 
         # Get subscription info if available
         sub_id = os.getenv("AZURE_SUBSCRIPTION_ID", "Not configured")
         if sub_id and len(sub_id) > 10:
-            socketio.emit("new_log", {"data": f"📋 Subscription: {sub_id[:8]}...{sub_id[-4:]}"})
+            await sio.emit("new_log", {"data": f"📋 Subscription: {sub_id[:8]}...{sub_id[-4:]}"})
         else:
-            socketio.emit("new_log", {"data": "⚠️  Subscription ID not configured"})
-        socketio.sleep(0.2)
+            await sio.emit("new_log", {"data": "⚠️  Subscription ID not configured"})
+        import asyncio; await asyncio.sleep(0.2)
 
     except Exception as e:
-        socketio.emit("new_log", {"data": f"❌ System info error: {e!s}"})
-        socketio.sleep(0.2)
+        await sio.emit("new_log", {"data": f"❌ System info error: {e!s}"})
+        import asyncio; await asyncio.sleep(0.2)
 
     # Stream actual collector information
     try:
-        socketio.emit("new_log", {"data": "🔍 Checking Cloud-Reaper collectors..."})
-        socketio.sleep(0.2)
+        await sio.emit("new_log", {"data": "🔍 Checking Cloud-Reaper collectors..."})
+        import asyncio; await asyncio.sleep(0.2)
 
         from reaper.collectors.providers.azure_collector import AzureCollector
 
         az = AzureCollector()
-        socketio.emit("new_log", {"data": "✅ AzureCollector initialized successfully"})
-        socketio.sleep(0.2)
+        await sio.emit("new_log", {"data": "✅ AzureCollector initialized successfully"})
+        import asyncio; await asyncio.sleep(0.2)
 
         # Try to get actual resource counts
         try:
             vms = list(az.compute.virtual_machines.list_all())
-            socketio.emit("new_log", {"data": f"🖥️  Virtual Machines found: {len(vms)}"})
-            socketio.sleep(0.2)
+            await sio.emit("new_log", {"data": f"🖥️  Virtual Machines found: {len(vms)}"})
+            import asyncio; await asyncio.sleep(0.2)
         except Exception as vm_error:
-            socketio.emit("new_log", {"data": f"⚠️  Could not fetch VMs: {vm_error!s}"})
-            socketio.sleep(0.2)
+            await sio.emit("new_log", {"data": f"⚠️  Could not fetch VMs: {vm_error!s}"})
+            import asyncio; await asyncio.sleep(0.2)
 
         try:
             disks = list(az.compute.disks.list())
-            socketio.emit("new_log", {"data": f"💾 Disks found: {len(disks)}"})
-            socketio.sleep(0.2)
+            await sio.emit("new_log", {"data": f"💾 Disks found: {len(disks)}"})
+            import asyncio; await asyncio.sleep(0.2)
         except Exception as disk_error:
-            socketio.emit("new_log", {"data": f"⚠️  Could not fetch disks: {disk_error!s}"})
-            socketio.sleep(0.2)
+            await sio.emit("new_log", {"data": f"⚠️  Could not fetch disks: {disk_error!s}"})
+            import asyncio; await asyncio.sleep(0.2)
 
     except Exception as collector_error:
-        socketio.emit("new_log", {"data": f"❌ Collector error: {collector_error!s}"})
-        socketio.sleep(0.2)
+        await sio.emit("new_log", {"data": f"❌ Collector error: {collector_error!s}"})
+        import asyncio; await asyncio.sleep(0.2)
 
     # Stream engine information if available
     try:
-        socketio.emit("new_log", {"data": "⚙️  Checking Cloud-Reaper engine status..."})
-        socketio.sleep(0.2)
+        await sio.emit("new_log", {"data": "⚙️  Checking Cloud-Reaper engine status..."})
+        import asyncio; await asyncio.sleep(0.2)
 
         binary_path = _reaper_engine_binary()
         if binary_path and binary_path.exists():
-            socketio.emit("new_log", {"data": f"✅ Go engine binary found at: {binary_path}"})
+            await sio.emit("new_log", {"data": f"✅ Go engine binary found at: {binary_path}"})
         else:
-            socketio.emit(
+            await sio.emit(
                 "new_log", {"data": "⚠️  Go engine binary not found - using Python engine"}
             )
-        socketio.sleep(0.2)
+        import asyncio; await asyncio.sleep(0.2)
 
     except Exception as engine_error:
-        socketio.emit("new_log", {"data": f"❌ Engine check error: {engine_error!s}"})
-        socketio.sleep(0.2)
+        await sio.emit("new_log", {"data": f"❌ Engine check error: {engine_error!s}"})
+        import asyncio; await asyncio.sleep(0.2)
 
-    socketio.emit(
+    await sio.emit(
         "new_log", {"data": "✅ Real-time log stream complete - System operating normally"}
     )
 

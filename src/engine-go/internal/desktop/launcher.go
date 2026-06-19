@@ -3,13 +3,16 @@
 package desktop
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	webview "github.com/webview/webview_go"
@@ -35,11 +38,15 @@ func Run() {
 	pythonExe := filepath.Join(runtimeDir, "python", "python.exe")
 	appScript := filepath.Join(runtimeDir, "src", "reaper", "web", "app.py")
 
+	ipcName := fmt.Sprintf("cloudreaper-ipc-%d.sock", time.Now().UnixNano())
+	ipcPath := filepath.Join(os.TempDir(), ipcName)
+
 	// Subprocess Management: Initialize background worker execution
 	cmd := exec.Command(pythonExe, appScript)
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("PORT=%d", port),
 		"PRODUCTION_DESKTOP_MODE=TRUE",
+		fmt.Sprintf("IPC_PATH=%s", ipcPath),
 	)
 
 	if err := cmd.Start(); err != nil {
@@ -51,6 +58,26 @@ func Run() {
 		if cmd.Process != nil {
 			_ = cmd.Process.Kill()
 			_ = cmd.Wait()
+		}
+		os.Remove(ipcPath)
+	}()
+
+	// Start Go Reverse Proxy to UDS
+	proxy := &httputil.ReverseProxy{
+		Director: func(req *http.Request) {
+			req.URL.Scheme = "http"
+			req.URL.Host = "python-backend"
+		},
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return net.Dial("unix", ipcPath)
+			},
+		},
+	}
+
+	go func() {
+		if err := http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", port), proxy); err != nil {
+			log.Fatalf("Fatal: Failed to start internal proxy: %v", err)
 		}
 	}()
 

@@ -463,7 +463,7 @@ def cmd_web(args: argparse.Namespace) -> int:
 
     try:
         subprocess.run(
-            [py_exe, "-m", "reaper.web.app"],
+            [py_exe, "-m", "uvicorn", "reaper.web.app_async:socket_app", "--host", env.get("FLASK_HOST", "0.0.0.0"), "--port", str(port)],
             cwd=str(REPO_ROOT),
             env=env,
             check=False,

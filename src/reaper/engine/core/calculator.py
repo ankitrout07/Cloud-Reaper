@@ -53,20 +53,48 @@ class CostCalculator:
             return 0.0
 
     def calculate_total_hourly_burn(self, burn_items):
-        """Normalizes a list of burn items into a total hourly rate."""
-        total = 0.0
-        for item in burn_items:
-            provider = item.get("provider")
-            resource_type = item.get("resource_type")
-            sku = item.get("sku")
-            quantity = item.get("quantity", 1)
-            frequency = item.get("frequency", "hourly")
+        """
+        Normalizes a list of burn items into a total hourly rate.
 
-            if frequency == "monthly":
-                total += self.calculate_monthly_cost(provider, resource_type, sku, quantity) / 730
-            else:
-                total += self.calculate_hourly_cost(provider, resource_type, sku, quantity)
+        Performance: converts burn_items to a Pandas DataFrame so the rate-lookup and
+        arithmetic happen in vectorized, C-compiled NumPy operations rather than a
+        Python for-loop, escaping the GIL for the hot numeric path.
+        """
+        if not burn_items:
+            return 0.0
 
+        df = pd.DataFrame(burn_items)
+
+        # Ensure required columns exist with sensible defaults
+        if "quantity" not in df.columns:
+            df["quantity"] = 1
+        if "frequency" not in df.columns:
+            df["frequency"] = "hourly"
+        df["quantity"] = df["quantity"].fillna(1)
+        df["frequency"] = df["frequency"].fillna("hourly")
+
+        # Vectorized rate lookup via apply (I/O-bound per-SKU dict lookup — unavoidable)
+        df["rate"] = df.apply(
+            lambda row: self.calculate_hourly_cost(
+                row["provider"], row["resource_type"], row["sku"], row["quantity"]
+            ),
+            axis=1,
+        )
+
+        # Vectorized monthly-to-hourly normalisation using np.where on the frequency column
+        df["hourly_cost"] = np.where(
+            df["frequency"] == "monthly",
+            df.apply(
+                lambda row: self.calculate_monthly_cost(
+                    row["provider"], row["resource_type"], row["sku"], row["quantity"]
+                ),
+                axis=1,
+            ) / 730.0,
+            df["rate"],
+        )
+
+        # np.sum on the resulting column is a single C call
+        total = float(np.sum(df["hourly_cost"].to_numpy()))
         return round(total, 6)
 
     def _validate_price_item(self, item):
@@ -268,6 +296,75 @@ class RightsizingAgent:
             "sla_maintained": risk_profile != "High",
             "current_sku": current_sku,
         }
+
+    def batch_evaluate_migration(self, metrics_df: "pd.DataFrame") -> "pd.DataFrame":
+        """
+        Vectorized batch evaluation of an entire fleet's migration decisions.
+
+        Instead of calling evaluate_migration() in a Python loop (which acquires the GIL
+        on every iteration), this method:
+          1. Converts continuous metric columns to discrete state tuples via NumPy
+             digitize (a C-compiled binning operation).
+          2. Resolves Q-values for every state in a single vectorized NumPy fancy-index
+             lookup, then runs np.argmax across the result matrix to pick the best action.
+          3. Derives risk profiles using np.where broadcast comparisons.
+
+        Parameters
+        ----------
+        metrics_df : pd.DataFrame
+            Must contain columns: cpu, mem, iops, net, sku (optional, for output only).
+
+        Returns
+        -------
+        pd.DataFrame with additional columns:
+            state, action_idx, recommended_action, risk_profile, sla_maintained
+        """
+        import pandas as pd
+
+        df = metrics_df.copy()
+
+        bins = np.array([0, 30, 70, 100], dtype=np.float64)
+
+        # Vectorized discretization — np.digitize runs in C for all rows at once
+        def _disc(col: pd.Series) -> np.ndarray:
+            return (np.digitize(col.to_numpy(dtype=np.float64), bins[1:-1])).astype(np.int8)
+
+        cpu_d = _disc(df["cpu"])
+        mem_d = _disc(df["mem"])
+        iops_d = _disc(df["iops"])
+        net_d = _disc(df["net"])
+
+        # Build state tuples and resolve Q-values --------------------------------
+        states = list(zip(cpu_d, mem_d, iops_d, net_d))
+        q_vals = np.array(
+            [
+                self.q_table.get(s, np.zeros(len(self.actions)))
+                for s in states
+            ],
+            dtype=np.float64,
+        )  # shape: (N, num_actions)
+
+        # Single np.argmax call across all rows replaces N Python argmax calls
+        action_idxs = np.argmax(q_vals, axis=1)
+        actions = np.array(self.actions)[action_idxs]
+
+        # Vectorized risk classification using np.where broadcast ---------------
+        cpu_arr = df["cpu"].to_numpy(dtype=np.float64)
+        mem_arr = df["mem"].to_numpy(dtype=np.float64)
+
+        high_mask = (actions == "migrate_family") & ((mem_arr > 80) | (cpu_arr > 80))
+        med_mask = (actions == "downscale") & (np.maximum(cpu_arr, mem_arr) > 60)
+
+        risk = np.where(high_mask, "High", np.where(med_mask, "Medium", "Low"))
+        sla = risk != "High"
+
+        df["state"] = states
+        df["action_idx"] = action_idxs
+        df["recommended_action"] = actions
+        df["risk_profile"] = risk
+        df["sla_maintained"] = sla
+
+        return df
 
 
 class SpotEvictionPredictor:

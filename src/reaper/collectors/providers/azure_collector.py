@@ -1,3 +1,4 @@
+from __future__ import annotations
 import datetime
 import json
 import os
@@ -179,7 +180,7 @@ class AzureCollector:
         if not vms:
             return []
 
-        end_time = datetime.datetime.now(datetime.UTC)
+        end_time = datetime.datetime.now(timezone.utc)
         start_time = end_time - datetime.timedelta(days=7)
         timespan = (
             f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
@@ -417,7 +418,7 @@ class AzureCollector:
             return default
 
         scope = f"/subscriptions/{self.subscription_id}"
-        end_date = datetime.datetime.now(datetime.UTC)
+        end_date = datetime.datetime.now(timezone.utc)
         start_date = end_date - datetime.timedelta(days=30)
 
         from azure.mgmt.costmanagement.models import (
@@ -543,7 +544,7 @@ class AzureCollector:
             f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
             f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
         )
-        end_time = datetime.datetime.now(datetime.UTC)
+        end_time = datetime.datetime.now(timezone.utc)
         start_time = end_time - datetime.timedelta(hours=24)
         span = (
             f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
@@ -744,7 +745,7 @@ class AzureCollector:
         """Identify 'zombie' VMs based on age and lack of activity (CPU < 1% for 7 days)."""
         vms = self.compute.virtual_machines.list_all()
         zombies = []
-        end_time = datetime.datetime.now(datetime.UTC)
+        end_time = datetime.datetime.now(timezone.utc)
         start_time = end_time - datetime.timedelta(days=7)
 
         for vm in vms:
@@ -790,7 +791,7 @@ class AzureCollector:
         except Exception:
             return []
 
-        end_time = datetime.datetime.now(datetime.UTC)
+        end_time = datetime.datetime.now(timezone.utc)
         start_time = end_time - datetime.timedelta(days=1)
         timespan = (
             f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
@@ -833,7 +834,7 @@ class AzureCollector:
             return []
 
         scope = f"/subscriptions/{self.subscription_id}"
-        end_date = datetime.datetime.now(datetime.UTC)
+        end_date = datetime.datetime.now(timezone.utc)
         start_date = end_date - datetime.timedelta(days=30)
 
         from azure.mgmt.costmanagement.models import (
@@ -1036,7 +1037,7 @@ class AzureCollector:
                             "severity": "HIGH",
                             "rule": "Tagging Compliance",
                             "action": "FLAGGED",
-                            "detected_at": datetime.datetime.now(datetime.UTC).strftime(
+                            "detected_at": datetime.datetime.now(timezone.utc).strftime(
                                 "%Y-%m-%d %H:%M:%S"
                             ),
                         }
@@ -1155,7 +1156,7 @@ class AzureCollector:
 
     def get_burn_rate_forecast(self):
         """Calculates burn rate and EOM forecast using real Azure Cost data and ARIMA."""
-        now = datetime.datetime.now(datetime.UTC)
+        now = datetime.datetime.now(timezone.utc)
         spend_data = []
 
         # Check in-memory cache first to avoid rate-limiting (429)
@@ -1165,7 +1166,7 @@ class AzureCollector:
 
         if not spend_data and self.cost_management:
             scope = f"/subscriptions/{self.subscription_id}"
-            end_date = datetime.datetime.now(datetime.UTC)
+            end_date = datetime.datetime.now(timezone.utc)
             start_date = end_date - datetime.timedelta(days=30)
 
             from azure.mgmt.costmanagement.models import (
