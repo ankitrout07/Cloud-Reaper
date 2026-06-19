@@ -1,6 +1,7 @@
 # === Core Web Framework ===
 flask==3.0.0
 flask-socketio
+flask-compress
 gevent
 weasyprint
 

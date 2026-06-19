@@ -465,12 +465,7 @@ window.applyWhatIfPolicy = async () => {
 };
 
 // --- Dashboard (index.html) ---
-window.toggleConsole = () => {
-    const consoleEl = document.getElementById('engine-console');
-    if (consoleEl) {
-        consoleEl.classList.toggle('hidden');
-    }
-};
+// Note: toggleConsole is now defined in theme.js to handle the new terminal interface
 
 window.runScan = async () => {
     const scanBtn = document.getElementById('scanBtn');

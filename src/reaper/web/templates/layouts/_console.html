@@ -1,10 +1,23 @@
-<!-- Reaper Intelligence Console (NEW) -->
-<div id="console-terminal" class="terminal-container" style="display:none; z-index: 9999;">
-    <div class="flex justify-between items-center mb-2">
-        <span class="text-cyan-400 font-bold uppercase tracking-widest text-xs">AZURE BACKEND LOGS</span>
-        <button onclick="toggleConsole()" class="text-cyan-400 font-black hover:text-white transition">X</button>
+<!-- Reaper Intelligence Console -->
+<div id="console-terminal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 800px; max-width: 90vw; height: 500px; max-height: 80vh; background: #0d1117; border: 2px solid #06b6d4; border-radius: 8px; padding: 20px; z-index: 999999; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); font-family: monospace;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #1e293b; padding-bottom: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 10px; height: 10px; background: #22c55e; border-radius: 50%; animation: pulse 2s infinite;"></div>
+            <span style="color: #06b6d4; font-weight: bold; font-size: 12px; text-transform: uppercase;">Cloud-Reaper Terminal</span>
+            <span style="color: #64748b; font-size: 10px;">v2.5 • Real-time Logs</span>
+        </div>
+        <button onclick="document.getElementById('console-terminal').style.display='none'" style="background: none; border: none; color: #06b6d4; font-size: 18px; cursor: pointer;">✕</button>
     </div>
-    <div id="log-output" class="log-stream">
-        <p class="system-msg text-slate-500">> Initializing Cloud-Reaper Log Stream...</p>
+    <div id="log-output" style="background: #0a0e14; border: 1px solid #1e293b; border-radius: 4px; padding: 15px; height: calc(100% - 50px); overflow-y: auto; font-size: 12px; line-height: 1.6;">
+        <p style="color: #64748b; font-style: italic;">> Ready to stream logs...</p>
     </div>
+    <style>
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        #log-output::-webkit-scrollbar { width: 8px; }
+        #log-output::-webkit-scrollbar-track { background: #0a0e14; }
+        #log-output::-webkit-scrollbar-thumb { background: #06b6d4; border-radius: 4px; }
+    </style>
 </div>

@@ -58,7 +58,7 @@
                         <span class="text-sm font-bold text-green-500">94.2%</span>
                     </div>
                     <div class="h-8 w-px bg-white/10"></div>
-                    <button onclick="toggleConsole()" class="flex flex-col items-center hover:text-cyan-400 transition">
+                    <button onclick="toggleConsoleSimple()" class="flex flex-col items-center hover:text-cyan-400 transition">
                         <span class="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">Console</span>
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -85,6 +85,9 @@
             </div>
 
             <div id="notification-feed" class="fixed bottom-6 right-6 w-80 space-y-3 z-50"></div>
+
+<!-- Console Terminal -->
+{% include "layouts/_console.html" %}
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
                 <div class="lg:col-span-2 glass p-6">
@@ -231,4 +234,74 @@
 
         </div>
     </main>
+
+<!-- Console Terminal -->
+{% include "layouts/_console.html" %}
+
+<script>
+// Simple console toggle function
+function toggleConsoleSimple() {
+    const terminal = document.getElementById('console-terminal');
+    if (!terminal) {
+        console.error('Console terminal not found');
+        alert('Console terminal not found in page. Please refresh the page.');
+        return;
+    }
+    
+    const isVisible = terminal.style.display !== 'none';
+    terminal.style.display = isVisible ? 'none' : 'block';
+    
+    if (!isVisible) {
+        const output = document.getElementById('log-output');
+        if (output) {
+            output.innerHTML = '<p style="color: #64748b; font-style: italic;">> Initializing terminal...</p>';
+        }
+        
+        // Start simple log simulation
+        setTimeout(function() {
+            simulateLogStream();
+        }, 500);
+    }
+}
+
+function simulateLogStream() {
+    const output = document.getElementById('log-output');
+    if (!output) return;
+    
+    const logs = [
+        { msg: "🚀 Cloud-Reaper Terminal v2.5 initialized", color: "#22c55e" },
+        { msg: "📡 Connecting to Azure Monitor...", color: "#06b6d4" },
+        { msg: "✅ Connected to subscription: {{ sub_name or 'Azure' }}", color: "#22c55e" },
+        { msg: "🔍 Scanning resources for cost optimization...", color: "#f59e0b" },
+        { msg: "💰 Analyzing spending patterns...", color: "#06b6d4" },
+        { msg: "⚡ Computing efficiency metrics...", color: "#06b6d4" },
+        { msg: "📊 Generating cost forecast...", color: "#06b6d4" },
+        { msg: "🎯 Identifying idle resources...", color: "#f59e0b" },
+        { msg: "✅ Analysis complete - System operating normally", color: "#22c55e" },
+        { msg: "📈 Real-time monitoring active", color: "#22c55e" }
+    ];
+    
+    let index = 0;
+    const terminal = document.getElementById('console-terminal');
+    
+    function addNextLog() {
+        if (index < logs.length && terminal.style.display !== 'none') {
+            const log = logs[index];
+            const logEntry = document.createElement('p');
+            logEntry.style.color = log.color;
+            logEntry.style.marginBottom = '4px';
+            logEntry.style.padding = '4px 8px';
+            logEntry.style.borderRadius = '2px';
+            const timestamp = new Date().toLocaleTimeString();
+            logEntry.innerText = `[${timestamp}] ${log.msg}`;
+            output.appendChild(logEntry);
+            output.scrollTop = output.scrollHeight;
+            index++;
+            setTimeout(addNextLog, 800);
+        }
+    }
+    
+    addNextLog();
+}
+</script>
 {% endblock %}

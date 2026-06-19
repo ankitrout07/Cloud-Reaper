@@ -35,13 +35,19 @@ if not DATABASE_URL:
 
 # Configure engine with connection pooling for better performance
 engine_config = (
-    {"connect_args": {"check_same_thread": False}}
+    {
+        "connect_args": {"check_same_thread": False},
+        "pool_pre_ping": True,  # Verify connections before using
+        "echo": False,  # Disable SQL logging for performance
+    }
     if "sqlite" in DATABASE_URL
     else {
-        "pool_size": 10,
-        "max_overflow": 20,
+        "pool_size": 20,  # Increased pool size for better concurrency
+        "max_overflow": 30,  # Increased max overflow for peak loads
         "pool_pre_ping": True,  # Verify connections before using
-        "pool_recycle": 3600,  # Recycle connections after 1 hour
+        "pool_recycle": 1800,  # Recycle connections after 30 minutes
+        "pool_timeout": 30,  # Timeout for getting connection from pool
+        "echo": False,  # Disable SQL logging for performance
     }
 )
 

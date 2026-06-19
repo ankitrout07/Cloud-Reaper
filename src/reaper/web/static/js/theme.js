@@ -358,40 +358,65 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
                     return;
                 }
                 const c = body.charts;
+                
+                // Parallel chart updates for better performance
+                const updates = [];
+                
                 if (state.burnChart && c.cost_vs_budget) {
-                    state.burnChart.data.labels = c.cost_vs_budget.labels || [];
-                    state.burnChart.data.datasets[0].data = c.cost_vs_budget.cumulative_spend || [];
-                    state.burnChart.data.datasets[1].data = c.cost_vs_budget.budget_pace || [];
-                    state.burnChart.update('none');
+                    updates.push(Promise.resolve().then(() => {
+                        state.burnChart.data.labels = c.cost_vs_budget.labels || [];
+                        state.burnChart.data.datasets[0].data = c.cost_vs_budget.cumulative_spend || [];
+                        state.burnChart.data.datasets[1].data = c.cost_vs_budget.budget_pace || [];
+                        state.burnChart.update('none');
+                    }));
                 }
                 if (state.serviceChart && c.services) {
-                    state.serviceChart.data.labels = c.services.labels || [];
-                    state.serviceChart.data.datasets[0].data = c.services.data || [];
-                    state.serviceChart.update('none');
+                    updates.push(Promise.resolve().then(() => {
+                        state.serviceChart.data.labels = c.services.labels || [];
+                        state.serviceChart.data.datasets[0].data = c.services.data || [];
+                        state.serviceChart.update('none');
+                    }));
                 }
                 if (state.familyChart && c.families) {
-                    state.familyChart.data.labels = c.families.labels || [];
-                    state.familyChart.data.datasets[0].data = c.families.cpu || [];
-                    state.familyChart.data.datasets[1].data = c.families.memory_gib || [];
-                    state.familyChart.update('none');
+                    updates.push(Promise.resolve().then(() => {
+                        state.familyChart.data.labels = c.families.labels || [];
+                        state.familyChart.data.datasets[0].data = c.families.cpu || [];
+                        state.familyChart.data.datasets[1].data = c.families.memory_gib || [];
+                        state.familyChart.update('none');
+                    }));
                 }
                 if (state.heatmapChart && c.hourly_cpu) {
-                    const vals = c.hourly_cpu.values || [];
-                    state.heatmapChart.data.labels = c.hourly_cpu.labels || [];
-                    state.heatmapChart.data.datasets[0].data = vals;
-                    state.heatmapChart.data.datasets[0].backgroundColor = heatColors(vals);
-                    state.heatmapChart.update('none');
+                    updates.push(Promise.resolve().then(() => {
+                        const vals = c.hourly_cpu.values || [];
+                        state.heatmapChart.data.labels = c.hourly_cpu.labels || [];
+                        state.heatmapChart.data.datasets[0].data = vals;
+                        state.heatmapChart.data.datasets[0].backgroundColor = heatColors(vals);
+                        state.heatmapChart.update('none');
+                    }));
                 }
+                
+                // Execute all updates in parallel
+                await Promise.all(updates);
             } catch (e) {
                 console.warn('[reaper] finops charts refresh failed', e);
             }
         }
 
-        refresh();
-        setInterval(refresh, 90000);
+        // Delay initial refresh to not block page render
+        setTimeout(() => {
+            refresh();
+            setInterval(refresh, 90000);
+        }, 300);
     }
 
-    window.addEventListener('load', function () {
+    // Use DOMContentLoaded instead of load for faster initialization
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDashboardCharts);
+    } else {
+        initDashboardCharts();
+    }
+
+    function initDashboardCharts() {
         if (typeof Chart === 'undefined') {
             return;
         }
@@ -426,41 +451,115 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
             }
 
             hookMetricSocket(state);
-            initFinopsDashboardCharts(state);
+            
+            // Lazy load finops charts with intersection observer
+            if (document.getElementById('burnAreaChart')) {
+                initFinopsDashboardChartsLazy(state);
+            }
         } catch (error) {
             console.warn("Telemetry Canvas stream initialization deferred safely: ", error);
         }
-    });
+    }
+
+    function initFinopsDashboardChartsLazy(state) {
+        // Use IntersectionObserver for lazy loading charts when they come into viewport
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        initFinopsDashboardCharts(state);
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { rootMargin: '50px' });
+
+            // Observe the dashboard container
+            const dashboardContainer = document.querySelector('.app-main');
+            if (dashboardContainer) {
+                observer.observe(dashboardContainer);
+            } else {
+                // Fallback: initialize after a short delay
+                setTimeout(() => initFinopsDashboardCharts(state), 100);
+            }
+        } else {
+            // Fallback for browsers without IntersectionObserver
+            setTimeout(() => initFinopsDashboardCharts(state), 200);
+        }
+    }
 })();
 
 // === Global Console Terminal Functions ===
 
 (function() {
-    const sock = window.__reaperEnsureSocket ? window.__reaperEnsureSocket() : null;
-    if (sock && !window.__reaperConsoleHooked) {
-        window.__reaperConsoleHooked = true;
-        sock.on('new_log', function (msg) {
-            const output = document.getElementById('log-output');
-            if (!output) return;
-            const logEntry = document.createElement('p');
-            logEntry.className = 'log-line text-cyan-200';
-            logEntry.innerText = `[${new Date().toLocaleTimeString()}] ${msg.data}`;
-            output.appendChild(logEntry);
-            output.scrollTop = output.scrollHeight;
-        });
+    // Set up console log listener when socket is available
+    function setupConsoleListener() {
+        const sock = window.__reaperEnsureSocket ? window.__reaperEnsureSocket() : null;
+        if (sock && !window.__reaperConsoleHooked) {
+            window.__reaperConsoleHooked = true;
+            sock.on('new_log', function (msg) {
+                const output = document.getElementById('log-output');
+                if (!output) return;
+                
+                const logEntry = document.createElement('p');
+                
+                // Color-code based on log content
+                let colorClass = 'text-cyan-200';
+                if (msg.data.includes('❌') || msg.data.includes('error')) {
+                    colorClass = 'text-red-400';
+                } else if (msg.data.includes('✅') || msg.data.includes('success')) {
+                    colorClass = 'text-green-400';
+                } else if (msg.data.includes('⚠️') || msg.data.includes('warning')) {
+                    colorClass = 'text-yellow-400';
+                }
+                
+                logEntry.className = `log-line ${colorClass}`;
+                logEntry.innerText = `[${new Date().toLocaleTimeString()}] ${msg.data}`;
+                output.appendChild(logEntry);
+                output.scrollTop = output.scrollHeight;
+            });
+        }
+    }
+    
+    // Try to set up immediately
+    setupConsoleListener();
+    
+    // Also set up when DOM is loaded in case socket isn't ready yet
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupConsoleListener);
     }
 })();
 
 window.startLogStream = function() {
     const sock = window.__reaperEnsureSocket ? window.__reaperEnsureSocket() : null;
-    if (sock) {
-        sock.emit('start_log_stream');
+    const output = document.getElementById('log-output');
+    
+    if (!sock) {
+        if (output) {
+            const errorEntry = document.createElement('p');
+            errorEntry.className = 'log-line text-red-400';
+            errorEntry.innerText = '❌ WebSocket connection not available. Please refresh the page.';
+            output.appendChild(errorEntry);
+        }
+        console.error('WebSocket connection not available for log streaming');
+        return;
     }
+    
+    if (output) {
+        const statusEntry = document.createElement('p');
+        statusEntry.className = 'log-line system-msg';
+        statusEntry.innerText = '> Connecting to log stream...';
+        output.appendChild(statusEntry);
+    }
+    
+    sock.emit('start_log_stream');
 };
 
 window.toggleConsole = function(forceOpen = false) {
     const terminal = document.getElementById('console-terminal');
-    if (!terminal) return;
+    if (!terminal) {
+        console.error('Console terminal element not found');
+        return;
+    }
     
     if (forceOpen) {
         terminal.style.display = 'block';
@@ -470,8 +569,13 @@ window.toggleConsole = function(forceOpen = false) {
 
     if (terminal.style.display === 'block') {
         const output = document.getElementById('log-output');
-        if (output) output.innerHTML = ''; // Clear previous logs
-        window.startLogStream();
+        if (output) {
+            output.innerHTML = '<p class="log-line system-msg">> Initializing terminal...</p>';
+        }
+        // Small delay to ensure DOM is ready before starting log stream
+        setTimeout(() => {
+            window.startLogStream();
+        }, 100);
     }
 };
 

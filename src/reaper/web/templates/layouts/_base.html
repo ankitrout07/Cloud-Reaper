@@ -5,6 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cloud Reaper</title>
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/static/css/professional-theme.css" as="style">
+    <link rel="preload" href="/static/css/main.css" as="style">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    
+    {% block head %}{% endblock %}
+    
     <!-- Professional Theme CSS -->
     <link rel="stylesheet" href="/static/css/professional-theme.css">
     <link rel="stylesheet" href="/static/css/components.css">
@@ -13,23 +22,11 @@
     <!-- Legacy CSS support -->
     <link rel="stylesheet" href="/static/css/main.css">
     <link rel="stylesheet" href="/static/css/professional-dark.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" media="print" onload="this.media='all'">
     <!-- Highlight.js for code syntax highlighting -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/static/js/theme.js"></script>
-    <script src="/static/js/setup.js"></script>
-    <script src="/static/js/ui-interactions.js"></script>
-    <script src="/static/js/cloud-providers.js"></script>
-    <script src="/static/js/vault.js"></script>
-    <script src="/static/js/docs.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Marked library for rendering markdown docs -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- HTMX for SPA -->
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
     <style>
         body {
             font-family: 'Outfit', sans-serif;
@@ -50,6 +47,90 @@
             letter-spacing: 1px;
         }
     </style>
+    
+    <!-- Critical inline CSS for above-the-fold content -->
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .terminal-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px;
+            max-width: 90vw;
+            height: 500px;
+            max-height: 80vh;
+            background: rgba(13, 17, 23, 0.95);
+            border: 1px solid rgba(34, 211, 238, 0.3);
+            border-radius: 8px;
+            padding: 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .log-stream {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(34, 211, 238, 0.1);
+            border-radius: 4px;
+            padding: 12px;
+            height: calc(100% - 40px);
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            line-height: 1.6;
+        }
+
+        .log-stream::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-stream::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        .log-stream::-webkit-scrollbar-thumb {
+            background: rgba(34, 211, 238, 0.3);
+            border-radius: 4px;
+        }
+
+        .log-stream::-webkit-scrollbar-thumb:hover {
+            background: rgba(34, 211, 238, 0.5);
+        }
+
+        .log-line {
+            margin-bottom: 4px;
+            padding: 4px 8px;
+            border-radius: 2px;
+        }
+
+        .log-line:hover {
+            background: rgba(34, 211, 238, 0.1);
+        }
+
+        .system-msg {
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .text-cyan-200 {
+            color: #a5f3fc;
+        }
+
+        .text-red-400 {
+            color: #f87171;
+        }
+
+        .text-green-400 {
+            color: #4ade80;
+        }
+
+        .text-yellow-400 {
+            color: #facc15;
+        }
+    </style>
 </head>
 <body class="flex">
     <!-- Sidebar Navigation -->
@@ -59,6 +140,31 @@
     <div id="main-content" class="flex-1 w-full h-full relative transition-all fade-in">
         {% block content %}{% endblock %}
     </div>
+
+    <!-- Load scripts at the end for better performance -->
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- HTMX for SPA -->
+    <script src="https://unpkg.com/htmx.org@1.9.10" defer></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    
+    <!-- Highlight.js for code syntax highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+    
+    <!-- Marked library for rendering markdown docs -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+    
+    <!-- Application scripts with defer for non-blocking load -->
+    <script src="/static/js/theme.js" defer></script>
+    <script src="/static/js/setup.js" defer></script>
+    <script src="/static/js/ui-interactions.js" defer></script>
+    <script src="/static/js/cloud-providers.js" defer></script>
+    <script src="/static/js/vault.js" defer></script>
+    <script src="/static/js/docs.js" defer></script>
+    <script src="/static/js/cost-optimization.js" defer></script>
 
     <!-- SPA Re-init script -->
     <script>
