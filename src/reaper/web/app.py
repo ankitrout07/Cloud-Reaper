@@ -182,7 +182,9 @@ def background_metrics_worker():
                 # Exponential backoff for consecutive errors
                 if error_count >= max_errors:
                     backoff_time = min(backoff_time * 2, max_backoff)
-                    print(f"[!] Too many consecutive errors, backing off for {backoff_time} seconds")
+                    print(
+                        f"[!] Too many consecutive errors, backing off for {backoff_time} seconds"
+                    )
                     error_count = 0
 
             if cpu_usage is not None:
@@ -274,28 +276,28 @@ def _get_cached_user_info() -> tuple[str, str]:
     """Get cached user/subscription info with 5-minute TTL to avoid blocking Azure API calls."""
     cache_key_prefix = "azure_user_info"
     cache_ttl = 300  # 5 minutes
-    
+
     # Check session cache first
     user_name = session.get(f"{cache_key_prefix}_user")
     sub_name = session.get(f"{cache_key_prefix}_sub")
     timestamp = session.get(f"{cache_key_prefix}_timestamp")
-    
+
     # Return cached data if valid
     if user_name and sub_name and timestamp:
         if time.time() - float(timestamp) < cache_ttl:
             return user_name, sub_name
-    
+
     # Fetch fresh data and cache it
     try:
         az = AzureCollector()
         user_name = az.get_user_name()
         sub_name = az.get_subscription_name()
-        
+
         # Cache in session
         session[f"{cache_key_prefix}_user"] = user_name
         session[f"{cache_key_prefix}_sub"] = sub_name
         session[f"{cache_key_prefix}_timestamp"] = str(time.time())
-        
+
         return user_name, sub_name
     except Exception as e:
         print(f"[!] Error fetching user info: {e}")
@@ -1513,28 +1515,28 @@ def api_dashboard_finops_charts():
     """HTTP snapshot for heavier FinOps charts (refreshed periodically from the client)."""
     if is_first_run():
         return jsonify({"status": "unconfigured", "charts": None}), 200
-    
+
     cache_key = "finops_charts_data"
     cache_ttl = 60  # 60 seconds cache for chart data
-    
+
     # Check session cache first
     cached_charts = session.get(cache_key)
     cached_timestamp = session.get(f"{cache_key}_timestamp")
-    
+
     # Return cached data if valid
     if cached_charts and cached_timestamp:
         if time.time() - float(cached_timestamp) < cache_ttl:
             return jsonify({"status": "ok", "charts": cached_charts, "cached": True})
-    
+
     try:
         az = AzureCollector()
         budget = float(settings_state.get("budget_threshold", 1000.0))
         charts = az.get_finops_dashboard_snapshot(monthly_budget=budget)
-        
+
         # Cache in session
         session[cache_key] = charts
         session[f"{cache_key}_timestamp"] = str(time.time())
-        
+
         return jsonify({"status": "ok", "charts": charts, "cached": False})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "charts": None}), 500
@@ -1542,14 +1544,17 @@ def api_dashboard_finops_charts():
 
 def cache_response(max_age=300):
     """Decorator to add cache headers to responses."""
+
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             response = f(*args, **kwargs)
-            if hasattr(response, 'headers'):
-                response.headers['Cache-Control'] = f'public, max-age={max_age}'
+            if hasattr(response, "headers"):
+                response.headers["Cache-Control"] = f"public, max-age={max_age}"
             return response
+
         return decorated_function
+
     return decorator
 
 
@@ -2884,7 +2889,7 @@ def handle_connect():
 def handle_start_log_stream():
     """Handle real-time log streaming with fallback to system logs."""
     import time
-    import logging
+
     from reaper.services.log_streamer import fetch_azure_logs
 
     socketio.emit("new_log", {"data": "🚀 Initializing Cloud-Reaper Log Stream..."})
@@ -2896,23 +2901,26 @@ def handle_start_log_stream():
     try:
         azure_logs = fetch_azure_logs()
         if azure_logs and len(azure_logs) > 0:
-            socketio.emit("new_log", {"data": f"✅ Connected to Azure Monitor - Found {len(azure_logs)} recent logs"})
+            socketio.emit(
+                "new_log",
+                {"data": f"✅ Connected to Azure Monitor - Found {len(azure_logs)} recent logs"},
+            )
             socketio.sleep(0.3)
             for i, log in enumerate(azure_logs):
-                socketio.emit("new_log", {"data": f"[Azure #{i+1}] {log}"})
+                socketio.emit("new_log", {"data": f"[Azure #{i + 1}] {log}"})
                 # pyrefly: ignore [bad-argument-type]
                 socketio.sleep(0.3)
         else:
             socketio.emit("new_log", {"data": "⚠️  No Azure logs found or workspace not configured"})
             socketio.sleep(0.3)
     except Exception as e:
-        socketio.emit("new_log", {"data": f"❌ Azure logs error: {str(e)}"})
+        socketio.emit("new_log", {"data": f"❌ Azure logs error: {e!s}"})
         socketio.sleep(0.3)
 
     # Fallback to system logs
     socketio.emit("new_log", {"data": "🔄 Switching to system log streaming..."})
     socketio.sleep(0.2)
-    
+
     # Stream some simulated system logs for demonstration
     system_logs = [
         "🔍 Scanning Azure subscription for cost anomalies...",
@@ -2924,15 +2932,15 @@ def handle_start_log_stream():
         "📈 Processing real-time telemetry data...",
         "🌐 Monitoring network bandwidth usage...",
         "💾 Evaluating storage tier optimization...",
-        "🚀 Finalizing analysis report..."
+        "🚀 Finalizing analysis report...",
     ]
-    
+
     for i, log in enumerate(system_logs):
         timestamp = time.strftime("%H:%M:%S")
         socketio.emit("new_log", {"data": f"[{timestamp}] {log}"})
         # pyrefly: ignore [bad-argument-type]
         socketio.sleep(0.5)
-    
+
     socketio.emit("new_log", {"data": "✅ Log stream complete. System operating normally."})
 
 
