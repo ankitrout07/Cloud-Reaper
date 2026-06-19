@@ -1802,8 +1802,12 @@ def refresh_prices():
     provider = (request.json or {}).get("provider") if request.is_json else None
     providers = [provider] if provider else ["azure", "aws", "gcp"]
     for prov in providers:
-        threading.Thread(target=warm_catalog, args=(prov,), kwargs={"force": True}, daemon=True).start()
-    return jsonify({"status": "success", "message": "Price catalog refresh started", "providers": providers})
+        threading.Thread(
+            target=warm_catalog, args=(prov,), kwargs={"force": True}, daemon=True
+        ).start()
+    return jsonify(
+        {"status": "success", "message": "Price catalog refresh started", "providers": providers}
+    )
 
 
 @app.route("/api/export/bom", methods=["POST"])

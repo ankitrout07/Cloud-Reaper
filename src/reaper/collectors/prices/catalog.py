@@ -15,7 +15,7 @@ PROVIDERS = ("azure", "aws", "gcp")
 _CATALOG_CACHE: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 _CACHE_LOCK = threading.Lock()
 _FETCH_LOCKS: dict[str, threading.Lock] = {}
-_WARM_STATUS: dict[str, str] = {p: "idle" for p in PROVIDERS}
+_WARM_STATUS: dict[str, str] = dict.fromkeys(PROVIDERS, "idle")
 _WARM_META: dict[str, dict[str, Any]] = {}
 
 
@@ -35,12 +35,7 @@ def normalize_price_record(raw: dict[str, Any], provider: str) -> dict[str, Any]
         return None
 
     region = raw.get("region") or raw.get("armRegionName") or raw.get("location") or "global"
-    service = (
-        raw.get("service")
-        or raw.get("serviceName")
-        or raw.get("product_name")
-        or "Compute"
-    )
+    service = raw.get("service") or raw.get("serviceName") or raw.get("product_name") or "Compute"
 
     price = raw.get("price") or raw.get("retailPrice") or raw.get("rate") or raw.get("hourly_price")
     if price is None:
@@ -58,12 +53,7 @@ def normalize_price_record(raw: dict[str, Any], provider: str) -> dict[str, Any]
     if "Month" in unit:
         hourly = hourly / 730
 
-    description = (
-        raw.get("description")
-        or raw.get("productName")
-        or raw.get("meterName")
-        or ""
-    )
+    description = raw.get("description") or raw.get("productName") or raw.get("meterName") or ""
 
     return {
         "sku": sku,
@@ -190,7 +180,9 @@ def warm_catalog(provider: str, *, force: bool = False) -> None:
 def warm_all_catalogs(*, force: bool = False) -> None:
     """Warm all provider catalogs in parallel (GCP finishes first)."""
     threads = [
-        threading.Thread(target=warm_catalog, args=(provider,), kwargs={"force": force}, daemon=True)
+        threading.Thread(
+            target=warm_catalog, args=(provider,), kwargs={"force": force}, daemon=True
+        )
         for provider in ("gcp", "aws", "azure")
     ]
     for thread in threads:
@@ -236,8 +228,7 @@ def lookup_price(provider: str, sku: str, region: str) -> float | None:
     if provider == "azure":
         client = AzurePriceClient()
         query = (
-            f"armSkuName eq '{sku}' and armRegionName eq '{region}' "
-            "and priceType eq 'Consumption'"
+            f"armSkuName eq '{sku}' and armRegionName eq '{region}' and priceType eq 'Consumption'"
         )
         results = client.get_prices(filter_query=query, max_pages=1)
         if not results:
