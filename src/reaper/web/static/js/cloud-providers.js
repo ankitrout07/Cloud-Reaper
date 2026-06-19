@@ -244,9 +244,10 @@ window.connectWizardProvider = async () => {
     }
     
     const btn = document.getElementById('connect-provider-btn');
+    const originalBtnText = btn.innerHTML;
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Connecting...';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Validating credentials...';
     }
     
     try {
@@ -290,6 +291,13 @@ window.connectWizardProvider = async () => {
             }
         }
         
+        // Add connection log entry to show progress
+        const logPanel = document.getElementById('setup-scan-log');
+        if (logPanel) {
+            logPanel.innerHTML += `<p class="text-cyan-400">> Validating ${selectedWizardProvider.toUpperCase()} credentials...</p>`;
+            logPanel.scrollTop = logPanel.scrollHeight;
+        }
+        
         const response = await fetch('/api/settings/connect-cloud', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -303,12 +311,30 @@ window.connectWizardProvider = async () => {
         const data = await response.json();
         
         if (data.status === 'success') {
+            if (logPanel) {
+                logPanel.innerHTML += `<p class="text-green-400">> ${data.message}</p>`;
+                logPanel.scrollTop = logPanel.scrollHeight;
+            }
+            
             if (typeof showToast === "function") {
                 showToast(data.message, "success");
             }
+            
+            // Enable finish button
+            const finishBtn = document.getElementById('finish-btn');
+            if (finishBtn) {
+                finishBtn.disabled = false;
+                finishBtn.classList.remove('bg-gray-700', 'text-gray-500', 'cursor-not-allowed');
+                finishBtn.classList.add('bg-cyan-500', 'text-white', 'cursor-pointer');
+            }
+            
             // Move to step 3
             wizardNext(3);
         } else {
+            if (logPanel) {
+                logPanel.innerHTML += `<p class="text-red-400">> Connection failed: ${data.message}</p>`;
+                logPanel.scrollTop = logPanel.scrollHeight;
+            }
             throw new Error(data.message || 'Connection failed');
         }
     } catch (error) {
@@ -318,16 +344,23 @@ window.connectWizardProvider = async () => {
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = 'Connect & Activate';
+            btn.innerHTML = originalBtnText;
         }
     }
 };
 
 window.completeSetup = () => {
+    const logPanel = document.getElementById('setup-scan-log');
+    if (logPanel) {
+        logPanel.innerHTML += `<p class="text-green-400">> Setup completed successfully!</p>`;
+        logPanel.innerHTML += `<p class="text-cyan-400">> Redirecting to dashboard...</p>`;
+        logPanel.scrollTop = logPanel.scrollHeight;
+    }
+    
     if (typeof showToast === "function") {
         showToast("Setup complete! Redirecting to dashboard...", "success");
     }
     setTimeout(() => {
         window.location.href = '/';
-    }, 2000);
+    }, 1500);
 };

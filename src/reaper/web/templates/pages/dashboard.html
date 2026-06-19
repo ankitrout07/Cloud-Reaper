@@ -158,49 +158,110 @@ function toggleConsoleSimple() {
             output.innerHTML = '<p style="color: #64748b; font-style: italic;">> Initializing terminal...</p>';
         }
         
-        // Start simple log simulation
+        // Start real log streaming via WebSocket
         setTimeout(function() {
-            simulateLogStream();
+            startRealLogStream();
         }, 500);
     }
 }
 
-function simulateLogStream() {
+function startRealLogStream() {
     const output = document.getElementById('log-output');
     if (!output) return;
     
-    const logs = [
-        { msg: "🚀 Cloud-Reaper Terminal v2.5 initialized", color: "#22c55e" },
-        { msg: "📡 Connecting to Azure Monitor...", color: "#06b6d4" },
-        { msg: "✅ Connected to subscription: {{ sub_name or 'Azure' }}", color: "#22c55e" },
-        { msg: "🔍 Scanning resources for cost optimization...", color: "#f59e0b" },
-        { msg: "💰 Analyzing spending patterns...", color: "#06b6d4" },
-        { msg: "⚡ Computing efficiency metrics...", color: "#06b6d4" },
-        { msg: "📊 Generating cost forecast...", color: "#06b6d4" },
-        { msg: "🎯 Identifying idle resources...", color: "#f59e0b" },
-        { msg: "✅ Analysis complete - System operating normally", color: "#22c55e" },
-        { msg: "📈 Real-time monitoring active", color: "#22c55e" }
-    ];
+    // Add system message
+    const statusMsg = document.createElement('p');
+    statusMsg.style.color = '#64748b';
+    statusMsg.style.fontStyle = 'italic';
+    statusMsg.innerText = '> Connecting to real-time log stream...';
+    output.appendChild(statusMsg);
+    output.scrollTop = output.scrollHeight;
     
-    let index = 0;
-    function addNextLog() {
-        if (index < logs.length && terminal.style.display !== 'none') {
-            const log = logs[index];
-            const logEntry = document.createElement('p');
-            logEntry.style.color = log.color;
-            logEntry.style.marginBottom = '4px';
-            logEntry.style.padding = '4px 8px';
-            logEntry.style.borderRadius = '2px';
-            const timestamp = new Date().toLocaleTimeString();
-            logEntry.innerText = `[${timestamp}] ${log.msg}`;
-            output.appendChild(logEntry);
-            output.scrollTop = output.scrollHeight;
-            index++;
-            setTimeout(addNextLog, 800);
+    // Function to attempt connection with retry
+    function attemptConnection(retryCount = 0) {
+        const maxRetries = 5;
+        
+        // Check if Socket.IO and the ensure socket function are available
+        if (window.__reaperEnsureSocket) {
+            try {
+                const sock = window.__reaperEnsureSocket();
+                if (sock) {
+                    // Emit request to start real log streaming
+                    sock.emit('start_log_stream');
+                    
+                    // Set up listener for real logs if not already set up
+                    if (!window.__realConsoleListenerSetup) {
+                        window.__realConsoleListenerSetup = true;
+                        sock.on('new_log', function(msg) {
+                            const logOutput = document.getElementById('log-output');
+                            if (!logOutput) return;
+                            
+                            const logEntry = document.createElement('p');
+                            
+                            // Color-code based on log content
+                            let color = '#a5f3fc'; // default cyan
+                            if (msg.data && typeof msg.data === 'string') {
+                                if (msg.data.includes('❌') || msg.data.toLowerCase().includes('error')) {
+                                    color = '#f87171'; // red
+                                } else if (msg.data.includes('✅') || msg.data.toLowerCase().includes('success')) {
+                                    color = '#4ade80'; // green  
+                                } else if (msg.data.includes('⚠️') || msg.data.toLowerCase().includes('warning')) {
+                                    color = '#facc15'; // yellow
+                                }
+                            }
+                            
+                            logEntry.style.color = color;
+                            logEntry.style.marginBottom = '4px';
+                            logEntry.style.padding = '4px 8px';
+                            logEntry.style.borderRadius = '2px';
+                            const timestamp = new Date().toLocaleTimeString();
+                            logEntry.innerText = `[${timestamp}] ${msg.data}`;
+                            logOutput.appendChild(logEntry);
+                            logOutput.scrollTop = logOutput.scrollHeight;
+                        });
+                        
+                        // Clear previous fallback messages
+                        const fallbackMsgs = output.querySelectorAll('.fallback-msg');
+                        fallbackMsgs.forEach(msg => msg.remove());
+                    }
+                } else {
+                    throw new Error('Socket.IO connection not established');
+                }
+            } catch (error) {
+                if (retryCount < maxRetries) {
+                    setTimeout(() => attemptConnection(retryCount + 1), 500);
+                } else {
+                    addFallbackLog('WebSocket connection failed after retries');
+                }
+            }
+        } else {
+            // Socket.IO not loaded yet, retry
+            if (retryCount < maxRetries) {
+                setTimeout(() => attemptConnection(retryCount + 1), 500);
+            } else {
+                addFallbackLog('Socket.IO library failed to load');
+            }
         }
     }
     
-    addNextLog();
+    // Start attempting connection
+    attemptConnection();
+}
+
+function addFallbackLog(message) {
+    const output = document.getElementById('log-output');
+    if (!output) return;
+    
+    const logEntry = document.createElement('p');
+    logEntry.className = 'fallback-msg';
+    logEntry.style.color = '#facc15';
+    logEntry.style.marginBottom = '4px';
+    logEntry.style.padding = '4px 8px';
+    logEntry.style.borderRadius = '2px';
+    const timestamp = new Date().toLocaleTimeString();
+    logEntry.innerText = `[${timestamp}] ⚠️ ${message}`;
+    output.appendChild(logEntry);
+    output.scrollTop = output.scrollHeight;
 }
 </script>
 {% endblock %}
