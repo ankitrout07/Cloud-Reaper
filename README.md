@@ -103,7 +103,8 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
                           │   ├── price_client   (23 Azure SVCs)    │
                           │   ├── arbitrage      (Region Pricing)   │
                           │   ├── auth           (Graph API)        │
-                          │   └── db bridge      (pgx/v5 + upsert)  │
+                          │   ├── serve          (HTTP Bridge)      │
+                          │   └── db bridge      (Zero-alloc Pool)  │
                           └────────────────────┬────────────────────┘
                                                │  PostgreSQL 15
                           ┌────────────────────▼────────────────────┐
@@ -112,11 +113,11 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
                           │   ├── engine/      ARIMA, Q-RL, Econ    │
                           │   ├── rag/         BM25 + Gemini RRF    │
                           │   ├── services/    InfluxDB, Pusher     │
-                          │   └── web/         Flask + SocketIO     │
+                          │   └── web/         FastAPI + Uvicorn    │
                           └────────────────────┬────────────────────┘
                                                │
                           ┌────────────────────▼────────────────────┐
-                          │   Flask/SocketIO Dashboard              │
+                          │   FastAPI ASGI Dashboard                │
                           │   ├── Real-time WebSocket metrics       │
                           │   ├── Glassmorphism Dark Theme UI       │
                           │   ├── Vault & Credential Management     │
@@ -127,9 +128,9 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 ### Data Flow
 
 1. **Go Scanner** concurrently scrapes multi-cloud APIs using goroutines with a token-bucket rate limiter (10 req/s)
-2. Resource data is normalized and batch-upserted into PostgreSQL via `pgx/v5`; stale entries auto-purged after 5 min
+2. Resource data is normalized and batch-upserted into PostgreSQL via `pgx/v5` using a **zero-allocation `sync.Pool` buffer** (eliminates GC pauses); stale entries auto-purged after 5 min
 3. **Python Intelligence Layer** queries the DB, runs ARIMA anomaly detection, Q-learning right-sizing, and unit economics models
-4. **Flask Dashboard** renders real-time metrics via WebSocket (SocketIO) with in-memory cache acceleration
+4. **FastAPI Dashboard** calls the Go engine via a resident **HTTP bridge (loopback:7070)** for zero-fork overhead and renders real-time metrics via WebSockets with in-memory cache acceleration
 5. Every vault access and resource action is logged into a **SHA-256 chained hash ledger** for tamper detection
 6. Savings telemetry is pushed to **InfluxDB** for long-term time-series retention
 
@@ -236,7 +237,7 @@ Cloud-Reaper/
 | **Language (Go)** | Go 1.24+ |
 | **Database** | PostgreSQL 15 (SQLAlchemy 2.0 ORM + pgx/v5 driver) |
 | **Time-Series** | InfluxDB (savings & unit economics telemetry via `influxdb-client`) |
-| **Web Framework** | Flask 3.0 + Flask-SocketIO (gevent WebSocket transport) |
+| **Web Framework** | FastAPI + Uvicorn (ASGI) + WebSockets |
 | **AI Copilot** | Google GenAI (`google-genai`) · Gemini 2.5 Flash · Bounded Knapsack Optimizer |
 | **AI Architect** | OpenAI (`openai>=1.50.0`) + Google Gemini (multi-provider BOM generation + offline fallback) |
 | **RAG Search** | BM25 sparse retrieval + Gemini Embedding dense retrieval + Reciprocal Rank Fusion (k=60) |
@@ -775,6 +776,8 @@ cp .env.example .env
 Full history in **[CHANGELOG.md](CHANGELOG.md)**.
 
 **Recent Highlights:**
+- **Architecture**: Fully migrated the web layer from synchronous Flask to asynchronous non-blocking **FastAPI + Uvicorn (ASGI)**.
+- **Performance (Go)**: Implemented a resident Go HTTP Bridge (`--mode serve`) to eliminate process-fork latency, and integrated a zero-allocation `BatchUpsert` pool (`sync.Pool`) for GC-free PostgreSQL inserts.
 - **Performance**: Upgraded `ruff` for faster static analysis; stabilized hybrid Go/Python execution pipelines and reduced memory footprint across resource scrapers
 - **Fixes**: Iterative improvements to multi-cloud authentication (Azure/AWS/GCP) and enforced vault log retention policies to prevent unbounded DB growth
 - **UI/UX**: Shipped glassmorphism redesign for vault and cloud provider UIs; fine-tuned cyan/slate color palette across the dashboard; added About page, Kubernetes Agent card, and enriched Budget Alerts tab

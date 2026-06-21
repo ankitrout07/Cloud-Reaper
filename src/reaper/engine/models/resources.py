@@ -1,7 +1,7 @@
 import os
 import time
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from functools import wraps
 
 from dotenv import load_dotenv
@@ -70,7 +70,7 @@ class Resource(Base):
     active = Column(Boolean, default=True)
     is_protected = Column(Boolean, default=False)
     is_unallocated = Column(Boolean, default=False)
-    last_seen = Column(DateTime, default=lambda: datetime.now(UTC))
+    last_seen = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     cost_history = relationship("CostHistory", back_populates="resource")
     reap_actions = relationship("ReapAction", back_populates="resource")
@@ -83,7 +83,7 @@ class CostHistory(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     resource_id = Column(String, ForeignKey("legacy_resources.id"))
-    date = Column(DateTime, default=lambda: datetime.now(UTC))
+    date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     cost = Column(Numeric(15, 4))
     cost_type = Column(String, default="ACTUAL")  # ACTUAL or AMORTIZED
     currency = Column(String, default="USD")
@@ -98,7 +98,7 @@ class ReapAction(Base):
     resource_id = Column(String, ForeignKey("legacy_resources.id"))
     action = Column(String)  # e.g. DEALLOCATE, DELETE
     authorized_by = Column(String)
-    timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     resource = relationship("Resource", back_populates="reap_actions")
 
@@ -123,7 +123,7 @@ class ActionLog(Base):
     action_type = Column(String)  # REAP, KILL, PROTECTION_ADD
     status = Column(String)  # SUCCESS, FAILED
     details = Column(String)
-    timestamp = Column(DateTime, default=lambda: datetime.now(UTC))
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     resource = relationship("Resource", back_populates="action_logs")
 
@@ -135,7 +135,7 @@ class BusinessMetric(Base):
     metric_name = Column(String, index=True)  # e.g. ACTIVE_USERS, API_REQUESTS
     value = Column(Float)
     unit = Column(String)
-    date = Column(DateTime, default=lambda: datetime.now(UTC))
+    date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class RegionPriceCache(Base):
@@ -146,7 +146,7 @@ class RegionPriceCache(Base):
     region_name = Column(String, index=True)
     price = Column(Numeric(15, 6))
     currency = Column(String, default="USD")
-    last_updated = Column(DateTime, default=lambda: datetime.now(UTC))
+    last_updated = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class VaultSettings(Base):
@@ -157,11 +157,11 @@ class VaultSettings(Base):
     id = Column(Integer, primary_key=True, default=1)
     salt = Column(String(64), nullable=False)
     passcode_verifier = Column(String(128), nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
 
@@ -176,11 +176,11 @@ class VaultEntry(Base):
         String(40), nullable=False, default="credential"
     )  # credential, passcode, note
     encrypted_payload = Column(String, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
 
@@ -202,11 +202,11 @@ class CloudConnection(Base):
     connection_name = Column(String(100), nullable=False)
     credentials = Column(JSON, nullable=False, default=dict)
     is_active = Column(Boolean, default=False, index=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
 
@@ -218,7 +218,7 @@ class CloudResource(Base):
     resource_type = Column(String, nullable=False)  # virtual_machines, disks
     region = Column(String, nullable=False)
     cost_attributes = Column(JSON, nullable=False)  # Engine-agnostic storage replacement for JSONB
-    last_scanned = Column(DateTime, default=lambda: datetime.now(UTC))
+    last_scanned = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class Budget(Base):
@@ -229,7 +229,7 @@ class Budget(Base):
     scope_type = Column(String, nullable=False)  # TAG, SUBSCRIPTION, etc.
     scope_value = Column(String, nullable=False)
     monthly_limit = Column(Numeric(15, 2), nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     alerts = relationship("BudgetAlert", back_populates="budget", cascade="all, delete-orphan")
 
@@ -242,7 +242,7 @@ class BudgetAlert(Base):
     threshold_percentage = Column(Numeric(5, 2), nullable=False)  # e.g., 85.00
     notification_channel = Column(String, nullable=False)  # DISCORD, SLACK, etc.
     is_triggered = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     budget = relationship("Budget", back_populates="alerts")
 
@@ -256,7 +256,7 @@ class CloudCommitment(Base):
     hourly_commitment = Column(Numeric(15, 4), nullable=False)
     status = Column(String, nullable=False)  # ACTIVE, EXPIRED, etc.
     expiration_date = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 def get_desktop_engine():

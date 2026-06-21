@@ -9,7 +9,7 @@ Provides a rich argparse CLI with subcommands:
   python3 bootstrap.py check            # verify system prerequisites
   python3 bootstrap.py scan             # run the Azure FinOps CLI scan
   python3 bootstrap.py metrics          # display live FinOps performance metrics
-  python3 bootstrap.py web              # launch the Flask/SocketIO dashboard
+  python3 bootstrap.py web              # launch the FastAPI ASGI dashboard
   python3 bootstrap.py clean            # remove build artefacts & caches
   python3 bootstrap.py pr-simulation    # run a PR cost delta simulation
 
@@ -435,8 +435,8 @@ def _init_database() -> bool:
 
 
 def cmd_web(args: argparse.Namespace) -> int:
-    """Launch the Flask/SocketIO dashboard."""
-    print(c("\n[web] Starting Flask/SocketIO dashboard\n", BOLD))
+    """Launch the FastAPI ASGI dashboard and Go HTTP bridge."""
+    print(c("\n[web] Starting FastAPI ASGI dashboard\n", BOLD))
 
     # Setup env file (safe to call multiple times)
     _setup_env_file()
@@ -461,13 +461,28 @@ def cmd_web(args: argparse.Namespace) -> int:
 
     _print_success_report(str(port))
 
+    go_proc = None
     try:
+        # Start Go bridge server first
+        go_bin = REPO_ROOT / "bin" / ("reaper-engine.exe" if platform.system() == "Windows" else "reaper-engine")
+        if go_bin.exists():
+            print(c("  Starting Go HTTP bridge (port 7070) …", CYAN))
+            go_proc = subprocess.Popen(
+                [str(go_bin), "--mode", "serve", "--port", "7070"], 
+                cwd=str(REPO_ROOT), 
+                env=env,
+                stdout=subprocess.DEVNULL,  # Keep Uvicorn logs clean
+                stderr=subprocess.DEVNULL
+            )
+        else:
+            print(c("  [⚠] Go engine binary not found in bin/. Bridge features may fallback.", YELLOW))
+
         subprocess.run(
             [
                 py_exe,
                 "-m",
                 "uvicorn",
-                "reaper.web.app_async:socket_app",
+                "reaper.web.app_async:app",
                 "--host",
                 env.get("FLASK_HOST", "0.0.0.0"),
                 "--port",
@@ -486,8 +501,12 @@ def cmd_web(args: argparse.Namespace) -> int:
         print("\n  Try manually:")
         print(f"    cd {REPO_ROOT}")
         print("    source venv/bin/activate")
-        print("    PYTHONPATH=src python -m reaper.web.app")
+        print("    PYTHONPATH=src python -m uvicorn reaper.web.app_async:app")
         return 1
+    finally:
+        if go_proc:
+            go_proc.terminate()
+            go_proc.wait()
 
 
 def cmd_pr_simulation(args: argparse.Namespace) -> int:
@@ -664,7 +683,7 @@ def _print_success_report(port: str) -> None:
     print(f"  {c('▸ Dashboard:', BOLD)}  http://localhost:{port}")
     print(f"  {c('▸ Port:     ', BOLD)}  {port}")
     print(f"  {c('▸ Status:   ', BOLD)}  {c('HEALTHY', GREEN)}")
-    print(f"  {c('▸ Engine:   ', BOLD)}  Flask + SocketIO + Go binary")
+    print(f"  {c('▸ Engine:   ', BOLD)}  FastAPI + Uvicorn + Go HTTP Bridge")
     print(c("=" * width, GREEN))
     print(c("  Press Ctrl+C to terminate the session safely.", DIM))
     print()
@@ -746,7 +765,7 @@ examples:
     p_metrics.set_defaults(func=cmd_metrics)
 
     # ---- web ----
-    p_web = sub.add_parser("web", help="Launch the Flask/SocketIO dashboard")
+    p_web = sub.add_parser("web", help="Launch the FastAPI ASGI dashboard")
     p_web.add_argument("--port", type=int, help="Dashboard port (overrides .env FLASK_PORT)")
     p_web.set_defaults(func=cmd_web)
 

@@ -58,3 +58,5 @@ google-genai>=1.15.0
 gymnasium==0.29.1
 tenacity>=8.2.3
 flask-cors==4.0.0
+httpx[http2]>=0.27.0          # async Go bridge client (go_bridge.py)
+eval-type-backport>=0.2.0     # Python 3.9 typing compatibility for Pydantic

@@ -102,6 +102,35 @@ def is_first_run():
 _web_dir = Path(__file__).resolve().parent
 app = FastAPI(title="Cloud-Reaper", docs_url=None, redoc_url=None)
 templates = Jinja2Templates(directory=str(_web_dir / "templates"))
+
+from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
+from starlette.requests import Request as StarletteRequest
+
+def jsonify(*args, **kwargs):
+    if args and isinstance(args[0], dict):
+        content = args[0]
+    else:
+        content = kwargs
+    return JSONResponse(content=content)
+
+def redirect(url: str):
+    return RedirectResponse(url=url)
+
+def url_for(endpoint: str, **kwargs):
+    query = "&".join(f"{k}={v}" for k, v in kwargs.items())
+    return f"/{endpoint}?{query}" if query else f"/{endpoint}"
+
+def render_template(template_name: str, **kwargs):
+    request = kwargs.get("request")
+    if not request:
+        # Create a dummy scope to satisfy Jinja2Templates for legacy routes
+        request = StarletteRequest({"type": "http", "method": "GET", "headers": []})
+        kwargs["request"] = request
+    return templates.TemplateResponse(template_name, kwargs)
+
+def send_from_directory(directory: str, filename: str, **kwargs):
+    return FileResponse(os.path.join(directory, filename))
+
 app.mount("/static", StaticFiles(directory=str(_web_dir / "static")), name="static")
 
 app.add_middleware(
@@ -137,6 +166,7 @@ app.include_router(search_router)
 from reaper.web.metrics_router import telemetry_router
 
 app.include_router(telemetry_router)
+from reaper.web import go_bridge  # async Go engine bridge (non-blocking)
 
 VAULT_UNLOCK_TTL_SEC = int(os.getenv("VAULT_UNLOCK_TTL_SEC", "3600"))
 thread = None
@@ -158,7 +188,7 @@ async def background_metrics_worker():
             import asyncio
 
             await asyncio.sleep(backoff_time)
-            now = datetime.datetime.now(datetime.UTC).strftime("%H:%M:%S")
+            now = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%S")
             cpu_usage = None
 
             try:
@@ -245,18 +275,19 @@ async def sync_settings(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
-
-@app.before_request
-def check_setup():
+@app.middleware("http")
+async def check_setup(request: Request, call_next):
+    path = request.url.path
     if (
-        request.path.startswith("/static")
-        or request.path.startswith("/api/")
-        or "favicon" in request.path
+        path.startswith("/static")
+        or path.startswith("/api/")
+        or "favicon" in path
+        or path.startswith("/settings")
     ):
-        return None
-    if is_first_run() and request.endpoint != "settings":
-        return redirect(url_for("settings", tab="cloud"))
-    return None
+        return await call_next(request)
+    if is_first_run():
+        return RedirectResponse(url="/settings?tab=cloud")
+    return await call_next(request)
 
 
 @app.get("/favicon.ico")
@@ -1855,26 +1886,22 @@ async def telemetry_insights(request: Request):
 @app.get("/api/rightsizing")
 async def get_rightsizing(request: Request):
     az = AzureCollector()
-    go_binary = _reaper_engine_binary()
-    if not go_binary:
-        return JSONResponse(
-            status_code=500, content={"status": "error", "message": "Go Engine binary not found"}
-        )
 
     try:
-        # pyrefly: ignore [no-matching-overload]
-        result = subprocess.run(
-            [str(go_binary), "--subscription", az.subscription_id],
-            capture_output=True,
-            text=True,
-            check=False,
+        # ── Non-blocking Go engine call ──────────────────────────────────────
+        # go_bridge.scan() first tries the resident HTTP bridge server on
+        # :7070 (zero fork overhead); if the bridge is not running it falls
+        # back to asyncio.create_subprocess_exec — still non-blocking.
+        go_data = await go_bridge.scan(
+            subscription_id=az.subscription_id, provider="azure"
         )
-        if result.returncode != 0:
+        if not go_data:
             return JSONResponse(
-                status_code=500, content={"status": "error", "message": result.stderr}
+                status_code=500,
+                content={"status": "error", "message": "Go engine returned no data"},
             )
 
-        vm_reports = json.loads(result.stdout).get("vm_reports", [])
+        vm_reports = go_data.get("vm_reports", [])
         recommendations = RightSizer().calculate_recommendation(vm_reports)
 
         return jsonify(
@@ -1882,6 +1909,7 @@ async def get_rightsizing(request: Request):
                 "status": "success",
                 "recommendations": recommendations,
                 "total_saving": sum(r["monthly_saving"] for r in recommendations),
+                "engine": "go-bridge" if go_data.get("db_stats") else "go-subprocess",
             }
         )
     except Exception as e:
@@ -1890,7 +1918,7 @@ async def get_rightsizing(request: Request):
 
 @app.get("/api/scan")
 async def scan(request: Request):
-    events = [{"msg": "Authenticating with Azure Identity...", "type": "info"}]
+    events: list[dict] = [{"msg": "Authenticating with Azure Identity...", "type": "info"}]
     try:
         target_subs = settings_state.get("selected_subscriptions", []) or [
             os.getenv("AZURE_SUBSCRIPTION_ID")
@@ -1902,7 +1930,11 @@ async def scan(request: Request):
                 content={"status": "error", "message": "No subscription ID configured."},
             )
 
-        scan_results = perform_subscription_scan(target_subs, events)
+        # ── Async scan dispatch ──────────────────────────────────────────────
+        # Each subscription scan is awaited via go_bridge, which is fully
+        # non-blocking: the ASGI event loop is released during the I/O wait
+        # so other requests (metrics, WebSocket pushes) are never starved.
+        scan_results = await _async_perform_subscription_scan(target_subs, events)
         formatted_results = format_scan_results(scan_results)
 
         events.append(
@@ -1915,6 +1947,113 @@ async def scan(request: Request):
         return {"status": "success", "events": events, **formatted_results}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
+async def _async_perform_subscription_scan(
+    target_subs: list[str], events: list[dict]
+) -> dict:
+    """
+    Async variant of perform_subscription_scan.
+
+    Each subscription is dispatched via go_bridge.scan(), which either calls
+    the resident HTTP bridge or falls back to asyncio subprocess — both paths
+    are non-blocking.  Results are merged in the same shape as the sync
+    version so format_scan_results() works unchanged.
+    """
+    az = AzureCollector()
+    results: dict = {
+        "vms_count": 0,
+        "orphans": [],
+        "snapshots": [],
+        "zombies": [],
+        "idle_vms": [],
+        "utilization": [],
+    }
+
+    for sub_id in target_subs:
+        events.append({"msg": f"Scanning subscription: {sub_id[:8]}...", "type": "info"})
+        az.subscription_id = sub_id
+
+        # await — releases the event loop during Go engine I/O
+        go_data = await go_bridge.scan(subscription_id=sub_id, provider="azure")
+
+        if go_data:
+            reports = go_data.get("vm_reports", [])
+            active_vms = go_data.get("active_vms", [])
+            results["vms_count"] += len(active_vms)
+
+            for d in go_data.get("orphaned_disks", []):
+                d["rg"] = "Unknown"
+                results["orphans"].append(d)
+
+            for s in go_data.get("orphaned_snapshots", []):
+                s["rg"] = "Unknown"
+                results["snapshots"].append(s)
+
+            threshold = 2.0 if settings_state.get("idle_strategy") == "aggressive" else 10.0
+
+            reported_vms: set[str] = set()
+            for r in reports:
+                name = r.get("name")
+                reported_vms.add(name)
+                avg_usage = r.get("usage", 0.0)
+                rid = r.get("id", "")
+                rg = rid.split("/")[4] if "/" in rid else "Unknown"
+
+                results["utilization"].append(
+                    {"name": name, "usage": round(avg_usage, 1), "rg": rg}
+                )
+
+                if avg_usage < 1.0:
+                    results["zombies"].append(
+                        {"name": name, "usage": f"{round(avg_usage, 2)}%", "rg": rg}
+                    )
+                elif avg_usage < threshold:
+                    results["idle_vms"].append(
+                        {"name": name, "usage": f"{round(avg_usage, 2)}%", "rg": rg}
+                    )
+
+            for name in active_vms:
+                if name not in reported_vms:
+                    results["utilization"].append(
+                        {"name": name, "usage": 0.0, "rg": "Unknown"}
+                    )
+        else:
+            # Bridge unavailable — fall back to synchronous Python collector
+            events.append(
+                {"msg": f"Bridge unavailable, using Python collector for {sub_id[:8]}...", "type": "info"}
+            )
+            _python_fallback_scan(az, results)
+
+    results["utilization"].sort(key=lambda x: x["usage"], reverse=True)
+    return results
+
+
+def _python_fallback_scan(az: Any, results: dict) -> None:
+    """Pure-Python collector fallback when the Go engine bridge is unavailable."""
+    # pyrefly: ignore [missing-attribute]
+    az._scan_cache = None
+
+    vms = az.get_vm_inventory()
+    results["vms_count"] += len(vms)
+
+    reap_data = az.get_orphaned_disks()
+    results["orphans"].extend(reap_data["disks"])
+    results["snapshots"].extend(reap_data["snapshots"])
+    results["zombies"].extend(az.get_zombie_vms())
+
+    threshold = 2.0 if settings_state["idle_strategy"] == "aggressive" else 10.0
+    results["idle_vms"].extend(az.get_idle_vms(cpu_threshold=threshold))
+
+    with contextlib.suppress(Exception):
+        results["utilization"].extend(az.get_utilization_report())
+
+    reported_python = {u["name"] for u in results["utilization"]}
+    for vm in vms:
+        if vm["name"] not in reported_python:
+            results["utilization"].append(
+                {"name": vm["name"], "usage": 0.0, "rg": vm.get("location", "Unknown")}
+            )
 
 
 def perform_subscription_scan(target_subs, events):
@@ -2175,7 +2314,7 @@ async def export_bom(request: Request):
             items=items,
             totalHourly=total_hourly,
             totalMonthly=total_monthly,
-            date=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S"),
+            date=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
         # Generate PDF in memory

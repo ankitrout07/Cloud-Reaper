@@ -1,4 +1,6 @@
 # src/reaper/web/metrics_router.py
+from __future__ import annotations
+
 from typing import Any
 
 from fastapi import APIRouter

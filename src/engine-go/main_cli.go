@@ -13,7 +13,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 
 	"cloud-reaper/engine-go/internal/arbitrage"
+	"cloud-reaper/engine-go/internal/bridge"
 	"cloud-reaper/engine-go/internal/collectors"
+	"cloud-reaper/engine-go/internal/db"
 )
 
 type vmReport struct {
@@ -47,10 +49,11 @@ type scanResult struct {
 func main() {
 	subscription := flag.String("subscription", "", "Azure subscription ID")
 	listSubs := flag.Bool("list-subs", false, "List accessible Azure subscriptions")
-	mode := flag.String("mode", "scan", "Operation mode: scan, prices, arbitrage")
+	mode := flag.String("mode", "scan", "Operation mode: scan, prices, arbitrage, serve")
 	sku := flag.String("sku", "", "SKU for arbitrage mode")
 	regions := flag.String("regions", "", "Comma-separated regions for arbitrage mode")
 	provider := flag.String("provider", "azure", "Cloud provider: azure, aws, gcp")
+	servePort := flag.Int("port", 7070, "Port for HTTP bridge server (serve mode)")
 	flag.Parse()
 
 	if *listSubs {
@@ -71,6 +74,10 @@ func main() {
 		arbitrage.RunArbitrageScan(*sku, regionList)
 	case "prices":
 		outputPrices(*provider)
+	case "serve":
+		// HTTP bridge server: lets Python call the Go engine non-blocking over loopback.
+		// Boots in the background during bootstrap; Python calls /scan, /prices, /health.
+		bridge.RunBridgeServer(*servePort)
 	case "scan":
 		subID := *subscription
 		if subID == "" {
@@ -82,7 +89,7 @@ func main() {
 		}
 		runScan(subID)
 	default:
-		fmt.Fprintf(os.Stderr, "unknown mode %q (use scan, prices, or arbitrage)\n", *mode)
+		fmt.Fprintf(os.Stderr, "unknown mode %q (use scan, prices, arbitrage, serve)\n", *mode)
 		os.Exit(1)
 	}
 }
@@ -136,6 +143,20 @@ func runScan(subscriptionID string) {
 		fmt.Fprintf(os.Stderr, "scan error: %v\n", err)
 		os.Exit(1)
 	}
+
+	// ── Zero-allocation persistence ──────────────────────────────────────────
+	// Flush the scanned resources into SQLite via the sync.Pool-backed
+	// BatchUpsert.  The pooled buffer is acquired once, filled, upserted in a
+	// single transaction, then returned — the GC never touches the intermediate
+	// slice.  Errors here are non-fatal: the JSON result is still emitted so
+	// the Python caller can continue even when the local DB is unavailable.
+	if stats, upsertErr := db.BatchUpsert(resources); upsertErr != nil {
+		fmt.Fprintf(os.Stderr, "[warn] db upsert skipped: %v\n", upsertErr)
+	} else {
+		fmt.Fprintf(os.Stderr, "[db] BatchUpsert: %d resources in %s (pool_reused=%v)\n",
+			stats.ResourceCount, stats.Elapsed, stats.PoolReused)
+	}
+	// ────────────────────────────────────────────────────────────────────────
 
 	result := scanResult{
 		UserName:         collectors.GetAzureUserName(),

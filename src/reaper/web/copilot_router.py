@@ -1,4 +1,6 @@
 # src/reaper/web/copilot_router.py
+from __future__ import annotations
+
 from functools import lru_cache
 from typing import Any
 
