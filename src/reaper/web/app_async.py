@@ -123,6 +123,7 @@ def url_for(endpoint: str, **kwargs):
     query = "&".join(f"{k}={v}" for k, v in kwargs.items())
     return f"/{endpoint}?{query}" if query else f"/{endpoint}"
 
+
 def render_template(template_name: str, request: Request | None = None, **kwargs):
     if request is None:
         request = kwargs.pop("request", None)
