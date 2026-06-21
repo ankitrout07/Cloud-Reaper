@@ -87,9 +87,7 @@ Cloud-Reaper/
 ├── bootstrap.py               # Universal, one-click cross-platform setup script
 ├── docker-compose.yml         # Container definitions for PostgreSQL database services
 ├── Dockerfile                 # Multi-stage production container build manifest
-├── Docs/                      # High-fidelity system diagrams, patch updates, and docs
-│   ├── Pasted image.png       # Integrated UI reference visual
-│   ├── Patch-Updates.txt      # Roadmap item logs and checklist modifications
+├── docs/                      # High-fidelity system diagrams and documentation
 │   └── Part-*.txt             # Modular multi-part system documentation
 ├── HOW_TO_RUN.md              # Exhaustive setup, database initialization & run guide
 ├── main.py                    # Unified CLI command-line interface entry point
