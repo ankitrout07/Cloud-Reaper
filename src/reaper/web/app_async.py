@@ -103,8 +103,9 @@ _web_dir = Path(__file__).resolve().parent
 app = FastAPI(title="Cloud-Reaper", docs_url=None, redoc_url=None)
 templates = Jinja2Templates(directory=str(_web_dir / "templates"))
 
-from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from starlette.requests import Request as StarletteRequest
+
 
 def jsonify(*args, **kwargs):
     if args and isinstance(args[0], dict):
@@ -113,12 +114,15 @@ def jsonify(*args, **kwargs):
         content = kwargs
     return JSONResponse(content=content)
 
+
 def redirect(url: str):
     return RedirectResponse(url=url)
+
 
 def url_for(endpoint: str, **kwargs):
     query = "&".join(f"{k}={v}" for k, v in kwargs.items())
     return f"/{endpoint}?{query}" if query else f"/{endpoint}"
+
 
 def render_template(template_name: str, **kwargs):
     request = kwargs.get("request")
@@ -128,8 +132,10 @@ def render_template(template_name: str, **kwargs):
         kwargs["request"] = request
     return templates.TemplateResponse(template_name, kwargs)
 
+
 def send_from_directory(directory: str, filename: str, **kwargs):
     return FileResponse(os.path.join(directory, filename))
+
 
 app.mount("/static", StaticFiles(directory=str(_web_dir / "static")), name="static")
 
@@ -188,7 +194,7 @@ async def background_metrics_worker():
             import asyncio
 
             await asyncio.sleep(backoff_time)
-            now = datetime.datetime.now(datetime.timezone.utc).strftime("%H:%M:%S")
+            now = datetime.datetime.now(datetime.UTC).strftime("%H:%M:%S")
             cpu_usage = None
 
             try:
@@ -274,6 +280,7 @@ async def sync_settings(request: Request):
         )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
 
 @app.middleware("http")
 async def check_setup(request: Request, call_next):
@@ -1892,9 +1899,7 @@ async def get_rightsizing(request: Request):
         # go_bridge.scan() first tries the resident HTTP bridge server on
         # :7070 (zero fork overhead); if the bridge is not running it falls
         # back to asyncio.create_subprocess_exec — still non-blocking.
-        go_data = await go_bridge.scan(
-            subscription_id=az.subscription_id, provider="azure"
-        )
+        go_data = await go_bridge.scan(subscription_id=az.subscription_id, provider="azure")
         if not go_data:
             return JSONResponse(
                 status_code=500,
@@ -1949,9 +1954,7 @@ async def scan(request: Request):
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-async def _async_perform_subscription_scan(
-    target_subs: list[str], events: list[dict]
-) -> dict:
+async def _async_perform_subscription_scan(target_subs: list[str], events: list[dict]) -> dict:
     """
     Async variant of perform_subscription_scan.
 
@@ -2015,13 +2018,14 @@ async def _async_perform_subscription_scan(
 
             for name in active_vms:
                 if name not in reported_vms:
-                    results["utilization"].append(
-                        {"name": name, "usage": 0.0, "rg": "Unknown"}
-                    )
+                    results["utilization"].append({"name": name, "usage": 0.0, "rg": "Unknown"})
         else:
             # Bridge unavailable — fall back to synchronous Python collector
             events.append(
-                {"msg": f"Bridge unavailable, using Python collector for {sub_id[:8]}...", "type": "info"}
+                {
+                    "msg": f"Bridge unavailable, using Python collector for {sub_id[:8]}...",
+                    "type": "info",
+                }
             )
             _python_fallback_scan(az, results)
 
@@ -2314,7 +2318,7 @@ async def export_bom(request: Request):
             items=items,
             totalHourly=total_hourly,
             totalMonthly=total_monthly,
-            date=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+            date=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
         # Generate PDF in memory

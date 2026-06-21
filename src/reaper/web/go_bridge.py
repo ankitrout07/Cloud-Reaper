@@ -84,9 +84,7 @@ async def scan(subscription_id: str, provider: str = "azure") -> dict[str, Any] 
     return await _scan_via_subprocess(subscription_id)
 
 
-async def _scan_via_bridge(
-    subscription_id: str, provider: str
-) -> dict[str, Any] | None:
+async def _scan_via_bridge(subscription_id: str, provider: str) -> dict[str, Any] | None:
     """POST /scan to the resident Go bridge server — non-blocking."""
     try:
         import httpx
@@ -119,7 +117,8 @@ async def _scan_via_subprocess(subscription_id: str) -> dict[str, Any] | None:
     try:
         proc = await asyncio.create_subprocess_exec(
             str(binary),
-            "--subscription", subscription_id,
+            "--subscription",
+            subscription_id,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -128,7 +127,7 @@ async def _scan_via_subprocess(subscription_id: str) -> dict[str, Any] | None:
             print(f"[go_bridge] subprocess stderr: {stderr.decode()[:400]}")
             return None
         return json.loads(stdout.decode())
-    except asyncio.TimeoutError:
+    except TimeoutError:
         print("[go_bridge] subprocess timed out")
         return None
     except Exception as exc:
@@ -147,9 +146,7 @@ async def prices(provider: str = "azure") -> dict[str, Any] | None:
             import httpx
 
             async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-                resp = await client.get(
-                    f"{_BRIDGE_BASE}/prices", params={"provider": provider}
-                )
+                resp = await client.get(f"{_BRIDGE_BASE}/prices", params={"provider": provider})
                 if resp.status_code == 200:
                     return resp.json()
         except Exception as exc:
@@ -165,8 +162,10 @@ async def _prices_via_subprocess(provider: str) -> dict[str, Any] | None:
     try:
         proc = await asyncio.create_subprocess_exec(
             str(binary),
-            "--mode", "prices",
-            "--provider", provider,
+            "--mode",
+            "prices",
+            "--provider",
+            provider,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )

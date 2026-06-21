@@ -464,18 +464,24 @@ def cmd_web(args: argparse.Namespace) -> int:
     go_proc = None
     try:
         # Start Go bridge server first
-        go_bin = REPO_ROOT / "bin" / ("reaper-engine.exe" if platform.system() == "Windows" else "reaper-engine")
+        go_bin = (
+            REPO_ROOT
+            / "bin"
+            / ("reaper-engine.exe" if platform.system() == "Windows" else "reaper-engine")
+        )
         if go_bin.exists():
             print(c("  Starting Go HTTP bridge (port 7070) …", CYAN))
             go_proc = subprocess.Popen(
-                [str(go_bin), "--mode", "serve", "--port", "7070"], 
-                cwd=str(REPO_ROOT), 
+                [str(go_bin), "--mode", "serve", "--port", "7070"],
+                cwd=str(REPO_ROOT),
                 env=env,
                 stdout=subprocess.DEVNULL,  # Keep Uvicorn logs clean
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
             )
         else:
-            print(c("  [⚠] Go engine binary not found in bin/. Bridge features may fallback.", YELLOW))
+            print(
+                c("  [⚠] Go engine binary not found in bin/. Bridge features may fallback.", YELLOW)
+            )
 
         subprocess.run(
             [
