@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from reaper.rag import DocSearchEngine
-from reaper.web.app import app
+from reaper.web.app_async import app
 
 
 class TestDocSearchEngine(unittest.TestCase):
@@ -343,11 +343,10 @@ class TestEmbedWithBackoff(unittest.TestCase):
 
 class TestSearchRoutes(unittest.TestCase):
     def setUp(self):
-        app.config["TESTING"] = True
-        app.config["WTF_CSRF_ENABLED"] = False
-        app.config["SECRET_KEY"] = "dummy-test-key-for-testing-only"  # noqa: S105
-        self.client = app.test_client()
-        self.first_run_patcher = patch("reaper.web.app.is_first_run", return_value=False)
+        from fastapi.testclient import TestClient
+
+        self.client = TestClient(app)
+        self.first_run_patcher = patch("reaper.web.app_async.is_first_run", return_value=False)
         self.mock_first_run = self.first_run_patcher.start()
 
     def tearDown(self):
@@ -357,10 +356,10 @@ class TestSearchRoutes(unittest.TestCase):
         """Test that the /docs route renders successfully."""
         response = self.client.get("/docs")
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Audit Logs &amp; Change Tracking", response.data)
-        self.assertIn(b"Attribution Stability Index", response.data)
+        self.assertIn(b"Audit Logs &amp; Change Tracking", response.content)
+        self.assertIn(b"Attribution Stability Index", response.content)
 
-    @patch("reaper.web.search_routes.search_engine")
+    @patch("reaper.web.search_router.search_engine")
     def test_handle_docs_search(self, mock_search_engine):
         """Test the /api/v1/docs/search endpoint."""
         mock_search_engine.query_docs.return_value = [
@@ -376,7 +375,7 @@ class TestSearchRoutes(unittest.TestCase):
             json={"query": "audit logs"},
         )
         self.assertEqual(response.status_code, 200)
-        data = response.get_json()
+        data = response.json()
         self.assertEqual(data["status"], "success")
         self.assertEqual(len(data["results"]), 1)
         self.assertEqual(data["results"][0]["file"], "4_audit_logs.md")

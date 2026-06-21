@@ -39,11 +39,10 @@ COPY --from=go-builder /reaper-engine ./bin/reaper-engine
 
 # Set environment variables
 ENV PYTHONPATH=/app/src
-ENV FLASK_APP=reaper.web.app
-ENV FLASK_PORT=5001
 ENV FLASK_HOST=0.0.0.0
+ENV FLASK_PORT=5001
 
 EXPOSE 5001
 
-# Entrypoint
-CMD ["python", "main.py"]
+# Start FastAPI dashboard with Socket.IO
+CMD ["python", "-m", "uvicorn", "reaper.web.app_async:socket_app", "--host", "0.0.0.0", "--port", "5001"]

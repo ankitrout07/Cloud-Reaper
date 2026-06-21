@@ -136,7 +136,7 @@ if ($envFileContent -match "your_subscription_id") {
     Write-Host ""
     Write-Host "    Please update your .env file with a real Subscription ID."
     Write-Host "    Or launch the Dashboard to use the Onboarding Wizard:"
-    Write-Host "    .\venv\Scripts\python.exe -m reaper.web.app"
+    Write-Host "    .\venv\Scripts\python.exe -m uvicorn reaper.web.app_async:socket_app"
     Write-Host ""
     Write-Host "=================================================="
     Write-Host ""
@@ -157,4 +157,4 @@ Write-Host "[+] Starting Dashboard..."
 Write-Host "    Access at: http://localhost:5001"
 Write-Host "    Press Ctrl+C to stop"
 Write-Host "------------------------------------------------"
-& .\venv\Scripts\python.exe -m reaper.web.app
+& .\venv\Scripts\python.exe -m uvicorn reaper.web.app_async:socket_app --host 0.0.0.0 --port 5001

@@ -123,14 +123,18 @@ def url_for(endpoint: str, **kwargs):
     query = "&".join(f"{k}={v}" for k, v in kwargs.items())
     return f"/{endpoint}?{query}" if query else f"/{endpoint}"
 
+def render_template(template_name: str, request: Request | None = None, **kwargs):
+    if request is None:
+        request = kwargs.pop("request", None)
+    if request is None:
+        request = StarletteRequest({"type": "http", "method": "GET", "headers": [], "path": "/"})
+    context = {"request": request, **kwargs}
+    return templates.TemplateResponse(request, template_name, context)
 
-def render_template(template_name: str, **kwargs):
-    request = kwargs.get("request")
-    if not request:
-        # Create a dummy scope to satisfy Jinja2Templates for legacy routes
-        request = StarletteRequest({"type": "http", "method": "GET", "headers": []})
-        kwargs["request"] = request
-    return templates.TemplateResponse(template_name, kwargs)
+
+def render_template_string(template_name: str, **kwargs) -> str:
+    template = templates.env.get_template(template_name)
+    return template.render(**kwargs)
 
 
 def send_from_directory(directory: str, filename: str, **kwargs):
@@ -311,7 +315,7 @@ async def favicon_png(request: Request):
     )
 
 
-def _get_cached_user_info() -> tuple[str, str]:
+def _get_cached_user_info(request: Request) -> tuple[str, str]:
     """Get cached user/subscription info with 5-minute TTL to avoid blocking Azure API calls."""
     cache_key_prefix = "azure_user_info"
     cache_ttl = 300  # 5 minutes
@@ -345,9 +349,11 @@ def _get_cached_user_info() -> tuple[str, str]:
 
 @app.get("/")
 async def index(request: Request):
-    user_name, sub_name = _get_cached_user_info()
+    user_name, sub_name = _get_cached_user_info(request)
     return templates.TemplateResponse(
-        "pages/index.html", {"request": request, "user_name": user_name, "sub_name": sub_name}
+        request,
+        "pages/index.html",
+        {"request": request, "user_name": user_name, "sub_name": sub_name},
     )
 
 
@@ -396,7 +402,7 @@ def _vault_salt_bytes(settings: VaultSettings) -> bytes:
     return base64.b64decode(settings.salt.encode("utf-8"))
 
 
-def _is_vault_unlocked() -> bool:
+def _is_vault_unlocked(request: Request) -> bool:
     if not request.session.get("vault_unlocked"):
         return False
     expires = request.session.get("vault_unlock_expires", 0)
@@ -408,14 +414,14 @@ def _is_vault_unlocked() -> bool:
     return bool(request.session.get("vault_fernet_key"))
 
 
-def _session_fernet() -> Fernet | None:
+def _session_fernet(request: Request) -> Fernet | None:
     key = request.session.get("vault_fernet_key")
-    if not key or not _is_vault_unlocked():
+    if not key or not _is_vault_unlocked(request):
         return None
     return Fernet(key.encode("utf-8"))
 
 
-def _unlock_vault_session(passcode: str, settings: VaultSettings) -> bool:
+def _unlock_vault_session(request: Request, passcode: str, settings: VaultSettings) -> bool:
     salt = _vault_salt_bytes(settings)
     if not verify_passcode(passcode, salt, cast(str, settings.passcode_verifier)):
         return False
@@ -431,6 +437,7 @@ async def settings(request: Request):
     vault_configured = _vault_settings_row() is not None
     return render_template(
         "pages/settings.html",
+        request=request,
         cloud_connections=cloud_summary,
         active_provider=active_provider,
         vault_configured=vault_configured,
@@ -921,7 +928,7 @@ async def vault_status(request: Request):
         {
             "status": "success",
             "configured": configured,
-            "unlocked": _is_vault_unlocked(),
+            "unlocked": _is_vault_unlocked(request),
         }
     )
 
@@ -968,7 +975,7 @@ async def vault_setup(request: Request):
         )
         db.add(settings)
         db.commit()
-        _unlock_vault_session(passcode, settings)
+        _unlock_vault_session(request, passcode, settings)
         return {"status": "success", "message": "Vault created and unlocked."}
     except Exception as e:
         db.rollback()
@@ -1019,7 +1026,7 @@ async def vault_unlock(request: Request):
         return JSONResponse(
             status_code=400, content={"status": "error", "message": "Vault is not configured yet."}
         )
-    if not _unlock_vault_session(passcode, settings):
+    if not _unlock_vault_session(request, passcode, settings):
         return JSONResponse(
             status_code=401, content={"status": "error", "message": "Incorrect passcode."}
         )
@@ -1036,7 +1043,7 @@ async def vault_lock(request: Request):
 
 @app.get("/api/vault/entries")
 async def vault_list_entries(request: Request):
-    if not _is_vault_unlocked():
+    if not _is_vault_unlocked(request):
         return JSONResponse(
             status_code=403, content={"status": "error", "message": "Vault is locked."}
         )
@@ -1063,12 +1070,12 @@ async def vault_list_entries(request: Request):
 
 @app.post("/api/vault/entries")
 async def vault_create_entry(request: Request):
-    if not _is_vault_unlocked():
+    if not _is_vault_unlocked(request):
         return JSONResponse(
             status_code=403, content={"status": "error", "message": "Vault is locked."}
         )
 
-    fernet = _session_fernet()
+    fernet = _session_fernet(request)
     if not fernet:
         return JSONResponse(
             status_code=403, content={"status": "error", "message": "Vault session expired."}
@@ -1123,14 +1130,14 @@ async def vault_create_entry(request: Request):
         db.close()
 
 
-@app.get("/api/vault/entries/<int:entry_id>")
+@app.get("/api/vault/entries/{entry_id}")
 async def vault_get_entry(request: Request, entry_id: int):
-    if not _is_vault_unlocked():
+    if not _is_vault_unlocked(request):
         return JSONResponse(
             status_code=403, content={"status": "error", "message": "Vault is locked."}
         )
 
-    fernet = _session_fernet()
+    fernet = _session_fernet(request)
     if not fernet:
         return JSONResponse(
             status_code=403, content={"status": "error", "message": "Vault session expired."}
@@ -1171,9 +1178,9 @@ async def vault_get_entry(request: Request, entry_id: int):
         db.close()
 
 
-@app.delete("/api/vault/entries/<int:entry_id>")
+@app.delete("/api/vault/entries/{entry_id}")
 async def vault_delete_entry(request: Request, entry_id: int):
-    if not _is_vault_unlocked():
+    if not _is_vault_unlocked(request):
         return JSONResponse(
             status_code=403, content={"status": "error", "message": "Vault is locked."}
         )
@@ -1228,12 +1235,12 @@ async def list_subscriptions(request: Request):
 
 @app.get("/pricing")
 async def pricing(request: Request):
-    return templates.TemplateResponse("pages/pricing.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/pricing.html", {"request": request})
 
 
 @app.get("/finops")
 async def finops(request: Request):
-    return templates.TemplateResponse("pages/finops.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/finops.html", {"request": request})
 
 
 @app.get("/financial")
@@ -1261,7 +1268,11 @@ async def financial(request: Request):
         db.close()
 
     return render_template(
-        "pages/financial.html", active_tab=tab, settings=settings_state, db_metrics=db_metrics
+        "pages/financial.html",
+        request=request,
+        active_tab=tab,
+        settings=settings_state,
+        db_metrics=db_metrics,
     )
 
 
@@ -1277,20 +1288,6 @@ async def simulate_commitment(request: Request):
             "roi_months": 3.5,
         }
     )
-
-
-@app.post("/api/v1/finops/test-webhook")
-async def test_webhook(request: Request):
-    """Test webhook endpoint for alert integration testing."""
-    from reaper.engine.notifications.notifier import send_discord_alert
-
-    try:
-        send_discord_alert(
-            "Test Alert", "This is a test notification from Cloud-Reaper.", color=0x3B82F6
-        )
-        return {"status": "success", "message": "Test webhook triggered successfully"}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
 @app.post("/api/v1/finops/simulate/policy")
@@ -1691,9 +1688,10 @@ async def add_business_metric(request: Request):
             )
             db.add(metric)
             db.commit()
-            return jsonify(
-                {"status": "success", "message": f"Metric '{name}' recorded successfully."}
-            ), 201
+            return JSONResponse(
+                status_code=201,
+                content={"status": "success", "message": f"Metric '{name}' recorded successfully."},
+            )
         except Exception as e:
             db.rollback()
             return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -1706,7 +1704,7 @@ async def add_business_metric(request: Request):
 @app.get("/build-with-ai")
 async def build_with_ai(request: Request):
     """Renders the AI Multi-Cloud Architect Estimator workspace dashboard."""
-    return templates.TemplateResponse("pages/build_with_ai.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/build_with_ai.html", {"request": request})
 
 
 @app.get("/api/v1/architect/status")
@@ -1751,7 +1749,7 @@ async def api_architect_estimate(request: Request):
 
 @app.get("/about")
 async def about(request: Request):
-    return templates.TemplateResponse("pages/about.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/about.html", {"request": request})
 
 
 @app.get("/docs")
@@ -1768,30 +1766,38 @@ async def docs(request: Request):
                 content = f.read()
             docs_data.append({"filename": filename, "title": title, "content": content})
     return templates.TemplateResponse(
-        "pages/docs.html", {"request": request, "docs_data": docs_data}
+        request,
+        "pages/docs.html",
+        {"request": request, "docs_data": docs_data},
     )
 
 
 @app.get("/integrations")
 async def integrations(request: Request):
     return templates.TemplateResponse(
-        "pages/integrations.html", {"request": request, "settings": settings_state}
+        request,
+        "pages/integrations.html",
+        {"request": request, "settings": settings_state},
     )
 
 
 @app.get("/monitor")
 async def monitor(request: Request):
-    return templates.TemplateResponse("pages/monitor.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/monitor.html", {"request": request})
 
 
 @app.get("/dashboard")
 async def dashboard(request: Request):
-    user_name, sub_name = _get_cached_user_info()
-    return render_template(
+    user_name, sub_name = _get_cached_user_info(request)
+    return templates.TemplateResponse(
+        request,
         "pages/dashboard.html",
-        user_name=user_name,
-        sub_name=sub_name,
-        metrics_emit_sec=SOCKET_METRICS_INTERVAL_SEC,
+        {
+            "request": request,
+            "user_name": user_name,
+            "sub_name": sub_name,
+            "metrics_emit_sec": SOCKET_METRICS_INTERVAL_SEC,
+        },
     )
 
 
@@ -1849,45 +1855,6 @@ def cache_response(max_age=300):
 @cache_response(max_age=60)  # Cache for 1 minute
 def auth_status():
     return check_azure_status()
-
-
-@app.post("/api/v1/docs/search")
-async def docs_search(request: Request):
-    """Search endpoint for documentation using RAG engine."""
-    from reaper.web.search_routes import search_engine
-
-    try:
-        data = (await request.json() if await request.body() else {}) or {}
-        query = data.get("query", "")
-        if not query:
-            return JSONResponse(
-                status_code=400, content={"status": "error", "message": "Query is required"}
-            )
-
-        results = search_engine.query_docs(user_query=query, top_k=3)
-        return {"status": "success", "results": results, "query": query}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-
-
-@app.post("/api/v1/finops/telemetry-insights")
-async def telemetry_insights(request: Request):
-    """Generate telemetry insights for the integrations page."""
-    try:
-        return jsonify(
-            {
-                "status": "success",
-                "message": "Telemetry insights generated",
-                "insights": {
-                    "total_requests": 15420,
-                    "avg_response_time": "245ms",
-                    "error_rate": "0.02%",
-                    "active_connections": 42,
-                },
-            }
-        )
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
 @app.get("/api/rightsizing")
@@ -2313,7 +2280,7 @@ async def export_bom(request: Request):
         total_monthly = data.get("totalMonthly", 0.0)
 
         # Render the HTML template
-        rendered_html = render_template(
+        rendered_html = render_template_string(
             "components/bom_pdf_template.html",
             items=items,
             totalHourly=total_hourly,
@@ -3016,7 +2983,7 @@ async def get_optimization_categories(request: Request):
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.get("/api/cost-optimization/priority/<priority>")
+@app.get("/api/cost-optimization/priority/{priority}")
 async def get_optimization_by_priority(request: Request, priority):
     """Get recommendations filtered by priority level"""
     try:
@@ -3044,7 +3011,7 @@ async def get_optimization_by_priority(request: Request, priority):
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
-@app.get("/api/cost-optimization/resource/<resource_id>")
+@app.get("/api/cost-optimization/resource/{resource_id}")
 async def get_resource_optimizations(request: Request, resource_id):
     """Get all optimization recommendations for a specific resource"""
     try:
@@ -3147,7 +3114,7 @@ async def get_optimization_dashboard(request: Request):
 @app.get("/cost-optimization")
 async def cost_optimization_page(request: Request):
     """Render the cost optimization dashboard page"""
-    return templates.TemplateResponse("pages/cost-optimization.html", {"request": request})
+    return templates.TemplateResponse(request, "pages/cost-optimization.html", {"request": request})
 
 
 @app.get("/api/cost-reports/executive-summary")
@@ -3508,63 +3475,12 @@ async def handle_start_log_stream():
 
 
 if __name__ == "__main__":
-    # use_reloader=False stops the 'after_fork_in_child' assertion error
+    import uvicorn
+
     port = int(os.getenv("FLASK_PORT", "5001"))
     host = os.getenv("FLASK_HOST", "127.0.0.1")
-    ipc_path = os.getenv("IPC_PATH")
 
-    if ipc_path:
-        print(f"\n[+] Cloud-Reaper Dashboard Active via IPC Pipe: {ipc_path}")
-    else:
-        print(f"\n[+] Cloud-Reaper Dashboard Active at http://{host}:{port}")
+    print(f"\n[+] Cloud-Reaper Dashboard Active at http://{host}:{port}")
+    print("[*] Engine: uvicorn + Socket.IO | Real-Time Monitoring: ENABLED\n")
 
-    print("[*] Engine: gevent | Real-Time Monitoring: ENABLED\n")
-
-    try:
-        if ipc_path:
-            import socket
-
-            try:
-                import gevent.pywsgi
-
-                has_gevent = True
-            except ImportError:
-                has_gevent = False
-
-            if os.path.exists(ipc_path):
-                try:
-                    os.remove(ipc_path)
-                except OSError:
-                    pass
-
-            listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            listener.bind(ipc_path)
-            listener.listen(128)
-
-            if has_gevent:
-                server = gevent.pywsgi.WSGIServer(listener, app)
-                server.serve_forever()
-            else:
-                # Fallback if gevent is not available (werkzeug doesn't easily support UDS)
-                print(
-                    "[!] Gevent is required for Unix Domain Socket IPC. Falling back to loopback."
-                )
-                socketio.run(
-                    app,
-                    host=host,
-                    port=port,
-                    debug=True,
-                    use_reloader=False,
-                    allow_unsafe_werkzeug=True,
-                )
-        else:
-            socketio.run(
-                app,
-                host=host,
-                port=port,
-                debug=True,
-                use_reloader=False,
-                allow_unsafe_werkzeug=True,
-            )
-    except KeyboardInterrupt:
-        print("\n[!] Dashboard server stopped by user.")
+    uvicorn.run("reaper.web.app_async:socket_app", host=host, port=port, reload=False)

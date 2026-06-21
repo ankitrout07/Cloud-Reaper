@@ -169,7 +169,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cloud_reaper
         run: |
-          python -c "from reaper.collectors.azure_collector import AzureCollector; from reaper.engine.calculator import CostCalculator; print('✅ Wiring OK')"
+          python -c "from reaper.collectors.azure_collector import AzureCollector; from reaper.engine.core.calculator import CostCalculator; print('✅ Wiring OK')"
           ./src/engine-go/reaper-engine --help || true
   docker-build:
     name: Docker Build

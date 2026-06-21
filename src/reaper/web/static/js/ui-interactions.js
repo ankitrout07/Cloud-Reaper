@@ -281,6 +281,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.location.pathname === '/financial') {
         initFinancialIntelligence();
     }
+    if (window.location.pathname === '/finops') {
+        initFinopsIntelligence();
+    }
     if (window.location.pathname === '/pricing') {
         loadPrices('azure', 1);
     }
@@ -467,6 +470,75 @@ window.applyWhatIfPolicy = async () => {
 // --- Dashboard (index.html) ---
 // Note: toggleConsole is now defined in theme.js to handle the new terminal interface
 
+const populateScanResults = (data) => {
+    if (!data || data.status !== 'success') return;
+
+    const vmCount = document.getElementById('vm-count');
+    if (vmCount) vmCount.textContent = String(data.vm_count ?? 0);
+
+    const diskCount = document.getElementById('disk-count');
+    if (diskCount) {
+        const orphanCount = (data.orphans || []).length;
+        const snapCount = (data.snapshots || []).length;
+        diskCount.textContent = String(orphanCount + snapCount);
+    }
+
+    const savingsVal = document.getElementById('savings-val');
+    if (savingsVal && data.total_savings) savingsVal.textContent = data.total_savings;
+
+    const targetList = document.getElementById('target-list');
+    if (targetList) {
+        const rows = [];
+        (data.orphans || []).forEach((item) => {
+            rows.push(
+                `<tr data-type="DISK"><td class="px-4 py-3 font-mono">${item.name}</td>` +
+                `<td class="px-4 py-3">DISK</td><td class="px-4 py-3 text-red-400">${item.savings}</td>` +
+                `<td class="px-4 py-3 text-right"><button class="text-cyan-400">Reap</button></td></tr>`
+            );
+        });
+        (data.snapshots || []).forEach((item) => {
+            rows.push(
+                `<tr data-type="DISK"><td class="px-4 py-3 font-mono">${item.name}</td>` +
+                `<td class="px-4 py-3">SNAPSHOT</td><td class="px-4 py-3 text-red-400">${item.savings}</td>` +
+                `<td class="px-4 py-3 text-right"><button class="text-cyan-400">Reap</button></td></tr>`
+            );
+        });
+        (data.zombies || []).forEach((item) => {
+            rows.push(
+                `<tr data-type="VM"><td class="px-4 py-3 font-mono">${item.name}</td>` +
+                `<td class="px-4 py-3">VM</td><td class="px-4 py-3 text-purple-400">${item.savings}</td>` +
+                `<td class="px-4 py-3 text-right"><button class="text-cyan-400">Reap</button></td></tr>`
+            );
+        });
+        targetList.innerHTML = rows.join('') ||
+            '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-500">No reap targets found.</td></tr>';
+    }
+
+    const zombieList = document.getElementById('zombie-list');
+    if (zombieList) {
+        const zombies = [...(data.zombies || []), ...(data.idle_vms || [])];
+        zombieList.innerHTML = zombies.map((z) =>
+            `<tr><td class="px-4 py-3 font-mono">${z.name}</td>` +
+            `<td class="px-4 py-3">CPU: ${z.usage ?? '—'}%</td>` +
+            `<td class="px-4 py-3 text-emerald-400">${z.savings ?? '—'}</td>` +
+            `<td class="px-4 py-3 text-right"><button class="text-rose-400">Kill</button></td></tr>`
+        ).join('') ||
+            '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-500">No zombies detected.</td></tr>';
+    }
+
+    const efficiencyList = document.getElementById('efficiency-list');
+    if (efficiencyList && data.utilization_report) {
+        efficiencyList.innerHTML = data.utilization_report.map((row) =>
+            `<tr><td class="py-3 px-4 font-mono">${row.name}</td>` +
+            `<td class="py-3 px-4">${row.current_sku}</td>` +
+            `<td class="py-3 px-4">${row.metrics}</td>` +
+            `<td class="py-3 px-4 ${row.color}">${row.status}</td>` +
+            `<td class="py-3 px-4">${row.recommendation}</td></tr>`
+        ).join('') ||
+            '<tr><td colspan="5" class="py-6 text-center text-gray-500">No utilization data.</td></tr>';
+    }
+};
+
 window.runScan = async () => {
     const scanBtn = document.getElementById('scanBtn');
     if (scanBtn) {
@@ -477,7 +549,12 @@ window.runScan = async () => {
     try {
         const response = await fetch('/api/scan');
         const data = await response.json();
-        notify("Cloud scan completed successfully.", "success");
+        if (data.status === 'success') {
+            populateScanResults(data);
+            notify("Cloud scan completed successfully.", "success");
+        } else {
+            notify(data.message || "Scan failed.", "error");
+        }
     } catch (e) {
         notify("Error running scan.", "error");
     } finally {
@@ -1371,8 +1448,216 @@ window.nextPage = () => {
     }
 };
 
-window.refreshAll = () => {
-    window.location.reload();
+window.refreshAll = async () => {
+    const icon = document.getElementById('refresh-icon');
+    if (icon) icon.classList.add('animate-spin');
+    try {
+        if (window.location.pathname === '/finops') {
+            await initFinopsIntelligence();
+            notify('FinOps intelligence synced.', 'success');
+        } else {
+            window.location.reload();
+        }
+    } finally {
+        if (icon) icon.classList.remove('animate-spin');
+    }
+};
+
+const fetchJson = async (url) => {
+    const response = await fetch(url);
+    return response.json();
+};
+
+window.initFinopsIntelligence = async () => {
+    const loaders = [
+        fetchJson('/api/finops/tag-health').then((data) => {
+            if (data.status !== 'success') return;
+            const rate = data.compliance_rate ?? 0;
+            const indicator = document.getElementById('tag-health-indicator');
+            if (indicator) {
+                indicator.textContent = `${Math.round(rate)}%`;
+                indicator.className = `w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg metric-value ${
+                    rate >= 80 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                }`;
+            }
+            const pct = document.getElementById('tag-integrity-pct');
+            if (pct) pct.textContent = `${rate}%`;
+            const bar = document.getElementById('tag-health-bar');
+            if (bar) bar.style.width = `${Math.min(rate, 100)}%`;
+            const list = document.getElementById('tag-missing-list');
+            if (list) {
+                const items = data.missing_tags_summary || [];
+                list.innerHTML = items.slice(0, 5).map((t) =>
+                    `<div class="flex justify-between text-sm"><span class="text-slate-300">${t.resource}</span>` +
+                    `<span class="text-rose-400 text-xs">${t.missing}</span></div>`
+                ).join('') || '<p class="text-xs text-slate-500">All resources tagged.</p>';
+            }
+        }),
+        fetchJson('/api/finops/anomalies').then((data) => {
+            if (data.status !== 'success') return;
+            const count = document.getElementById('anomaly-alert-count');
+            if (count) count.textContent = `${data.spike_count ?? 0} ALERTS`;
+            const list = document.getElementById('anomaly-list');
+            if (list) {
+                list.innerHTML = (data.services || []).slice(0, 4).map((s) =>
+                    `<div class="flex justify-between items-center ${s.is_anomaly ? 'text-rose-400' : 'text-slate-400'}">` +
+                    `<span>${s.service || s.name || 'Service'}</span>` +
+                    `<span class="text-xs font-mono">$${(s.cost ?? 0).toFixed?.(2) ?? s.cost ?? 0}</span></div>`
+                ).join('') || '<p class="text-xs text-slate-500">No anomalies detected.</p>';
+            }
+        }),
+        fetchJson('/api/finops/utilization').then((data) => {
+            if (data.status !== 'success') return;
+            const critical = (data.report || []).filter((r) => r.waste_coefficient > 0.7);
+            const badge = document.getElementById('zombie-count-badge');
+            if (badge) badge.textContent = String(critical.length);
+            const list = document.getElementById('zombie-radar-list');
+            if (list) {
+                list.innerHTML = critical.slice(0, 5).map((r) =>
+                    `<div class="flex justify-between text-sm"><span class="text-slate-300">${r.name}</span>` +
+                    `<span class="text-rose-400 text-xs">${Math.round(r.waste_coefficient * 100)}% waste</span></div>`
+                ).join('') || '<p class="text-xs text-slate-500">No high-waste resources.</p>';
+            }
+            const pending = document.getElementById('pending-reap-list');
+            if (pending) {
+                pending.innerHTML = critical.slice(0, 6).map((r) =>
+                    `<tr><td class="py-3 font-mono">${r.name}</td>` +
+                    `<td class="py-3">${Math.round(r.waste_coefficient * 100)}</td>` +
+                    `<td class="py-3">$${(r.monthly_cost ?? 0).toFixed(2)}</td>` +
+                    `<td class="py-3 text-right"><button class="text-cyan-400 text-xs">Approve</button></td></tr>`
+                ).join('') ||
+                    '<tr><td colspan="4" class="py-6 text-center text-slate-500">No pending approvals.</td></tr>';
+            }
+        }),
+        fetchJson('/api/finops/unit-economics').then((data) => {
+            if (data.status !== 'success') return;
+            const list = document.getElementById('unit-economics-list');
+            if (list) {
+                list.innerHTML = (data.metrics || []).map((m) =>
+                    `<div class="flex justify-between items-center"><div><p class="text-white font-semibold">${m.metric}</p>` +
+                    `<p class="text-xs text-slate-500">${m.count} ${m.unit}</p></div>` +
+                    `<div class="text-right"><p class="text-cyan-400 font-mono">$${m.cost_per_unit}</p>` +
+                    `<p class="text-xs text-slate-500">/ unit</p></div></div>`
+                ).join('') || '<p class="text-xs text-slate-500">No business metrics recorded.</p>';
+            }
+        }),
+        fetchJson('/api/finops/burn-rate-forecast').then((data) => {
+            if (data.status !== 'success' || !data.forecast) return;
+            const f = data.forecast;
+            const total = document.getElementById('projected-total');
+            if (total) total.textContent = `$${(f.projected_total ?? 0).toFixed(2)}`;
+            const trend = document.getElementById('burn-trend');
+            if (trend) {
+                const slope = f.slope ?? 0;
+                trend.textContent = `${slope >= 0 ? '+' : ''}${slope.toFixed(2)}%`;
+                trend.className = `text-xs font-bold ${slope >= 0 ? 'text-rose-400' : 'text-emerald-400'}`;
+            }
+            const chart = document.getElementById('burn-chart');
+            if (chart && f.daily_history?.length) {
+                const max = Math.max(...f.daily_history, 1);
+                chart.innerHTML = f.daily_history.slice(-14).map((v) =>
+                    `<div class="flex-1 bg-cyan-500/60 rounded-t" style="height:${Math.max(8, (v / max) * 100)}%"></div>`
+                ).join('');
+            }
+        }),
+        fetchJson('/api/finops/virtual-tags').then((data) => {
+            if (data.status !== 'success') return;
+            const list = document.getElementById('virtual-tags-list');
+            if (list) {
+                list.innerHTML = (data.virtual_tags || []).slice(0, 5).map((t) =>
+                    `<div class="p-3 bg-black/20 rounded-xl border border-white/5">` +
+                    `<p class="text-sm text-white font-mono">${t.resource_name}</p>` +
+                    `<p class="text-[10px] text-cyan-400 mt-1">${Object.entries(t.virtual_tags || {}).map(([k, v]) => `${k}: ${v}`).join(' · ')}</p></div>`
+                ).join('') || '<p class="text-xs text-slate-500">No virtual tags mapped.</p>';
+            }
+        }),
+        fetchJson('/api/finops/greenops').then((data) => {
+            if (data.status !== 'success') return;
+            const list = document.getElementById('greenops-list');
+            if (list) {
+                list.innerHTML = (data.recommendations || []).slice(0, 4).map((r) =>
+                    `<div class="flex justify-between text-sm"><span class="text-slate-300">${r.name}</span>` +
+                    `<span class="text-emerald-400 text-xs">${r.current_region} → ${r.target_region} (${r.savings_pct}%)</span></div>`
+                ).join('') || '<p class="text-xs text-slate-500">No carbon migrations suggested.</p>';
+            }
+        }),
+        fetchJson('/api/finops/ri-advisor').then((data) => {
+            if (data.status !== 'success') return;
+            const total = document.getElementById('ri-savings-total');
+            if (total) total.textContent = `+$${(data.total_annual_savings ?? 0).toFixed(2)}/yr`;
+            const list = document.getElementById('ri-list');
+            if (list) {
+                list.innerHTML = (data.candidates || []).slice(0, 5).map((c) =>
+                    `<tr><td class="py-3">${c.name || c.sku || 'Candidate'}</td>` +
+                    `<td class="py-3">$${(c.on_demand_monthly ?? c.on_demand ?? 0).toFixed?.(2) ?? c.on_demand ?? 0}</td>` +
+                    `<td class="py-3">$${(c.ri_monthly ?? 0).toFixed?.(2) ?? c.ri_monthly ?? 0}</td>` +
+                    `<td class="py-3 text-right text-emerald-400">$${(c.annual_savings ?? 0).toFixed?.(2) ?? c.annual_savings ?? 0}</td></tr>`
+                ).join('') ||
+                    '<tr><td colspan="4" class="py-6 text-center text-slate-500">No RI candidates.</td></tr>';
+            }
+        }),
+        fetchJson('/api/finops/cold-storage').then((data) => {
+            if (data.status !== 'success') return;
+            const total = document.getElementById('storage-savings-total');
+            if (total) total.textContent = `$${(data.total_monthly_savings ?? 0).toFixed(2)}/mo`;
+            const list = document.getElementById('storage-list');
+            if (list) {
+                list.innerHTML = (data.buckets || []).slice(0, 4).map((b) =>
+                    `<div class="flex justify-between text-sm"><span class="text-slate-300">${b.name}</span>` +
+                    `<span class="text-emerald-400">$${(b.monthly_savings ?? 0).toFixed(2)}/mo</span></div>`
+                ).join('') || '<p class="text-xs text-slate-500">No cold storage candidates.</p>';
+            }
+        }),
+        fetchJson('/api/finops/modernization').then((data) => {
+            if (data.status !== 'success') return;
+            const list = document.getElementById('modernization-list');
+            if (list) {
+                list.innerHTML = (data.suggestions || []).slice(0, 3).map((s) =>
+                    `<div class="p-4 bg-black/20 rounded-xl border border-white/5"><p class="text-white font-semibold">${s.title || s.resource || 'Upgrade'}</p>` +
+                    `<p class="text-xs text-slate-400 mt-2">${s.description || s.recommendation || ''}</p>` +
+                    `<p class="text-emerald-400 text-sm mt-2">$${(s.annual_savings ?? 0).toFixed(2)}/yr</p></div>`
+                ).join('') || '<p class="text-xs text-slate-500 col-span-3">No modernization tips.</p>';
+            }
+        }),
+        fetch('/api/rightsizing').then((r) => r.json()).then((data) => {
+            if (data.status !== 'success') return;
+            const total = document.getElementById('rightsizing-total-saving');
+            if (total) total.textContent = `$${(data.total_saving ?? 0).toFixed(2)}`;
+            const list = document.getElementById('rightsizing-list');
+            if (list) {
+                list.innerHTML = (data.recommendations || []).slice(0, 4).map((r) =>
+                    `<div class="p-4 bg-black/30 rounded-xl border border-cyan-500/10"><p class="font-mono text-white">${r.name || r.vm_name}</p>` +
+                    `<p class="text-xs text-slate-400 mt-1">${r.current_sku || r.current_size} → ${r.recommended_sku || r.recommended_size}</p>` +
+                    `<p class="text-emerald-400 text-sm mt-2">$${(r.monthly_saving ?? 0).toFixed(2)}/mo</p></div>`
+                ).join('') || '<p class="text-xs text-slate-500 col-span-2">No rightsizing recommendations.</p>';
+            }
+        }),
+        fetchJson('/api/finops/policy-violations').then((data) => {
+            if (data.status !== 'success') return;
+            const count = document.getElementById('policy-violation-count');
+            if (count) count.textContent = String(data.critical_count ?? 0);
+            const list = document.getElementById('policy-list');
+            if (list) {
+                list.innerHTML = (data.violations || []).slice(0, 4).map((v) =>
+                    `<div class="p-3 bg-rose-500/5 border border-rose-500/20 rounded-xl"><p class="text-sm text-white">${v.resource || v.name}</p>` +
+                    `<p class="text-xs text-rose-400 mt-1">${v.policy || v.violation} · ${v.severity}</p></div>`
+                ).join('') || '<p class="text-xs text-slate-500">No policy violations.</p>';
+            }
+        }),
+        fetchJson('/api/finops/budget-status').then((data) => {
+            if (data.status !== 'success') return;
+            const list = document.getElementById('budget-list');
+            if (list) {
+                list.innerHTML = (data.budgets || []).map((b) => {
+                    const pct = b.budget > 0 ? (b.actual / b.budget) * 100 : 0;
+                    return `<div><div class="flex justify-between text-sm mb-2"><span class="text-white">${b.name}</span>` +
+                        `<span class="${pct > 90 ? 'text-rose-400' : 'text-cyan-400'}">${pct.toFixed(0)}%</span></div>` +
+                        `<div class="w-full bg-white/5 h-1.5 rounded-full"><div class="bg-cyan-400 h-full rounded-full" style="width:${Math.min(pct, 100)}%"></div></div></div>`;
+                }).join('') || '<p class="text-xs text-slate-500">No budgets configured.</p>';
+            }
+        }),
+    ];
+    await Promise.allSettled(loaders);
 };
 
 window.toggleAdvancedLock = () => {

@@ -117,7 +117,7 @@ if grep -q "your_subscription_id" .env; then
     echo ""
     echo "    Please update your .env file with a real Subscription ID."
     echo "    Or launch the Dashboard to use the Onboarding Wizard:"
-    echo "    ./venv/bin/python3 -m reaper.web.app"
+    echo "    ./venv/bin/python3 -m uvicorn reaper.web.app_async:socket_app"
     echo ""
     echo "=================================================="
     echo ""
@@ -138,4 +138,4 @@ echo "[+] Starting Dashboard..."
 echo "    Access at: http://localhost:5001"
 echo "    Press Ctrl+C to stop"
 echo "------------------------------------------------"
-./venv/bin/python -m reaper.web.app
+./venv/bin/python -m uvicorn reaper.web.app_async:socket_app --host 0.0.0.0 --port 5001

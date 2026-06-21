@@ -24,7 +24,7 @@ def print_banner(error_id=None):
         print(f"    Current ID: {error_id}")
         print("\n    Please update your .env file with a real Subscription ID.")
         print("    Or launch the Dashboard to use the Onboarding Wizard:")
-        print("    python3 -m reaper.web.app")
+        print("    python3 -m uvicorn reaper.web.app_async:socket_app")
         print("\n" + "=" * 50 + "\n")
 
 

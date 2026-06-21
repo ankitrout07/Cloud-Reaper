@@ -488,7 +488,7 @@ def cmd_web(args: argparse.Namespace) -> int:
                 py_exe,
                 "-m",
                 "uvicorn",
-                "reaper.web.app_async:app",
+                "reaper.web.app_async:socket_app",
                 "--host",
                 env.get("FLASK_HOST", "0.0.0.0"),
                 "--port",
@@ -507,7 +507,7 @@ def cmd_web(args: argparse.Namespace) -> int:
         print("\n  Try manually:")
         print(f"    cd {REPO_ROOT}")
         print("    source venv/bin/activate")
-        print("    PYTHONPATH=src python -m uvicorn reaper.web.app_async:app")
+        print("    PYTHONPATH=src python -m uvicorn reaper.web.app_async:socket_app")
         return 1
     finally:
         if go_proc:
