@@ -60,7 +60,7 @@
     justify-content: space-between;
     padding: 32px 40px;
     border-bottom: 1px solid rgba(55, 65, 81, 0.25);
-    background: linear-gradient(90deg, rgba(75, 85, 99, 0.08) 0%, rgba(75, 85, 99, 0.03) 50%, transparent 100%);
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.03) 30%, rgba(75, 85, 99, 0.03) 70%, transparent 100%);
 }
 
 .section-title {
@@ -101,15 +101,17 @@
 }
 
 .section-icon-cyan .section-icon {
-    background: linear-gradient(135deg, rgba(75, 85, 99, 0.3) 0%, rgba(55, 65, 81, 0.25) 100%);
-    border: 1px solid rgba(107, 114, 128, 0.3);
-    color: #9ca3af;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.15) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #60a5fa;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
 }
 
 .section-icon-purple .section-icon {
-    background: linear-gradient(135deg, rgba(107, 114, 128, 0.3) 0%, rgba(75, 85, 99, 0.25) 100%);
-    border: 1px solid rgba(156, 163, 175, 0.3);
-    color: #d1d5db;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(59, 130, 246, 0.15) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    color: #a78bfa;
+    box-shadow: 0 0 15px rgba(139, 92, 246, 0.15);
 }
 
 .section-icon-green .section-icon {
@@ -146,6 +148,7 @@
     margin-bottom: 40px;
     position: relative;
     z-index: 10;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.05);
 }
 
 .settings-tab {
@@ -164,15 +167,18 @@
 }
 
 .settings-tab:hover {
-    color: #d1d5db;
-    background: rgba(75, 85, 99, 0.3);
+    color: #60a5fa;
+    background: rgba(59, 130, 246, 0.15);
     pointer-events: auto;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.1);
 }
 
 .settings-tab.active {
-    background: rgba(75, 85, 99, 0.4);
-    color: #e5e7eb;
+    background: rgba(59, 130, 246, 0.25);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
     pointer-events: auto;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
 }
 
 .form-group {
@@ -203,8 +209,8 @@
 
 .form-input:focus {
     outline: none;
-    border-color: rgba(107, 114, 128, 0.5);
-    box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.1);
+    border-color: rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     background: rgba(31, 41, 55, 0.8);
 }
 
@@ -227,8 +233,8 @@
 
 .form-select:focus {
     outline: none;
-    border-color: rgba(107, 114, 128, 0.5);
-    box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.1);
+    border-color: rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .form-range {
@@ -257,7 +263,7 @@
 
 .btn-primary {
     padding: 18px 40px;
-    background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     border: none;
     border-radius: 14px;
     color: white;
@@ -267,13 +273,13 @@
     letter-spacing: 0.05em;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+    box-shadow: 0 12px 32px rgba(59, 130, 246, 0.4);
+    background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
 }
 
 .btn-secondary {
@@ -291,8 +297,9 @@
 }
 
 .btn-secondary:hover {
-    background: rgba(75, 85, 99, 0.4);
-    border-color: rgba(107, 114, 128, 0.4);
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #60a5fa;
 }
 
 .toggle-switch {
@@ -307,8 +314,8 @@
 }
 
 .toggle-switch.active {
-    background: rgba(107, 114, 128, 0.6);
-    border-color: rgba(156, 163, 175, 0.4);
+    background: rgba(59, 130, 246, 0.4);
+    border-color: rgba(96, 165, 250, 0.5);
 }
 
 .toggle-switch::after {
@@ -325,7 +332,8 @@
 
 .toggle-switch.active::after {
     left: 27px;
-    background: #d1d5db;
+    background: #60a5fa;
+    box-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
 }
 
 .provider-grid {
@@ -407,8 +415,8 @@
 }
 
 .progress-dot.active {
-    background: #6b7280;
-    box-shadow: 0 0 10px rgba(107, 114, 128, 0.3);
+    background: #3b82f6;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
 }
 
 @media (max-width: 768px) {
@@ -451,10 +459,10 @@
 
             <!-- Navigation Tabs -->
             <nav class="settings-nav">
-                <button class="settings-tab active" data-tab="general" onclick="showTab('general')">General</button>
-                <button class="settings-tab" data-tab="cloud" onclick="showTab('cloud')">Cloud Providers</button>
-                <button class="settings-tab" data-tab="vault" onclick="showTab('vault')">Vault</button>
-                <button class="settings-tab" data-tab="advanced" onclick="showTab('advanced')">Advanced</button>
+                <button class="settings-tab active" data-tab="general" onclick="showSettingsTab('general')">General</button>
+                <button class="settings-tab" data-tab="cloud" onclick="showSettingsTab('cloud')">Cloud Providers</button>
+                <button class="settings-tab" data-tab="vault" onclick="showSettingsTab('vault')">Vault</button>
+                <button class="settings-tab" data-tab="advanced" onclick="showSettingsTab('advanced')">Advanced</button>
             </nav>
         </div>
     </header>
@@ -917,9 +925,9 @@
     });
 })();
 
-// Legacy function support (for backward compatibility)
-function showTab(tabName) {
-    console.log('showTab called with:', tabName);
+// Settings page specific tab function
+function showSettingsTab(tabName) {
+    console.log('showSettingsTab called with:', tabName);
     const tabs = document.querySelectorAll('.settings-tab');
     const tabContents = document.querySelectorAll('.tab-content');
 
@@ -939,6 +947,11 @@ function showTab(tabName) {
     if (targetContent) {
         targetContent.classList.remove('hidden');
     }
+}
+
+// Legacy function support (for backward compatibility)
+function showTab(tabName) {
+    showSettingsTab(tabName);
 }
 
 // Wizard Functions

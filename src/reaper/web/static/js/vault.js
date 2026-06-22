@@ -1,20 +1,24 @@
 let vaultUnlocked = false;
 
 async function refreshVaultStatus() {
+    console.log("Refreshing vault status...");
     try {
         const res = await fetch("/api/vault/status");
         const data = await res.json();
+        console.log("Vault status response:", data);
         vaultUnlocked = Boolean(data.unlocked);
         renderVaultState(Boolean(data.configured), vaultUnlocked);
         if (vaultUnlocked) {
             await loadVaultEntries();
         }
-    } catch {
+    } catch (error) {
+        console.error("Failed to refresh vault status:", error);
         renderVaultState(false, false);
     }
 }
 
 function renderVaultState(configured, unlocked) {
+    console.log("Rendering vault state:", { configured, unlocked });
     const setupBlock = document.getElementById("vault-setup-block");
     const unlockBlock = document.getElementById("vault-unlock-block");
     const contentBlock = document.getElementById("vault-content-block");
@@ -23,6 +27,7 @@ function renderVaultState(configured, unlocked) {
         setupBlock?.classList.remove("hidden");
         unlockBlock?.classList.add("hidden");
         contentBlock?.classList.add("hidden");
+        console.log("Vault not configured - showing setup block");
         return;
     }
 
@@ -30,9 +35,11 @@ function renderVaultState(configured, unlocked) {
     if (unlocked) {
         unlockBlock?.classList.add("hidden");
         contentBlock?.classList.remove("hidden");
+        console.log("Vault unlocked - showing content block");
     } else {
         unlockBlock?.classList.remove("hidden");
         contentBlock?.classList.add("hidden");
+        console.log("Vault locked - showing unlock block");
     }
 }
 
@@ -68,18 +75,26 @@ async function setupVault() {
         if (data.status !== "success") {
             throw new Error(data.message || "Failed to create vault");
         }
-        if (typeof showToast === "function") {
+        if (typeof notify === "function") {
+            notify(data.message, "success");
+        } else if (typeof showToast === "function") {
             showToast(data.message, "success");
+        } else {
+            alert(data.message);
         }
-        
+
         // Clear setup fields
         if (document.getElementById("vault-setup-passcode")) document.getElementById("vault-setup-passcode").value = "";
         if (document.getElementById("vault-setup-confirm")) document.getElementById("vault-setup-confirm").value = "";
-        
+
         await refreshVaultStatus();
     } catch (error) {
-        if (typeof showToast === "function") {
+        if (typeof notify === "function") {
+            notify(error.message, "error");
+        } else if (typeof showToast === "function") {
             showToast(error.message, "error");
+        } else {
+            alert(error.message);
         }
     }
 }
@@ -97,17 +112,25 @@ async function resetVault() {
         if (data.status !== "success") {
             throw new Error(data.message || "Failed to reset vault");
         }
-        if (typeof showToast === "function") {
+        if (typeof notify === "function") {
+            notify(data.message, "success");
+        } else if (typeof showToast === "function") {
             showToast(data.message, "success");
+        } else {
+            alert(data.message);
         }
-        
+
         // Clear all fields
         if (document.getElementById("vault-unlock-passcode")) document.getElementById("vault-unlock-passcode").value = "";
-        
+
         await refreshVaultStatus();
     } catch (error) {
-        if (typeof showToast === "function") {
+        if (typeof notify === "function") {
+            notify(error.message, "error");
+        } else if (typeof showToast === "function") {
             showToast(error.message, "error");
+        } else {
+            alert(error.message);
         }
     }
 }
@@ -125,14 +148,22 @@ async function unlockVault() {
         if (data.status !== "success") {
             throw new Error(data.message || "Failed to unlock vault");
         }
-        if (typeof showToast === "function") {
+        if (typeof notify === "function") {
+            notify(data.message, "success");
+        } else if (typeof showToast === "function") {
             showToast(data.message, "success");
+        } else {
+            alert(data.message);
         }
         document.getElementById("vault-unlock-passcode").value = "";
         await refreshVaultStatus();
     } catch (error) {
-        if (typeof showToast === "function") {
+        if (typeof notify === "function") {
+            notify(error.message, "error");
+        } else if (typeof showToast === "function") {
             showToast(error.message, "error");
+        } else {
+            alert(error.message);
         }
     }
 }
@@ -141,8 +172,12 @@ async function lockVault() {
     await fetch("/api/vault/lock", { method: "POST" });
     vaultUnlocked = false;
     await refreshVaultStatus();
-    if (typeof showToast === "function") {
+    if (typeof notify === "function") {
+        notify("Vault locked.", "success");
+    } else if (typeof showToast === "function") {
         showToast("Vault locked.", "success");
+    } else {
+        alert("Vault locked.");
     }
 }
 
@@ -206,13 +241,21 @@ async function saveVaultEntry() {
         document.getElementById("vault-entry-username").value = "";
         document.getElementById("vault-entry-value").value = "";
         document.getElementById("vault-entry-notes").value = "";
-        if (typeof showToast === "function") {
+        if (typeof notify === "function") {
+            notify(data.message, "success");
+        } else if (typeof showToast === "function") {
             showToast(data.message, "success");
+        } else {
+            alert(data.message);
         }
         await loadVaultEntries();
     } catch (error) {
-        if (typeof showToast === "function") {
+        if (typeof notify === "function") {
+            notify(error.message, "error");
+        } else if (typeof showToast === "function") {
             showToast(error.message, "error");
+        } else {
+            alert(error.message);
         }
     }
 }
@@ -234,8 +277,12 @@ async function revealVaultEntry(entryId) {
             .join("\n");
         alert(`${entry.label} (${entry.entry_type.replace('_', ' ').toUpperCase()})\n\n${details}`);
     } catch (error) {
-        if (typeof showToast === "function") {
+        if (typeof notify === "function") {
+            notify(error.message, "error");
+        } else if (typeof showToast === "function") {
             showToast(error.message, "error");
+        } else {
+            alert(error.message);
         }
     }
 }
@@ -250,13 +297,21 @@ async function deleteVaultEntry(entryId) {
         if (data.status !== "success") {
             throw new Error(data.message || "Failed to delete entry");
         }
-        if (typeof showToast === "function") {
+        if (typeof notify === "function") {
+            notify(data.message, "success");
+        } else if (typeof showToast === "function") {
             showToast(data.message, "success");
+        } else {
+            alert(data.message);
         }
         await loadVaultEntries();
     } catch (error) {
-        if (typeof showToast === "function") {
+        if (typeof notify === "function") {
+            notify(error.message, "error");
+        } else if (typeof showToast === "function") {
             showToast(error.message, "error");
+        } else {
+            alert(error.message);
         }
     }
 }
@@ -264,7 +319,12 @@ async function deleteVaultEntry(entryId) {
 document.addEventListener("DOMContentLoaded", () => {
     refreshVaultStatus();
     const params = new URLSearchParams(window.location.search);
-    if (params.get("tab") === "vault" && typeof showTab === "function") {
-        showTab("vault");
+    if (params.get("tab") === "vault") {
+        // Try the settings-specific function first, then fall back to generic showTab
+        if (typeof showSettingsTab === "function") {
+            showSettingsTab("vault");
+        } else if (typeof showTab === "function") {
+            showTab("vault");
+        }
     }
 });
