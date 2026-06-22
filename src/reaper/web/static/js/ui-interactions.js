@@ -5,7 +5,7 @@ function showTab(tabId) {
     tabs.forEach(t => {
         const el = document.getElementById(t + '-tab');
         if (el) el.classList.add('hidden');
-        
+
         const btn = document.getElementById('tab-' + t);
         if (btn) {
             btn.className = "pb-4 text-sm font-bold text-gray-500 hover:text-white transition-all";
@@ -29,9 +29,14 @@ function showTab(tabId) {
     const url = new URL(window.location);
     url.searchParams.set('tab', tabId);
     window.history.pushState({}, '', url);
-    
+
     if (typeof initializeSidebarHighlighting === 'function') {
         initializeSidebarHighlighting();
+    }
+
+    // Refresh cloud connections when cloud tab is shown
+    if (tabId === 'cloud' && typeof refreshCloudConnections === 'function') {
+        refreshCloudConnections();
     }
 }
 

@@ -151,6 +151,9 @@ async function refreshCloudConnections() {
     }
 }
 
+// Make refreshCloudConnections globally accessible
+window.refreshCloudConnections = refreshCloudConnections;
+
 function toggleCloudPanel(provider) {
     document.querySelectorAll(".cloud-provider-panel").forEach((panel) => {
         panel.classList.add("hidden");
@@ -159,6 +162,8 @@ function toggleCloudPanel(provider) {
     if (panel) {
         panel.classList.remove("hidden");
     }
+    // Refresh connections when showing a provider panel
+    refreshCloudConnections();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
