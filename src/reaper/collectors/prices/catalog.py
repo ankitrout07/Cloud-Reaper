@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 from reaper.collectors.prices.aws import AWSPriceClient
-from reaper.collectors.prices.azure import AzurePriceClient
+from reaper.collectors.prices.azure import AZURE_RETAIL_SERVICE_NAMES, AzurePriceClient
 from reaper.collectors.prices.gcp import GCPPriceClient
 
 logger = logging.getLogger(__name__)
@@ -332,6 +332,9 @@ def query_catalog_prices(
 def get_catalog_filters(provider: str) -> dict[str, list[str]]:
     """Distinct service and region values for filter dropdowns."""
     prices = get_catalog_prices(provider)
-    services = sorted({p["service"] for p in prices})
+    if provider.lower() == "azure":
+        services = AZURE_RETAIL_SERVICE_NAMES.copy()
+    else:
+        services = sorted({p["service"] for p in prices})
     regions = sorted({p["region"] for p in prices})
     return {"services": services, "regions": regions}

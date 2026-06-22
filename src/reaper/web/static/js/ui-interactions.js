@@ -489,27 +489,90 @@ const populateScanResults = (data) => {
     const targetList = document.getElementById('target-list');
     if (targetList) {
         const rows = [];
+        
+        // Azure Disks (Orphans)
         (data.orphans || []).forEach((item) => {
             rows.push(
-                `<tr data-type="DISK"><td class="px-4 py-3 font-mono">${item.name}</td>` +
-                `<td class="px-4 py-3">DISK</td><td class="px-4 py-3 text-red-400">${item.savings}</td>` +
+                `<tr data-type="DISK" data-provider="azure" data-component="Disk"><td class="px-4 py-3 font-mono">${item.name}</td>` +
+                `<td class="px-4 py-3">DISK (Azure)</td><td class="px-4 py-3 text-red-400">${item.savings}</td>` +
                 `<td class="px-4 py-3 text-right"><button class="text-cyan-400">Reap</button></td></tr>`
             );
         });
+        
+        // Azure Snapshots
         (data.snapshots || []).forEach((item) => {
             rows.push(
-                `<tr data-type="DISK"><td class="px-4 py-3 font-mono">${item.name}</td>` +
-                `<td class="px-4 py-3">SNAPSHOT</td><td class="px-4 py-3 text-red-400">${item.savings}</td>` +
+                `<tr data-type="DISK" data-provider="azure" data-component="Snapshot"><td class="px-4 py-3 font-mono">${item.name}</td>` +
+                `<td class="px-4 py-3">SNAPSHOT (Azure)</td><td class="px-4 py-3 text-red-400">${item.savings}</td>` +
                 `<td class="px-4 py-3 text-right"><button class="text-cyan-400">Reap</button></td></tr>`
             );
         });
+        
+        // Azure VMs (Zombies)
         (data.zombies || []).forEach((item) => {
             rows.push(
-                `<tr data-type="VM"><td class="px-4 py-3 font-mono">${item.name}</td>` +
-                `<td class="px-4 py-3">VM</td><td class="px-4 py-3 text-purple-400">${item.savings}</td>` +
+                `<tr data-type="VM" data-provider="azure" data-component="VirtualMachine"><td class="px-4 py-3 font-mono">${item.name}</td>` +
+                `<td class="px-4 py-3">VM (Azure)</td><td class="px-4 py-3 text-purple-400">${item.savings}</td>` +
                 `<td class="px-4 py-3 text-right"><button class="text-cyan-400">Reap</button></td></tr>`
             );
         });
+        
+        // AWS Resources (from aws_resources if available)
+        (data.aws_resources || []).forEach((item) => {
+            const resourceType = item.type || 'Unknown';
+            let component = 'Unknown';
+            let displayType = 'RESOURCE';
+            let dataType = 'VM';
+            
+            if (resourceType.includes('EC2')) {
+                component = 'EC2Instance';
+                displayType = 'EC2 INSTANCE';
+                dataType = 'VM';
+            } else if (resourceType.includes('EBS') || resourceType.includes('Volume')) {
+                component = 'EBS';
+                displayType = 'EBS VOLUME';
+                dataType = 'DISK';
+            } else if (resourceType.includes('Snapshot')) {
+                component = 'Snapshot';
+                displayType = 'SNAPSHOT';
+                dataType = 'DISK';
+            }
+            
+            rows.push(
+                `<tr data-type="${dataType}" data-provider="aws" data-component="${component}"><td class="px-4 py-3 font-mono">${item.name || resourceType}</td>` +
+                `<td class="px-4 py-3">${displayType} (AWS)</td><td class="px-4 py-3 text-red-400">${item.savings || '$0.00'}</td>` +
+                `<td class="px-4 py-3 text-right"><button class="text-cyan-400">Reap</button></td></tr>`
+            );
+        });
+        
+        // GCP Resources (from gcp_resources if available)
+        (data.gcp_resources || []).forEach((item) => {
+            const resourceType = item.type || 'Unknown';
+            let component = 'Unknown';
+            let displayType = 'RESOURCE';
+            let dataType = 'VM';
+            
+            if (resourceType.includes('Compute') || resourceType.includes('Instance')) {
+                component = 'ComputeInstance';
+                displayType = 'COMPUTE INSTANCE';
+                dataType = 'VM';
+            } else if (resourceType.includes('Disk') || resourceType.includes('PersistentDisk')) {
+                component = 'PersistentDisk';
+                displayType = 'PERSISTENT DISK';
+                dataType = 'DISK';
+            } else if (resourceType.includes('Snapshot')) {
+                component = 'Snapshot';
+                displayType = 'SNAPSHOT';
+                dataType = 'DISK';
+            }
+            
+            rows.push(
+                `<tr data-type="${dataType}" data-provider="gcp" data-component="${component}"><td class="px-4 py-3 font-mono">${item.name || resourceType}</td>` +
+                `<td class="px-4 py-3">${displayType} (GCP)</td><td class="px-4 py-3 text-red-400">${item.savings || '$0.00'}</td>` +
+                `<td class="px-4 py-3 text-right"><button class="text-cyan-400">Reap</button></td></tr>`
+            );
+        });
+        
         targetList.innerHTML = rows.join('') ||
             '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-500">No reap targets found.</td></tr>';
     }
@@ -613,6 +676,95 @@ window.filterTable = () => {
             row.style.display = 'none';
         }
     });
+};
+
+// Provider and Component Filtering Functions
+window.filterByProvider = () => {
+    const provider = document.getElementById('providerFilter')?.value || '';
+    const tableBody = document.getElementById('target-list');
+    if (!tableBody) return;
+
+    // Show/hide component-specific dropdowns
+    document.getElementById('awsComponentFilter').classList.toggle('hidden', provider !== 'aws');
+    document.getElementById('azureComponentFilter').classList.toggle('hidden', provider !== 'azure');
+    document.getElementById('gcpComponentFilter').classList.toggle('hidden', provider !== 'gcp');
+
+    // Reset component filters when provider changes
+    if (provider) {
+        if (provider === 'aws') {
+            document.getElementById('awsComponentFilter').value = '';
+        } else if (provider === 'azure') {
+            document.getElementById('azureComponentFilter').value = '';
+        } else if (provider === 'gcp') {
+            document.getElementById('gcpComponentFilter').value = '';
+        }
+    }
+
+    const rows = tableBody.querySelectorAll('tr');
+    rows.forEach(row => {
+        const rowProvider = row.getAttribute('data-provider');
+        if (!provider) {
+            row.style.display = '';
+        } else {
+            row.style.display = rowProvider === provider ? '' : 'none';
+        }
+    });
+
+    notify(provider ? `Filtering by ${provider.toUpperCase()} resources` : 'Showing all providers', 'success');
+};
+
+window.filterByAwsComponent = () => {
+    const component = document.getElementById('awsComponentFilter')?.value || '';
+    const tableBody = document.getElementById('target-list');
+    if (!tableBody) return;
+
+    const rows = tableBody.querySelectorAll('tr[data-provider="aws"]');
+    rows.forEach(row => {
+        const rowComponent = row.getAttribute('data-component');
+        if (!component) {
+            row.style.display = '';
+        } else {
+            row.style.display = rowComponent === component ? '' : 'none';
+        }
+    });
+
+    notify(component ? `Filtering AWS by ${component}` : 'Showing all AWS components', 'success');
+};
+
+window.filterByAzureComponent = () => {
+    const component = document.getElementById('azureComponentFilter')?.value || '';
+    const tableBody = document.getElementById('target-list');
+    if (!tableBody) return;
+
+    const rows = tableBody.querySelectorAll('tr[data-provider="azure"]');
+    rows.forEach(row => {
+        const rowComponent = row.getAttribute('data-component');
+        if (!component) {
+            row.style.display = '';
+        } else {
+            row.style.display = rowComponent === component ? '' : 'none';
+        }
+    });
+
+    notify(component ? `Filtering Azure by ${component}` : 'Showing all Azure components', 'success');
+};
+
+window.filterByGcpComponent = () => {
+    const component = document.getElementById('gcpComponentFilter')?.value || '';
+    const tableBody = document.getElementById('target-list');
+    if (!tableBody) return;
+
+    const rows = tableBody.querySelectorAll('tr[data-provider="gcp"]');
+    rows.forEach(row => {
+        const rowComponent = row.getAttribute('data-component');
+        if (!component) {
+            row.style.display = '';
+        } else {
+            row.style.display = rowComponent === component ? '' : 'none';
+        }
+    });
+
+    notify(component ? `Filtering GCP by ${component}` : 'Showing all GCP components', 'success');
 };
 
 window.fetchActivity = async () => {

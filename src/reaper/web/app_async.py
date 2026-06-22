@@ -1947,6 +1947,8 @@ async def _async_perform_subscription_scan(target_subs: list[str], events: list[
         "zombies": [],
         "idle_vms": [],
         "utilization": [],
+        "aws_resources": [],
+        "gcp_resources": [],
     }
 
     for sub_id in target_subs:
@@ -2155,6 +2157,8 @@ def format_scan_results(raw):
         "zombies": [],
         "idle_vms": [],
         "utilization_report": util_rows,
+        "aws_resources": [],
+        "gcp_resources": [],
     }
 
     # Idle VMs
@@ -2201,6 +2205,32 @@ def format_scan_results(raw):
                 "usage": z["usage"],
                 "savings": calc.format_price(cost),
                 "rg": z.get("rg", "N/A"),
+            }
+        )
+
+    # AWS Resources
+    for resource in raw.get("aws_resources", []):
+        cost = calc.calculate_monthly_cost("aws", resource.get("category", "compute"), resource.get("sku", "t3.micro"))
+        total_savings += cost
+        formatted["aws_resources"].append(
+            {
+                "name": resource.get("name", "Unknown"),
+                "type": resource.get("type", "Unknown"),
+                "savings": calc.format_price(cost),
+                "region": resource.get("region", "N/A"),
+            }
+        )
+
+    # GCP Resources
+    for resource in raw.get("gcp_resources", []):
+        cost = calc.calculate_monthly_cost("gcp", resource.get("category", "compute"), resource.get("sku", "n1-standard-1"))
+        total_savings += cost
+        formatted["gcp_resources"].append(
+            {
+                "name": resource.get("name", "Unknown"),
+                "type": resource.get("type", "Unknown"),
+                "savings": calc.format_price(cost),
+                "region": resource.get("region", "N/A"),
             }
         )
 

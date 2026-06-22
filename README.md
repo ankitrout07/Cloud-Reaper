@@ -103,8 +103,7 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
                           │   ├── price_client   (23 Azure SVCs)    │
                           │   ├── arbitrage      (Region Pricing)   │
                           │   ├── auth           (Graph API)        │
-                          │   ├── serve          (HTTP Bridge)      │
-                          │   └── db bridge      (Zero-alloc Pool)  │
+                          │   └── db bridge      (pgx/v5 + upsert)  │
                           └────────────────────┬────────────────────┘
                                                │  PostgreSQL 15
                           ┌────────────────────▼────────────────────┐
@@ -113,11 +112,11 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
                           │   ├── engine/      ARIMA, Q-RL, Econ    │
                           │   ├── rag/         BM25 + Gemini RRF    │
                           │   ├── services/    InfluxDB, Pusher     │
-                          │   └── web/         FastAPI + Uvicorn    │
+                          │   └── web/         Flask + SocketIO     │
                           └────────────────────┬────────────────────┘
                                                │
                           ┌────────────────────▼────────────────────┐
-                          │   FastAPI ASGI Dashboard                │
+                          │   Flask/SocketIO Dashboard              │
                           │   ├── Real-time WebSocket metrics       │
                           │   ├── Glassmorphism Dark Theme UI       │
                           │   ├── Vault & Credential Management     │
@@ -128,9 +127,9 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 ### Data Flow
 
 1. **Go Scanner** concurrently scrapes multi-cloud APIs using goroutines with a token-bucket rate limiter (10 req/s)
-2. Resource data is normalized and batch-upserted into PostgreSQL via `pgx/v5` using a **zero-allocation `sync.Pool` buffer** (eliminates GC pauses); stale entries auto-purged after 5 min
+2. Resource data is normalized and batch-upserted into PostgreSQL via `pgx/v5`; stale entries auto-purged after 5 min
 3. **Python Intelligence Layer** queries the DB, runs ARIMA anomaly detection, Q-learning right-sizing, and unit economics models
-4. **FastAPI Dashboard** calls the Go engine via a resident **HTTP bridge (loopback:7070)** for zero-fork overhead and renders real-time metrics via WebSockets with in-memory cache acceleration
+4. **Flask Dashboard** renders real-time metrics via WebSocket (SocketIO) with in-memory cache acceleration
 5. Every vault access and resource action is logged into a **SHA-256 chained hash ledger** for tamper detection
 6. Savings telemetry is pushed to **InfluxDB** for long-term time-series retention
 
@@ -152,41 +151,51 @@ Cloud-Reaper/
 ├── HOW_TO_RUN.md               # Full setup guide
 ├── scripts/
 │   └── reap.sh                 # Linux/macOS shell entrypoint
-├── docs/                       # Project documentation (indexed by RAG engine)
-│   ├── 1_product_docs.md
-│   ├── 2_features_guide.md
-│   ├── 4_audit_logs.md
-│   ├── 5_executive_summary_and_architecture.txt
-│   ├── 6_finops_intelligence_layer_python.txt
-│   ├── 7_performance_scanner_go.txt
-│   ├── 8_ai_copilot_and_token_usage.txt
-│   └── 9_database_schema_and_api_endpoints.txt
-├── CHANGELOG.md                # Release history (canonical changelog)
+├── Docs/                       # Project documentation (indexed by RAG engine)
+│   ├── Part-1-Executive-Summary-And-Architecture.txt
+│   ├── Part-2-Core-FinOps-Intelligence-Layer-Python.txt
+│   ├── Part-3-High-Velocity-Performance-Scanner-Go.txt
+│   ├── Part-4-AI-Copilot-And-Token-Usage.txt
+│   ├── Part-5-Database-Schema-And-API-Endpoints.txt
+│   ├── Patch-Updates.txt
+│   └── [feature guides, changelog, audit log docs]
 ├── src/
 │   ├── reaper/                 # Python Intelligence & Web Layer
 │   │   ├── cli.py              # CLI runner (scan, --pr-simulation mode)
 │   │   ├── collectors/         # Multi-cloud scrapers & price clients
-│   │   │   ├── providers/            # Cloud resource collectors (Azure, etc.)
-│   │   │   ├── prices/               # Azure/AWS/GCP pricing API clients
-│   │   │   ├── telemetry/            # Prometheus metric bridge
-│   │   │   └── utils/                # Config management & auth checks
+│   │   │   ├── azure_collector.py    # Core Azure resource collector
+│   │   │   ├── aws_collector.py      # AWS EC2/S3 resource collector
+│   │   │   ├── azure_prices.py       # Azure Retail Pricing API client
+│   │   │   ├── aws_prices.py         # AWS Pricing API client
+│   │   │   ├── gcp_prices.py         # GCP Pricing API client
+│   │   │   ├── config_manager.py     # Centralized configuration management
+│   │   │   ├── auth_check.py         # Azure credential validation
+│   │   │   └── prometheus_finops.py  # Prometheus metric bridge
 │   │   ├── engine/             # FinOps models, ML/RL engines, economics
-│   │   │   ├── core/                 # Architect, calculator, logic, economics
-│   │   │   ├── copilot/              # KnapsackCopilotEngine (Gemini 2.5 Flash)
-│   │   │   ├── models/               # SQLAlchemy ORM (13 tables)
-│   │   │   ├── notifications/        # Multi-channel notification dispatcher
-│   │   │   ├── telemetry/            # Metrics analysis & CLI
-│   │   │   └── price_book.yaml       # Static SKU price reference book
+│   │   │   ├── models.py             # SQLAlchemy ORM (13 tables)
+│   │   │   ├── architect.py          # AI Architect Estimator (BOM + offline fallback)
+│   │   │   ├── calculator.py         # Cost calculator + RightsizingAgent (Q-learning)
+│   │   │   ├── economics.py          # Unit economics: MC=MR, ProportionalAllocator
+│   │   │   ├── logic.py              # ZombieScorer, BudgetForecaster, AnomalyDetector
+│   │   │   ├── workload.py           # WorkloadPersonality, PredictiveScalingEngine, SpotAdvisor
+│   │   │   ├── copilot_engine.py     # KnapsackCopilotEngine (Gemini 2.5 Flash)
+│   │   │   ├── copilot_schemas.py    # Pydantic schemas for structured LLM output
+│   │   │   ├── metrics_analyzer.py   # Telemetry metrics analysis
+│   │   │   ├── metrics_cli.py        # CLI tool for metrics inspection
+│   │   │   ├── price_book.yaml       # Static SKU price reference book
+│   │   │   ├── scheduler.py          # Background job scheduler
+│   │   │   ├── notifier.py           # Multi-channel notification dispatcher
+│   │   │   └── schema.py             # Data validation schemas
 │   │   ├── rag/                # Retrieval-Augmented Generation engine
 │   │   │   └── engine.py             # BM25 + Gemini Embedding hybrid search + RRF
 │   │   ├── services/           # Background services
 │   │   │   ├── log_streamer.py       # WebSocket log streaming service
 │   │   │   └── pusher.py             # InfluxDB push & notification service
-│   │   └── web/                # FastAPI app, templates, static assets
-│   │       ├── app_async.py          # Main FastAPI application
-│   │       ├── copilot_router.py     # /api/v1/copilot/optimize
-│   │       ├── metrics_router.py     # /api/metrics/*
-│   │       ├── search_router.py      # /api/v1/docs/search
+│   │   └── web/                # Flask app, templates, static assets
+│   │       ├── app.py                # Main Flask application
+│   │       ├── copilot_routes.py     # Blueprint: /api/v1/copilot/optimize
+│   │       ├── metrics_routes.py     # Blueprint: /api/metrics/*
+│   │       ├── search_routes.py      # Blueprint: /api/search
 │   │       ├── vault_crypto.py       # PBKDF2 + Fernet encryption helpers
 │   │       ├── templates/            # Jinja2 templates (15 pages)
 │   │       └── static/              # CSS (Glassmorphism Dark Theme), JS, assets
@@ -210,7 +219,8 @@ Cloud-Reaper/
 │           └── db.go                 # PostgreSQL bridge (pgx/v5) + crypto audit
 ├── tests/
 │   ├── unit/                   # Python unit tests
-│   └── integration/            # Integration tests (requires live DB)
+│   ├── integration/            # Integration tests (requires live DB)
+│   └── experimental/           # Exploratory tests & scratch scripts
 └── .github/
     └── workflows/
         └── ci.yml              # 7-stage parallel CI pipeline
@@ -226,7 +236,7 @@ Cloud-Reaper/
 | **Language (Go)** | Go 1.24+ |
 | **Database** | PostgreSQL 15 (SQLAlchemy 2.0 ORM + pgx/v5 driver) |
 | **Time-Series** | InfluxDB (savings & unit economics telemetry via `influxdb-client`) |
-| **Web Framework** | FastAPI + Uvicorn (ASGI) + WebSockets |
+| **Web Framework** | Flask 3.0 + Flask-SocketIO (gevent WebSocket transport) |
 | **AI Copilot** | Google GenAI (`google-genai`) · Gemini 2.5 Flash · Bounded Knapsack Optimizer |
 | **AI Architect** | OpenAI (`openai>=1.50.0`) + Google Gemini (multi-provider BOM generation + offline fallback) |
 | **RAG Search** | BM25 sparse retrieval + Gemini Embedding dense retrieval + Reciprocal Rank Fusion (k=60) |
@@ -443,7 +453,7 @@ POST /api/v1/copilot/optimize
 
 ## 🔍 RAG Documentation Search
 
-Cloud-Reaper includes a built-in **Retrieval-Augmented Generation** engine for searching the `docs/` directory with hybrid retrieval.
+Cloud-Reaper includes a built-in **Retrieval-Augmented Generation** engine for searching the `Docs/` directory with hybrid retrieval.
 
 ### 4-Stage Pipeline
 
@@ -456,7 +466,7 @@ Cloud-Reaper includes a built-in **Retrieval-Augmented Generation** engine for s
 - **Contextual chunk situating** — Each chunk is prefixed with a document-level summary
 - **Sliding window enrichment** — Left/right sentence context for richer retrieval
 - **Graceful degradation** — Falls back to Jaccard/overlap scoring when Gemini is unavailable
-- Drop any Markdown or text file into `docs/` to make it instantly searchable
+- Drop any Markdown or text file into `Docs/` to make it instantly searchable
 
 ```bash
 POST /api/search
@@ -520,9 +530,9 @@ Cloud-Reaper includes a built-in encrypted vault for managing cloud credentials 
 
 | Provider | Go Scanner | Python Collector | Price Client | Features |
 |---|---|---|---|---|
-| **Azure** | `cloud_scrapers.go` | `providers/azure_collector.py` | `prices/azure.py` | VMs, Disks, Snapshots, NSGs, Monitor Metrics |
-| **AWS** | `cloud_scrapers.go` | — (Go scanner) | `prices/aws.py` | EC2, EBS, S3, IAM resource scanning |
-| **GCP** | `cloud_scrapers.go` | — | `prices/gcp.py` | Compute Engine, Persistent Disks, GCS, GKE |
+| **Azure** | `azure_scraper.go` | `azure_collector.py` | `azure_prices.py` | VMs, Disks, Snapshots, NSGs, Monitor Metrics |
+| **AWS** | `aws_scraper.go` | `aws_collector.py` | `aws_prices.py` | EC2, EBS, S3, IAM resource scanning |
+| **GCP** | `gcp_scraper.go` | — | `gcp_prices.py` | Compute Engine, Persistent Disks, GCS, GKE |
 | **Kubernetes** | `k8s_scraper.go` | — | — | Pod metrics, node utilization, MostAllocated bin-packing |
 
 All non-Azure collectors implement the unified `CloudProvider` interface:
@@ -765,8 +775,6 @@ cp .env.example .env
 Full history in **[CHANGELOG.md](CHANGELOG.md)**.
 
 **Recent Highlights:**
-- **Architecture**: Fully migrated the web layer from synchronous Flask to asynchronous non-blocking **FastAPI + Uvicorn (ASGI)**.
-- **Performance (Go)**: Implemented a resident Go HTTP Bridge (`--mode serve`) to eliminate process-fork latency, and integrated a zero-allocation `BatchUpsert` pool (`sync.Pool`) for GC-free PostgreSQL inserts.
 - **Performance**: Upgraded `ruff` for faster static analysis; stabilized hybrid Go/Python execution pipelines and reduced memory footprint across resource scrapers
 - **Fixes**: Iterative improvements to multi-cloud authentication (Azure/AWS/GCP) and enforced vault log retention policies to prevent unbounded DB growth
 - **UI/UX**: Shipped glassmorphism redesign for vault and cloud provider UIs; fine-tuned cyan/slate color palette across the dashboard; added About page, Kubernetes Agent card, and enriched Budget Alerts tab

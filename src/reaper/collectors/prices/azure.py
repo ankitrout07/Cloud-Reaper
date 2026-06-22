@@ -2,6 +2,34 @@ import logging
 
 import requests
 
+AZURE_RETAIL_SERVICE_NAMES = [
+    "Virtual Machines",
+    "Virtual Machines Licenses",
+    "Azure Kubernetes Service",
+    "Container Instances",
+    "App Service",
+    "Functions",
+    "Storage",
+    "Archive Storage",
+    "Azure NetApp Files",
+    "Virtual Network",
+    "VPN Gateway",
+    "ExpressRoute",
+    "Azure Front Door Service",
+    "Bandwidth",
+    "Load Balancer",
+    "NAT Gateway",
+    "SQL Database",
+    "Azure Cosmos DB",
+    "Azure Database for PostgreSQL",
+    "Azure Database for MySQL",
+    "Cache for Redis",
+    "Azure Monitor",
+    "Log Analytics",
+    "Key Vault",
+    "Microsoft Defender for Cloud",
+]
+
 
 class AzurePriceClient:
     BASE_URL = "https://prices.azure.com/api/retail/prices"
@@ -56,12 +84,11 @@ class AzurePriceClient:
         return prices
 
     def get_catalog_prices(self):
-        """Fetch full Linux VM on-demand catalog from the Azure Retail Prices API."""
-        filter_query = (
-            "serviceName eq 'Virtual Machines' and priceType eq 'Consumption' "
-            "and contains(productName,'Linux') and isPrimaryMeterRegion eq true"
-        )
-        return self.get_prices(filter_query=filter_query)
+        """Fetch the Azure Retail Prices API catalog for all supported service categories."""
+        all_prices = []
+        for service in AZURE_RETAIL_SERVICE_NAMES:
+            all_prices.extend(self.get_prices_by_service(service))
+        return all_prices
 
     def get_prices_by_service(self, service_name):
         filter_query = f"serviceName eq '{service_name}' and priceType eq 'Consumption'"

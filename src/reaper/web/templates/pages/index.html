@@ -150,6 +150,37 @@
                 </div>
             </div>
 
+            <!-- Provider & Component Dropdowns -->
+            <div class="flex gap-3 px-1 mb-4 flex-wrap">
+                <select id="providerFilter" onchange="filterByProvider()" class="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs font-semibold text-gray-300 hover:border-cyan-400 transition">
+                    <option value="">All Providers</option>
+                    <option value="aws">AWS</option>
+                    <option value="azure">Azure</option>
+                    <option value="gcp">GCP</option>
+                </select>
+
+                <select id="awsComponentFilter" onchange="filterByAwsComponent()" class="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs font-semibold text-gray-300 hover:border-cyan-400 transition hidden">
+                    <option value="">AWS: All Components</option>
+                    <option value="EC2Instance">EC2 Instances</option>
+                    <option value="EBS">EBS Volumes</option>
+                    <option value="Snapshot">Snapshots</option>
+                </select>
+
+                <select id="azureComponentFilter" onchange="filterByAzureComponent()" class="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs font-semibold text-gray-300 hover:border-cyan-400 transition hidden">
+                    <option value="">Azure: All Components</option>
+                    <option value="VirtualMachine">Virtual Machines</option>
+                    <option value="Disk">Disks</option>
+                    <option value="Snapshot">Snapshots</option>
+                </select>
+
+                <select id="gcpComponentFilter" onchange="filterByGcpComponent()" class="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs font-semibold text-gray-300 hover:border-cyan-400 transition hidden">
+                    <option value="">GCP: All Components</option>
+                    <option value="ComputeInstance">Compute Instances</option>
+                    <option value="PersistentDisk">Persistent Disks</option>
+                    <option value="Snapshot">Snapshots</option>
+                </select>
+            </div>
+
             <!-- Category Tabs -->
             <div class="flex gap-4 px-6 py-2 bg-white/5 border-b border-white/5 overflow-x-auto">
                 <button type="button" data-filter="ALL" onclick="filterType('ALL')"

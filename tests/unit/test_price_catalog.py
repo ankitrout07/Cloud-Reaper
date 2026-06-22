@@ -1,3 +1,4 @@
+from reaper.collectors.prices.azure import AZURE_RETAIL_SERVICE_NAMES
 from reaper.collectors.prices.catalog import normalize_price_record, query_catalog_prices
 
 
@@ -75,3 +76,25 @@ def test_query_catalog_prices_pagination_shape():
     assert len(result["prices"]) == 1
     assert result["page"] == 1
     assert result["total_pages"] == 2
+
+
+def test_azure_catalog_filters_use_exact_service_list(monkeypatch):
+    from reaper.collectors.prices.catalog import get_catalog_filters
+
+    prices = [
+        {
+            "sku": "Standard_D4s_v5",
+            "service": "Virtual Machines",
+            "region": "eastus",
+            "price": 0.36,
+        },
+    ]
+
+    monkeypatch.setattr(
+        "reaper.collectors.prices.catalog.get_catalog_prices",
+        lambda provider: prices,
+    )
+
+    filters = get_catalog_filters("azure")
+    assert filters["services"] == AZURE_RETAIL_SERVICE_NAMES
+    assert filters["regions"] == ["eastus"]
