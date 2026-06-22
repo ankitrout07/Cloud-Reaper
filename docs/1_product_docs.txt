@@ -2,7 +2,246 @@
 
 Welcome to the Cloud Reaper intelligence suite. Cloud Reaper is a high-performance multi-cloud FinOps engine designed to bridge the gap between cloud engineering and financial accountability.
 
-With real-time asset tracking, predictive AI resource sizing, and dynamic multi-cloud architecture builders, this engine helps organizations drastically reduce operational waste while optimizing global deployments.
+## 🚀 Quick Overview
+
+Cloud Reaper is an enterprise-grade platform that provides:
+
+- **Real-time Asset Tracking**: Monitor your entire cloud infrastructure across multiple providers
+- **Predictive AI Resource Sizing**: ML-powered recommendations for optimal resource allocation
+- **Dynamic Multi-cloud Architecture**: Support for AWS, Azure, GCP, and Kubernetes
+- **Automated Cost Optimization**: Intelligent waste detection and remediation
+- **Budget Guardrails**: Real-time spend monitoring and alerting
+- **AI-Powered Infrastructure Design**: Natural-language architecture generation
+
+## 🎯 Key Capabilities
+
+### FinOps Intelligence
+- ARIMA-based spend forecasting
+- Unit economics analysis
+- Commitment coverage optimization
+- Real-time anomaly detection
+
+### High-Performance Scanning
+- Go-powered fleet discovery
+- Sub-second resource enumeration
+- Real-time telemetry correlation
+- Multi-cloud API aggregation
+
+### AI Architect
+- Natural-language infrastructure design
+- Live cost estimation
+- Multi-provider architectural blueprints
+- Real-time pricing integration
+
+### Budget Control
+- Automated spend throttling
+- Multi-channel alerting (Discord, Slack, Teams)
+- Customizable budget thresholds
+- Real-time spend tracking
+
+## 📋 Getting Started
+
+### Prerequisites
+- Cloud provider credentials (AWS, Azure, GCP, or Kubernetes)
+- Python 3.8+ (for local development)
+- Go 1.18+ (for scanner components)
+- Database (SQLite for development, PostgreSQL for production)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/cloud-reaper.git
+cd cloud-reaper
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Configure environment variables
+cp .env.example .env
+# Edit .env with your credentials
+
+# Run the application
+python main.py
+```
+
+### Initial Configuration
+
+1. **Cloud Provider Setup**: Connect your cloud accounts via the Settings page
+2. **Budget Configuration**: Set your monthly spend limits and alert thresholds
+3. **Scanner Initialization**: Enable automated resource discovery
+4. **Alert Configuration**: Set up notification channels (Discord, Slack, etc.)
+
+## 🏗️ Architecture Overview
+
+### Components
+
+- **Go Scanner Engine**: High-performance resource discovery and telemetry collection
+- **Python ML Engine**: Q-learning rightsizing, ARIMA forecasting, and anomaly detection
+- **FastAPI Backend**: RESTful API with WebSocket support for real-time updates
+- **Web Dashboard**: Modern interface with real-time charts and metrics
+- **SQLite/PostgreSQL**: Flexible database backend with connection pooling
+
+### Data Flow
+
+1. **Telemetry Collection**: Go scrapers collect resource metrics from cloud APIs
+2. **Analysis Pipeline**: Python ML engines analyze usage patterns and generate recommendations
+3. **Storage**: Optimized data is stored in the database for historical analysis
+4. **Presentation**: Dashboard displays real-time insights and actionable recommendations
+
+## 🔧 Configuration
+
+### Environment Variables
+
+```bash
+# Database
+DATABASE_URL=sqlite:///data/reaper.db
+
+# Cloud Providers
+AZURE_SUBSCRIPTION_ID=your-subscription-id
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+GCP_PROJECT_ID=your-project-id
+
+# AI Integration
+OPENAI_API_KEY=your-openai-key
+GEMINI_API_KEY=your-gemini-key
+
+# Notifications
+DISCORD_WEBHOOK_URL=your-discord-webhook
+SLACK_WEBHOOK_URL=your-slack-webhook
+```
+
+### Scanner Configuration
+
+Configure scanner behavior via the Settings page:
+
+- **Scan Frequency**: How often to scan your cloud resources
+- **Resource Types**: Which resource types to include (VMs, disks, databases, etc.)
+- **Regions**: Which cloud regions to scan
+- **Thresholds**: Custom CPU/memory utilization thresholds
+
+## 📊 Monitoring & Alerts
+
+### Dashboard Metrics
+
+The real-time dashboard provides:
+
+- **Compute Velocity**: Real-time CPU/memory utilization charts
+- **Burn Rate vs Budget**: Current spend vs. budget comparison
+- **Service Distribution**: Cost breakdown by service type
+- **Instance Family Analysis**: Resource usage by instance family
+- **Usage Heatmaps**: Hourly resource utilization patterns
+
+### Alert Configuration
+
+Set up multi-channel alerts for:
+
+- Budget threshold breaches
+- Anomaly detection (unusual spend patterns)
+- Resource optimization opportunities
+- System health issues
+
+## 🔒 Security
+
+### Credential Management
+
+Cloud Reaper uses a secure vault for credential storage:
+
+- **AES-128 Encryption**: All credentials are encrypted at rest
+- **PBKDF2 Key Derivation**: Secure master passcode verification
+- **Role-Based Access**: Configure access controls for different users
+- **Audit Logging**: Track all credential access and modifications
+
+### Best Practices
+
+- Use service accounts with minimal required permissions
+- Rotate credentials regularly
+- Enable audit logging for compliance
+- Use environment variables for sensitive configuration
+
+## 🚢 Deployment
+
+### Production Deployment
+
+```bash
+# Using Docker
+docker-compose up -d
+
+# Using Kubernetes
+kubectl apply -f k8s/
+
+# Using Systemd
+sudo systemctl enable cloud-reaper
+sudo systemctl start cloud-reaper
+```
+
+### High Availability Setup
+
+- **Database**: Use PostgreSQL with replication
+- **Load Balancing**: Deploy multiple API instances behind a load balancer
+- **Caching**: Configure Redis for session management
+- **Monitoring**: Set up application performance monitoring
+
+## 📈 Performance Optimization
+
+### Scanner Tuning
+
+- **Parallel Scanning**: Enable concurrent API requests
+- **Rate Limiting**: Configure appropriate API rate limits
+- **Caching**: Enable caching for frequently accessed data
+- **Batch Processing**: Process resources in batches for efficiency
+
+### Database Optimization
+
+- **Connection Pooling**: Configure appropriate pool sizes
+- **Indexing**: Add indexes for frequently queried fields
+- **Partitioning**: Partition tables by date for large datasets
+- **Query Optimization**: Use efficient query patterns
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our contributing guidelines for details.
+
+### Development Setup
+
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Run tests
+pytest
+
+# Run linter
+flake8
+black .
+```
+
+## 📞 Support
+
+### Getting Help
+
+- **Documentation**: Check this documentation first
+- **Community**: Join our Discord community
+- **Issues**: Report bugs on GitHub
+- **Email**: Contact our support team
+
+### Common Issues
+
+**Q: Scanner not finding resources?**
+A: Verify cloud provider credentials and check API permissions.
+
+**Q: Dashboard not updating?**
+A: Check WebSocket connection and refresh the page.
+
+**Q: Alerts not firing?**
+A: Verify webhook URLs and check notification service status.
+
+---
 
 > [!NOTE]
 > We update these product docs along with every major release. Keep an eye on this section to understand how to fully utilize the Reaper engine.
