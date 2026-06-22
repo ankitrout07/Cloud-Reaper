@@ -1759,10 +1759,12 @@ async def docs(request: Request):
     docs_dir = base_dir / "docs"
     docs_data = []
     if docs_dir.exists():
-        files = sorted(docs_dir.glob("*.md"))
+        md_files = list(docs_dir.glob("*.md"))
+        txt_files = list(docs_dir.glob("*.txt"))
+        files = sorted(md_files + txt_files)
         for file_path in files:
             filename = file_path.name
-            title = filename.replace(".md", "").lstrip("0123456789_").replace("_", " ").title()
+            title = filename.replace(".md", "").replace(".txt", "").lstrip("0123456789_").replace("_", " ").title()
             with file_path.open(encoding="utf-8") as f:
                 content = f.read()
             docs_data.append({"filename": filename, "title": title, "content": content})
@@ -2203,8 +2205,14 @@ def format_scan_results(raw):
 @app.get("/api/prices")
 async def get_prices(request: Request):
     provider = request.query_params.get("provider", "azure").lower()
-    page = request.query_params.get("page", 1, type=int)
-    per_page = request.query_params.get("per_page", 50, type=int)
+    try:
+        page = int(request.query_params.get("page", 1))
+    except ValueError:
+        page = 1
+    try:
+        per_page = int(request.query_params.get("per_page", 50))
+    except ValueError:
+        per_page = 50
     search = request.query_params.get("search", "").strip()
     service = request.query_params.get("service", "").strip()
     region = request.query_params.get("region", "").strip()

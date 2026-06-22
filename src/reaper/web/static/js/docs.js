@@ -222,11 +222,17 @@ document.addEventListener('DOMContentLoaded', () => {
     initMarkdownDocs();
     // Add smooth scrolling to TOC links
     document.addEventListener('click', (e) => {
-        if (e.target.matches('a[href^="#"]')) {
-            e.preventDefault();
-            const target = document.querySelector(e.target.getAttribute('href'));
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Handle click on <a> or its children
+        const a = e.target.closest('a[href^="#"]');
+        if (a) {
+            const href = a.getAttribute('href');
+            if (href && href !== '#') {
+                e.preventDefault();
+                const targetId = href.substring(1);
+                const target = document.getElementById(targetId);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
             }
         }
     });

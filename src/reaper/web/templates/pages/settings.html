@@ -45,7 +45,7 @@
 
                 <!-- Step 2: Provider Connect -->
                 <div id="wizard-step-2" class="hidden animate-fade-in">
-                    <input type="hidden" id="wizard-provider" value="{{ request.args.get('provider', '') }}">
+                    <input type="hidden" id="wizard-provider" value="{{ request.query_params.get('provider', '') }}">
 
                     <div id="provider-aws" class="hidden provider-panel">
                         <h2 class="text-4xl font-black text-white tracking-tighter mb-4">AWS CONNECT</h2>

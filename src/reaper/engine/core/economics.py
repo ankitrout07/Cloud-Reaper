@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from reaper.collectors import azure_collector as _ac_module
+from reaper.collectors.providers import azure_collector as _ac_module
 
 
 class BusinessCorrelation:
