@@ -2210,7 +2210,9 @@ def format_scan_results(raw):
 
     # AWS Resources
     for resource in raw.get("aws_resources", []):
-        cost = calc.calculate_monthly_cost("aws", resource.get("category", "compute"), resource.get("sku", "t3.micro"))
+        cost = calc.calculate_monthly_cost(
+            "aws", resource.get("category", "compute"), resource.get("sku", "t3.micro")
+        )
         total_savings += cost
         formatted["aws_resources"].append(
             {
@@ -2223,7 +2225,9 @@ def format_scan_results(raw):
 
     # GCP Resources
     for resource in raw.get("gcp_resources", []):
-        cost = calc.calculate_monthly_cost("gcp", resource.get("category", "compute"), resource.get("sku", "n1-standard-1"))
+        cost = calc.calculate_monthly_cost(
+            "gcp", resource.get("category", "compute"), resource.get("sku", "n1-standard-1")
+        )
         total_savings += cost
         formatted["gcp_resources"].append(
             {
