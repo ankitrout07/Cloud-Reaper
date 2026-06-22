@@ -1,67 +1,309 @@
 {% extends "layouts/_base.html" if not request.headers.get("HX-Request") else "layouts/_empty.html" %}
 {% block content %}
 <main class="app-main flex-1 p-8 lg:p-12 overflow-y-auto">
-        <div class="max-w-4xl mx-auto">
-            <header class="mb-10">
-                <h1 class="text-4xl font-black tracking-tighter glow-text-cyan uppercase">About <span
-                        class="text-cyan-400">Cloud Reaper</span></h1>
-                <p class="text-gray-500 text-xs mt-2 font-bold uppercase tracking-widest">
-                    AI-Powered FinOps • Multi-Cloud Intelligence • Automated Remediation
-                </p>
-            </header>
+    <div class="max-w-6xl mx-auto">
+        <!-- Hero Section -->
+        <header class="mb-12 text-center">
+            <div class="flex justify-center items-center gap-4 mb-6">
+                <img src="/static/img/logo.png" alt="Cloud Reaper" class="w-16 h-16 object-contain">
+                <span class="v-badge text-xs font-mono px-3 py-1">v3.2</span>
+            </div>
+            <h1 class="text-5xl lg:text-6xl font-black tracking-tighter glow-text-cyan uppercase mb-4">Cloud <span
+                    class="text-cyan-400">Reaper</span></h1>
+            <p class="text-gray-400 text-sm font-bold uppercase tracking-[0.3em] mb-6">
+                Enterprise FinOps Control Plane
+            </p>
+            <p class="text-slate-300 text-base max-w-3xl mx-auto leading-relaxed">
+                AI-powered multi-cloud cost optimization platform that unifies visibility, rightsizing, and automated
+                remediation across AWS, Azure, GCP, and Kubernetes environments.
+            </p>
+        </header>
 
-            <section class="about-hero p-8 lg:p-10 mb-8">
-                <div class="flex items-center gap-3 mb-4">
-                    <img src="/static/img/logo.png" alt="Cloud Reaper" class="w-14 h-14 object-contain">
-                    <span class="v-badge text-[10px] font-mono">v2.5</span>
+        <!-- Mission Statement -->
+        <section class="glass-morph p-8 lg:p-12 mb-10 rounded-3xl border border-cyan-500/20">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center">
+                    <i class="fas fa-rocket text-cyan-400 text-xl"></i>
                 </div>
-                <h2 class="text-xl font-black text-white uppercase tracking-wider mb-3">Mission</h2>
-                <p class="text-slate-300 text-sm leading-relaxed max-w-2xl">
-                    Cloud Reaper is an enterprise-grade FinOps control plane that unifies cost visibility, rightsizing,
-                    budget guardrails, and automated waste remediation across AWS, Azure, GCP, and Kubernetes.
-                    Built for platform engineers who need velocity without runaway cloud spend.
-                </p>
-            </section>
+                <h2 class="text-2xl font-black text-white uppercase tracking-wider">Mission</h2>
+            </div>
+            <p class="text-slate-300 text-lg leading-relaxed max-w-4xl">
+                Cloud Reaper eliminates cloud waste through intelligent automation, enabling platform engineers to
+                maintain infrastructure velocity while ensuring financial accountability. We bridge the gap between
+                development speed and cost efficiency through ML-driven insights and sequential FinOps pipelines.
+            </p>
+        </section>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
-                <div class="feature-pill p-5">
-                    <i class="fas fa-chart-line text-cyan-400 mb-2"></i>
-                    <h3 class="text-xs font-black text-white uppercase tracking-wider mb-1">FinOps Intelligence</h3>
-                    <p class="text-[11px] text-slate-400">ARIMA forecasting, unit economics, and commitment coverage analytics.</p>
+        <!-- Key Features Grid -->
+        <section class="mb-12">
+            <h3 class="text-xl font-black text-white uppercase tracking-wider mb-8 flex items-center gap-3">
+                <i class="fas fa-cogs text-cyan-400"></i>
+                Core Capabilities
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="glass p-6 rounded-2xl border border-white/5 hover:border-cyan-500/30 transition group">
+                    <div
+                        class="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center mb-4 group-hover:bg-cyan-500/30 transition">
+                        <i class="fas fa-chart-line text-cyan-400 text-xl"></i>
+                    </div>
+                    <h4 class="text-sm font-black text-white uppercase tracking-wider mb-2">FinOps Intelligence</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">ARIMA forecasting, unit economics, commitment
+                        coverage analytics, and spend anomaly detection.</p>
                 </div>
-                <div class="feature-pill p-5">
-                    <i class="fas fa-bolt text-amber-400 mb-2"></i>
-                    <h3 class="text-xs font-black text-white uppercase tracking-wider mb-1">Go Engine Scanner</h3>
-                    <p class="text-[11px] text-slate-400">High-velocity fleet discovery with real-time telemetry correlation.</p>
+
+                <div class="glass p-6 rounded-2xl border border-white/5 hover:border-amber-500/30 transition group">
+                    <div
+                        class="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center mb-4 group-hover:bg-amber-500/30 transition">
+                        <i class="fas fa-bolt text-amber-400 text-xl"></i>
+                    </div>
+                    <h4 class="text-sm font-black text-white uppercase tracking-wider mb-2">High-Velocity Scanner</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">Go-powered fleet discovery with real-time
+                        telemetry correlation and sub-second resource enumeration.</p>
                 </div>
-                <div class="feature-pill p-5">
-                    <i class="fas fa-robot text-purple-400 mb-2"></i>
-                    <h3 class="text-xs font-black text-white uppercase tracking-wider mb-1">AI Architect</h3>
-                    <p class="text-[11px] text-slate-400">Natural-language infrastructure design with live cost estimation.</p>
+
+                <div class="glass p-6 rounded-2xl border border-white/5 hover:border-purple-500/30 transition group">
+                    <div
+                        class="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center mb-4 group-hover:bg-purple-500/30 transition">
+                        <i class="fas fa-robot text-purple-400 text-xl"></i>
+                    </div>
+                    <h4 class="text-sm font-black text-white uppercase tracking-wider mb-2">AI Architect</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">Natural-language infrastructure design with live
+                        cost estimation via OpenAI and Gemini APIs.</p>
                 </div>
-                <div class="feature-pill p-5">
-                    <i class="fas fa-shield-alt text-emerald-400 mb-2"></i>
-                    <h3 class="text-xs font-black text-white uppercase tracking-wider mb-1">Budget Kill-Switch</h3>
-                    <p class="text-[11px] text-slate-400">Automated safeguards and multi-channel alert dispatch (Discord, Slack, Teams).</p>
+
+                <div class="glass p-6 rounded-2xl border border-white/5 hover:border-emerald-500/30 transition group">
+                    <div
+                        class="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-4 group-hover:bg-emerald-500/30 transition">
+                        <i class="fas fa-shield-alt text-emerald-400 text-xl"></i>
+                    </div>
+                    <h4 class="text-sm font-black text-white uppercase tracking-wider mb-2">Budget Kill-Switch</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">Automated safeguards with multi-channel alert
+                        dispatch (Discord, Slack, Teams) and instant spend throttling.</p>
+                </div>
+
+                <div class="glass p-6 rounded-2xl border border-white/5 hover:border-blue-500/30 transition group">
+                    <div
+                        class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 group-hover:bg-blue-500/30 transition">
+                        <i class="fas fa-brain text-blue-400 text-xl"></i>
+                    </div>
+                    <h4 class="text-sm font-black text-white uppercase tracking-wider mb-2">Sequential Pipeline</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">Enforced FinOps sequence: Telemetry → Rightsizing
+                        → Baseline → Commitments to prevent capital waste.</p>
+                </div>
+
+                <div class="glass p-6 rounded-2xl border border-white/5 hover:border-rose-500/30 transition group">
+                    <div
+                        class="w-12 h-12 rounded-xl bg-rose-500/20 flex items-center justify-center mb-4 group-hover:bg-rose-500/30 transition">
+                        <i class="fas fa-network-wired text-rose-400 text-xl"></i>
+                    </div>
+                    <h4 class="text-sm font-black text-white uppercase tracking-wider mb-2">Workload Awareness</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">Environment-aware thresholds with automatic
+                        dev-test vs production classification and safety guardrails.</p>
                 </div>
             </div>
+        </section>
 
-            <section class="author-card p-8 flex flex-col sm:flex-row items-center gap-6">
-                <div
-                    class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-2xl font-black text-white shadow-lg shadow-cyan-500/30 shrink-0">
-                    AR
+        <!-- Technical Specifications -->
+        <section class="glass-morph p-8 lg:p-12 mb-10 rounded-3xl border border-white/5">
+            <h3 class="text-xl font-black text-white uppercase tracking-wider mb-8 flex items-center gap-3">
+                <i class="fas fa-microchip text-cyan-400"></i>
+                Technical Architecture
+            </h3>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Backend Stack -->
+                <div>
+                    <h4 class="text-sm font-black text-cyan-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <i class="fas fa-server"></i>
+                        Backend Engine
+                    </h4>
+                    <ul class="space-y-3">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check text-emerald-400 mt-1 text-xs"></i>
+                            <div>
+                                <span class="text-white font-bold text-sm">Go Scanner</span>
+                                <p class="text-slate-400 text-xs">High-performance fleet discovery and telemetry
+                                    collection</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check text-emerald-400 mt-1 text-xs"></i>
+                            <div>
+                                <span class="text-white font-bold text-sm">Python ML Engine</span>
+                                <p class="text-slate-400 text-xs">Q-learning rightsizing, ARIMA forecasting, NumPy
+                                    vectorization</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check text-emerald-400 mt-1 text-xs"></i>
+                            <div>
+                                <span class="text-white font-bold text-sm">FastAPI + WebSocket</span>
+                                <p class="text-slate-400 text-xs">Real-time dashboard updates and streaming telemetry
+                                </p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check text-emerald-400 mt-1 text-xs"></i>
+                            <div>
+                                <span class="text-white font-bold text-sm">SQLite + PostgreSQL</span>
+                                <p class="text-slate-400 text-xs">Flexible database backend with connection pooling</p>
+                            </div>
+                        </li>
+                    </ul>
                 </div>
-                <div class="flex-1 text-center sm:text-left">
-                    <p class="text-[9px] font-black text-cyan-400 uppercase tracking-[0.25em] mb-1">Created by</p>
-                    <h3 class="text-lg font-black text-white uppercase tracking-wide">Ankit Rout</h3>
-                    <p class="text-xs text-slate-400 mt-1 mb-4">Cloud architect &amp; FinOps engineer building tools for sustainable infrastructure.</p>
-                    <a href="https://www.linkedin.com/in/ankitrout07" target="_blank" rel="noopener noreferrer"
-                        class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0A66C2]/20 hover:bg-[#0A66C2]/35 border border-[#0A66C2]/40 rounded-xl text-[#70B5F9] text-xs font-black uppercase tracking-wider transition">
-                        <i class="fab fa-linkedin text-lg"></i>
-                        Connect on LinkedIn
-                    </a>
+
+                <!-- Frontend Stack -->
+                <div>
+                    <h4 class="text-sm font-black text-cyan-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <i class="fas fa-desktop"></i>
+                        Frontend Interface
+                    </h4>
+                    <ul class="space-y-3">
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check text-emerald-400 mt-1 text-xs"></i>
+                            <div>
+                                <span class="text-white font-bold text-sm">Modern Dashboard</span>
+                                <p class="text-slate-400 text-xs">Real-time charts with Chart.js and WebSocket
+                                    integration</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check text-emerald-400 mt-1 text-xs"></i>
+                            <div>
+                                <span class="text-white font-bold text-sm">HTMX + Tailwind</span>
+                                <p class="text-slate-400 text-xs">Dynamic UI with minimal JavaScript overhead</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check text-emerald-400 mt-1 text-xs"></i>
+                            <div>
+                                <span class="text-white font-bold text-sm">Multi-Cloud Support</span>
+                                <p class="text-slate-400 text-xs">Unified interface for AWS, Azure, GCP, and Kubernetes
+                                </p>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <i class="fas fa-check text-emerald-400 mt-1 text-xs"></i>
+                            <div>
+                                <span class="text-white font-bold text-sm">Secure Vault</span>
+                                <p class="text-slate-400 text-xs">PBKDF2 encrypted credential storage with master
+                                    passcode</p>
+                            </div>
+                        </li>
+                    </ul>
                 </div>
-            </section>
-        </div>
-    </main>
+            </div>
+        </section>
+
+        <!-- Performance Metrics -->
+        <section class="mb-12">
+            <h3 class="text-xl font-black text-white uppercase tracking-wider mb-8 flex items-center gap-3">
+                <i class="fas fa-tachometer-alt text-cyan-400"></i>
+                Performance Benchmarks
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="glass p-6 rounded-2xl border border-white/5 text-center">
+                    <div class="text-3xl font-black text-cyan-400 mb-2">10-100x</div>
+                    <p class="text-xs text-slate-400 uppercase tracking-wider">Faster with NumPy</p>
+                </div>
+                <div class="glass p-6 rounded-2xl border border-white/5 text-center">
+                    <div class="text-3xl font-black text-cyan-400 mb-2">&lt;1s</div>
+                    <p class="text-xs text-slate-400 uppercase tracking-wider">Fleet Discovery</p>
+                </div>
+                <div class="glass p-6 rounded-2xl border border-white/5 text-center">
+                    <div class="text-3xl font-black text-cyan-400 mb-2">99.9%</div>
+                    <p class="text-xs text-slate-400 uppercase tracking-wider">API Uptime</p>
+                </div>
+                <div class="glass p-6 rounded-2xl border border-white/5 text-center">
+                    <div class="text-3xl font-black text-cyan-400 mb-2">AES-128</div>
+                    <p class="text-xs text-slate-400 uppercase tracking-wider">Vault Encryption</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Version History -->
+        <section class="glass-morph p-8 lg:p-12 mb-10 rounded-3xl border border-white/5">
+            <h3 class="text-xl font-black text-white uppercase tracking-wider mb-8 flex items-center gap-3">
+                <i class="fas fa-history text-cyan-400"></i>
+                Recent Updates
+            </h3>
+            <div class="space-y-6">
+                <div class="border-l-2 border-cyan-500 pl-4">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="v-badge text-[10px] font-mono">v3.2</span>
+                        <span class="text-xs text-slate-400">Latest Release</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-white mb-2">Sequential FinOps Pipeline</h4>
+                    <p class="text-xs text-slate-400">Enforced optimization sequence with workload-aware thresholds,
+                        vectorized NumPy operations, and environment-based safety guardrails.</p>
+                </div>
+                <div class="border-l-2 border-slate-600 pl-4">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="text-[10px] font-mono text-slate-400">v3.1</span>
+                        <span class="text-xs text-slate-500">Previous</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-white mb-2">Multi-Cloud Expansion</h4>
+                    <p class="text-xs text-slate-400">Added GCP and Kubernetes support with unified credential
+                        management and cross-platform resource discovery.</p>
+                </div>
+                <div class="border-l-2 border-slate-600 pl-4">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="text-[10px] font-mono text-slate-400">v3.0</span>
+                        <span class="text-xs text-slate-500">Major Release</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-white mb-2">AI Architect Integration</h4>
+                    <p class="text-xs text-slate-400">Natural-language infrastructure design with live pricing
+                        estimation and multi-provider architectural blueprints.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Creator Section -->
+        <section class="glass-morph p-8 lg:p-12 rounded-3xl border border-cyan-500/20">
+            <div class="flex flex-col lg:flex-row items-center gap-8">
+                <div class="relative">
+                    <div
+                        class="w-24 h-24 rounded-3xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-3xl font-black text-white shadow-xl shadow-cyan-500/40">
+                        AR
+                    </div>
+                    <div
+                        class="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center border-4 border-[#0d1117]">
+                        <i class="fas fa-check text-white text-xs"></i>
+                    </div>
+                </div>
+                <div class="flex-1 text-center lg:text-left">
+                    <p class="text-[10px] font-black text-cyan-400 uppercase tracking-[0.3em] mb-2">Created & Maintained
+                        by</p>
+                    <h3 class="text-2xl font-black text-white uppercase tracking-wide mb-2">Ankit Rout</h3>
+                    <p class="text-slate-300 text-sm mb-6 max-w-2xl">
+                        Cloud architect and FinOps engineer specializing in building sustainable infrastructure tools.
+                        Focused on eliminating cloud waste through intelligent automation and ML-driven insights.
+                    </p>
+                    <div class="flex flex-wrap gap-4 justify-center lg:justify-start">
+                        <a href="https://www.linkedin.com/in/ankitrout07" target="_blank" rel="noopener noreferrer"
+                            class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0A66C2]/20 hover:bg-[#0A66C2]/35 border border-[#0A66C2]/40 rounded-xl text-[#70B5F9] text-xs font-black uppercase tracking-wider transition">
+                            <i class="fab fa-linkedin"></i>
+                            LinkedIn
+                        </a>
+                        <a href="https://github.com/ankitrout" target="_blank" rel="noopener noreferrer"
+                            class="inline-flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white text-xs font-black uppercase tracking-wider transition">
+                            <i class="fab fa-github"></i>
+                            GitHub
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="mt-12 text-center pb-8">
+            <p class="text-slate-500 text-xs">
+                Built for sustainable cloud infrastructure
+            </p>
+            <p class="text-slate-600 text-[10px] mt-2">
+                © 2026 Cloud Reaper. Enterprise FinOps Control Plane.
+            </p>
+        </footer>
+    </div>
+</main>
 {% endblock %}

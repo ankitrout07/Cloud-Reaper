@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from reaper.collectors.providers.azure_collector import AzureCollector
 from reaper.engine.core.calculator import CostCalculator
 from reaper.engine.core.logic import ZombieScorer
+from reaper.engine.core.scheduler import FinOpsPipeline
 from reaper.services.pusher import DataPusher
 
 # Constants
@@ -88,11 +89,137 @@ def run_pr_simulation(target_file=None):
     print("\n" + "=" * 60 + "\n")
 
 
+def run_enhanced_finops_pipeline(provider="azure", lookback_days=7):
+    """
+    Enhanced FinOps pipeline with sequential operations and workload differentiation.
+    Enforces: Telemetry → Rightsizing → Baseline → Commitment Management
+    """
+    print("\n" + "=" * 60)
+    print("🚀 ENHANCED FINOPS PIPELINE v2.0")
+    print("=" * 60)
+    print(f"[*] Provider: {provider.upper()}")
+    print(f"[*] Lookback Period: {lookback_days} days")
+    print(f"[*] Sequential Pipeline: Telemetry → Rightsizing → Baseline → Commitments")
+
+    try:
+        # Initialize collector
+        if provider == "azure":
+            collector = AzureCollector()
+        else:
+            print(f"[!] Provider {provider} not yet supported in enhanced pipeline")
+            return
+
+        # Initialize pipeline
+        calc = CostCalculator()
+        pipeline = FinOpsPipeline(price_book=calc.prices)
+
+        # Collect telemetry data (Stage 1)
+        print("\n[+] STAGE 1: Telemetry Collection")
+        print("    - Fetching resource inventory...")
+
+        try:
+            vms = collector.get_vm_inventory()
+            print(f"    - VMs collected: {len(vms)}")
+
+            # Transform VM data to telemetry format
+            telemetry_data = []
+            for vm in vms:
+                telemetry_data.append({
+                    "id": vm.get("id", vm.get("name", "unknown")),
+                    "name": vm.get("name", "unknown"),
+                    "sku": vm.get("size", "unknown"),
+                    "tags": vm.get("tags", {}),
+                    # Generate synthetic usage history for demonstration
+                    # In production, this would come from actual monitoring data
+                    "cpu_history": [vm.get("cpu_percent", 10)] * lookback_days,
+                    "memory_history": [vm.get("memory_percent", 20)] * lookback_days,
+                    "iops": vm.get("iops", 50),
+                    "network_throughput": vm.get("network_throughput", 40),
+                })
+
+        except Exception as e:
+            print(f"    [!] Error collecting telemetry: {e}")
+            telemetry_data = []
+
+        # Execute the complete pipeline
+        print("\n[+] EXECUTING SEQUENTIAL FINOPS PIPELINE")
+        pipeline_results = pipeline.execute_pipeline(
+            telemetry_data=telemetry_data,
+            provider=provider,
+            lookback_days=lookback_days
+        )
+
+        # Display results
+        print("\n[+] PIPELINE EXECUTION RESULTS")
+        print(f"    Status: {pipeline_results['pipeline_status'].upper()}")
+        print(f"    Execution Time: {pipeline_results.get('execution_time_seconds', 0):.2f}s")
+
+        if pipeline_results["pipeline_status"] == "completed":
+            # Display stage results
+            for stage_name, stage_result in pipeline_results["stages"].items():
+                if stage_result.get("success"):
+                    print(f"\n    ✓ {stage_name.replace('_', ' ').title()}: SUCCESS")
+                    if "summary" in stage_result:
+                        for key, value in stage_result["summary"].items():
+                            print(f"      - {key}: {value}")
+                else:
+                    print(f"\n    ✗ {stage_name.replace('_', ' ').title()}: FAILED")
+                    print(f"      Error: {stage_result.get('error', 'Unknown')}")
+
+            # Display final recommendations
+            print(f"\n[+] FINAL RECOMMENDATIONS")
+            print(f"    Total Recommendations: {len(pipeline_results['final_recommendations'])}")
+
+            for rec in pipeline_results["final_recommendations"]:
+                print(f"\n    Resource: {rec['resource_name']}")
+                print(f"    Environment: {rec['environment_type']}")
+                print(f"    Action: {rec['recommended_action']}")
+                print(f"    Confidence: {rec['confidence']:.1%}")
+                print(f"    Reason: {rec['rl_evaluation'].get('risk_profile', 'N/A')} risk profile")
+
+            # Display commitment insights
+            if "commitment_recommendations" in pipeline_results:
+                print(f"\n[+] COMMITMENT MANAGEMENT INSIGHTS")
+                insights = pipeline_results["commitment_recommendations"]
+                print(f"    Baseline Entries: {insights.get('baseline_entries', 0)}")
+                print(f"    Optimized Monthly Spend: ${insights.get('optimized_monthly_spend', 0):.2f}")
+                print(f"    Avoided Capital Waste: {insights.get('avoided_capital_waste', False)}")
+
+        else:
+            print(f"\n[!] Pipeline execution failed: {pipeline_results.get('error', 'Unknown error')}")
+
+        print("\n" + "=" * 60 + "\n")
+
+    except Exception as e:
+        print(f"[!] Enhanced pipeline execution failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+
 def run_reaper():
     """Main execution loop for the Reaper CLI."""
     import sys
 
     load_dotenv(override=True)
+
+    # Check for enhanced pipeline flag
+    if len(sys.argv) > 1 and "--enhanced-pipeline" in sys.argv:
+        lookback = 7
+        provider = "azure"
+
+        # Parse optional arguments
+        if "--lookback" in sys.argv:
+            idx = sys.argv.index("--lookback")
+            if idx + 1 < len(sys.argv):
+                lookback = int(sys.argv[idx + 1])
+
+        if "--provider" in sys.argv:
+            idx = sys.argv.index("--provider")
+            if idx + 1 < len(sys.argv):
+                provider = sys.argv[idx + 1]
+
+        run_enhanced_finops_pipeline(provider=provider, lookback_days=lookback)
+        return
 
     if len(sys.argv) > 1 and "--pr-simulation" in sys.argv:
         target = (

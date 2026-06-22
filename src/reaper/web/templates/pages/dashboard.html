@@ -45,54 +45,57 @@
                 </button>
             </header>
 
-            <div class="monitor-card glass-morph p-6 mb-8">
-                <div class="card-header">
-                    <i class="fas fa-chart-line text-cyan-400"></i>
-                    <h3>REAL-TIME COMPUTE VELOCITY</h3>
-                </div>
-                <div class="h-[260px] relative">
-                    <div class="chart-loading absolute inset-0 flex items-center justify-center" id="computeChart-loading">
-                        <div class="skeleton"></div>
+            <!-- Symmetrical 2x2 Grid Layout for Optimal Space Usage -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Main Chart - Spans Full Width on Large Screens -->
+                <div class="lg:col-span-2 monitor-card glass-morph p-6">
+                    <div class="card-header">
+                        <i class="fas fa-chart-line text-cyan-400"></i>
+                        <h3>REAL-TIME COMPUTE VELOCITY</h3>
                     </div>
-                    <canvas id="computeChart" class="relative z-10"></canvas>
+                    <div class="h-[280px] relative">
+                        <div class="chart-loading absolute inset-0 flex items-center justify-center" id="computeChart-loading">
+                            <div class="skeleton"></div>
+                        </div>
+                        <canvas id="computeChart" class="relative z-10"></canvas>
+                    </div>
                 </div>
-            </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Chart 1 -->
                 <div class="glass p-6 chart-tile">
                     <div class="card-header">
                         <i class="fas fa-layer-group text-cyan-400/80"></i>
                         <h3>BURN RATE VS BUDGET PACE</h3>
                     </div>
-                    <div class="h-[200px] relative">
+                    <div class="h-[220px] relative">
                         <div class="chart-loading absolute inset-0 flex items-center justify-center" id="burnAreaChart-loading">
                             <div class="skeleton"></div>
                         </div>
                         <canvas id="burnAreaChart" class="relative z-10"></canvas>
                     </div>
                 </div>
+
+                <!-- Chart 2 -->
                 <div class="glass p-6 chart-tile">
                     <div class="card-header">
                         <i class="fas fa-chart-bar text-blue-400"></i>
                         <h3>SERVICE DISTRIBUTION (30D)</h3>
                     </div>
-                    <div class="h-[200px] relative">
+                    <div class="h-[220px] relative">
                         <div class="chart-loading absolute inset-0 flex items-center justify-center" id="serviceBarChart-loading">
                             <div class="skeleton"></div>
                         </div>
                         <canvas id="serviceBarChart" class="relative z-10"></canvas>
                     </div>
                 </div>
-            </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Chart 3 -->
                 <div class="glass p-6 chart-tile">
                     <div class="card-header">
                         <i class="fas fa-server text-purple-400"></i>
                         <h3>CPU &amp; MEMORY BY INSTANCE FAMILY</h3>
                     </div>
-                    <p class="text-[9px] text-gray-500 mb-2 font-bold uppercase">Memory GiB from host Available Memory
-                        when emitted</p>
+                    <p class="text-[9px] text-gray-500 mb-2 font-bold uppercase">Memory GiB from host Available Memory when emitted</p>
                     <div class="h-[220px] relative">
                         <div class="chart-loading absolute inset-0 flex items-center justify-center" id="familyStackChart-loading">
                             <div class="skeleton"></div>
@@ -100,13 +103,14 @@
                         <canvas id="familyStackChart" class="relative z-10"></canvas>
                     </div>
                 </div>
+
+                <!-- Chart 4 -->
                 <div class="glass p-6 chart-tile">
                     <div class="card-header">
                         <i class="fas fa-fire text-orange-400"></i>
                         <h3>USAGE BY HOUR (SAMPLE VM)</h3>
                     </div>
-                    <p class="text-[9px] text-gray-500 mb-2 font-bold uppercase">Heatmap-style CPU for auto-shutdown
-                        signals</p>
+                    <p class="text-[9px] text-gray-500 mb-2 font-bold uppercase">Heatmap-style CPU for auto-shutdown signals</p>
                     <div class="h-[220px] relative">
                         <div class="chart-loading absolute inset-0 flex items-center justify-center" id="usageHeatmapChart-loading">
                             <div class="skeleton"></div>

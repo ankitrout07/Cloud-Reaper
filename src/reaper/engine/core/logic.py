@@ -11,6 +11,77 @@ from reaper.engine.core.workload import WorkloadPersonality
 from reaper.engine.notifications.notifier import send_discord_alert
 
 
+def analyze_compute_telemetry(cpu_matrix, memory_matrix, env_type="dev-test", lookback_days=7):
+    """
+    Vectorized evaluation of compute performance data over variable lookback windows.
+    Differentiates thresholds between production and dev-test environments safely.
+
+    Args:
+        cpu_matrix: 2D numpy array of CPU usage data (resources x days)
+        memory_matrix: 2D numpy array of memory usage data (resources x days)
+        env_type: 'production' or 'dev-test' for threshold differentiation
+        lookback_days: Number of days to analyze (7, 14, 30)
+
+    Returns:
+        List of recommendation dictionaries with action, impact, and reason
+    """
+    # Slice the input matrices to target the exact user lookback timeframe
+    cpu_slice = cpu_matrix[:, -lookback_days:]
+    mem_slice = memory_matrix[:, -lookback_days:]
+
+    # High-velocity vectorized average calculations bypassing the Python GIL
+    avg_cpu = np.mean(cpu_slice, axis=1)
+    max_cpu = np.max(cpu_slice, axis=1)
+    avg_mem = np.mean(mem_slice, axis=1)
+
+    recommendations = []
+
+    # Establish thresholds based on explicit workload differentiation rules
+    cpu_shutdown_threshold = 5.0 if env_type == "production" else 15.0
+
+    for idx in range(cpu_matrix.shape[0]):
+        # Rule 1: Zero or near-zero utilization Shutdown Trigger
+        if max_cpu[idx] < cpu_shutdown_threshold:
+            recommendations.append({
+                "resource_index": idx,
+                "action": "SHUTDOWN",
+                "impact": "HIGH",
+                "reason": "Idle resource threshold breach",
+                "metrics": {
+                    "avg_cpu": float(avg_cpu[idx]),
+                    "max_cpu": float(max_cpu[idx]),
+                    "avg_memory": float(avg_mem[idx]),
+                }
+            })
+        # Rule 2: Low-average / high-peak Burstable B-Series Rightsize Trigger
+        elif avg_cpu[idx] < 20.0 and max_cpu[idx] > 70.0:
+            recommendations.append({
+                "resource_index": idx,
+                "action": "RIGHTSIZE_BURSTABLE",
+                "impact": "MEDIUM",
+                "reason": "Fits burstable B-Series profile",
+                "metrics": {
+                    "avg_cpu": float(avg_cpu[idx]),
+                    "max_cpu": float(max_cpu[idx]),
+                    "avg_memory": float(avg_mem[idx]),
+                }
+            })
+        else:
+            recommendations.append({
+                "resource_index": idx,
+                "action": "STAY",
+                "impact": "LOW",
+                "reason": "Stable operation baseline",
+                "metrics": {
+                    "avg_cpu": float(avg_cpu[idx]),
+                    "max_cpu": float(max_cpu[idx]),
+                    "avg_memory": float(avg_mem[idx]),
+                }
+            })
+
+    return recommendations
+
+
 class ZombieScorer:
     def __init__(self):
         self.threshold = 90

@@ -231,20 +231,44 @@ class RightsizingAgent:
     Reinforcement Learning (Q-learning) Workload Rightsizing Agent.
     State space: CPU, memory, IOPS, and network bandwidth.
     Action space: Stay, Downscale, Upscale, Migrate Family (e.g., D-series to E-series).
+    Now includes environment-aware thresholds for production vs dev-test safety.
     """
 
-    def __init__(self, learning_rate=0.1, discount_factor=0.9, exploration_rate=1.0):
+    def __init__(
+        self,
+        learning_rate=0.1,
+        discount_factor=0.9,
+        exploration_rate=1.0,
+        environment_type="production",
+    ):
         self.lr = learning_rate
         self.gamma = discount_factor
         self.epsilon = exploration_rate
+        self.environment_type = environment_type
         self.actions = ["stay", "downscale", "upscale", "migrate_family"]
         self.q_table = {}
 
+        # Environment-aware thresholds
+        # Production uses more conservative (higher) thresholds for safety
+        if self.environment_type == "production":
+            self.risk_thresholds = {
+                "high_utilization": 80.0,  # Higher threshold for production
+                "medium_utilization": 60.0,
+                "low_utilization": 30.0,
+            }
+        else:  # dev-test
+            self.risk_thresholds = {
+                "high_utilization": 70.0,  # More aggressive for dev-test
+                "medium_utilization": 50.0,
+                "low_utilization": 20.0,
+            }
+
     def get_state(self, cpu, mem, iops, net):
         def discretize(val):
-            if val < 30:
+            # Use environment-aware discretization
+            if val < self.risk_thresholds["low_utilization"]:
                 return 0
-            if val < 70:
+            if val < self.risk_thresholds["medium_utilization"]:
                 return 1
             return 2
 
@@ -269,11 +293,33 @@ class RightsizingAgent:
         target = reward + self.gamma * np.max(self.q_table[next_state])
         self.q_table[state][action] = self.q_table[state][action] + self.lr * (target - predict)
 
-    def evaluate_migration(self, metrics, current_sku):
+    def evaluate_migration(self, metrics, current_sku, environment_type=None):
         """
         Evaluates safe down-scaling or cross-family migrations.
         Builds risk profiles ensuring performance SLAs are maintained while minimizing cost.
+        Now supports environment-aware thresholds.
+
+        Args:
+            metrics: Dictionary with cpu, mem, iops, net values
+            current_sku: Current SKU identifier
+            environment_type: 'production' or 'dev-test' (overrides instance setting)
         """
+        # Update environment if provided
+        if environment_type:
+            self.environment_type = environment_type
+            if self.environment_type == "production":
+                self.risk_thresholds = {
+                    "high_utilization": 80.0,
+                    "medium_utilization": 60.0,
+                    "low_utilization": 30.0,
+                }
+            else:
+                self.risk_thresholds = {
+                    "high_utilization": 70.0,
+                    "medium_utilization": 50.0,
+                    "low_utilization": 20.0,
+                }
+
         cpu_util = metrics.get("cpu", 0)
         mem_util = metrics.get("mem", 0)
         iops = metrics.get("iops", 0)
@@ -285,17 +331,36 @@ class RightsizingAgent:
         action_idx = self.choose_action(state)
         action = self.actions[action_idx]
 
+        # Environment-aware risk assessment
         risk_profile = "Low"
-        if action == "migrate_family" and (mem_util > 80 or cpu_util > 80):
-            risk_profile = "High"
-        elif action == "downscale" and max(cpu_util, mem_util) > 60:
-            risk_profile = "Medium"
+        if action == "migrate_family":
+            if (
+                mem_util > self.risk_thresholds["high_utilization"]
+                or cpu_util > self.risk_thresholds["high_utilization"]
+            ):
+                risk_profile = "High"
+            elif (
+                mem_util > self.risk_thresholds["medium_utilization"]
+                or cpu_util > self.risk_thresholds["medium_utilization"]
+            ):
+                risk_profile = "Medium"
+        elif action == "downscale":
+            if max(cpu_util, mem_util) > self.risk_thresholds["medium_utilization"]:
+                risk_profile = "Medium"
+            if max(cpu_util, mem_util) > self.risk_thresholds["high_utilization"]:
+                risk_profile = "High"
+
+        # Production safety override
+        if self.environment_type == "production" and risk_profile == "High":
+            action = "stay"  # Override to stay for production safety
 
         return {
             "recommended_action": action,
             "risk_profile": risk_profile,
             "sla_maintained": risk_profile != "High",
             "current_sku": current_sku,
+            "environment_type": self.environment_type,
+            "thresholds_used": self.risk_thresholds,
         }
 
     def batch_evaluate_migration(self, metrics_df: "pd.DataFrame") -> "pd.DataFrame":

@@ -259,6 +259,33 @@ class CloudCommitment(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
+class OptimizationBaseline(Base):
+    """
+    Stores the optimized resource baseline after rightsizing analysis.
+    This baseline is used for commitment management calculations to prevent
+    capital waste by evaluating reservations AFTER rightsizing.
+    """
+
+    __tablename__ = "optimization_baselines"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    resource_id = Column(String, nullable=False, index=True)
+    provider = Column(String, nullable=False, index=True)  # azure, aws, gcp
+    current_sku = Column(String, nullable=False)
+    recommended_action = Column(String, nullable=False)  # STAY, RIGHTSIZE, SHUTDOWN
+    environment_type = Column(String, nullable=False)  # production, dev-test
+    current_avg_cpu = Column(Numeric(10, 2), nullable=False)
+    current_avg_memory = Column(Numeric(10, 2), nullable=False)
+    confidence_score = Column(Numeric(5, 4), nullable=False)
+    estimated_savings = Column(Numeric(15, 4), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+
 def get_desktop_engine():
     """Resolves zero-configuration database mapping inside native system APPDATA"""
     if os.name == "nt" or "PRODUCTION_DESKTOP_MODE" in os.environ:
