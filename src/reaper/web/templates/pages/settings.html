@@ -127,6 +127,8 @@
     border-radius: 14px;
     border: 1px solid rgba(55, 65, 81, 0.3);
     margin-bottom: 40px;
+    position: relative;
+    z-index: 10;
 }
 
 .settings-tab {
@@ -141,16 +143,19 @@
     letter-spacing: 0.05em;
     cursor: pointer;
     transition: all 0.2s ease;
+    pointer-events: auto;
 }
 
 .settings-tab:hover {
     color: #d1d5db;
     background: rgba(75, 85, 99, 0.3);
+    pointer-events: auto;
 }
 
 .settings-tab.active {
     background: rgba(75, 85, 99, 0.4);
     color: #e5e7eb;
+    pointer-events: auto;
 }
 
 .form-group {
@@ -429,10 +434,10 @@
 
             <!-- Navigation Tabs -->
             <nav class="settings-nav">
-                <button class="settings-tab active" data-tab="general">General</button>
-                <button class="settings-tab" data-tab="cloud">Cloud Providers</button>
-                <button class="settings-tab" data-tab="vault">Vault</button>
-                <button class="settings-tab" data-tab="advanced">Advanced</button>
+                <button class="settings-tab active" data-tab="general" onclick="showTab('general')">General</button>
+                <button class="settings-tab" data-tab="cloud" onclick="showTab('cloud')">Cloud Providers</button>
+                <button class="settings-tab" data-tab="vault" onclick="showTab('vault')">Vault</button>
+                <button class="settings-tab" data-tab="advanced" onclick="showTab('advanced')">Advanced</button>
             </nav>
         </div>
     </header>
@@ -856,13 +861,21 @@
 
 <script>
 // Tab Navigation
-document.addEventListener('DOMContentLoaded', function() {
+(function() {
     const tabs = document.querySelectorAll('.settings-tab');
     const tabContents = document.querySelectorAll('.tab-content');
 
-    tabs.forEach(tab => {
-        tab.addEventListener('click', function() {
+    console.log('Settings page loaded. Found', tabs.length, 'tabs and', tabContents.length, 'tab contents.');
+
+    tabs.forEach((tab, index) => {
+        console.log('Tab', index, ':', tab.getAttribute('data-tab'));
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
             const tabId = this.getAttribute('data-tab');
+            console.log('Tab clicked:', tabId);
+            
             if (!tabId) return;
 
             // Remove active class from all tabs
@@ -876,15 +889,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Show selected tab content
             const targetContent = document.getElementById('tab-' + tabId);
+            console.log('Target content element:', targetContent);
             if (targetContent) {
                 targetContent.classList.remove('hidden');
+                console.log('Tab', tabId, 'shown');
+            } else {
+                console.error('Tab content not found for:', tabId);
             }
         });
     });
-});
+})();
 
 // Legacy function support (for backward compatibility)
 function showTab(tabName) {
+    console.log('showTab called with:', tabName);
     const tabs = document.querySelectorAll('.settings-tab');
     const tabContents = document.querySelectorAll('.tab-content');
 
