@@ -6,266 +6,280 @@
 
 {% block content %}
 <style>
-.skeleton {
-    background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
-    background-size: 200% 100%;
-    animation: skeleton-loading 1.5s infinite;
-    border-radius: 4px;
-}
-@keyframes skeleton-loading {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
-.chart-loading .skeleton {
-    width: 100%;
-    height: 100%;
-    min-height: 200px;
-}
+    .skeleton {
+        background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+        background-size: 200% 100%;
+        animation: skeleton-loading 1.5s infinite;
+        border-radius: 4px;
+    }
+
+    @keyframes skeleton-loading {
+        0% {
+            background-position: 200% 0;
+        }
+
+        100% {
+            background-position: -200% 0;
+        }
+    }
+
+    .chart-loading .skeleton {
+        width: 100%;
+        height: 100%;
+        min-height: 200px;
+    }
 </style>
 
 <main class="app-main flex-1 p-8 lg:p-10">
-        <div class="max-w-7xl mx-auto">
-            <header class="mb-10 flex justify-between items-center">
-                <div>
-                    <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Subscription • {{
-                        sub_name or 'Azure' }}</p>
-                    <h1 class="text-4xl font-black tracking-tighter glow-text-cyan uppercase">Metrics <span
-                            class="text-cyan-400">Command</span></h1>
-                    <p class="text-gray-500 text-xs mt-2 font-bold uppercase tracking-widest">
-                        Python pusher • WebSocket cadence {{ metrics_emit_sec }}s (Azure-friendly)
-                    </p>
-                </div>
-                <button onclick="toggleConsoleSimple()" 
-                    class="glass px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-white/10 transition border border-white/5">
-                    <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span class="text-[10px] font-black text-cyan-400 uppercase tracking-widest">Console</span>
-                </button>
-            </header>
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-10 flex justify-between items-center">
+            <div>
+                <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Subscription • {{
+                    sub_name or 'Azure' }}</p>
+                <h1 class="text-4xl font-black tracking-tighter glow-text-cyan uppercase">Metrics <span
+                        class="text-cyan-400">Command</span></h1>
+                <p class="text-gray-500 text-xs mt-2 font-bold uppercase tracking-widest">
+                    Python pusher • WebSocket cadence {{ metrics_emit_sec }}s (Azure-friendly)
+                </p>
+            </div>
+            <button onclick="toggleConsoleSimple()"
+                class="glass px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-white/10 transition border border-white/5">
+                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span class="text-[10px] font-black text-cyan-400 uppercase tracking-widest">Console</span>
+            </button>
+        </header>
 
-            <!-- Symmetrical 2x2 Grid Layout for Optimal Space Usage -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Main Chart - Spans Full Width on Large Screens -->
-                <div class="lg:col-span-2 monitor-card glass-morph p-6">
-                    <div class="card-header">
-                        <i class="fas fa-chart-line text-cyan-400"></i>
-                        <h3>REAL-TIME COMPUTE VELOCITY</h3>
-                    </div>
-                    <div class="h-[280px] relative">
-                        <div class="chart-loading absolute inset-0 flex items-center justify-center" id="computeChart-loading">
-                            <div class="skeleton"></div>
-                        </div>
-                        <canvas id="computeChart" class="relative z-10"></canvas>
-                    </div>
+        <!-- Symmetrical 2x2 Grid Layout for Optimal Space Usage -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Main Chart - Spans Full Width on Large Screens -->
+            <div class="lg:col-span-2 monitor-card glass-morph p-6">
+                <div class="card-header">
+                    <i class="fas fa-chart-line text-cyan-400"></i>
+                    <h3>REAL-TIME COMPUTE VELOCITY</h3>
                 </div>
-
-                <!-- Chart 1 -->
-                <div class="glass p-6 chart-tile">
-                    <div class="card-header">
-                        <i class="fas fa-layer-group text-cyan-400/80"></i>
-                        <h3>BURN RATE VS BUDGET PACE</h3>
+                <div class="h-[280px] relative">
+                    <div class="chart-loading absolute inset-0 flex items-center justify-center"
+                        id="computeChart-loading">
+                        <div class="skeleton"></div>
                     </div>
-                    <div class="h-[220px] relative">
-                        <div class="chart-loading absolute inset-0 flex items-center justify-center" id="burnAreaChart-loading">
-                            <div class="skeleton"></div>
-                        </div>
-                        <canvas id="burnAreaChart" class="relative z-10"></canvas>
-                    </div>
+                    <canvas id="computeChart" class="relative z-10"></canvas>
                 </div>
+            </div>
 
-                <!-- Chart 2 -->
-                <div class="glass p-6 chart-tile">
-                    <div class="card-header">
-                        <i class="fas fa-chart-bar text-blue-400"></i>
-                        <h3>SERVICE DISTRIBUTION (30D)</h3>
-                    </div>
-                    <div class="h-[220px] relative">
-                        <div class="chart-loading absolute inset-0 flex items-center justify-center" id="serviceBarChart-loading">
-                            <div class="skeleton"></div>
-                        </div>
-                        <canvas id="serviceBarChart" class="relative z-10"></canvas>
-                    </div>
+            <!-- Chart 1 -->
+            <div class="glass p-6 chart-tile">
+                <div class="card-header">
+                    <i class="fas fa-layer-group text-cyan-400/80"></i>
+                    <h3>BURN RATE VS BUDGET PACE</h3>
                 </div>
-
-                <!-- Chart 3 -->
-                <div class="glass p-6 chart-tile">
-                    <div class="card-header">
-                        <i class="fas fa-server text-purple-400"></i>
-                        <h3>CPU &amp; MEMORY BY INSTANCE FAMILY</h3>
+                <div class="h-[220px] relative">
+                    <div class="chart-loading absolute inset-0 flex items-center justify-center"
+                        id="burnAreaChart-loading">
+                        <div class="skeleton"></div>
                     </div>
-                    <p class="text-[9px] text-gray-500 mb-2 font-bold uppercase">Memory GiB from host Available Memory when emitted</p>
-                    <div class="h-[220px] relative">
-                        <div class="chart-loading absolute inset-0 flex items-center justify-center" id="familyStackChart-loading">
-                            <div class="skeleton"></div>
-                        </div>
-                        <canvas id="familyStackChart" class="relative z-10"></canvas>
-                    </div>
+                    <canvas id="burnAreaChart" class="relative z-10"></canvas>
                 </div>
+            </div>
 
-                <!-- Chart 4 -->
-                <div class="glass p-6 chart-tile">
-                    <div class="card-header">
-                        <i class="fas fa-fire text-orange-400"></i>
-                        <h3>USAGE BY HOUR (SAMPLE VM)</h3>
+            <!-- Chart 2 -->
+            <div class="glass p-6 chart-tile">
+                <div class="card-header">
+                    <i class="fas fa-chart-bar text-blue-400"></i>
+                    <h3>SERVICE DISTRIBUTION (30D)</h3>
+                </div>
+                <div class="h-[220px] relative">
+                    <div class="chart-loading absolute inset-0 flex items-center justify-center"
+                        id="serviceBarChart-loading">
+                        <div class="skeleton"></div>
                     </div>
-                    <p class="text-[9px] text-gray-500 mb-2 font-bold uppercase">Heatmap-style CPU for auto-shutdown signals</p>
-                    <div class="h-[220px] relative">
-                        <div class="chart-loading absolute inset-0 flex items-center justify-center" id="usageHeatmapChart-loading">
-                            <div class="skeleton"></div>
-                        </div>
-                        <canvas id="usageHeatmapChart" class="relative z-10"></canvas>
+                    <canvas id="serviceBarChart" class="relative z-10"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 3 -->
+            <div class="glass p-6 chart-tile">
+                <div class="card-header">
+                    <i class="fas fa-server text-purple-400"></i>
+                    <h3>CPU &amp; MEMORY BY INSTANCE FAMILY</h3>
+                </div>
+                <p class="text-[9px] text-gray-500 mb-2 font-bold uppercase">Memory GiB from host Available Memory when
+                    emitted</p>
+                <div class="h-[220px] relative">
+                    <div class="chart-loading absolute inset-0 flex items-center justify-center"
+                        id="familyStackChart-loading">
+                        <div class="skeleton"></div>
                     </div>
+                    <canvas id="familyStackChart" class="relative z-10"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 4 -->
+            <div class="glass p-6 chart-tile">
+                <div class="card-header">
+                    <i class="fas fa-fire text-orange-400"></i>
+                    <h3>USAGE BY HOUR (SAMPLE VM)</h3>
+                </div>
+                <p class="text-[9px] text-gray-500 mb-2 font-bold uppercase">Heatmap-style CPU for auto-shutdown signals
+                </p>
+                <div class="h-[220px] relative">
+                    <div class="chart-loading absolute inset-0 flex items-center justify-center"
+                        id="usageHeatmapChart-loading">
+                        <div class="skeleton"></div>
+                    </div>
+                    <canvas id="usageHeatmapChart" class="relative z-10"></canvas>
                 </div>
             </div>
         </div>
-    </main>
+    </div>
+</main>
 
 <!-- Console Terminal -->
 {% include "layouts/_console.html" %}
 
 <script>
-// Remove loading skeletons when charts are ready
-function hideChartLoading(chartId) {
-    const loadingElement = document.getElementById(chartId + '-loading');
-    if (loadingElement) {
-        loadingElement.style.display = 'none';
-    }
-}
-
-// Hook into chart initialization to hide loading states
-const originalChartUpdate = Chart.prototype.update;
-Chart.prototype.update = function(mode) {
-    const result = originalChartUpdate.call(this, mode);
-    if (this.canvas.id) {
-        hideChartLoading(this.canvas.id);
-    }
-    return result;
-};
-
-// Immediate console toggle handler - doesn't wait for deferred scripts
-function toggleConsoleSimple() {
-    const terminal = document.getElementById('console-terminal');
-    if (!terminal) {
-        console.error('Console terminal not found');
-        alert('Console terminal not found in page. Please refresh the page.');
-        return;
-    }
-    
-    const isVisible = terminal.style.display !== 'none';
-    terminal.style.display = isVisible ? 'none' : 'block';
-    
-    if (!isVisible) {
-        const output = document.getElementById('log-output');
-        if (output) {
-            output.innerHTML = '<p style="color: #64748b; font-style: italic;">> Initializing terminal...</p>';
+    // Remove loading skeletons when charts are ready
+    function hideChartLoading(chartId) {
+        const loadingElement = document.getElementById(chartId + '-loading');
+        if (loadingElement) {
+            loadingElement.style.display = 'none';
         }
-        
-        // Start real log streaming via WebSocket
-        setTimeout(function() {
-            startRealLogStream();
-        }, 500);
     }
-}
 
-function startRealLogStream() {
-    const output = document.getElementById('log-output');
-    if (!output) return;
-    
-    // Add system message
-    const statusMsg = document.createElement('p');
-    statusMsg.style.color = '#64748b';
-    statusMsg.style.fontStyle = 'italic';
-    statusMsg.innerText = '> Connecting to real-time log stream...';
-    output.appendChild(statusMsg);
-    output.scrollTop = output.scrollHeight;
-    
-    // Function to attempt connection with retry
-    function attemptConnection(retryCount = 0) {
-        const maxRetries = 5;
-        
-        // Check if Socket.IO and the ensure socket function are available
-        if (window.__reaperEnsureSocket) {
-            try {
-                const sock = window.__reaperEnsureSocket();
-                if (sock) {
-                    // Emit request to start real log streaming
-                    sock.emit('start_log_stream');
-                    
-                    // Set up listener for real logs if not already set up
-                    if (!window.__realConsoleListenerSetup) {
-                        window.__realConsoleListenerSetup = true;
-                        sock.on('new_log', function(msg) {
-                            const logOutput = document.getElementById('log-output');
-                            if (!logOutput) return;
-                            
-                            const logEntry = document.createElement('p');
-                            
-                            // Color-code based on log content
-                            let color = '#a5f3fc'; // default cyan
-                            if (msg.data && typeof msg.data === 'string') {
-                                if (msg.data.includes('❌') || msg.data.toLowerCase().includes('error')) {
-                                    color = '#f87171'; // red
-                                } else if (msg.data.includes('✅') || msg.data.toLowerCase().includes('success')) {
-                                    color = '#4ade80'; // green  
-                                } else if (msg.data.includes('⚠️') || msg.data.toLowerCase().includes('warning')) {
-                                    color = '#facc15'; // yellow
+    // Hook into chart initialization to hide loading states
+    const originalChartUpdate = Chart.prototype.update;
+    Chart.prototype.update = function (mode) {
+        const result = originalChartUpdate.call(this, mode);
+        if (this.canvas.id) {
+            hideChartLoading(this.canvas.id);
+        }
+        return result;
+    };
+
+    // Immediate console toggle handler - doesn't wait for deferred scripts
+    function toggleConsoleSimple() {
+        const terminal = document.getElementById('console-terminal');
+        if (!terminal) {
+            console.error('Console terminal not found');
+            alert('Console terminal not found in page. Please refresh the page.');
+            return;
+        }
+
+        const isVisible = terminal.style.display !== 'none';
+        terminal.style.display = isVisible ? 'none' : 'block';
+
+        if (!isVisible) {
+            const output = document.getElementById('log-output');
+            if (output) {
+                output.innerHTML = '<p style="color: #64748b; font-style: italic;">> Initializing terminal...</p>';
+            }
+
+            // Start real log streaming via WebSocket
+            setTimeout(function () {
+                startRealLogStream();
+            }, 500);
+        }
+    }
+
+    function startRealLogStream() {
+        const output = document.getElementById('log-output');
+        if (!output) return;
+
+        // Add system message
+        const statusMsg = document.createElement('p');
+        statusMsg.style.color = '#64748b';
+        statusMsg.style.fontStyle = 'italic';
+        statusMsg.innerText = '> Connecting to real-time log stream...';
+        output.appendChild(statusMsg);
+        output.scrollTop = output.scrollHeight;
+
+        // Function to attempt connection with retry
+        function attemptConnection(retryCount = 0) {
+            const maxRetries = 5;
+
+            // Check if Socket.IO and the ensure socket function are available
+            if (window.__reaperEnsureSocket) {
+                try {
+                    const sock = window.__reaperEnsureSocket();
+                    if (sock) {
+                        // Emit request to start real log streaming
+                        sock.emit('start_log_stream');
+
+                        // Set up listener for real logs if not already set up
+                        if (!window.__realConsoleListenerSetup) {
+                            window.__realConsoleListenerSetup = true;
+                            sock.on('new_log', function (msg) {
+                                const logOutput = document.getElementById('log-output');
+                                if (!logOutput) return;
+
+                                const logEntry = document.createElement('p');
+
+                                // Color-code based on log content
+                                let color = '#a5f3fc'; // default cyan
+                                if (msg.data && typeof msg.data === 'string') {
+                                    if (msg.data.includes('❌') || msg.data.toLowerCase().includes('error')) {
+                                        color = '#f87171'; // red
+                                    } else if (msg.data.includes('✅') || msg.data.toLowerCase().includes('success')) {
+                                        color = '#4ade80'; // green  
+                                    } else if (msg.data.includes('⚠️') || msg.data.toLowerCase().includes('warning')) {
+                                        color = '#facc15'; // yellow
+                                    }
                                 }
-                            }
-                            
-                            logEntry.style.color = color;
-                            logEntry.style.marginBottom = '4px';
-                            logEntry.style.padding = '4px 8px';
-                            logEntry.style.borderRadius = '2px';
-                            const timestamp = new Date().toLocaleTimeString();
-                            logEntry.innerText = `[${timestamp}] ${msg.data}`;
-                            logOutput.appendChild(logEntry);
-                            logOutput.scrollTop = logOutput.scrollHeight;
-                        });
-                        
-                        // Clear previous fallback messages
-                        const fallbackMsgs = output.querySelectorAll('.fallback-msg');
-                        fallbackMsgs.forEach(msg => msg.remove());
+
+                                logEntry.style.color = color;
+                                logEntry.style.marginBottom = '4px';
+                                logEntry.style.padding = '4px 8px';
+                                logEntry.style.borderRadius = '2px';
+                                const timestamp = new Date().toLocaleTimeString();
+                                logEntry.innerText = `[${timestamp}] ${msg.data}`;
+                                logOutput.appendChild(logEntry);
+                                logOutput.scrollTop = logOutput.scrollHeight;
+                            });
+
+                            // Clear previous fallback messages
+                            const fallbackMsgs = output.querySelectorAll('.fallback-msg');
+                            fallbackMsgs.forEach(msg => msg.remove());
+                        }
+                    } else {
+                        throw new Error('Socket.IO connection not established');
                     }
-                } else {
-                    throw new Error('Socket.IO connection not established');
+                } catch (error) {
+                    if (retryCount < maxRetries) {
+                        setTimeout(() => attemptConnection(retryCount + 1), 500);
+                    } else {
+                        addFallbackLog('WebSocket connection failed after retries');
+                    }
                 }
-            } catch (error) {
+            } else {
+                // Socket.IO not loaded yet, retry
                 if (retryCount < maxRetries) {
                     setTimeout(() => attemptConnection(retryCount + 1), 500);
                 } else {
-                    addFallbackLog('WebSocket connection failed after retries');
+                    addFallbackLog('Socket.IO library failed to load');
                 }
             }
-        } else {
-            // Socket.IO not loaded yet, retry
-            if (retryCount < maxRetries) {
-                setTimeout(() => attemptConnection(retryCount + 1), 500);
-            } else {
-                addFallbackLog('Socket.IO library failed to load');
-            }
         }
-    }
-    
-    // Start attempting connection
-    attemptConnection();
-}
 
-function addFallbackLog(message) {
-    const output = document.getElementById('log-output');
-    if (!output) return;
-    
-    const logEntry = document.createElement('p');
-    logEntry.className = 'fallback-msg';
-    logEntry.style.color = '#facc15';
-    logEntry.style.marginBottom = '4px';
-    logEntry.style.padding = '4px 8px';
-    logEntry.style.borderRadius = '2px';
-    const timestamp = new Date().toLocaleTimeString();
-    logEntry.innerText = `[${timestamp}] ⚠️ ${message}`;
-    output.appendChild(logEntry);
-    output.scrollTop = output.scrollHeight;
-}
+        // Start attempting connection
+        attemptConnection();
+    }
+
+    function addFallbackLog(message) {
+        const output = document.getElementById('log-output');
+        if (!output) return;
+
+        const logEntry = document.createElement('p');
+        logEntry.className = 'fallback-msg';
+        logEntry.style.color = '#facc15';
+        logEntry.style.marginBottom = '4px';
+        logEntry.style.padding = '4px 8px';
+        logEntry.style.borderRadius = '2px';
+        const timestamp = new Date().toLocaleTimeString();
+        logEntry.innerText = `[${timestamp}] ⚠️ ${message}`;
+        output.appendChild(logEntry);
+        output.scrollTop = output.scrollHeight;
+    }
 </script>
 {% endblock %}
