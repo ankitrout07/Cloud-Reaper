@@ -1,5 +1,5 @@
-<div class="settings-section section-icon-blue">
-    <div class="section-header">
+<div class="settings-section section-icon-blue" style="border-color: rgba(59, 130, 246, 0.25); box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,0,0,0.2) inset, 0 0 40px rgba(59,130,246,0.06);">
+    <div class="section-header" style="background: linear-gradient(90deg, rgba(59,130,246,0.08) 0%, rgba(59,130,246,0.03) 50%, transparent 100%); border-bottom-color: rgba(59,130,246,0.15);">
         <div class="section-title">
             <div class="section-icon">
                 <i class="fas fa-cloud"></i>
@@ -13,7 +13,7 @@
     <div class="section-content">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
             <!-- AWS -->
-            <div class="p-8 rounded-2xl border border-gray-700 hover:border-gray-600 transition-all" style="background: rgba(31, 41, 55, 0.5);">
+            <div class="p-8 rounded-2xl border border-gray-700 transition-all" style="background: rgba(31, 41, 55, 0.5); transition: border-color 0.25s ease, box-shadow 0.25s ease;" onmouseover="this.style.borderColor='rgba(59,130,246,0.4)';this.style.boxShadow='0 0 20px rgba(59,130,246,0.08)'" onmouseout="this.style.borderColor='rgba(55,65,81,1)';this.style.boxShadow='none'">
                 <div class="flex justify-between items-center mb-6">
                     <span class="font-bold text-white flex items-center gap-4 text-lg">
                         <span class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(255, 153, 0, 0.1); border: 1px solid rgba(255, 153, 0, 0.2);">
@@ -29,7 +29,7 @@
                 </div>
             </div>
             <!-- Azure -->
-            <div class="p-8 rounded-2xl border border-gray-700 hover:border-gray-600 transition-all" style="background: rgba(31, 41, 55, 0.5);">
+            <div class="p-8 rounded-2xl border border-gray-700 transition-all" style="background: rgba(31, 41, 55, 0.5); transition: border-color 0.25s ease, box-shadow 0.25s ease;" onmouseover="this.style.borderColor='rgba(59,130,246,0.4)';this.style.boxShadow='0 0 20px rgba(59,130,246,0.08)'" onmouseout="this.style.borderColor='rgba(55,65,81,1)';this.style.boxShadow='none'">
                 <div class="flex justify-between items-center mb-6">
                     <span class="font-bold text-white flex items-center gap-4 text-lg">
                         <span class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(0, 120, 212, 0.1); border: 1px solid rgba(0, 120, 212, 0.2);">
@@ -45,7 +45,7 @@
                 </div>
             </div>
             <!-- GCP -->
-            <div class="p-8 rounded-2xl border border-gray-700 hover:border-gray-600 transition-all" style="background: rgba(31, 41, 55, 0.5);">
+            <div class="p-8 rounded-2xl border border-gray-700 transition-all" style="background: rgba(31, 41, 55, 0.5); transition: border-color 0.25s ease, box-shadow 0.25s ease;" onmouseover="this.style.borderColor='rgba(59,130,246,0.4)';this.style.boxShadow='0 0 20px rgba(59,130,246,0.08)'" onmouseout="this.style.borderColor='rgba(55,65,81,1)';this.style.boxShadow='none'">
                 <div class="flex justify-between items-center mb-6">
                     <span class="font-bold text-white flex items-center gap-4 text-lg">
                         <span class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(66, 133, 244, 0.1); border: 1px solid rgba(66, 133, 244, 0.2);">
@@ -61,7 +61,7 @@
                 </div>
             </div>
             <!-- Kubernetes -->
-            <div class="p-8 rounded-2xl border border-gray-700 hover:border-gray-600 transition-all" style="background: rgba(31, 41, 55, 0.5);">
+            <div class="p-8 rounded-2xl border border-gray-700 transition-all" style="background: rgba(31, 41, 55, 0.5); transition: border-color 0.25s ease, box-shadow 0.25s ease;" onmouseover="this.style.borderColor='rgba(59,130,246,0.4)';this.style.boxShadow='0 0 20px rgba(59,130,246,0.08)'" onmouseout="this.style.borderColor='rgba(55,65,81,1)';this.style.boxShadow='none'">
                 <div class="flex justify-between items-center mb-6">
                     <span class="font-bold text-white flex items-center gap-4 text-lg">
                         <span class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(50, 108, 229, 0.1); border: 1px solid rgba(50, 108, 229, 0.2);">
@@ -79,7 +79,7 @@
         </div>
 
         <!-- Configuration Panels -->
-        <div id="cloud-panel-aws" class="cloud-provider-panel hidden p-8 rounded-2xl mt-8 space-y-6" style="background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(55, 65, 81, 0.3);">
+        <div id="cloud-panel-aws" class="cloud-provider-panel hidden p-8 rounded-2xl mt-8 space-y-6" style="background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(59, 130, 246, 0.2); box-shadow: 0 0 24px rgba(59,130,246,0.06);">
             <div class="flex items-center gap-3 mb-4">
                 <span class="w-2 h-2 rounded-full" style="background: #FF9900;"></span>
                 <span class="text-xs font-bold uppercase tracking-widest text-gray-400">AWS Credentials</span>
@@ -92,7 +92,7 @@
             </button>
         </div>
 
-        <div id="cloud-panel-azure" class="cloud-provider-panel hidden p-8 rounded-2xl mt-8 space-y-6" style="background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(55, 65, 81, 0.3);">
+        <div id="cloud-panel-azure" class="cloud-provider-panel hidden p-8 rounded-2xl mt-8 space-y-6" style="background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(59, 130, 246, 0.2); box-shadow: 0 0 24px rgba(59,130,246,0.06);">
             <div class="flex items-center gap-3 mb-4">
                 <span class="w-2 h-2 rounded-full" style="background: #0078D4;"></span>
                 <span class="text-xs font-bold uppercase tracking-widest text-gray-400">Azure Service Principal</span>
@@ -108,7 +108,7 @@
             </button>
         </div>
 
-        <div id="cloud-panel-gcp" class="cloud-provider-panel hidden p-8 rounded-2xl mt-8 space-y-6" style="background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(55, 65, 81, 0.3);">
+        <div id="cloud-panel-gcp" class="cloud-provider-panel hidden p-8 rounded-2xl mt-8 space-y-6" style="background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(59, 130, 246, 0.2); box-shadow: 0 0 24px rgba(59,130,246,0.06);">
             <div class="flex items-center gap-3 mb-4">
                 <span class="w-2 h-2 rounded-full" style="background: #4285F4;"></span>
                 <span class="text-xs font-bold uppercase tracking-widest text-gray-400">GCP Service Account</span>
@@ -121,7 +121,7 @@
             </button>
         </div>
 
-        <div id="cloud-panel-k8s" class="cloud-provider-panel hidden p-8 rounded-2xl mt-8 space-y-6" style="background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(55, 65, 81, 0.3);">
+        <div id="cloud-panel-k8s" class="cloud-provider-panel hidden p-8 rounded-2xl mt-8 space-y-6" style="background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(59, 130, 246, 0.2); box-shadow: 0 0 24px rgba(59,130,246,0.06);">
             <div class="flex items-center gap-3 mb-4">
                 <span class="w-2 h-2 rounded-full" style="background: #326CE5;"></span>
                 <span class="text-xs font-bold uppercase tracking-widest text-gray-400">Kubernetes Cluster</span>
