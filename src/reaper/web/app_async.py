@@ -1764,7 +1764,13 @@ async def docs(request: Request):
         files = sorted(md_files + txt_files)
         for file_path in files:
             filename = file_path.name
-            title = filename.replace(".md", "").replace(".txt", "").lstrip("0123456789_").replace("_", " ").title()
+            title = (
+                filename.replace(".md", "")
+                .replace(".txt", "")
+                .lstrip("0123456789_")
+                .replace("_", " ")
+                .title()
+            )
             with file_path.open(encoding="utf-8") as f:
                 content = f.read()
             docs_data.append({"filename": filename, "title": title, "content": content})
