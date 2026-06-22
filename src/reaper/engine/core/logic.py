@@ -42,42 +42,48 @@ def analyze_compute_telemetry(cpu_matrix, memory_matrix, env_type="dev-test", lo
     for idx in range(cpu_matrix.shape[0]):
         # Rule 1: Zero or near-zero utilization Shutdown Trigger
         if max_cpu[idx] < cpu_shutdown_threshold:
-            recommendations.append({
-                "resource_index": idx,
-                "action": "SHUTDOWN",
-                "impact": "HIGH",
-                "reason": "Idle resource threshold breach",
-                "metrics": {
-                    "avg_cpu": float(avg_cpu[idx]),
-                    "max_cpu": float(max_cpu[idx]),
-                    "avg_memory": float(avg_mem[idx]),
+            recommendations.append(
+                {
+                    "resource_index": idx,
+                    "action": "SHUTDOWN",
+                    "impact": "HIGH",
+                    "reason": "Idle resource threshold breach",
+                    "metrics": {
+                        "avg_cpu": float(avg_cpu[idx]),
+                        "max_cpu": float(max_cpu[idx]),
+                        "avg_memory": float(avg_mem[idx]),
+                    },
                 }
-            })
+            )
         # Rule 2: Low-average / high-peak Burstable B-Series Rightsize Trigger
         elif avg_cpu[idx] < 20.0 and max_cpu[idx] > 70.0:
-            recommendations.append({
-                "resource_index": idx,
-                "action": "RIGHTSIZE_BURSTABLE",
-                "impact": "MEDIUM",
-                "reason": "Fits burstable B-Series profile",
-                "metrics": {
-                    "avg_cpu": float(avg_cpu[idx]),
-                    "max_cpu": float(max_cpu[idx]),
-                    "avg_memory": float(avg_mem[idx]),
+            recommendations.append(
+                {
+                    "resource_index": idx,
+                    "action": "RIGHTSIZE_BURSTABLE",
+                    "impact": "MEDIUM",
+                    "reason": "Fits burstable B-Series profile",
+                    "metrics": {
+                        "avg_cpu": float(avg_cpu[idx]),
+                        "max_cpu": float(max_cpu[idx]),
+                        "avg_memory": float(avg_mem[idx]),
+                    },
                 }
-            })
+            )
         else:
-            recommendations.append({
-                "resource_index": idx,
-                "action": "STAY",
-                "impact": "LOW",
-                "reason": "Stable operation baseline",
-                "metrics": {
-                    "avg_cpu": float(avg_cpu[idx]),
-                    "max_cpu": float(max_cpu[idx]),
-                    "avg_memory": float(avg_mem[idx]),
+            recommendations.append(
+                {
+                    "resource_index": idx,
+                    "action": "STAY",
+                    "impact": "LOW",
+                    "reason": "Stable operation baseline",
+                    "metrics": {
+                        "avg_cpu": float(avg_cpu[idx]),
+                        "max_cpu": float(max_cpu[idx]),
+                        "avg_memory": float(avg_mem[idx]),
+                    },
                 }
-            })
+            )
 
     return recommendations
 

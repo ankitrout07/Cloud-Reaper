@@ -3,20 +3,20 @@ Test script for the enhanced FinOps pipeline.
 Validates sequential pipeline execution with workload differentiation.
 """
 
-import numpy as np
 import sys
 from pathlib import Path
+
+import numpy as np
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
+from reaper.engine.core.calculator import RightsizingAgent
 from reaper.engine.core.scheduler import (
     FinOpsPipeline,
     WorkloadClassifier,
     analyze_compute_telemetry,
 )
-from reaper.engine.core.calculator import RightsizingAgent
-from reaper.engine.core.logic import analyze_compute_telemetry as logic_analyze
 
 
 def test_workload_classification():
@@ -69,7 +69,7 @@ def test_vectorized_compute_analysis():
         prod_recommendations = analyze_compute_telemetry(
             cpu_matrix, mem_matrix, env_type="production", lookback_days=lookback
         )
-        print(f"    Production Environment:")
+        print("    Production Environment:")
         for rec in prod_recommendations:
             print(f"      Resource {rec['resource_index']}: {rec['action']} - {rec['reason']}")
 
@@ -77,7 +77,7 @@ def test_vectorized_compute_analysis():
         dev_recommendations = analyze_compute_telemetry(
             cpu_matrix, mem_matrix, env_type="dev-test", lookback_days=lookback
         )
-        print(f"    Dev-Test Environment:")
+        print("    Dev-Test Environment:")
         for rec in dev_recommendations:
             print(f"      Resource {rec['resource_index']}: {rec['action']} - {rec['reason']}")
 
@@ -93,7 +93,7 @@ def test_environment_aware_rightsizing():
     prod_metrics = {"cpu": 25.0, "mem": 30.0, "iops": 50, "net": 40}
     prod_result = prod_agent.evaluate_migration(prod_metrics, "Standard_D4s_v3")
 
-    print(f"  Production Agent:")
+    print("  Production Agent:")
     print(f"    Recommended Action: {prod_result['recommended_action']}")
     print(f"    Risk Profile: {prod_result['risk_profile']}")
     print(f"    Thresholds: {prod_result['thresholds_used']}")
@@ -102,7 +102,7 @@ def test_environment_aware_rightsizing():
     dev_agent = RightsizingAgent(environment_type="dev-test")
     dev_result = dev_agent.evaluate_migration(prod_metrics, "Standard_D4s_v3")
 
-    print(f"  Dev-Test Agent:")
+    print("  Dev-Test Agent:")
     print(f"    Recommended Action: {dev_result['recommended_action']}")
     print(f"    Risk Profile: {dev_result['risk_profile']}")
     print(f"    Thresholds: {dev_result['thresholds_used']}")

@@ -6,20 +6,17 @@ Order: Telemetry Collection → Rightsizing → Baseline Update → Commitment M
 
 import logging
 from datetime import UTC, datetime
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
-import pandas as pd
 
 from reaper.engine.core.calculator import RightsizingAgent
 from reaper.engine.core.logic import RightSizer
+from reaper.engine.core.workload import WorkloadPersonality
 from reaper.engine.models.resources import (
-    CloudResource,
     OptimizationBaseline,
-    SessionLocal,
     get_db_session,
 )
-from reaper.engine.core.workload import WorkloadPersonality
 
 logger = logging.getLogger(__name__)
 
@@ -40,13 +37,13 @@ class WorkloadClassifier:
             "cost_center": ["cost-center", "costcenter", "billing"],
         }
 
-    def classify_resource(self, resource: Dict[str, Any]) -> str:
+    def classify_resource(self, resource: dict[str, Any]) -> str:
         """
         Classifies a resource as 'production' or 'dev-test' based on tags and naming.
-        
+
         Args:
             resource: Dictionary with 'tags', 'name', and other resource metadata
-            
+
         Returns:
             'production' or 'dev-test'
         """
@@ -60,25 +57,25 @@ class WorkloadClassifier:
                     env_value = str(tags[variation]).lower()
                     if any(kw in env_value for kw in self.PRODUCTION_KEYWORDS):
                         return "production"
-                    elif any(kw in env_value for kw in self.DEV_TEST_KEYWORDS):
+                    if any(kw in env_value for kw in self.DEV_TEST_KEYWORDS):
                         return "dev-test"
 
         # Fallback to name-based classification
         if any(kw in resource_name for kw in self.PRODUCTION_KEYWORDS):
             return "production"
-        elif any(kw in resource_name for kw in self.DEV_TEST_KEYWORDS):
+        if any(kw in resource_name for kw in self.DEV_TEST_KEYWORDS):
             return "dev-test"
 
         # Default to production for safety (more conservative thresholds)
         return "production"
 
-    def batch_classify(self, resources: List[Dict[str, Any]]) -> Dict[str, str]:
+    def batch_classify(self, resources: list[dict[str, Any]]) -> dict[str, str]:
         """
         Classifies multiple resources and returns a mapping of resource_id to environment type.
-        
+
         Args:
             resources: List of resource dictionaries
-            
+
         Returns:
             Dictionary mapping resource IDs to 'production' or 'dev-test'
         """
@@ -107,10 +104,10 @@ class FinOpsPipeline:
 
     def execute_pipeline(
         self,
-        telemetry_data: List[Dict[str, Any]],
+        telemetry_data: list[dict[str, Any]],
         provider: str = "azure",
         lookback_days: int = 7,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Executes the complete FinOps pipeline in the correct sequence.
 
@@ -170,9 +167,7 @@ class FinOpsPipeline:
             results["final_recommendations"] = stage2_result["rightsizing_recommendations"]
             results["commitment_recommendations"] = stage4_result["commitment_insights"]
             results["pipeline_status"] = "completed"
-            results["execution_time_seconds"] = (
-                datetime.now(UTC) - pipeline_start
-            ).total_seconds()
+            results["execution_time_seconds"] = (datetime.now(UTC) - pipeline_start).total_seconds()
 
             logger.info(f"FinOps Pipeline completed in {results['execution_time_seconds']:.2f}s")
             return results
@@ -181,23 +176,19 @@ class FinOpsPipeline:
             logger.error(f"Pipeline execution failed: {e}")
             results["pipeline_status"] = "failed"
             results["error"] = str(e)
-            results["execution_time_seconds"] = (
-                datetime.now(UTC) - pipeline_start
-            ).total_seconds()
+            results["execution_time_seconds"] = (datetime.now(UTC) - pipeline_start).total_seconds()
             return results
 
     def _stage_telemetry_classification(
-        self, telemetry_data: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, telemetry_data: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """
         Stage 1: Classify resources by environment type (production vs dev-test).
         This enables different threshold policies for safety.
         """
         try:
             classified_resources = []
-            environment_mapping = self.workload_classifier.batch_classify(
-                telemetry_data
-            )
+            environment_mapping = self.workload_classifier.batch_classify(telemetry_data)
 
             for resource in telemetry_data:
                 resource_id = resource.get("id", resource.get("name", "unknown"))
@@ -205,9 +196,7 @@ class FinOpsPipeline:
                 resource["environment_type"] = env_type
                 classified_resources.append(resource)
 
-            production_count = sum(
-                1 for env in environment_mapping.values() if env == "production"
-            )
+            production_count = sum(1 for env in environment_mapping.values() if env == "production")
             dev_test_count = len(environment_mapping) - production_count
 
             return {
@@ -227,10 +216,10 @@ class FinOpsPipeline:
 
     def _stage_rightsizing_analysis(
         self,
-        classified_resources: List[Dict[str, Any]],
-        environment_mapping: Dict[str, str],
+        classified_resources: list[dict[str, Any]],
+        environment_mapping: dict[str, str],
         lookback_days: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Stage 2: Perform rightsizing analysis using Q-learning agent and vectorized operations.
         Applies environment-aware thresholds for safety.
@@ -267,9 +256,7 @@ class FinOpsPipeline:
                     "net": resource.get("network_throughput", 40),
                 }
 
-                rl_evaluation = self.rightsizing_agent.evaluate_migration(
-                    metrics, current_sku
-                )
+                rl_evaluation = self.rightsizing_agent.evaluate_migration(metrics, current_sku)
 
                 # Combine heuristic and RL recommendations
                 recommendation = {
@@ -318,7 +305,7 @@ class FinOpsPipeline:
         memory_matrix: np.ndarray,
         env_type: str = "production",
         lookback_days: int = 7,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Vectorized evaluation of compute performance data over variable lookback windows.
         Differentiates thresholds between production and dev-test environments safely.
@@ -356,10 +343,7 @@ class FinOpsPipeline:
             action = "SHUTDOWN"
             impact = "HIGH"
             reason = "Idle resource threshold breach"
-        elif (
-            avg_cpu < cpu_rightsizing_threshold
-            and max_cpu > burst_eligible_threshold
-        ):
+        elif avg_cpu < cpu_rightsizing_threshold and max_cpu > burst_eligible_threshold:
             action = "RIGHTSIZE_BURSTABLE"
             impact = "MEDIUM"
             reason = "Fits burstable B-Series profile"
@@ -392,7 +376,7 @@ class FinOpsPipeline:
         }
 
     def _determine_final_action(
-        self, telemetry_analysis: Dict, rl_evaluation: Dict, env_type: str
+        self, telemetry_analysis: dict, rl_evaluation: dict, env_type: str
     ) -> str:
         """
         Combines heuristic telemetry analysis with RL agent evaluation
@@ -414,7 +398,7 @@ class FinOpsPipeline:
         return telemetry_action
 
     def _calculate_confidence(
-        self, telemetry_analysis: Dict, personality: Dict, rl_evaluation: Dict
+        self, telemetry_analysis: dict, personality: dict, rl_evaluation: dict
     ) -> float:
         """
         Calculates overall confidence score based on multiple factors.
@@ -422,10 +406,7 @@ class FinOpsPipeline:
         base_confidence = 0.75
 
         # Increase confidence if RL and heuristic agree
-        if (
-            telemetry_analysis["recommended_action"]
-            == rl_evaluation["recommended_action"]
-        ):
+        if telemetry_analysis["recommended_action"] == rl_evaluation["recommended_action"]:
             base_confidence += 0.1
 
         # Increase confidence for clear workload personalities
@@ -439,8 +420,8 @@ class FinOpsPipeline:
         return min(max(base_confidence, 0.0), 1.0)
 
     def _stage_baseline_update(
-        self, rightsizing_recommendations: List[Dict], provider: str
-    ) -> Dict[str, Any]:
+        self, rightsizing_recommendations: list[dict], provider: str
+    ) -> dict[str, Any]:
         """
         Stage 3: Update optimization baseline in SQLite with rightsizing recommendations.
         This baseline is used for commitment management calculations.
@@ -448,9 +429,7 @@ class FinOpsPipeline:
         try:
             with get_db_session() as session:
                 # Clear old baseline entries for this provider
-                session.query(OptimizationBaseline).filter_by(
-                    provider=provider
-                ).delete()
+                session.query(OptimizationBaseline).filter_by(provider=provider).delete()
 
                 # Insert new optimized baseline entries
                 baseline_entries = []
@@ -477,9 +456,7 @@ class FinOpsPipeline:
                 session.add_all(baseline_entries)
                 session.commit()
 
-                total_estimated_savings = sum(
-                    entry.estimated_savings for entry in baseline_entries
-                )
+                total_estimated_savings = sum(entry.estimated_savings for entry in baseline_entries)
 
                 return {
                     "success": True,
@@ -494,9 +471,7 @@ class FinOpsPipeline:
             logger.error(f"Baseline update failed: {e}")
             return {"success": False, "error": str(e), "optimized_baseline": {}}
 
-    def _estimate_savings(
-        self, recommendation: Dict, price_book: Dict
-    ) -> float:
+    def _estimate_savings(self, recommendation: dict, price_book: dict) -> float:
         """
         Estimates monthly savings for a rightsizing recommendation.
         """
@@ -520,8 +495,8 @@ class FinOpsPipeline:
         return 0.0
 
     def _stage_commitment_management(
-        self, optimized_baseline: Dict, provider: str
-    ) -> Dict[str, Any]:
+        self, optimized_baseline: dict, provider: str
+    ) -> dict[str, Any]:
         """
         Stage 4: Calculate commitment management recommendations based on OPTIMIZED baseline.
         This prevents wasted capital by evaluating reservations AFTER rightsizing.

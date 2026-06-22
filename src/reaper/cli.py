@@ -99,7 +99,7 @@ def run_enhanced_finops_pipeline(provider="azure", lookback_days=7):
     print("=" * 60)
     print(f"[*] Provider: {provider.upper()}")
     print(f"[*] Lookback Period: {lookback_days} days")
-    print(f"[*] Sequential Pipeline: Telemetry → Rightsizing → Baseline → Commitments")
+    print("[*] Sequential Pipeline: Telemetry → Rightsizing → Baseline → Commitments")
 
     try:
         # Initialize collector
@@ -124,18 +124,20 @@ def run_enhanced_finops_pipeline(provider="azure", lookback_days=7):
             # Transform VM data to telemetry format
             telemetry_data = []
             for vm in vms:
-                telemetry_data.append({
-                    "id": vm.get("id", vm.get("name", "unknown")),
-                    "name": vm.get("name", "unknown"),
-                    "sku": vm.get("size", "unknown"),
-                    "tags": vm.get("tags", {}),
-                    # Generate synthetic usage history for demonstration
-                    # In production, this would come from actual monitoring data
-                    "cpu_history": [vm.get("cpu_percent", 10)] * lookback_days,
-                    "memory_history": [vm.get("memory_percent", 20)] * lookback_days,
-                    "iops": vm.get("iops", 50),
-                    "network_throughput": vm.get("network_throughput", 40),
-                })
+                telemetry_data.append(
+                    {
+                        "id": vm.get("id", vm.get("name", "unknown")),
+                        "name": vm.get("name", "unknown"),
+                        "sku": vm.get("size", "unknown"),
+                        "tags": vm.get("tags", {}),
+                        # Generate synthetic usage history for demonstration
+                        # In production, this would come from actual monitoring data
+                        "cpu_history": [vm.get("cpu_percent", 10)] * lookback_days,
+                        "memory_history": [vm.get("memory_percent", 20)] * lookback_days,
+                        "iops": vm.get("iops", 50),
+                        "network_throughput": vm.get("network_throughput", 40),
+                    }
+                )
 
         except Exception as e:
             print(f"    [!] Error collecting telemetry: {e}")
@@ -144,9 +146,7 @@ def run_enhanced_finops_pipeline(provider="azure", lookback_days=7):
         # Execute the complete pipeline
         print("\n[+] EXECUTING SEQUENTIAL FINOPS PIPELINE")
         pipeline_results = pipeline.execute_pipeline(
-            telemetry_data=telemetry_data,
-            provider=provider,
-            lookback_days=lookback_days
+            telemetry_data=telemetry_data, provider=provider, lookback_days=lookback_days
         )
 
         # Display results
@@ -167,7 +167,7 @@ def run_enhanced_finops_pipeline(provider="azure", lookback_days=7):
                     print(f"      Error: {stage_result.get('error', 'Unknown')}")
 
             # Display final recommendations
-            print(f"\n[+] FINAL RECOMMENDATIONS")
+            print("\n[+] FINAL RECOMMENDATIONS")
             print(f"    Total Recommendations: {len(pipeline_results['final_recommendations'])}")
 
             for rec in pipeline_results["final_recommendations"]:
@@ -179,20 +179,25 @@ def run_enhanced_finops_pipeline(provider="azure", lookback_days=7):
 
             # Display commitment insights
             if "commitment_recommendations" in pipeline_results:
-                print(f"\n[+] COMMITMENT MANAGEMENT INSIGHTS")
+                print("\n[+] COMMITMENT MANAGEMENT INSIGHTS")
                 insights = pipeline_results["commitment_recommendations"]
                 print(f"    Baseline Entries: {insights.get('baseline_entries', 0)}")
-                print(f"    Optimized Monthly Spend: ${insights.get('optimized_monthly_spend', 0):.2f}")
+                print(
+                    f"    Optimized Monthly Spend: ${insights.get('optimized_monthly_spend', 0):.2f}"
+                )
                 print(f"    Avoided Capital Waste: {insights.get('avoided_capital_waste', False)}")
 
         else:
-            print(f"\n[!] Pipeline execution failed: {pipeline_results.get('error', 'Unknown error')}")
+            print(
+                f"\n[!] Pipeline execution failed: {pipeline_results.get('error', 'Unknown error')}"
+            )
 
         print("\n" + "=" * 60 + "\n")
 
     except Exception as e:
         print(f"[!] Enhanced pipeline execution failed: {e}")
         import traceback
+
         traceback.print_exc()
 
 

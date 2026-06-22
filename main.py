@@ -15,7 +15,9 @@ def main():
         "--metrics", action="store_true", help="Display live performance FinOps analysis data"
     )
     parser.add_argument(
-        "--enhanced-pipeline", action="store_true", help="Use enhanced sequential FinOps pipeline with workload differentiation"
+        "--enhanced-pipeline",
+        action="store_true",
+        help="Use enhanced sequential FinOps pipeline with workload differentiation",
     )
 
     args, unknown = parser.parse_known_args()
