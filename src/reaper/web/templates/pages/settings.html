@@ -420,10 +420,6 @@
                     <p class="text-gray-400 text-sm">Environment & Strategy Configuration</p>
                 </div>
                 <div class="flex items-center gap-4">
-                    <button onclick="openWizard()" class="btn-secondary flex items-center gap-2">
-                        <i class="fas fa-plus"></i>
-                        <span>Add Provider</span>
-                    </button>
                     <a href="/" class="btn-secondary flex items-center gap-2">
                         <i class="fas fa-arrow-left"></i>
                         <span>Dashboard</span>
@@ -511,12 +507,18 @@
 
         <!-- Cloud Providers Tab -->
         <div id="tab-cloud" class="tab-content hidden space-y-12">
-            {% include 'components/_settings_cloud_vault.html' %}
+            <div class="flex justify-end mb-8">
+                <button onclick="openWizard()" class="btn-primary flex items-center gap-2">
+                    <i class="fas fa-plus"></i>
+                    <span>Add New Provider</span>
+                </button>
+            </div>
+            {% include 'components/_settings_cloud.html' %}
         </div>
 
         <!-- Vault Tab -->
         <div id="tab-vault" class="tab-content hidden space-y-12">
-            {% include 'components/_settings_cloud_vault.html' %}
+            {% include 'components/_settings_vault.html' %}
         </div>
 
         <!-- Advanced Tab -->
@@ -975,6 +977,47 @@ function updateCurrency(currency) {
 // Placeholder functions for backward compatibility
 function saveAISettings() {
     console.log('Saving AI settings...');
+}
+
+// Cloud Provider Functions
+function toggleCloudPanel(provider) {
+    const panel = document.getElementById('cloud-panel-' + provider);
+    if (panel) {
+        panel.classList.toggle('hidden');
+    }
+}
+
+function switchSettingsProvider(provider) {
+    console.log('Switching to provider:', provider);
+}
+
+function connectSettingsProvider(provider) {
+    console.log('Connecting to provider:', provider);
+}
+
+// Vault Functions
+function toggleVaultSetupPlaceholder() {
+    console.log('Toggling vault setup placeholder...');
+}
+
+function setupVault() {
+    console.log('Setting up vault...');
+}
+
+function unlockVault() {
+    console.log('Unlocking vault...');
+}
+
+function lockVault() {
+    console.log('Locking vault...');
+}
+
+function resetVault() {
+    console.log('Resetting vault...');
+}
+
+function saveVaultEntry() {
+    console.log('Saving vault entry...');
 }
 
 function switchDirectory() {

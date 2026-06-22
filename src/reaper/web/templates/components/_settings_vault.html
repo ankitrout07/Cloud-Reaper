@@ -1,0 +1,126 @@
+<div class="settings-section section-icon-purple">
+    <div class="section-header">
+        <div class="section-title">
+            <div class="section-icon">
+                <i class="fas fa-lock"></i>
+            </div>
+            <div>
+                <h3>Secure Vault</h3>
+                <p>AES-128 encrypted credential storage</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 px-4 py-2 rounded-full border border-gray-700" style="background: rgba(31, 41, 55, 0.3);">
+            <i class="fas fa-shield-alt text-xs" style="color: #d1d5db;"></i>
+            <span class="text-xs font-bold uppercase tracking-wider text-gray-500">PBKDF2 · Fernet</span>
+        </div>
+    </div>
+    <div class="section-content">
+        <!-- Vault Setup -->
+        <div id="vault-setup-block" class="{% if vault_configured %}hidden{% endif %}">
+            <div class="max-w-lg mx-auto text-center py-12">
+                <div class="w-20 h-20 rounded-2xl mx-auto mb-6 flex items-center justify-center" style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%); border: 1px solid rgba(168, 85, 247, 0.25);">
+                    <i class="fas fa-lock text-3xl" style="color: #d1d5db;"></i>
+                </div>
+                <h4 class="text-2xl font-bold text-white mb-3">Initialize Your Vault</h4>
+                <p class="text-gray-400 mb-8 max-w-md mx-auto">Create a master passcode to encrypt all stored secrets with PBKDF2-derived keys.</p>
+                
+                <div class="space-y-6 max-w-md mx-auto">
+                    <div>
+                        <label class="form-label">Verification Type</label>
+                        <select id="vault-setup-type" class="form-select" onchange="toggleVaultSetupPlaceholder()">
+                            <option value="password">8-Character Secure Password</option>
+                            <option value="pin">4-Character PIN / Code</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Master Passcode</label>
+                        <input id="vault-setup-passcode" type="password" placeholder="Enter vault passcode" class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Confirm Passcode</label>
+                        <input id="vault-setup-confirm" type="password" placeholder="Confirm passcode" class="form-input">
+                    </div>
+                    <p id="vault-setup-tip" class="text-sm text-gray-500 italic">Minimum 8 characters. This passcode cannot be recovered.</p>
+                    <button type="button" onclick="setupVault()" class="btn-primary w-full">
+                        Create Vault
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vault Unlock -->
+        <div id="vault-unlock-block" class="hidden">
+            <div class="max-w-lg mx-auto text-center py-12">
+                <div class="w-20 h-20 rounded-2xl mx-auto mb-6 flex items-center justify-center" style="background: linear-gradient(135deg, rgba(251, 146, 60, 0.15) 0%, rgba(234, 88, 12, 0.1) 100%); border: 1px solid rgba(251, 146, 60, 0.25);">
+                    <i class="fas fa-lock text-3xl" style="color: #fb923c;"></i>
+                </div>
+                <h4 class="text-2xl font-bold text-white mb-3">Vault Locked</h4>
+                <p class="text-gray-400 mb-8 max-w-md mx-auto">Enter your master passcode to decrypt and access stored secrets.</p>
+                
+                <div class="space-y-6 max-w-md mx-auto">
+                    <input id="vault-unlock-passcode" type="password" placeholder="Enter vault passcode" class="form-input">
+                    <div class="flex gap-4">
+                        <button type="button" onclick="unlockVault()" class="btn-primary flex-1">
+                            Unlock Vault
+                        </button>
+                        <button type="button" onclick="resetVault()" class="btn-secondary">
+                            Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vault Content (Unlocked) -->
+        <div id="vault-content-block" class="hidden space-y-8">
+            <div class="flex justify-between items-center p-5 rounded-xl border" style="background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25);">
+                <div class="flex items-center gap-4">
+                    <span class="flex items-center gap-2 text-sm font-bold uppercase" style="color: #34d399;">
+                        <span class="relative flex h-3 w-3">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full" style="background: #34d399; opacity: 0.75;"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3" style="background: #34d399;"></span>
+                        </span>
+                        Vault Unlocked
+                    </span>
+                    <span class="text-xs text-gray-500 font-mono">• Session active</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button type="button" onclick="resetVault()" class="btn-secondary text-xs px-4 py-2">
+                        Reset
+                    </button>
+                    <button type="button" onclick="lockVault()" class="btn-secondary text-xs px-4 py-2 flex items-center gap-2">
+                        <i class="fas fa-lock"></i>
+                        Lock
+                    </button>
+                </div>
+            </div>
+
+            <!-- Vault Entries List -->
+            <div id="vault-entries-list" class="space-y-4"></div>
+
+            <!-- Add Entry Form -->
+            <div class="p-8 rounded-2xl border space-y-6" style="background: rgba(17, 24, 39, 0.8); border-color: rgba(55, 65, 81, 0.3);">
+                <div class="flex items-center gap-3 mb-4">
+                    <i class="fas fa-plus" style="color: #d1d5db;"></i>
+                    <h5 class="text-sm font-bold uppercase text-gray-300 tracking-wider">New Entry</h5>
+                </div>
+                <input id="vault-entry-label" placeholder="Label (e.g. Production DB)" class="form-input">
+                <select id="vault-entry-type" class="form-select">
+                    <option value="credential">General Credential</option>
+                    <option value="api_key">API Secret Key</option>
+                    <option value="private_key">SSH Private Key</option>
+                    <option value="db_connection">Database Connection String</option>
+                    <option value="passcode">System Passcode</option>
+                    <option value="note">Secure Memo Note</option>
+                </select>
+                <input id="vault-entry-username" placeholder="Username (optional)" class="form-input">
+                <input id="vault-entry-value" type="password" placeholder="Secret value" class="form-input">
+                <textarea id="vault-entry-notes" rows="2" placeholder="Notes (optional)" class="form-input"></textarea>
+                <button type="button" onclick="saveVaultEntry()" class="btn-primary w-full flex items-center justify-center gap-2">
+                    <i class="fas fa-save"></i>
+                    Save to Vault
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
