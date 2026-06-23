@@ -2,1255 +2,975 @@
 {% block content %}
 
 <style>
-  /* ========== TARGET-MARGIN ENGINE — PAGE STYLES ========== */
-  @keyframes tmf-glow-pulse {
-    0%, 100% { box-shadow: 0 0 20px rgba(6,182,212,0.15), 0 0 60px rgba(6,182,212,0.05); }
-    50%       { box-shadow: 0 0 40px rgba(6,182,212,0.30), 0 0 80px rgba(6,182,212,0.10); }
-  }
-  @keyframes tmf-scan-line {
-    0%   { transform: translateY(-100%); opacity: 0; }
-    10%  { opacity: 0.4; }
-    90%  { opacity: 0.4; }
-    100% { transform: translateY(100%); opacity: 0; }
-  }
-  @keyframes tmf-float {
-    0%, 100% { transform: translateY(0px); }
-    50%       { transform: translateY(-6px); }
-  }
-  @keyframes tmf-count-up {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes tmf-bar-fill {
-    from { width: 0%; }
-  }
-  @keyframes tmf-shimmer {
-    0%   { background-position: -600px 0; }
-    100% { background-position: 600px 0; }
-  }
-  @keyframes tmf-spin-slow {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
-  }
-  @keyframes tmf-dash {
-    to { stroke-dashoffset: 0; }
-  }
+/* ========== TMF ENGINE — STYLES ========== */
+@keyframes tmf-glow-pulse {
+  0%,100% { box-shadow: 0 0 24px rgba(6,182,212,.12), 0 0 60px rgba(6,182,212,.04); }
+  50%     { box-shadow: 0 0 44px rgba(6,182,212,.28), 0 0 80px rgba(6,182,212,.09); }
+}
+@keyframes tmf-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+@keyframes tmf-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes tmf-slide-up {
+  from { opacity:0; transform: translateY(10px); }
+  to   { opacity:1; transform: translateY(0); }
+}
 
-  .tmf-page-bg {
-    background: radial-gradient(ellipse 120% 60% at 50% -10%, rgba(6,182,212,0.06) 0%, transparent 60%),
-                radial-gradient(ellipse 80% 40% at 90% 80%, rgba(139,92,246,0.04) 0%, transparent 50%),
-                var(--bg-primary);
-    min-height: 100vh;
-  }
+.tmf-page { min-height:100vh; padding: 2rem 2.5rem; background:
+  radial-gradient(ellipse 110% 50% at 50% -5%, rgba(6,182,212,.06) 0%, transparent 60%),
+  radial-gradient(ellipse 70% 40% at 90% 85%, rgba(139,92,246,.04) 0%, transparent 50%),
+  var(--bg-primary); }
 
-  /* Header */
-  .tmf-header-title {
-    font-size: clamp(1.75rem, 3vw, 2.5rem);
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    line-height: 1.1;
-  }
-  .tmf-header-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.3rem 0.75rem;
-    background: rgba(6,182,212,0.1);
-    border: 1px solid rgba(6,182,212,0.3);
-    border-radius: 999px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #22d3ee;
-  }
-  .tmf-header-badge .dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: #22d3ee;
-    animation: pulse 1.5s ease-in-out infinite;
-  }
+/* Header */
+.tmf-title {
+  font-size: clamp(1.8rem,3.5vw,2.6rem);
+  font-weight: 800;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+}
+.tmf-badge {
+  display: inline-flex; align-items: center; gap:.35rem;
+  padding:.25rem .75rem;
+  background: rgba(6,182,212,.1); border:1px solid rgba(6,182,212,.3);
+  border-radius:999px; font-size:.65rem; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase; color:#22d3ee;
+}
+.tmf-badge .dot { width:6px;height:6px;border-radius:50%;background:#22d3ee;animation:pulse 1.5s ease-in-out infinite; }
+.tmf-pill {
+  background: rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07);
+  border-radius:1rem; padding:.75rem 1.25rem;
+  display:flex; align-items:center; gap:1rem;
+  backdrop-filter:blur(8px);
+}
+.tmf-pill-sep { width:1px;height:2rem;background:rgba(255,255,255,.08); }
 
-  /* Summary pills in header */
-  .tmf-summary-pill {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 1rem;
-    padding: 0.75rem 1.25rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    backdrop-filter: blur(8px);
-  }
-  .tmf-summary-pill-divider {
-    width: 1px; height: 2rem;
-    background: rgba(255,255,255,0.08);
-  }
+/* Board */
+.tmf-board {
+  background:linear-gradient(145deg,#12161f 0%,#0d1117 60%,#101520 100%);
+  border:1px solid rgba(6,182,212,.18);
+  border-radius:1.5rem; position:relative; overflow:hidden;
+  animation: tmf-glow-pulse 4s ease-in-out infinite;
+}
+.tmf-board::before {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(180deg,rgba(6,182,212,.04) 0%,transparent 35%);
+  pointer-events:none;
+}
+.tmf-corner { position:absolute; width:56px;height:56px; pointer-events:none; }
+.tmf-corner-tl { top:0;left:0;  border-top:2px solid rgba(6,182,212,.4);border-left:2px solid rgba(6,182,212,.4);border-radius:1.5rem 0 0 0; }
+.tmf-corner-tr { top:0;right:0; border-top:2px solid rgba(6,182,212,.4);border-right:2px solid rgba(6,182,212,.4);border-radius:0 1.5rem 0 0; }
+.tmf-corner-bl { bottom:0;left:0;  border-bottom:2px solid rgba(6,182,212,.4);border-left:2px solid rgba(6,182,212,.4);border-radius:0 0 0 1.5rem; }
+.tmf-corner-br { bottom:0;right:0; border-bottom:2px solid rgba(6,182,212,.4);border-right:2px solid rgba(6,182,212,.4);border-radius:0 0 1.5rem 0; }
 
-  /* ——— MAIN ENGINE BOARD ——— */
-  .tmf-board {
-    background: linear-gradient(145deg, #12161f 0%, #0d1117 60%, #101520 100%);
-    border: 1px solid rgba(6,182,212,0.15);
-    border-radius: 1.5rem;
-    position: relative;
-    overflow: hidden;
-    animation: tmf-glow-pulse 4s ease-in-out infinite;
-  }
-  .tmf-board::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, rgba(6,182,212,0.04) 0%, transparent 40%);
-    pointer-events: none;
-  }
-  /* Corner accents */
-  .tmf-corner {
-    position: absolute;
-    width: 60px; height: 60px;
-    pointer-events: none;
-  }
-  .tmf-corner-tl { top: 0; left: 0; border-top: 2px solid rgba(6,182,212,0.4); border-left: 2px solid rgba(6,182,212,0.4); border-radius: 1.5rem 0 0 0; }
-  .tmf-corner-tr { top: 0; right: 0; border-top: 2px solid rgba(6,182,212,0.4); border-right: 2px solid rgba(6,182,212,0.4); border-radius: 0 1.5rem 0 0; }
-  .tmf-corner-bl { bottom: 0; left: 0; border-bottom: 2px solid rgba(6,182,212,0.4); border-left: 2px solid rgba(6,182,212,0.4); border-radius: 0 0 0 1.5rem; }
-  .tmf-corner-br { bottom: 0; right: 0; border-bottom: 2px solid rgba(6,182,212,0.4); border-right: 2px solid rgba(6,182,212,0.4); border-radius: 0 0 1.5rem 0; }
+/* Board sections */
+.tmf-section { border-bottom:1px solid rgba(255,255,255,.05); }
 
-  /* Board header strip */
-  .tmf-board-header {
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-  .tmf-board-title {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-  .tmf-board-icon {
-    width: 44px; height: 44px;
-    border-radius: 0.875rem;
-    background: linear-gradient(135deg, #06b6d4, #3b82f6);
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 20px rgba(6,182,212,0.3);
-    flex-shrink: 0;
-  }
-  .tmf-engine-label {
-    font-size: 0.65rem;
-    font-weight: 800;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: #22d3ee;
-    opacity: 0.7;
-  }
+/* Spend cards */
+.tmf-spend-grid {
+  display:grid; grid-template-columns:1fr auto 1fr auto 1fr;
+  gap:0; padding:1.75rem 2rem; align-items:center;
+}
+@media(max-width:860px){
+  .tmf-spend-grid { grid-template-columns:1fr; }
+  .tmf-arr { display:none; }
+}
 
-  /* ——— SPEND TRIAD (Current / Target / Gap) ——— */
-  .tmf-spend-triad {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr auto 1fr;
-    gap: 0;
-    padding: 2rem;
-    align-items: center;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-  }
-  .tmf-spend-card {
-    padding: 1.25rem 1.5rem;
-    border-radius: 1.25rem;
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.2s ease;
-  }
-  .tmf-spend-card:hover { transform: translateY(-2px); }
-  .tmf-spend-card--current {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.07);
-  }
-  .tmf-spend-card--target {
-    background: rgba(6,182,212,0.06);
-    border: 1px solid rgba(6,182,212,0.25);
-    box-shadow: 0 0 30px rgba(6,182,212,0.08);
-  }
-  .tmf-spend-card--gap {
-    background: rgba(239,68,68,0.05);
-    border: 1px solid rgba(239,68,68,0.2);
-  }
-  .tmf-spend-label {
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #64748b;
-    margin-bottom: 0.5rem;
-  }
-  .tmf-spend-value {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.9rem;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.02em;
-  }
-  .tmf-spend-sub {
-    font-size: 0.7rem;
-    color: #475569;
-    margin-top: 0.35rem;
-  }
+.tmf-card {
+  padding:1.25rem 1.4rem; border-radius:1.2rem; position:relative;
+  overflow:hidden; transition:transform .2s ease;
+}
+.tmf-card:hover { transform:translateY(-2px); }
+.tmf-card--current {
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
+}
+.tmf-card--target {
+  background:rgba(6,182,212,.06); border:1px solid rgba(6,182,212,.25);
+  box-shadow: 0 0 30px rgba(6,182,212,.08);
+}
+.tmf-card--gap {
+  background:rgba(239,68,68,.05); border:1px solid rgba(239,68,68,.2);
+}
+.tmf-card-lbl {
+  font-size:.62rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.12em; color:#475569; margin-bottom:.4rem;
+  display:flex; align-items:center; gap:.4rem;
+}
+.tmf-card-val {
+  font-family:'JetBrains Mono',monospace; font-size:1.85rem;
+  font-weight:800; line-height:1; letter-spacing:-.02em;
+}
+.tmf-card-sub { font-size:.68rem; color:#334155; margin-top:.35rem; }
 
-  /* Target input styled */
-  .tmf-target-input {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.9rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: #22d3ee;
-    background: transparent;
-    border: none;
-    outline: none;
-    width: 100%;
-    line-height: 1;
-  }
-  .tmf-target-input::-webkit-inner-spin-button,
-  .tmf-target-input::-webkit-outer-spin-button { -webkit-appearance: none; }
-  .tmf-target-input-wrap {
-    position: relative;
-  }
-  .tmf-target-input-wrap::after {
-    content: 'click to edit';
-    position: absolute;
-    bottom: -1.1rem;
-    left: 0;
-    font-size: 0.6rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: rgba(34,211,238,0.4);
-    pointer-events: none;
-  }
+/* Source chip */
+.tmf-src-chip {
+  display:inline-flex; align-items:center; gap:.3rem;
+  padding:.15rem .5rem; border-radius:999px;
+  font-size:.58rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em;
+  border:1px solid;
+}
+.src-azure    { background:rgba(59,130,246,.1);  border-color:rgba(59,130,246,.3);  color:#93c5fd; }
+.src-override { background:rgba(139,92,246,.1);  border-color:rgba(139,92,246,.3);  color:#c4b5fd; }
+.src-fallback { background:rgba(100,116,139,.1); border-color:rgba(100,116,139,.3); color:#94a3b8; }
 
-  .tmf-arrow-sep {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 1rem;
-    color: rgba(255,255,255,0.12);
-  }
+/* Editable current spend */
+.tmf-current-edit-wrap {
+  display:flex; align-items:center; gap:.5rem;
+}
+.tmf-current-input {
+  font-family:'JetBrains Mono',monospace; font-size:1.85rem;
+  font-weight:800; line-height:1; letter-spacing:-.02em;
+  color:#f1f5f9; background:transparent;
+  border:none; border-bottom:2px solid rgba(255,255,255,.2);
+  outline:none; width:100%;
+}
+.tmf-current-input:focus { border-bottom-color:#22d3ee; }
+.tmf-current-input::-webkit-inner-spin-button,
+.tmf-current-input::-webkit-outer-spin-button { -webkit-appearance:none; }
 
-  /* ——— GAP CLOSURE TRACK ——— */
-  .tmf-gap-track-section {
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-  }
-  .tmf-track-labels {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
-  }
-  .tmf-track-title {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #94a3b8;
-  }
-  .tmf-track-pct {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #f1f5f9;
-  }
-  .tmf-track-bar-bg {
-    width: 100%;
-    height: 8px;
-    background: rgba(255,255,255,0.07);
-    border-radius: 999px;
-    overflow: hidden;
-    position: relative;
-  }
-  .tmf-track-bar-fill {
-    height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(90deg, #ef4444 0%, #f97316 40%, #22c55e 100%);
-    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-    position: relative;
-  }
-  .tmf-track-bar-fill::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-    animation: tmf-shimmer 2s ease-in-out infinite;
-    background-size: 600px 100%;
-  }
-  .tmf-track-markers {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 0.4rem;
-    font-size: 0.6rem;
-    color: #334155;
-    font-weight: 600;
-  }
+/* Edit icon button */
+.tmf-edit-btn {
+  background:none; border:none; cursor:pointer; padding:.25rem; border-radius:.4rem;
+  color:#475569; transition:color .15s ease, background .15s ease;
+  display:flex; align-items:center; justify-content:center;
+}
+.tmf-edit-btn:hover { color:#22d3ee; background:rgba(6,182,212,.1); }
 
-  /* ——— LEVERS + OUTCOMES GRID ——— */
-  .tmf-levers-section {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-  }
-  @media (max-width: 900px) {
-    .tmf-levers-section { grid-template-columns: 1fr; }
-    .tmf-spend-triad { grid-template-columns: 1fr; }
-    .tmf-arrow-sep { display: none; }
-  }
+/* Save/cancel for current spend */
+.tmf-save-row { display:none; align-items:center; gap:.5rem; margin-top:.5rem; }
+.tmf-save-row.visible { display:flex; }
+.tmf-btn-xs {
+  font-size:.65rem; font-weight:700; padding:.3rem .65rem;
+  border-radius:.5rem; border:none; cursor:pointer; transition:all .15s ease;
+  display:inline-flex; align-items:center; gap:.3rem;
+}
+.tmf-btn-xs-save { background:rgba(6,182,212,.15); color:#22d3ee; border:1px solid rgba(6,182,212,.3); }
+.tmf-btn-xs-save:hover { background:rgba(6,182,212,.25); }
+.tmf-btn-xs-cancel { background:rgba(255,255,255,.05); color:#64748b; border:1px solid rgba(255,255,255,.08); }
+.tmf-btn-xs-cancel:hover { background:rgba(255,255,255,.09); color:#94a3b8; }
 
-  .tmf-levers-panel {
-    padding: 2rem;
-    border-right: 1px solid rgba(255,255,255,0.05);
-  }
-  .tmf-outcomes-panel {
-    padding: 2rem;
-  }
+/* Target input */
+.tmf-target-input {
+  font-family:'JetBrains Mono',monospace; font-size:1.85rem;
+  font-weight:800; line-height:1; letter-spacing:-.02em;
+  color:#22d3ee; background:transparent;
+  border:none; border-bottom:2px solid rgba(6,182,212,.3);
+  outline:none; width:100%;
+}
+.tmf-target-input:focus { border-bottom-color:#22d3ee; }
+.tmf-target-input::-webkit-inner-spin-button,
+.tmf-target-input::-webkit-outer-spin-button { -webkit-appearance:none; }
 
-  .tmf-panel-heading {
-    font-size: 0.65rem;
-    font-weight: 800;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: #475569;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .tmf-panel-heading::before {
-    content: '';
-    display: inline-block;
-    width: 12px; height: 2px;
-    background: var(--accent-primary);
-    border-radius: 1px;
-  }
+.tmf-arr { display:flex; align-items:center; justify-content:center; padding:0 .75rem; }
 
-  /* Lever rows */
-  .tmf-lever {
-    margin-bottom: 1.5rem;
-  }
-  .tmf-lever:last-child { margin-bottom: 0; }
-  .tmf-lever-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-  }
-  .tmf-lever-name {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #cbd5e1;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .tmf-lever-icon {
-    width: 20px; height: 20px;
-    border-radius: 6px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.6rem;
-    flex-shrink: 0;
-  }
-  .tmf-lever-vals {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-  .tmf-lever-pct {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #22d3ee;
-    min-width: 2.5rem;
-    text-align: right;
-  }
-  .tmf-lever-saving {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #10b981;
-    min-width: 4rem;
-    text-align: right;
-  }
+/* Gap badge */
+.tmf-gap-badge {
+  display:inline-flex; align-items:center; gap:.3rem;
+  padding:.2rem .55rem; border-radius:999px;
+  font-size:.62rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.07em; border:1px solid; transition:all .3s ease;
+}
+.gap-open   { background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.3);  color:#f87171; }
+.gap-closed { background:rgba(16,185,129,.12); border-color:rgba(16,185,129,.3); color:#34d399; }
 
-  /* Custom range slider */
-  input[type="range"].tmf-range {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 4px;
-    border-radius: 999px;
-    background: rgba(255,255,255,0.08);
-    cursor: pointer;
-    position: relative;
-    outline: none;
-  }
-  input[type="range"].tmf-range::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #22d3ee, #3b82f6);
-    box-shadow: 0 0 10px rgba(6,182,212,0.5);
-    cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-  }
-  input[type="range"].tmf-range::-webkit-slider-thumb:hover {
-    transform: scale(1.3);
-    box-shadow: 0 0 16px rgba(6,182,212,0.7);
-  }
-  input[type="range"].tmf-range::-moz-range-thumb {
-    width: 16px; height: 16px;
-    border-radius: 50%;
-    border: none;
-    background: linear-gradient(135deg, #22d3ee, #3b82f6);
-    box-shadow: 0 0 10px rgba(6,182,212,0.5);
-    cursor: pointer;
-  }
+/* Progress track */
+.tmf-track-bg {
+  width:100%; height:8px; background:rgba(255,255,255,.07);
+  border-radius:999px; overflow:hidden; position:relative;
+}
+.tmf-track-fill {
+  height:100%; border-radius:999px;
+  background:linear-gradient(90deg,#ef4444 0%,#f97316 40%,#22c55e 100%);
+  transition:width .6s cubic-bezier(.34,1.56,.64,1);
+  position:relative;
+}
+.tmf-track-fill::after {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);
+  animation:tmf-shimmer 2s ease-in-out infinite; background-size:600px 100%;
+}
 
-  /* Outcomes panel */
-  .tmf-outcome-hero {
-    background: linear-gradient(145deg, rgba(16,185,129,0.08), rgba(6,182,212,0.04));
-    border: 1px solid rgba(16,185,129,0.2);
-    border-radius: 1rem;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    position: relative;
-    overflow: hidden;
-  }
-  .tmf-outcome-hero::before {
-    content: '';
-    position: absolute;
-    top: -20px; right: -20px;
-    width: 80px; height: 80px;
-    background: radial-gradient(circle, rgba(16,185,129,0.15), transparent 70%);
-    pointer-events: none;
-  }
-  .tmf-outcome-savings-label {
-    font-size: 0.6rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: #6ee7b7;
-    opacity: 0.7;
-    margin-bottom: 0.25rem;
-  }
-  .tmf-outcome-savings-value {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 2.5rem;
-    font-weight: 800;
-    line-height: 1;
-    color: #34d399;
-    letter-spacing: -0.03em;
-  }
-  .tmf-outcome-savings-pct {
-    font-size: 0.7rem;
-    color: #10b981;
-    margin-top: 0.3rem;
-    font-weight: 600;
-  }
+/* Levers / Outcomes */
+.tmf-two-col { display:grid; grid-template-columns:1fr 1fr; }
+@media(max-width:860px){ .tmf-two-col { grid-template-columns:1fr; } }
+.tmf-levers-panel { padding:1.75rem 2rem; border-right:1px solid rgba(255,255,255,.05); }
+.tmf-outcomes-panel { padding:1.75rem 2rem; }
+.tmf-panel-hdr {
+  font-size:.62rem; font-weight:800; letter-spacing:.15em;
+  text-transform:uppercase; color:#334155; margin-bottom:1.4rem;
+  display:flex; align-items:center; gap:.5rem;
+}
+.tmf-panel-hdr::before { content:''; display:inline-block; width:12px;height:2px;background:#06b6d4;border-radius:1px; }
 
-  .tmf-outcome-stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-  }
-  .tmf-outcome-stat {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 0.75rem;
-    padding: 0.875rem;
-  }
-  .tmf-outcome-stat-label {
-    font-size: 0.58rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #475569;
-    margin-bottom: 0.25rem;
-  }
-  .tmf-outcome-stat-value {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #f1f5f9;
-  }
+.tmf-lever { margin-bottom:1.4rem; }
+.tmf-lever:last-child { margin-bottom:0; }
+.tmf-lever-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:.45rem; }
+.tmf-lever-name { font-size:.78rem; font-weight:600; color:#cbd5e1; display:flex; align-items:center; gap:.45rem; }
+.tmf-lever-icon { width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:.55rem;flex-shrink:0; }
+.tmf-lever-vals { display:flex; align-items:center; gap:.65rem; }
+.tmf-lever-pct  { font-family:'JetBrains Mono',monospace; font-size:.78rem; font-weight:700; color:#22d3ee; min-width:2.4rem; text-align:right; }
+.tmf-lever-sav  { font-family:'JetBrains Mono',monospace; font-size:.72rem; font-weight:600; color:#10b981; min-width:4rem; text-align:right; }
 
-  /* Gap status badge */
-  .tmf-gap-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.25rem 0.6rem;
-    border-radius: 999px;
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    transition: all 0.3s ease;
-  }
-  .tmf-gap-badge--open {
-    background: rgba(239,68,68,0.12);
-    border: 1px solid rgba(239,68,68,0.3);
-    color: #f87171;
-  }
-  .tmf-gap-badge--closed {
-    background: rgba(16,185,129,0.12);
-    border: 1px solid rgba(16,185,129,0.3);
-    color: #34d399;
-  }
+input[type="range"].tmf-range {
+  -webkit-appearance:none; width:100%; height:4px;
+  border-radius:999px; background:rgba(255,255,255,.08);
+  cursor:pointer; outline:none;
+}
+input[type="range"].tmf-range::-webkit-slider-thumb {
+  -webkit-appearance:none; width:16px;height:16px; border-radius:50%;
+  background:linear-gradient(135deg,#22d3ee,#3b82f6);
+  box-shadow:0 0 10px rgba(6,182,212,.5); cursor:pointer;
+  transition:transform .15s ease,box-shadow .15s ease;
+}
+input[type="range"].tmf-range::-webkit-slider-thumb:hover { transform:scale(1.35); box-shadow:0 0 16px rgba(6,182,212,.7); }
+input[type="range"].tmf-range::-moz-range-thumb {
+  width:16px;height:16px;border-radius:50%;border:none;
+  background:linear-gradient(135deg,#22d3ee,#3b82f6);
+  box-shadow:0 0 10px rgba(6,182,212,.5); cursor:pointer;
+}
 
-  /* ——— RECOMMENDATIONS TABLE ——— */
-  .tmf-recs-section {
-    padding: 1.75rem 2rem;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-  }
-  .tmf-rec-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.875rem 1rem;
-    border-radius: 0.875rem;
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.04);
-    margin-bottom: 0.5rem;
-    transition: all 0.2s ease;
-    gap: 1rem;
-  }
-  .tmf-rec-row:last-child { margin-bottom: 0; }
-  .tmf-rec-row:hover {
-    background: rgba(255,255,255,0.04);
-    border-color: rgba(255,255,255,0.08);
-    transform: translateX(2px);
-  }
-  .tmf-rec-type-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .tmf-rec-info { flex: 1; min-width: 0; }
-  .tmf-rec-name {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #e2e8f0;
-    margin-bottom: 0.15rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .tmf-rec-desc {
-    font-size: 0.7rem;
-    color: #475569;
-  }
-  .tmf-rec-impact {
-    text-align: right;
-    flex-shrink: 0;
-  }
-  .tmf-rec-impact-val {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: #34d399;
-  }
-  .tmf-rec-impact-label {
-    font-size: 0.58rem;
-    color: #334155;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-  .tmf-rec-risk {
-    font-size: 0.6rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
-    flex-shrink: 0;
-  }
-  .risk-very-low { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
-  .risk-low      { background: rgba(6,182,212,0.12); color: #22d3ee; border: 1px solid rgba(6,182,212,0.2); }
-  .risk-medium   { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
-  .risk-high     { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
-  .risk-critical { background: rgba(220,38,38,0.15); color: #f87171; border: 1px solid rgba(220,38,38,0.3); }
+/* Outcomes */
+.tmf-hero {
+  background:linear-gradient(145deg,rgba(16,185,129,.08),rgba(6,182,212,.04));
+  border:1px solid rgba(16,185,129,.2); border-radius:1rem;
+  padding:1.4rem; margin-bottom:.875rem; position:relative; overflow:hidden;
+}
+.tmf-hero::before {
+  content:''; position:absolute; top:-20px;right:-20px;
+  width:80px;height:80px; background:radial-gradient(circle,rgba(16,185,129,.15),transparent 70%);
+  pointer-events:none;
+}
+.tmf-hero-lbl { font-size:.58rem; font-weight:800; text-transform:uppercase; letter-spacing:.15em; color:#6ee7b7; opacity:.7; margin-bottom:.25rem; }
+.tmf-hero-val { font-family:'JetBrains Mono',monospace; font-size:2.4rem; font-weight:800; line-height:1; color:#34d399; letter-spacing:-.03em; }
+.tmf-hero-sub { font-size:.68rem; color:#10b981; margin-top:.3rem; font-weight:600; }
+.tmf-stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; }
+.tmf-stat {
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);
+  border-radius:.75rem; padding:.875rem;
+}
+.tmf-stat-lbl { font-size:.57rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#334155; margin-bottom:.2rem; }
+.tmf-stat-val { font-family:'JetBrains Mono',monospace; font-size:.95rem; font-weight:700; color:#f1f5f9; }
 
-  .tmf-empty-recs {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2.5rem 1rem;
-    color: #334155;
-    gap: 0.5rem;
-    text-align: center;
-  }
-  .tmf-empty-recs svg { opacity: 0.2; }
-  .tmf-empty-recs p { font-size: 0.8rem; font-weight: 500; }
-  .tmf-empty-recs span { font-size: 0.7rem; opacity: 0.6; }
+/* Recommendations */
+.tmf-recs { padding:1.5rem 2rem; }
+.tmf-rec {
+  display:flex; align-items:center; gap:.875rem;
+  padding:.825rem .95rem; border-radius:.875rem;
+  background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.04);
+  margin-bottom:.45rem; transition:all .2s ease;
+}
+.tmf-rec:last-child { margin-bottom:0; }
+.tmf-rec:hover { background:rgba(255,255,255,.04); border-color:rgba(255,255,255,.08); transform:translateX(2px); }
+.tmf-rec-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+.tmf-rec-body { flex:1;min-width:0; }
+.tmf-rec-name { font-size:.8rem;font-weight:600;color:#e2e8f0; white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.tmf-rec-desc { font-size:.68rem;color:#475569;margin-top:.12rem; }
+.tmf-risk { font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:.15rem .5rem;border-radius:999px;flex-shrink:0; }
+.risk-very-low { background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.2); }
+.risk-low      { background:rgba(6,182,212,.12);color:#22d3ee;border:1px solid rgba(6,182,212,.2); }
+.risk-medium   { background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.2); }
+.risk-high     { background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.2); }
+.risk-critical { background:rgba(220,38,38,.15);color:#f87171;border:1px solid rgba(220,38,38,.3); }
+.tmf-rec-impact { text-align:right;flex-shrink:0; }
+.tmf-rec-impact-val { font-family:'JetBrains Mono',monospace;font-size:.86rem;font-weight:700;color:#34d399; }
+.tmf-rec-impact-lbl { font-size:.56rem;color:#334155;font-weight:600;text-transform:uppercase;letter-spacing:.08em; }
 
-  /* ——— ACTION BAR ——— */
-  .tmf-action-bar {
-    padding: 1.25rem 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-  .tmf-status-line {
-    font-size: 0.7rem;
-    color: #334155;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 600;
-  }
-  .tmf-status-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: #22d3ee;
-    animation: pulse 2s ease-in-out infinite;
-  }
+.tmf-empty {
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:2rem 1rem;color:#334155;gap:.45rem;text-align:center;
+}
+.tmf-empty svg { opacity:.2; }
+.tmf-empty p  { font-size:.78rem;font-weight:500; }
+.tmf-empty span { font-size:.68rem;opacity:.6; }
 
-  .tmf-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.6rem 1.25rem;
-    border-radius: 0.75rem;
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: none;
-    outline: none;
-  }
-  .tmf-btn-primary {
-    background: linear-gradient(135deg, #06b6d4, #3b82f6);
-    color: #fff;
-    box-shadow: 0 4px 14px rgba(6,182,212,0.3);
-  }
-  .tmf-btn-primary:hover {
-    box-shadow: 0 6px 20px rgba(6,182,212,0.45);
-    transform: translateY(-1px);
-  }
-  .tmf-btn-primary:active { transform: translateY(0); }
-  .tmf-btn-primary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-  }
-  .tmf-btn-success {
-    background: linear-gradient(135deg, #10b981, #059669);
-    color: #fff;
-    box-shadow: 0 4px 14px rgba(16,185,129,0.25);
-  }
-  .tmf-btn-success:hover {
-    box-shadow: 0 6px 20px rgba(16,185,129,0.4);
-    transform: translateY(-1px);
-  }
-  .tmf-btn-success:active { transform: translateY(0); }
-  .tmf-btn-success:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-  }
-  .tmf-btn-ghost {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #94a3b8;
-  }
-  .tmf-btn-ghost:hover {
-    background: rgba(255,255,255,0.08);
-    color: #e2e8f0;
-  }
+/* Action bar */
+.tmf-action { padding:1.2rem 2rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.875rem; }
+.tmf-status-line { font-size:.68rem;color:#334155;display:flex;align-items:center;gap:.45rem;font-weight:600; }
+.tmf-status-dot { width:6px;height:6px;border-radius:50%;background:#22d3ee;animation:pulse 2s ease-in-out infinite; }
 
-  /* Spinner */
-  .tmf-spinner {
-    width: 14px; height: 14px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: tmf-spin-slow 0.7s linear infinite;
-  }
+.tmf-btn {
+  display:inline-flex;align-items:center;gap:.45rem;
+  padding:.6rem 1.2rem;border-radius:.75rem;
+  font-size:.78rem;font-weight:700;letter-spacing:.02em;
+  cursor:pointer;transition:all .2s ease;border:none;outline:none;
+}
+.tmf-btn-primary { background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;box-shadow:0 4px 14px rgba(6,182,212,.28); }
+.tmf-btn-primary:hover:not(:disabled) { box-shadow:0 6px 20px rgba(6,182,212,.42);transform:translateY(-1px); }
+.tmf-btn-success { background:linear-gradient(135deg,#10b981,#059669);color:#fff;box-shadow:0 4px 14px rgba(16,185,129,.22); }
+.tmf-btn-success:hover:not(:disabled) { box-shadow:0 6px 20px rgba(16,185,129,.38);transform:translateY(-1px); }
+.tmf-btn-ghost   { background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:#94a3b8; }
+.tmf-btn-ghost:hover { background:rgba(255,255,255,.09);color:#e2e8f0; }
+.tmf-btn:disabled  { opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important; }
+.tmf-btn:active:not(:disabled) { transform:translateY(0)!important; }
 
-  /* Toast */
-  .tmf-toast-container {
-    position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    pointer-events: none;
-  }
-  .tmf-toast {
-    pointer-events: auto;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-    padding: 0.875rem 1.25rem;
-    border-radius: 1rem;
-    backdrop-filter: blur(16px);
-    border: 1px solid;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    font-size: 0.82rem;
-    font-weight: 600;
-    min-width: 280px;
-    max-width: 380px;
-    transform: translateX(120%);
-    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  .tmf-toast.show { transform: translateX(0); }
-  .tmf-toast--success {
-    background: rgba(16,185,129,0.15);
-    border-color: rgba(16,185,129,0.3);
-    color: #d1fae5;
-  }
-  .tmf-toast--error {
-    background: rgba(239,68,68,0.15);
-    border-color: rgba(239,68,68,0.3);
-    color: #fee2e2;
-  }
-  .tmf-toast--info {
-    background: rgba(6,182,212,0.12);
-    border-color: rgba(6,182,212,0.3);
-    color: #e0f7fa;
-  }
+.tmf-spinner { width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:tmf-spin .7s linear infinite; }
 
-  /* Quick auto-calc badge */
-  .tmf-auto-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.6rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #7c3aed;
-    background: rgba(139,92,246,0.1);
-    border: 1px solid rgba(139,92,246,0.25);
-    padding: 0.2rem 0.5rem;
-    border-radius: 999px;
-  }
+/* Toast */
+.tmf-toasts { position:fixed;bottom:1.75rem;right:1.75rem;z-index:9999;display:flex;flex-direction:column;gap:.65rem;pointer-events:none; }
+.tmf-toast {
+  pointer-events:auto;display:flex;align-items:flex-start;gap:.7rem;
+  padding:.8rem 1.1rem;border-radius:.9rem;backdrop-filter:blur(16px);
+  border:1px solid;box-shadow:0 8px 32px rgba(0,0,0,.4);
+  font-size:.8rem;font-weight:600;min-width:260px;max-width:360px;
+  transform:translateX(115%);transition:transform .35s cubic-bezier(.34,1.56,.64,1);
+}
+.tmf-toast.show { transform:translateX(0); }
+.tmf-toast-success { background:rgba(16,185,129,.14);border-color:rgba(16,185,129,.3);color:#d1fae5; }
+.tmf-toast-error   { background:rgba(239,68,68,.14); border-color:rgba(239,68,68,.3);color:#fee2e2; }
+.tmf-toast-info    { background:rgba(6,182,212,.12);  border-color:rgba(6,182,212,.3); color:#e0f7fa; }
+
+/* Loading skeleton */
+.tmf-skeleton { background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.04) 75%);background-size:600px 100%;animation:tmf-shimmer 1.4s ease-in-out infinite;border-radius:.5rem;height:2rem;width:60%; }
 </style>
 
-<main class="tmf-page-bg flex-1 p-6 lg:p-10">
+<main class="tmf-page">
 
-  <!-- Toast Container -->
-  <div class="tmf-toast-container" id="tmf-toast-container"></div>
+  <!-- TOAST CONTAINER -->
+  <div class="tmf-toasts" id="tmf-toasts"></div>
 
   <!-- ====== PAGE HEADER ====== -->
   <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
     <div>
       <div class="flex items-center gap-3 mb-3">
-        <span class="tmf-header-badge">
-          <span class="dot"></span>
-          Financial Intelligence
-        </span>
-        <span class="tmf-auto-badge">
-          <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="4"/></svg>
-          AI-Powered
+        <span class="tmf-badge"><span class="dot"></span>Financial Intelligence</span>
+        <span class="tmf-badge" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);color:#c4b5fd;">
+          <span class="dot" style="background:#a78bfa;"></span> AI-Powered
         </span>
       </div>
-      <h1 class="tmf-header-title text-white">
+      <h1 class="tmf-title text-white">
         Target-Margin<br>
-        <span style="background: linear-gradient(90deg, #22d3ee, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+        <span style="background:linear-gradient(90deg,#22d3ee,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
           Forecasting Engine
         </span>
       </h1>
-      <p class="text-slate-400 mt-2 text-sm leading-relaxed" style="max-width: 440px;">
+      <p class="text-slate-400 mt-2 text-sm leading-relaxed" style="max-width:440px;">
         Calculate the exact combination of resource modifications to close the gap between your Current Spend and your Target Spend.
       </p>
     </div>
 
-    <!-- Summary Pills -->
-    <div class="tmf-summary-pill">
+    <!-- Summary pills -->
+    <div class="tmf-pill">
       <div>
-        <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Total MTD Spend</p>
-        <p class="text-white font-bold text-lg metric-value" id="hdr-mtd">$3,420.50</p>
+        <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Current Spend</p>
+        <p class="text-white font-bold text-lg metric-value" id="hdr-current">—</p>
       </div>
-      <div class="tmf-summary-pill-divider"></div>
+      <div class="tmf-pill-sep"></div>
       <div>
         <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Projected Savings</p>
         <p class="text-emerald-400 font-bold text-lg metric-value" id="hdr-savings">$0.00</p>
       </div>
-      <div class="tmf-summary-pill-divider"></div>
+      <div class="tmf-pill-sep"></div>
       <div>
         <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Gap Status</p>
-        <p class="font-bold text-lg metric-value" id="hdr-gap-status" style="color: #f87171;">Open</p>
+        <p class="font-bold text-lg metric-value" id="hdr-gap-status" style="color:#f87171;">Open</p>
       </div>
     </div>
   </div>
 
-  <!-- ====== MAIN ENGINE BOARD ====== -->
+  <!-- ====== MAIN BOARD ====== -->
   <div class="tmf-board">
-    <!-- Corner decorations -->
     <div class="tmf-corner tmf-corner-tl"></div>
     <div class="tmf-corner tmf-corner-tr"></div>
     <div class="tmf-corner tmf-corner-bl"></div>
     <div class="tmf-corner tmf-corner-br"></div>
 
-    <!-- Board Header -->
-    <div class="tmf-board-header">
-      <div class="tmf-board-title">
-        <div class="tmf-board-icon">
+    <!-- Board header -->
+    <div class="tmf-section px-8 py-5 flex items-center justify-between flex-wrap gap-3">
+      <div class="flex items-center gap-3">
+        <div style="width:42px;height:42px;border-radius:.875rem;background:linear-gradient(135deg,#06b6d4,#3b82f6);display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(6,182,212,.3);flex-shrink:0;">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
           </svg>
         </div>
         <div>
-          <div class="tmf-engine-label">Cloud-Reaper // Target-Margin Engine v2</div>
-          <h2 class="text-base font-bold text-white">Gap-Closure Optimizer</h2>
+          <div style="font-size:.6rem;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#22d3ee;opacity:.65;">Cloud-Reaper // Gap-Closure Optimizer</div>
+          <h2 class="text-base font-bold text-white">Target-Margin Forecasting Engine</h2>
         </div>
       </div>
-      <div class="flex items-center gap-3">
-        <button id="tmf-reset-btn" onclick="tmfReset()" class="tmf-btn tmf-btn-ghost text-xs py-2 px-3">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-          </svg>
+      <div class="flex items-center gap-2">
+        <!-- Data source indicator -->
+        <span class="tmf-src-chip src-fallback" id="data-source-chip">
+          <span id="data-source-icon">⊙</span>
+          <span id="data-source-text">Loading...</span>
+        </span>
+        <button onclick="tmfRefreshSpend()" class="tmf-btn tmf-btn-ghost" style="padding:.4rem .8rem;font-size:.7rem;">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Refresh
+        </button>
+        <button onclick="tmfReset()" class="tmf-btn tmf-btn-ghost" style="padding:.4rem .8rem;font-size:.7rem;">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
           Reset
         </button>
       </div>
     </div>
 
     <!-- ── SPEND TRIAD ── -->
-    <div class="tmf-spend-triad">
+    <div class="tmf-section tmf-spend-grid">
 
-      <!-- Current Spend -->
-      <div class="tmf-spend-card tmf-spend-card--current">
-        <div class="tmf-spend-label">Current Monthly Spend</div>
-        <div class="tmf-spend-value text-white" id="disp-current">$3,420.50</div>
-        <div class="tmf-spend-sub">Live baseline — this month</div>
-        <div style="position:absolute;top:0;right:0;width:60px;height:60px;background:radial-gradient(circle,rgba(148,163,184,0.08),transparent 70%);border-radius:0 1.25rem 0 0;pointer-events:none;"></div>
+      <!-- Current Spend (editable) -->
+      <div class="tmf-card tmf-card--current">
+        <div class="tmf-card-lbl">
+          Current Monthly Spend
+          <button class="tmf-edit-btn" id="current-edit-btn" onclick="tmfStartEditCurrent()" title="Edit current spend">
+            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Display mode -->
+        <div id="current-display" class="tmf-card-val text-white">
+          <div class="tmf-skeleton" id="current-skeleton"></div>
+          <span id="current-display-val" style="display:none;"></span>
+        </div>
+
+        <!-- Edit mode -->
+        <div id="current-edit" style="display:none;">
+          <div class="tmf-current-edit-wrap">
+            <span class="tmf-card-val text-white">$</span>
+            <input type="number" id="current-spend-input" class="tmf-current-input"
+              min="0" step="50" placeholder="e.g. 3420"
+              onkeydown="if(event.key==='Enter')tmfSaveCurrentSpend(); if(event.key==='Escape')tmfCancelEditCurrent();">
+          </div>
+          <div class="tmf-save-row visible" id="current-save-row">
+            <button class="tmf-btn-xs tmf-btn-xs-save" onclick="tmfSaveCurrentSpend()">
+              <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+              Save
+            </button>
+            <button class="tmf-btn-xs tmf-btn-xs-cancel" onclick="tmfCancelEditCurrent()">Cancel</button>
+            <span style="font-size:.58rem;color:#334155;">Overrides live Azure data</span>
+          </div>
+        </div>
+
+        <div class="tmf-card-sub" id="current-sub">Live baseline</div>
       </div>
 
       <!-- Arrow -->
-      <div class="tmf-arrow-sep">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <path d="M6 14h16M16 8l6 6-6 6" stroke="rgba(255,255,255,0.18)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
+      <div class="tmf-arr"><svg width="26" height="26" fill="none"><path d="M4 13h18M16 7l6 6-6 6" stroke="rgba(255,255,255,.15)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
 
-      <!-- Target Spend — editable price setter -->
-      <div class="tmf-spend-card tmf-spend-card--target">
-        <div class="tmf-spend-label" style="color:#22d3ee;opacity:0.8;">
-          ⊕ Set Your Target Spend
+      <!-- Target Spend (editable) -->
+      <div class="tmf-card tmf-card--target">
+        <div class="tmf-card-lbl" style="color:#22d3ee;opacity:.85;">⊕ Target Monthly Spend</div>
+        <div style="display:flex;align-items:center;gap:2px;">
+          <span class="tmf-card-val" style="color:#22d3ee;">$</span>
+          <input type="number" id="target-spend" class="tmf-target-input"
+            value="2500" min="0" step="50"
+            oninput="tmfUpdate()" onchange="tmfPersistTarget()"
+            title="Your desired monthly spend target">
         </div>
-        <div class="tmf-target-input-wrap flex items-center gap-1">
-          <span class="tmf-spend-value" style="color:#22d3ee;">$</span>
-          <input
-            type="number"
-            id="target-spend"
-            class="tmf-target-input"
-            value="2500"
-            min="0"
-            step="50"
-            oninput="tmfUpdate()"
-            title="Set your target monthly spend"
-          >
-        </div>
-        <div class="tmf-spend-sub" style="color:#0e7490;margin-top:0.7rem;">/ month target</div>
-        <div style="position:absolute;top:0;right:0;width:70px;height:70px;background:radial-gradient(circle,rgba(6,182,212,0.15),transparent 70%);border-radius:0 1.25rem 0 0;pointer-events:none;"></div>
+        <div class="tmf-card-sub" style="color:#0e7490;margin-top:.6rem;">/ month — editable target</div>
       </div>
 
       <!-- Arrow -->
-      <div class="tmf-arrow-sep">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <path d="M6 14h16M16 8l6 6-6 6" stroke="rgba(255,255,255,0.18)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
+      <div class="tmf-arr"><svg width="26" height="26" fill="none"><path d="M4 13h18M16 7l6 6-6 6" stroke="rgba(255,255,255,.15)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
 
       <!-- Gap to Close -->
-      <div class="tmf-spend-card tmf-spend-card--gap">
-        <div class="tmf-spend-label" style="color:#f87171;opacity:0.8;">Gap to Close</div>
-        <div class="tmf-spend-value" id="disp-gap" style="color:#f87171;">$920.50</div>
-        <div class="tmf-spend-sub" id="disp-gap-sub">reduction required</div>
-        <div id="gap-badge-wrap" style="margin-top:0.6rem;">
-          <span class="tmf-gap-badge tmf-gap-badge--open" id="tmf-gap-badge">
-            <span>●</span> Gap Open
-          </span>
+      <div class="tmf-card tmf-card--gap">
+        <div class="tmf-card-lbl" style="color:#f87171;opacity:.85;">Gap to Close</div>
+        <div class="tmf-card-val" id="disp-gap" style="color:#f87171;">—</div>
+        <div class="tmf-card-sub" id="disp-gap-sub">reduction required</div>
+        <div style="margin-top:.55rem;">
+          <span class="tmf-gap-badge gap-open" id="tmf-gap-badge">● Gap Open</span>
         </div>
-        <div style="position:absolute;top:0;right:0;width:60px;height:60px;background:radial-gradient(circle,rgba(239,68,68,0.1),transparent 70%);border-radius:0 1.25rem 0 0;pointer-events:none;"></div>
       </div>
     </div>
 
-    <!-- ── GAP CLOSURE PROGRESS TRACK ── -->
-    <div class="tmf-gap-track-section">
-      <div class="tmf-track-labels">
-        <span class="tmf-track-title">Gap Closure Progress</span>
-        <div class="flex items-center gap-3">
-          <span class="tmf-track-pct" id="gap-pct-text">0.0% closed</span>
-          <span class="text-xs text-slate-600 font-semibold" id="gap-remaining-text">$920.50 remaining</span>
+    <!-- ── PROGRESS TRACK ── -->
+    <div class="tmf-section px-8 py-5">
+      <div class="flex justify-between items-center mb-2.5">
+        <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#475569;">Gap Closure Progress</span>
+        <div class="flex items-center gap-4">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:.82rem;font-weight:700;color:#f1f5f9;" id="gap-pct-text">0.0% closed</span>
+          <span style="font-size:.68rem;color:#334155;font-weight:600;" id="gap-rem-text">—</span>
         </div>
       </div>
-      <div class="tmf-track-bar-bg">
-        <div class="tmf-track-bar-fill" id="gap-progress-bar" style="width:0%;"></div>
-      </div>
-      <div class="tmf-track-markers">
-        <span>$0</span>
-        <span>25%</span>
-        <span>50%</span>
-        <span>75%</span>
-        <span>100% Target</span>
+      <div class="tmf-track-bg"><div class="tmf-track-fill" id="gap-bar" style="width:0%"></div></div>
+      <div class="flex justify-between mt-1.5" style="font-size:.58rem;color:#1e293b;font-weight:600;">
+        <span>$0</span><span>25%</span><span>50%</span><span>75%</span><span>100% Target</span>
       </div>
     </div>
 
     <!-- ── LEVERS + OUTCOMES ── -->
-    <div class="tmf-levers-section">
+    <div class="tmf-section tmf-two-col">
 
-      <!-- LEFT: Resource Modification Levers -->
+      <!-- Levers -->
       <div class="tmf-levers-panel">
-        <div class="tmf-panel-heading">Resource Modification Levers</div>
+        <div class="tmf-panel-hdr">Resource Modification Levers</div>
 
-        <!-- Lever 1: VM Rightsizing -->
+        <!-- VM Rightsizing -->
         <div class="tmf-lever">
-          <div class="tmf-lever-header">
+          <div class="tmf-lever-hdr">
             <div class="tmf-lever-name">
-              <div class="tmf-lever-icon" style="background:rgba(59,130,246,0.15);color:#60a5fa;">
-                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
+              <div class="tmf-lever-icon" style="background:rgba(59,130,246,.13);color:#60a5fa;">
+                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14M12 5l7 7-7 7"/></svg>
               </div>
               VM Rightsizing
             </div>
             <div class="tmf-lever-vals">
               <span class="tmf-lever-pct" id="lv-pct-rs">0%</span>
-              <span class="tmf-lever-saving" id="lv-sav-rs">$0.00</span>
+              <span class="tmf-lever-sav" id="lv-sav-rs">$0.00</span>
             </div>
           </div>
           <input type="range" id="input-rightsizing" class="tmf-range" min="0" max="100" value="0" oninput="tmfUpdate()">
-          <div class="flex justify-between text-xs text-slate-600 mt-1 font-medium">
-            <span>Off</span><span>Downsize overprovisioned VMs</span><span>Max</span>
-          </div>
+          <div class="flex justify-between text-xs text-slate-700 mt-1 font-medium"><span>Off</span><span>Downsize over-provisioned VMs</span><span>Max</span></div>
         </div>
 
-        <!-- Lever 2: Idle Elimination -->
+        <!-- Idle Elimination -->
         <div class="tmf-lever">
-          <div class="tmf-lever-header">
+          <div class="tmf-lever-hdr">
             <div class="tmf-lever-name">
-              <div class="tmf-lever-icon" style="background:rgba(239,68,68,0.12);color:#f87171;">
-                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
+              <div class="tmf-lever-icon" style="background:rgba(239,68,68,.12);color:#f87171;">
+                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
               </div>
               Idle Resource Elimination
             </div>
             <div class="tmf-lever-vals">
               <span class="tmf-lever-pct" id="lv-pct-idle">0%</span>
-              <span class="tmf-lever-saving" id="lv-sav-idle">$0.00</span>
+              <span class="tmf-lever-sav" id="lv-sav-idle">$0.00</span>
             </div>
           </div>
           <input type="range" id="input-idle" class="tmf-range" min="0" max="100" value="0" oninput="tmfUpdate()">
-          <div class="flex justify-between text-xs text-slate-600 mt-1 font-medium">
-            <span>Off</span><span>Remove idle / zombie resources</span><span>Max</span>
-          </div>
+          <div class="flex justify-between text-xs text-slate-700 mt-1 font-medium"><span>Off</span><span>Remove idle / zombie resources</span><span>Max</span></div>
         </div>
 
-        <!-- Lever 3: Storage Tier -->
+        <!-- Storage Tier -->
         <div class="tmf-lever">
-          <div class="tmf-lever-header">
+          <div class="tmf-lever-hdr">
             <div class="tmf-lever-name">
-              <div class="tmf-lever-icon" style="background:rgba(245,158,11,0.12);color:#fbbf24;">
-                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
-                </svg>
+              <div class="tmf-lever-icon" style="background:rgba(245,158,11,.12);color:#fbbf24;">
+                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>
               </div>
               Storage Tier Optimization
             </div>
             <div class="tmf-lever-vals">
               <span class="tmf-lever-pct" id="lv-pct-st">0%</span>
-              <span class="tmf-lever-saving" id="lv-sav-st">$0.00</span>
+              <span class="tmf-lever-sav" id="lv-sav-st">$0.00</span>
             </div>
           </div>
           <input type="range" id="input-storage" class="tmf-range" min="0" max="100" value="0" oninput="tmfUpdate()">
-          <div class="flex justify-between text-xs text-slate-600 mt-1 font-medium">
-            <span>Off</span><span>Move data to cooler tiers</span><span>Max</span>
-          </div>
+          <div class="flex justify-between text-xs text-slate-700 mt-1 font-medium"><span>Off</span><span>Move data to cooler tiers</span><span>Max</span></div>
         </div>
 
-        <!-- Lever 4: Commitment Adoption -->
+        <!-- Commitments -->
         <div class="tmf-lever">
-          <div class="tmf-lever-header">
+          <div class="tmf-lever-hdr">
             <div class="tmf-lever-name">
-              <div class="tmf-lever-icon" style="background:rgba(139,92,246,0.12);color:#a78bfa;">
-                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
+              <div class="tmf-lever-icon" style="background:rgba(139,92,246,.12);color:#a78bfa;">
+                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
               </div>
               Commitment Adoption
             </div>
             <div class="tmf-lever-vals">
               <span class="tmf-lever-pct" id="lv-pct-cm">0%</span>
-              <span class="tmf-lever-saving" id="lv-sav-cm">$0.00</span>
+              <span class="tmf-lever-sav" id="lv-sav-cm">$0.00</span>
             </div>
           </div>
           <input type="range" id="input-commitments" class="tmf-range" min="0" max="100" value="0" oninput="tmfUpdate()">
-          <div class="flex justify-between text-xs text-slate-600 mt-1 font-medium">
-            <span>Off</span><span>Reserved instances / savings plans</span><span>Max</span>
-          </div>
+          <div class="flex justify-between text-xs text-slate-700 mt-1 font-medium"><span>Off</span><span>Reserved instances / savings plans</span><span>Max</span></div>
         </div>
       </div>
 
-      <!-- RIGHT: Projected Outcomes -->
+      <!-- Outcomes -->
       <div class="tmf-outcomes-panel">
-        <div class="tmf-panel-heading">Projected Outcomes</div>
+        <div class="tmf-panel-hdr">Projected Outcomes</div>
 
-        <!-- Hero Savings Block -->
-        <div class="tmf-outcome-hero">
-          <div class="tmf-outcome-savings-label">Projected Monthly Savings</div>
-          <div class="tmf-outcome-savings-value" id="proj-savings">$0.00</div>
-          <div class="tmf-outcome-savings-pct" id="proj-savings-pct">0.0% of current spend</div>
+        <div class="tmf-hero">
+          <div class="tmf-hero-lbl">Projected Monthly Savings</div>
+          <div class="tmf-hero-val" id="proj-savings">$0.00</div>
+          <div class="tmf-hero-sub" id="proj-savings-pct">0.0% of current spend</div>
         </div>
 
-        <!-- Stats grid -->
-        <div class="tmf-outcome-stats">
-          <div class="tmf-outcome-stat">
-            <div class="tmf-outcome-stat-label">New Monthly Spend</div>
-            <div class="tmf-outcome-stat-value text-white" id="proj-new-spend">$3,420.50</div>
+        <div class="tmf-stat-grid">
+          <div class="tmf-stat">
+            <div class="tmf-stat-lbl">New Monthly Spend</div>
+            <div class="tmf-stat-val text-white" id="proj-new-spend">—</div>
           </div>
-          <div class="tmf-outcome-stat">
-            <div class="tmf-outcome-stat-label">Annual Impact</div>
-            <div class="tmf-outcome-stat-value text-emerald-400" id="proj-annual">$0.00</div>
+          <div class="tmf-stat">
+            <div class="tmf-stat-lbl">Annual Impact</div>
+            <div class="tmf-stat-val text-emerald-400" id="proj-annual">$0.00</div>
           </div>
-          <div class="tmf-outcome-stat">
-            <div class="tmf-outcome-stat-label">Gap Remaining</div>
-            <div class="tmf-outcome-stat-value" id="proj-gap-rem" style="color:#f87171;">$920.50</div>
+          <div class="tmf-stat">
+            <div class="tmf-stat-lbl">Gap Remaining</div>
+            <div class="tmf-stat-val" id="proj-gap-rem" style="color:#f87171;">—</div>
           </div>
-          <div class="tmf-outcome-stat">
-            <div class="tmf-outcome-stat-label">Efficiency Gain</div>
-            <div class="tmf-outcome-stat-value text-cyan-400" id="proj-efficiency">0%</div>
+          <div class="tmf-stat">
+            <div class="tmf-stat-lbl">Efficiency Gain</div>
+            <div class="tmf-stat-val text-cyan-400" id="proj-efficiency">0%</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ── RECOMMENDED RESOURCE MODIFICATIONS ── -->
-    <div class="tmf-recs-section">
-      <div class="flex items-center justify-between mb-4">
-        <div class="tmf-panel-heading mb-0">Recommended Resource Modifications</div>
-        <span class="text-xs text-slate-600 font-semibold" id="recs-count-text"></span>
+    <!-- ── RECOMMENDATIONS ── -->
+    <div class="tmf-recs tmf-section">
+      <div class="flex items-center justify-between mb-3.5">
+        <div class="tmf-panel-hdr mb-0">Recommended Resource Modifications</div>
+        <span style="font-size:.68rem;color:#334155;font-weight:600;" id="recs-count"></span>
       </div>
       <div id="tmf-recs-list">
-        <!-- Empty state -->
-        <div class="tmf-empty-recs" id="tmf-empty-recs">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <rect x="8" y="8" width="24" height="24" rx="4" stroke="#475569" stroke-width="1.5"/>
-            <path d="M14 20h12M20 14v12" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+        <div class="tmf-empty" id="tmf-empty-state">
+          <svg width="38" height="38" fill="none"><rect x="8" y="8" width="22" height="22" rx="4" stroke="#475569" stroke-width="1.5"/><path d="M13 19h12M19 13v12" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/></svg>
           <p>No modifications selected yet</p>
-          <span>Adjust the optimization levers above, or click<br><strong style="color:#22d3ee;">Calculate Optimal Path</strong> to auto-configure</span>
+          <span>Adjust levers above or click <strong style="color:#22d3ee">Calculate Optimal Path</strong></span>
         </div>
       </div>
     </div>
 
     <!-- ── ACTION BAR ── -->
-    <div class="tmf-action-bar">
+    <div class="tmf-action">
       <div class="tmf-status-line">
         <span class="tmf-status-dot"></span>
-        Engine ready — adjust levers or auto-calculate
+        <span id="status-msg">Initializing — fetching live spend data…</span>
       </div>
-      <div class="flex gap-3 flex-wrap">
-        <button id="tmf-calc-btn" onclick="tmfCalculate(event)" class="tmf-btn tmf-btn-primary">
+      <div class="flex gap-2.5 flex-wrap">
+        <button id="tmf-calc-btn" onclick="tmfCalculate()" class="tmf-btn tmf-btn-primary">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
           </svg>
           Calculate Optimal Path
         </button>
-        <button id="tmf-apply-btn" onclick="tmfApply(event)" class="tmf-btn tmf-btn-success" disabled>
+        <button id="tmf-apply-btn" onclick="tmfApply()" class="tmf-btn tmf-btn-success" disabled>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M5 13l4 4L19 7"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
           </svg>
           Apply Optimizations
         </button>
       </div>
     </div>
-
   </div><!-- /tmf-board -->
+
 </main>
 
 <script>
-// ============================================================
-//  TARGET-MARGIN FORECASTING ENGINE  —  Logic
-// ============================================================
+// =============================================================================
+//  TARGET-MARGIN FORECASTING ENGINE  —  Full Backend-Wired Logic
+// =============================================================================
 const TMF = {
-  currentSpend: 3420.50,
+  currentSpend: 3420.50,     // loaded from backend on init
   lastCalcResult: null,
+  targetPersistTimer: null,
 
-  // Max-savings model per lever (used for immediate slider feedback)
-  maxSavings: {
-    rightsizing: 500,
-    idle:        300,
-    storage:     200,
-    commitments: 400
-  },
+  // Local max-savings model (used as fallback for instant slider feedback)
+  maxSavings: { rs: 500, idle: 300, st: 200, cm: 400 },
 
   fmt(n) {
     return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   },
 
   get targetSpend() {
-    return parseFloat(document.getElementById('target-spend').value) || 2500;
+    return parseFloat(document.getElementById('target-spend').value) || 0;
   },
 
   levers() {
     return {
-      rs:  parseInt(document.getElementById('input-rightsizing').value),
+      rs:   parseInt(document.getElementById('input-rightsizing').value),
       idle: parseInt(document.getElementById('input-idle').value),
-      st:  parseInt(document.getElementById('input-storage').value),
-      cm:  parseInt(document.getElementById('input-commitments').value),
+      st:   parseInt(document.getElementById('input-storage').value),
+      cm:   parseInt(document.getElementById('input-commitments').value),
     };
   }
 };
 
+// ─── Initialise: fetch live spend from backend ────────────────────────────────
+async function tmfInit() {
+  await tmfRefreshSpend();
+}
+
+async function tmfRefreshSpend() {
+  setStatus('Fetching live spend data from backend…');
+  try {
+    const res  = await fetch('/api/financial/spend/current');
+    const data = await res.json();
+
+    if (data.status === 'success') {
+      TMF.currentSpend = data.current_spend;
+
+      // Show current spend
+      _setCurrentDisplay(data.current_spend);
+      document.getElementById('hdr-current').textContent = TMF.fmt(data.current_spend);
+
+      // Populate target spend with backend persisted value
+      document.getElementById('target-spend').value = data.target_spend.toFixed(2);
+
+      // Source chip
+      const src = data.source || 'fallback';
+      const chip = document.getElementById('data-source-chip');
+      const srcText = document.getElementById('data-source-text');
+      const srcIcon = document.getElementById('data-source-icon');
+      chip.className = `tmf-src-chip src-${src}`;
+      srcText.textContent = src === 'azure' ? 'Live Azure' : src === 'override' ? 'Manual Override' : 'Fallback Data';
+      srcIcon.textContent = src === 'azure' ? '⬡' : src === 'override' ? '✎' : '⊙';
+
+      // Sub-line
+      const sub = document.getElementById('current-sub');
+      if (src === 'azure')    sub.textContent = 'Live from Azure Cost Management';
+      else if (src === 'override') sub.textContent = 'Manual override — click ✎ to change';
+      else                    sub.textContent = 'Demo data — connect Azure to see live figures';
+
+      tmfUpdate();
+      setStatus('Engine ready — adjust levers or click Calculate Optimal Path');
+    } else {
+      setStatus('Could not fetch spend data — using local fallback');
+      _setCurrentDisplay(TMF.currentSpend);
+      document.getElementById('hdr-current').textContent = TMF.fmt(TMF.currentSpend);
+      tmfUpdate();
+    }
+  } catch (err) {
+    console.warn('[TMF] Init error:', err);
+    _setCurrentDisplay(TMF.currentSpend);
+    document.getElementById('hdr-current').textContent = TMF.fmt(TMF.currentSpend);
+    tmfUpdate();
+    setStatus('Backend unreachable — using local data');
+  }
+}
+
+function _setCurrentDisplay(val) {
+  document.getElementById('current-skeleton').style.display = 'none';
+  const el = document.getElementById('current-display-val');
+  el.style.display = 'inline';
+  el.textContent = TMF.fmt(val);
+}
+
+// ─── Edit current spend ───────────────────────────────────────────────────────
+function tmfStartEditCurrent() {
+  const cur = TMF.currentSpend;
+  document.getElementById('current-display').style.display = 'none';
+  document.getElementById('current-edit').style.display = 'block';
+  document.getElementById('current-edit-btn').style.display = 'none';
+  const inp = document.getElementById('current-spend-input');
+  inp.value = cur.toFixed(2);
+  inp.focus();
+  inp.select();
+  document.getElementById('current-sub').textContent = 'Enter your actual current monthly spend';
+}
+
+function tmfCancelEditCurrent() {
+  document.getElementById('current-display').style.display = 'block';
+  document.getElementById('current-edit').style.display = 'none';
+  document.getElementById('current-edit-btn').style.display = 'flex';
+  document.getElementById('current-sub').textContent = 'Live baseline';
+}
+
+async function tmfSaveCurrentSpend() {
+  const raw = parseFloat(document.getElementById('current-spend-input').value);
+  if (isNaN(raw) || raw < 0) { tmfToast('Please enter a valid positive number', 'error'); return; }
+
+  const btn = document.querySelector('.tmf-btn-xs-save');
+  const origText = btn.innerHTML;
+  btn.innerHTML = '<div class="tmf-spinner" style="width:10px;height:10px;"></div> Saving…';
+  btn.disabled = true;
+
+  try {
+    const res  = await fetch('/api/financial/spend/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_spend: raw })
+    });
+    const data = await res.json();
+
+    if (data.status === 'success') {
+      TMF.currentSpend = raw;
+      _setCurrentDisplay(raw);
+      document.getElementById('hdr-current').textContent = TMF.fmt(raw);
+
+      // Update source chip to override
+      document.getElementById('data-source-chip').className = 'tmf-src-chip src-override';
+      document.getElementById('data-source-text').textContent = 'Manual Override';
+      document.getElementById('data-source-icon').textContent = '✎';
+      document.getElementById('current-sub').textContent = 'Manual override — click ✎ to change';
+
+      tmfCancelEditCurrent();
+      tmfUpdate();
+      tmfToast('Current spend updated to ' + TMF.fmt(raw), 'success');
+    } else {
+      tmfToast('Save failed: ' + (data.message || 'Unknown error'), 'error');
+    }
+  } catch (err) {
+    // Optimistic update even if backend is down
+    TMF.currentSpend = raw;
+    _setCurrentDisplay(raw);
+    document.getElementById('hdr-current').textContent = TMF.fmt(raw);
+    tmfCancelEditCurrent();
+    tmfUpdate();
+    tmfToast('Saved locally (backend unreachable)', 'info');
+  } finally {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+  }
+}
+
+// ─── Persist target spend (debounced) ─────────────────────────────────────────
+function tmfPersistTarget() {
+  clearTimeout(TMF.targetPersistTimer);
+  TMF.targetPersistTimer = setTimeout(async () => {
+    const target = TMF.targetSpend;
+    if (isNaN(target) || target < 0) return;
+    try {
+      await fetch('/api/financial/spend/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_spend: target })
+      });
+      // Silent save — no toast noise on every keystroke
+    } catch (_) { /* offline — ok */ }
+  }, 700);
+}
+
+// ─── Core reactive update ─────────────────────────────────────────────────────
 function tmfUpdate() {
   const { rs, idle, st, cm } = TMF.levers();
-  const target = TMF.targetSpend;
+  const target  = TMF.targetSpend;
   const current = TMF.currentSpend;
 
-  // Lever displays
   document.getElementById('lv-pct-rs').textContent   = rs   + '%';
   document.getElementById('lv-pct-idle').textContent = idle + '%';
   document.getElementById('lv-pct-st').textContent   = st   + '%';
   document.getElementById('lv-pct-cm').textContent   = cm   + '%';
 
-  const savRs   = (rs   / 100) * TMF.maxSavings.rightsizing;
+  const savRs   = (rs   / 100) * TMF.maxSavings.rs;
   const savIdle = (idle / 100) * TMF.maxSavings.idle;
-  const savSt   = (st   / 100) * TMF.maxSavings.storage;
-  const savCm   = (cm   / 100) * TMF.maxSavings.commitments;
+  const savSt   = (st   / 100) * TMF.maxSavings.st;
+  const savCm   = (cm   / 100) * TMF.maxSavings.cm;
 
   document.getElementById('lv-sav-rs').textContent   = TMF.fmt(savRs);
   document.getElementById('lv-sav-idle').textContent = TMF.fmt(savIdle);
   document.getElementById('lv-sav-st').textContent   = TMF.fmt(savSt);
   document.getElementById('lv-sav-cm').textContent   = TMF.fmt(savCm);
 
-  const totalSav  = savRs + savIdle + savSt + savCm;
-  const newSpend  = current - totalSav;
-  const gap       = current - target;
-  const gapClosed = gap > 0 ? Math.min(100, (totalSav / gap) * 100) : 100;
-  const remGap    = Math.max(0, newSpend - target);
+  const totalSav = savRs + savIdle + savSt + savCm;
+  const newSpend = current - totalSav;
+  const gap      = current - target;
+  const gapClosed = gap > 0 ? Math.min(100, (totalSav / gap) * 100) : (totalSav > 0 ? 100 : 0);
+  const remGap   = Math.max(0, newSpend - target);
 
   // Header KPIs
   document.getElementById('hdr-savings').textContent = TMF.fmt(totalSav);
 
   // Gap display
-  document.getElementById('disp-gap').textContent = TMF.fmt(gap);
-  document.getElementById('disp-gap').style.color = gap > 0 ? '#f87171' : '#34d399';
-  document.getElementById('disp-gap-sub').textContent = gap > 0 ? 'reduction required' : 'already at target!';
+  if (gap > 0) {
+    document.getElementById('disp-gap').textContent = TMF.fmt(gap);
+    document.getElementById('disp-gap').style.color = '#f87171';
+    document.getElementById('disp-gap-sub').textContent = 'reduction required';
+  } else {
+    document.getElementById('disp-gap').textContent = TMF.fmt(Math.abs(gap));
+    document.getElementById('disp-gap').style.color = '#34d399';
+    document.getElementById('disp-gap-sub').textContent = 'already at or below target!';
+  }
 
   // Gap badge
   const badge = document.getElementById('tmf-gap-badge');
-  const hdrStatus = document.getElementById('hdr-gap-status');
+  const hdrStat = document.getElementById('hdr-gap-status');
   if (newSpend <= target) {
-    badge.className = 'tmf-gap-badge tmf-gap-badge--closed';
-    badge.innerHTML = '<span>✔</span> Gap Closed';
-    hdrStatus.textContent = 'Closed';
-    hdrStatus.style.color = '#34d399';
+    badge.className = 'tmf-gap-badge gap-closed'; badge.textContent = '✔ Gap Closed';
+    hdrStat.textContent = 'Closed'; hdrStat.style.color = '#34d399';
   } else {
-    badge.className = 'tmf-gap-badge tmf-gap-badge--open';
-    badge.innerHTML = '<span>●</span> Gap Open';
-    hdrStatus.textContent = 'Open';
-    hdrStatus.style.color = '#f87171';
+    badge.className = 'tmf-gap-badge gap-open'; badge.textContent = '● Gap Open';
+    hdrStat.textContent = 'Open'; hdrStat.style.color = '#f87171';
   }
 
-  // Progress bar
-  document.getElementById('gap-progress-bar').style.width = gapClosed + '%';
+  // Progress
+  document.getElementById('gap-bar').style.width = gapClosed + '%';
   document.getElementById('gap-pct-text').textContent = gapClosed.toFixed(1) + '% closed';
-  document.getElementById('gap-remaining-text').textContent = TMF.fmt(remGap) + ' remaining';
+  document.getElementById('gap-rem-text').textContent = remGap > 0 ? TMF.fmt(remGap) + ' remaining' : 'target achieved!';
 
   // Outcomes
   document.getElementById('proj-savings').textContent     = TMF.fmt(totalSav);
-  document.getElementById('proj-savings-pct').textContent = ((totalSav / current) * 100).toFixed(1) + '% of current spend';
+  document.getElementById('proj-savings-pct').textContent = current > 0 ? ((totalSav / current) * 100).toFixed(1) + '% of current spend' : '';
   document.getElementById('proj-new-spend').textContent   = TMF.fmt(newSpend);
   document.getElementById('proj-annual').textContent      = TMF.fmt(totalSav * 12);
   document.getElementById('proj-gap-rem').textContent     = TMF.fmt(remGap);
   document.getElementById('proj-gap-rem').style.color     = remGap <= 0 ? '#34d399' : '#f87171';
-  document.getElementById('proj-efficiency').textContent  = ((totalSav / current) * 100).toFixed(1) + '%';
+  document.getElementById('proj-efficiency').textContent  = current > 0 ? ((totalSav / current) * 100).toFixed(1) + '%' : '0%';
 
   // Recommendations
   _renderRecs(rs, idle, st, cm, savRs, savIdle, savSt, savCm);
 }
 
+// ─── Render recommendations from sliders ─────────────────────────────────────
 function _renderRecs(rs, idle, st, cm, savRs, savIdle, savSt, savCm) {
-  const container = document.getElementById('tmf-recs-list');
-  const empty     = document.getElementById('tmf-empty-recs');
+  const list  = document.getElementById('tmf-recs-list');
+  const empty = document.getElementById('tmf-empty-state');
+  const count = document.getElementById('recs-count');
 
   const actions = [];
-  if (rs   > 0) actions.push({ color:'#60a5fa', name:'VM Rightsizing',            desc:`Downsize ${rs}% of overprovisioned virtual machines`,       impact: savRs,  risk:'low' });
-  if (idle > 0) actions.push({ color:'#f87171', name:'Idle Resource Elimination', desc:`Remove ${idle}% of idle, zombie, or abandoned resources`,    impact: savIdle, risk:'very_low' });
-  if (st   > 0) actions.push({ color:'#fbbf24', name:'Storage Tier Optimization', desc:`Migrate ${st}% of storage volumes to cooler, cheaper tiers`, impact: savSt,  risk:'low' });
-  if (cm   > 0) actions.push({ color:'#a78bfa', name:'Commitment Adoption',       desc:`Convert ${cm}% of on-demand spend to reserved instances`,    impact: savCm,  risk:'medium' });
+  if (rs   > 0) actions.push({ c:'#60a5fa', name:'VM Rightsizing',            desc:`Downsize ${rs}% of over-provisioned virtual machines`,         sav:savRs,  risk:'low' });
+  if (idle > 0) actions.push({ c:'#f87171', name:'Idle Resource Elimination', desc:`Remove ${idle}% of idle, zombie or abandoned resources`,         sav:savIdle, risk:'very_low' });
+  if (st   > 0) actions.push({ c:'#fbbf24', name:'Storage Tier Optimization', desc:`Move ${st}% of storage volumes to cooler, cheaper tiers`,        sav:savSt,  risk:'low' });
+  if (cm   > 0) actions.push({ c:'#a78bfa', name:'Commitment Adoption',       desc:`Convert ${cm}% of on-demand spend to reserved instances`,         sav:savCm,  risk:'medium' });
 
-  const countEl = document.getElementById('recs-count-text');
   if (actions.length === 0) {
-    container.innerHTML = '';
-    container.appendChild(empty || _makeEmptyEl());
-    empty && (empty.style.display = 'flex');
-    countEl.textContent = '';
+    list.innerHTML = '';
+    list.appendChild(_emptyEl());
+    count.textContent = '';
     return;
   }
 
-  empty && (empty.style.display = 'none');
-  countEl.textContent = actions.length + ' modification' + (actions.length > 1 ? 's' : '') + ' planned';
+  empty && (empty.remove());
+  count.textContent = actions.length + ' modification' + (actions.length > 1 ? 's' : '') + ' planned';
 
-  const riskMap = {
-    very_low: ['risk-very-low', 'Very Low'],
-    low:      ['risk-low',      'Low'],
-    medium:   ['risk-medium',   'Medium'],
-    high:     ['risk-high',     'High'],
-    critical: ['risk-critical', 'Critical'],
-  };
-
-  container.innerHTML = actions.map(a => {
-    const [riskCls, riskLabel] = riskMap[a.risk] || ['risk-low','Low'];
-    return `
-      <div class="tmf-rec-row">
-        <div class="tmf-rec-type-dot" style="background:${a.color};box-shadow:0 0 6px ${a.color}88;"></div>
-        <div class="tmf-rec-info">
-          <div class="tmf-rec-name">${a.name}</div>
-          <div class="tmf-rec-desc">${a.desc}</div>
-        </div>
-        <span class="tmf-rec-risk ${riskCls}">${riskLabel} Risk</span>
-        <div class="tmf-rec-impact">
-          <div class="tmf-rec-impact-val">${TMF.fmt(a.impact)}</div>
-          <div class="tmf-rec-impact-label">/ month saved</div>
-        </div>
-      </div>`;
+  const rMap = { very_low:['risk-very-low','Very Low'], low:['risk-low','Low'], medium:['risk-medium','Medium'], high:['risk-high','High'], critical:['risk-critical','Critical'] };
+  list.innerHTML = actions.map(a => {
+    const [rc,rl] = rMap[a.risk]||['risk-low','Low'];
+    return `<div class="tmf-rec">
+      <div class="tmf-rec-dot" style="background:${a.c};box-shadow:0 0 6px ${a.c}88;"></div>
+      <div class="tmf-rec-body">
+        <div class="tmf-rec-name">${a.name}</div>
+        <div class="tmf-rec-desc">${a.desc}</div>
+      </div>
+      <span class="tmf-risk ${rc}">${rl} Risk</span>
+      <div class="tmf-rec-impact">
+        <div class="tmf-rec-impact-val">${TMF.fmt(a.sav)}</div>
+        <div class="tmf-rec-impact-lbl">/ month saved</div>
+      </div>
+    </div>`;
   }).join('');
 }
 
-function _makeEmptyEl() {
+function _renderRecsFromBackend(actions) {
+  if (!actions || !actions.length) return;
+  const list  = document.getElementById('tmf-recs-list');
+  const count = document.getElementById('recs-count');
+  count.textContent = actions.length + ' modification' + (actions.length > 1 ? 's' : '') + ' recommended';
+  const cMap = { 'VM Rightsizing':'#60a5fa', 'Idle Resource Elimination':'#f87171', 'Storage Tier Optimization':'#fbbf24', 'Commitment Adoption':'#a78bfa' };
+  const rMap = { very_low:['risk-very-low','Very Low'], low:['risk-low','Low'], medium:['risk-medium','Medium'], high:['risk-high','High'], critical:['risk-critical','Critical'] };
+  list.innerHTML = actions.map(a => {
+    const c = cMap[a.type] || '#94a3b8';
+    const [rc,rl] = rMap[a.risk_level]||['risk-low','Low'];
+    const imp = typeof a.impact === 'number' ? TMF.fmt(a.impact) : a.impact;
+    return `<div class="tmf-rec">
+      <div class="tmf-rec-dot" style="background:${c};box-shadow:0 0 6px ${c}88;"></div>
+      <div class="tmf-rec-body">
+        <div class="tmf-rec-name">${a.type}</div>
+        <div class="tmf-rec-desc">${a.description}</div>
+      </div>
+      <span class="tmf-risk ${rc}">${rl} Risk</span>
+      <div class="tmf-rec-impact">
+        <div class="tmf-rec-impact-val">${imp}</div>
+        <div class="tmf-rec-impact-lbl">/ month saved</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _emptyEl() {
   const d = document.createElement('div');
-  d.id = 'tmf-empty-recs';
-  d.className = 'tmf-empty-recs';
-  d.innerHTML = `
-    <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-      <rect x="8" y="8" width="24" height="24" rx="4" stroke="#475569" stroke-width="1.5"/>
-      <path d="M14 20h12M20 14v12" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>
+  d.id = 'tmf-empty-state';
+  d.className = 'tmf-empty';
+  d.innerHTML = `<svg width="38" height="38" fill="none"><rect x="8" y="8" width="22" height="22" rx="4" stroke="#475569" stroke-width="1.5"/><path d="M13 19h12M19 13v12" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/></svg>
     <p>No modifications selected yet</p>
     <span>Adjust levers or click <strong style="color:#22d3ee">Calculate Optimal Path</strong></span>`;
   return d;
 }
 
-// ── Backend: Calculate Optimal Path ──
-async function tmfCalculate(e) {
+// ─── Calculate Optimal Path (backend) ────────────────────────────────────────
+async function tmfCalculate() {
   const btn = document.getElementById('tmf-calc-btn');
   const orig = btn.innerHTML;
-  btn.innerHTML = `<div class="tmf-spinner"></div> Calculating...`;
+  btn.innerHTML = `<div class="tmf-spinner"></div> Calculating…`;
   btn.disabled = true;
+  setStatus('Running optimization algorithm…');
 
   const target  = TMF.targetSpend;
   const current = TMF.currentSpend;
@@ -1266,35 +986,37 @@ async function tmfCalculate(e) {
     if (data.status === 'success') {
       TMF.lastCalcResult = data;
 
-      // Push lever positions from backend
-      document.getElementById('input-rightsizing').value  = (data.optimal_levers.rightsizing         || 0).toFixed(0);
-      document.getElementById('input-idle').value         = (data.optimal_levers.idle_elimination    || 0).toFixed(0);
-      document.getElementById('input-storage').value      = (data.optimal_levers.storage_optimization|| 0).toFixed(0);
-      document.getElementById('input-commitments').value  = (data.optimal_levers.commitment_adoption || 0).toFixed(0);
+      // Push optimal lever positions
+      document.getElementById('input-rightsizing').value  = (data.optimal_levers.rightsizing          || 0).toFixed(0);
+      document.getElementById('input-idle').value         = (data.optimal_levers.idle_elimination     || 0).toFixed(0);
+      document.getElementById('input-storage').value      = (data.optimal_levers.storage_optimization || 0).toFixed(0);
+      document.getElementById('input-commitments').value  = (data.optimal_levers.commitment_adoption  || 0).toFixed(0);
       tmfUpdate();
 
-      // If backend returned recommended_actions, overlay them
-      if (data.recommended_actions && data.recommended_actions.length) {
-        _renderRecsFromBackend(data.recommended_actions);
-      }
+      if (data.recommended_actions?.length) _renderRecsFromBackend(data.recommended_actions);
 
+      const nOpp = data.optimization_details?.total_opportunities_analyzed ?? 0;
+      const nSel = data.optimization_details?.selected_optimizations ?? 0;
       document.getElementById('tmf-apply-btn').disabled = false;
-      tmfToast(`Optimal path calculated — ${data.optimization_details?.total_opportunities_analyzed ?? 0} opportunities analyzed.`, 'success');
+      setStatus(`Calculated — ${nOpp} opportunities analyzed, ${nSel} selected`);
+      tmfToast(`Optimal path found — ${nOpp} opportunities analyzed.`, 'success');
 
     } else if (data.status === 'warning') {
-      tmfToast(`Warning: ${data.message}. Gap $${(data.gap||0).toFixed(2)}, max potential $${(data.total_potential||0).toFixed(2)}`, 'error');
-      // Fall back to local model
+      tmfToast(`⚠ ${data.message}. Gap $${(data.gap||0).toFixed(2)}, max potential $${(data.total_potential||0).toFixed(2)}`, 'error');
       _localOptimalPath(current, target);
+      setStatus('Warning: partial gap closure possible');
 
     } else {
-      tmfToast('Error: ' + (data.message || 'Unknown error'), 'error');
+      tmfToast('Error from backend: ' + (data.message || 'Unknown'), 'error');
       _localOptimalPath(current, target);
+      setStatus('Error — using local estimation');
     }
   } catch (err) {
-    console.warn('[TMF] Backend unavailable, using local model.', err);
-    tmfToast('Backend unavailable — using local estimation.', 'info');
+    console.warn('[TMF] Backend error:', err);
+    tmfToast('Backend unavailable — using local estimation', 'info');
     _localOptimalPath(current, target);
     document.getElementById('tmf-apply-btn').disabled = false;
+    setStatus('Local estimation applied (backend offline)');
   } finally {
     btn.innerHTML = orig;
     btn.disabled  = false;
@@ -1302,57 +1024,25 @@ async function tmfCalculate(e) {
 }
 
 function _localOptimalPath(current, target) {
-  const gap   = current - target;
+  const gap = current - target;
   if (gap <= 0) { tmfUpdate(); return; }
-  const total = Object.values(TMF.maxSavings).reduce((a,b)=>a+b,0);
+  const total = TMF.maxSavings.rs + TMF.maxSavings.idle + TMF.maxSavings.st + TMF.maxSavings.cm;
   const ratio = Math.min(1, gap / total);
-  document.getElementById('input-rightsizing').value  = Math.min(100, Math.ceil(ratio * 100));
-  document.getElementById('input-idle').value         = Math.min(100, Math.ceil(ratio * 100));
-  document.getElementById('input-storage').value      = Math.min(100, Math.ceil(ratio * 100));
-  document.getElementById('input-commitments').value  = Math.min(100, Math.ceil(ratio * 100));
+  ['input-rightsizing','input-idle','input-storage','input-commitments'].forEach(id => {
+    document.getElementById(id).value = Math.min(100, Math.ceil(ratio * 100));
+  });
   tmfUpdate();
 }
 
-function _renderRecsFromBackend(actions) {
-  const container = document.getElementById('tmf-recs-list');
-  const empty     = document.getElementById('tmf-empty-recs');
-  const countEl   = document.getElementById('recs-count-text');
-
-  if (!actions || !actions.length) return;
-  empty && (empty.style.display = 'none');
-  countEl.textContent = actions.length + ' modification' + (actions.length > 1 ? 's' : '') + ' recommended';
-
-  const colorMap = { 'VM Rightsizing':'#60a5fa', 'Idle Resource Elimination':'#f87171', 'Storage Tier Optimization':'#fbbf24', 'Commitment Adoption':'#a78bfa' };
-  const riskMap  = { very_low:['risk-very-low','Very Low'], low:['risk-low','Low'], medium:['risk-medium','Medium'], high:['risk-high','High'], critical:['risk-critical','Critical'] };
-
-  container.innerHTML = actions.map(a => {
-    const col = colorMap[a.type] || '#94a3b8';
-    const [rCls, rLabel] = riskMap[a.risk_level] || ['risk-low','Low'];
-    const impact = typeof a.impact === 'number' ? TMF.fmt(a.impact) : a.impact;
-    return `
-      <div class="tmf-rec-row">
-        <div class="tmf-rec-type-dot" style="background:${col};box-shadow:0 0 6px ${col}88;"></div>
-        <div class="tmf-rec-info">
-          <div class="tmf-rec-name">${a.type}</div>
-          <div class="tmf-rec-desc">${a.description}</div>
-        </div>
-        <span class="tmf-rec-risk ${rCls}">${rLabel} Risk</span>
-        <div class="tmf-rec-impact">
-          <div class="tmf-rec-impact-val">${impact}</div>
-          <div class="tmf-rec-impact-label">/ month saved</div>
-        </div>
-      </div>`;
-  }).join('');
-}
-
-// ── Apply Optimizations ──
-async function tmfApply(e) {
+// ─── Apply ───────────────────────────────────────────────────────────────────
+async function tmfApply() {
   if (!TMF.lastCalcResult) { tmfToast('Please calculate optimal path first', 'error'); return; }
 
   const btn = document.getElementById('tmf-apply-btn');
   const orig = btn.innerHTML;
-  btn.innerHTML = `<div class="tmf-spinner"></div> Applying...`;
+  btn.innerHTML = `<div class="tmf-spinner"></div> Applying…`;
   btn.disabled = true;
+  setStatus('Applying optimizations…');
 
   try {
     const res  = await fetch('/api/financial/target-margin/apply', {
@@ -1365,53 +1055,66 @@ async function tmfApply(e) {
     });
     const data = await res.json();
     if (data.status === 'success') {
-      tmfToast('Optimizations applied successfully!', 'success');
+      const mode = data.is_dry_run ? '[DRY-RUN]' : 'Successfully';
+      tmfToast(`${mode} initiated ${data.applied_count} modifications!`, 'success');
+      setStatus(`Optimizations applied (${data.is_dry_run ? 'Simulation' : 'Live'}) — monitoring changes`);
+      
+      // Log the detailed operations
+      console.log('--- Apply Optimization Results ---');
+      console.table(data.results);
     } else {
-      tmfToast('Error applying: ' + (data.message || 'Unknown'), 'error');
+      tmfToast('Apply error: ' + (data.message || 'Unknown'), 'error');
+      setStatus('Apply failed — see toast for details');
     }
   } catch (err) {
     tmfToast('Error connecting to server', 'error');
+    setStatus('Apply failed — server unreachable');
   } finally {
     btn.innerHTML = orig;
     btn.disabled  = false;
   }
 }
 
-// ── Reset ──
+// ─── Reset ───────────────────────────────────────────────────────────────────
 function tmfReset() {
   ['input-rightsizing','input-idle','input-storage','input-commitments'].forEach(id => {
     document.getElementById(id).value = 0;
   });
-  document.getElementById('target-spend').value = 2500;
   TMF.lastCalcResult = null;
   document.getElementById('tmf-apply-btn').disabled = true;
+  if (document.getElementById('current-edit').style.display !== 'none') tmfCancelEditCurrent();
   tmfUpdate();
   tmfToast('Engine reset to defaults', 'info');
+  setStatus('Reset — adjust levers or click Calculate Optimal Path');
 }
 
-// ── Toast ──
+// ─── Status line helper ───────────────────────────────────────────────────────
+function setStatus(msg) {
+  const el = document.getElementById('status-msg');
+  if (el) el.textContent = msg;
+}
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
 function tmfToast(msg, type = 'info') {
-  const container = document.getElementById('tmf-toast-container');
   const icons = {
-    success: `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`,
-    error:   `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`,
-    info:    `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+    success: `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`,
+    error:   `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`,
+    info:    `<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
   };
   const t = document.createElement('div');
-  t.className = `tmf-toast tmf-toast--${type}`;
-  t.innerHTML = `<span style="flex-shrink:0;opacity:0.8;">${icons[type]||''}</span><span>${msg}</span>`;
-  container.appendChild(t);
-  requestAnimationFrame(() => { requestAnimationFrame(() => { t.classList.add('show'); }); });
-  setTimeout(() => {
-    t.classList.remove('show');
-    setTimeout(() => t.remove(), 400);
-  }, 4000);
+  t.className = `tmf-toast tmf-toast-${type}`;
+  t.innerHTML = `<span style="flex-shrink:0;opacity:.75;">${icons[type]||''}</span><span>${msg}</span>`;
+  document.getElementById('tmf-toasts').appendChild(t);
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 420); }, 4500);
 }
 
-// ── Init ──
-document.addEventListener('DOMContentLoaded', tmfUpdate);
-// Also run immediately if DOM already ready (HTMX swap)
-if (document.readyState !== 'loading') tmfUpdate();
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', tmfInit);
+} else {
+  tmfInit();
+}
 </script>
 
 {% endblock %}

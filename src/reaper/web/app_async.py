@@ -1601,11 +1601,12 @@ async def calculate_target_margin(request: Request):
 
 @app.post("/api/financial/target-margin/apply")
 async def apply_target_margin_optimizations(request: Request):
-    """Apply the calculated optimization recommendations."""
+    """Apply the calculated optimization recommendations physically to Azure."""
     try:
         data = (await request.json() if await request.body() else {}) or {}
 
         optimizations = data.get("optimizations", {})
+<<<<<<< HEAD
 
         # Placeholder for actual optimization application logic
         # This would integrate with the actual cloud provider APIs to make changes
@@ -1621,16 +1622,167 @@ async def apply_target_margin_optimizations(request: Request):
                     "storage_optimization_applied": optimizations.get("storage_optimization", 0),
                     "commitment_adoption_applied": optimizations.get("commitment_adoption", 0),
                 },
+=======
+        detailed_recommendations = data.get("detailed_recommendations", [])
+        
+        if not detailed_recommendations:
+            return JSONResponse(status_code=400, content={"status": "error", "message": "No detailed recommendations provided to apply."})
+
+        from reaper.remediators.azure_remediator import AzureRemediator
+        remediator = AzureRemediator()
+        
+        results = []
+        applied_count = 0
+
+        for rec in detailed_recommendations:
+            rec_type = rec.get("type")
+            res_id = rec.get("resource_id")
+            res_name = rec.get("resource_name", "unknown")
+            
+            if not res_id or res_id == "commitment_pool":
+                # Skip commitments or invalid resources for automated physical remediation
+                continue
+                
+            op_result = {"resource": res_name, "type": rec_type, "status": "skipped", "message": "Unsupported type"}
+            
+            if rec_type == "rightsizing":
+                op_result = remediator.downsize_vm(res_id)
+                op_result["resource"] = res_name
+            elif rec_type == "idle_elimination":
+                op_result = remediator.delete_vm(res_id)
+                op_result["resource"] = res_name
+            elif rec_type == "storage_optimization":
+                op_result = remediator.downgrade_disk(res_id, target_tier="Standard_LRS")
+                op_result["resource"] = res_name
+                
+            results.append(op_result)
+            if op_result.get("status") in ["processing", "dry_run"]:
+                applied_count += 1
+        
+        return jsonify({
+            "status": "success",
+            "message": "Optimization operations initiated",
+            "applied_count": applied_count,
+            "is_dry_run": remediator.is_dry_run,
+            "results": results,
+            "details": {
+                "rightsizing_applied": optimizations.get("rightsizing", 0),
+                "idle_elimination_applied": optimizations.get("idle_elimination", 0),
+                "storage_optimization_applied": optimizations.get("storage_optimization", 0),
+                "commitment_adoption_applied": optimizations.get("commitment_adoption", 0)
+>>>>>>> 1127031 (Added Target Margin Engine02)
             }
         )
 
     except Exception as e:
         print(f"[!] Error applying optimizations: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-    data = (await request.json() if await request.body() else {}) or {}
-    return jsonify(
-        {"status": "success", "message": "Policy simulation applied", "cost_impact": -250.00}
-    )
+
+
+@app.get("/api/financial/spend/current")
+async def get_current_spend(request: Request):
+    """Fetch current monthly spend from Azure and return persisted target spend.
+
+    Returns:
+        current_spend  – live cumulative spend from Azure (or cached override)
+        target_spend   – last persisted target spend (default: 80% of budget_threshold)
+        budget_cap     – the budget threshold configured in Settings
+        burn_rate      – daily burn rate
+        forecast       – 30-day forecast
+        source         – 'azure' | 'override' | 'fallback'
+    """
+    try:
+        budget_threshold = float(settings_state.get("budget_threshold", 1000.0))
+        # Persisted target_spend – default 80 % of budget_threshold if not set
+        target_spend = float(
+            settings_state.get("target_spend", round(budget_threshold * 0.80, 2))
+        )
+        # Persisted current_spend override (manual entry takes precedence)
+        current_override = settings_state.get("current_spend_override")
+
+        source = "fallback"
+        current_spend = float(current_override) if current_override is not None else 3420.50
+        burn_rate = current_spend / 30
+        forecast = burn_rate * 30
+
+        if current_override is None:
+            # Try to pull live data from Azure
+            try:
+                az = AzureCollector()
+                cost_data = az.get_cost_vs_budget()
+                current_spend = float(cost_data.get("cumulative_spend", current_spend))
+                burn_rate = float(cost_data.get("burn_rate", current_spend / 30))
+                forecast = float(cost_data.get("forecast", burn_rate * 30))
+                source = "azure"
+            except Exception:
+                # Azure not configured – keep fallback
+                source = "fallback"
+
+        return jsonify({
+            "status": "success",
+            "current_spend": round(current_spend, 2),
+            "target_spend": round(target_spend, 2),
+            "budget_cap": round(budget_threshold, 2),
+            "burn_rate": round(burn_rate, 4),
+            "forecast": round(forecast, 2),
+            "source": source,
+        })
+    except Exception as e:
+        print(f"[!] Error fetching current spend: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
+@app.post("/api/financial/spend/update")
+async def update_spend_config(request: Request):
+    """Persist current spend override and / or target spend.
+
+    Body (all fields optional):
+        current_spend  (float) – manual override for current monthly spend
+        target_spend   (float) – desired target monthly spend
+    """
+    try:
+        data = (await request.json() if await request.body() else {}) or {}
+
+        updated: dict = {}
+
+        raw_current = data.get("current_spend")
+        if raw_current is not None:
+            val = float(raw_current)
+            if val < 0:
+                return JSONResponse(
+                    status_code=400,
+                    content={"status": "error", "message": "current_spend cannot be negative"},
+                )
+            settings_state["current_spend_override"] = val
+            updated["current_spend"] = val
+
+        raw_target = data.get("target_spend")
+        if raw_target is not None:
+            val = float(raw_target)
+            if val < 0:
+                return JSONResponse(
+                    status_code=400,
+                    content={"status": "error", "message": "target_spend cannot be negative"},
+                )
+            settings_state["target_spend"] = val
+            updated["target_spend"] = val
+
+        if not updated:
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "message": "Provide current_spend and/or target_spend"},
+            )
+
+        return jsonify({
+            "status": "success",
+            "message": "Spend configuration updated",
+            "updated": updated,
+        })
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"status": "error", "message": f"Invalid value: {e}"})
+    except Exception as e:
+        print(f"[!] Error updating spend config: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
 @app.get("/api/metrics")
