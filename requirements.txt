@@ -27,6 +27,21 @@ azure-mgmt-storage==24.0.1
 azure-mgmt-subscription==3.1.1
 azure-mgmt-web==7.0.0
 azure-monitor-query
+# === Azure SDKs — Extended Services ===
+azure-mgmt-containerservice>=26.0.0
+azure-mgmt-containerinstance>=9.0.0
+azure-mgmt-keyvault>=10.0.0
+azure-mgmt-redis>=13.0.0
+azure-mgmt-cosmosdb>=9.0.0
+azure-mgmt-datafactory>=3.0.0
+azure-mgmt-logic>=9.0.0
+azure-mgmt-eventhub>=11.0.0
+azure-mgmt-servicebus>=8.0.0
+azure-mgmt-iothub>=3.0.0
+azure-mgmt-cognitiveservices>=13.0.0
+azure-mgmt-applicationinsights>=2.0.0
+azure-mgmt-cdn>=12.0.0
+azure-mgmt-apimanagement>=3.0.0
 
 # === Database ===
 psycopg2-binary==2.9.9

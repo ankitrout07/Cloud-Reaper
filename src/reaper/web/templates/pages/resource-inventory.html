@@ -1,0 +1,182 @@
+{% extends "layouts/_base.html" if not request.headers.get("HX-Request") else "layouts/_empty.html" %}
+
+{% block content %}
+<main class="app-main flex-1 p-8 lg:p-10">
+    <div class="page-shell page-shell--wide animate-fade-in">
+        {% set breadcrumb_items = [
+            {"label": "Home", "href": "/"},
+            {"label": "Cost Optimization", "href": "/cost-optimization"},
+            {"label": "Resource Inventory", "current": true}
+        ] %}
+        {% include "components/_breadcrumb.html" %}
+
+        <header class="page-header">
+            <div class="page-header__row">
+                <div class="page-header__intro">
+                    <h1 class="page-header__title">
+                        Resource <span class="page-header__title-accent">Inventory</span>
+                        <span class="page-header__badge">Real-Time</span>
+                    </h1>
+                    <p class="page-header__subtitle">
+                        Monitor all Azure resources in real-time across 20+ service categories.
+                        Identify idle &amp; orphaned resources, estimate costs, and dismiss waste.
+                    </p>
+                </div>
+                <div class="page-header__actions">
+                    <button type="button" id="refresh-inventory-btn"
+                            onclick="loadResourceInventory()" class="btn btn-primary">
+                        <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Refresh
+                    </button>
+                    <button type="button" id="export-inventory-btn"
+                            onclick="exportInventory()" class="btn btn-ghost">
+                        <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Summary stat cards -->
+        <div id="summary-cards" class="stat-grid">
+            {% with label="Total Resources", value_id="total-resources", initial_value="0", hint="All Azure resources", accent="info" %}
+            {% include "components/_stat_card.html" %}
+            {% endwith %}
+            {% with label="Idle Resources", value_id="idle-resources", initial_value="0", hint="Low utilization", accent="warning" %}
+            {% include "components/_stat_card.html" %}
+            {% endwith %}
+            {% with label="Orphaned Resources", value_id="orphaned-resources", initial_value="0", hint="Unattached resources", accent="error" %}
+            {% include "components/_stat_card.html" %}
+            {% endwith %}
+            {% with label="Est. Monthly Cost", value_id="estimated-cost", initial_value="$0", hint="Across all services", accent="success" %}
+            {% include "components/_stat_card.html" %}
+            {% endwith %}
+        </div>
+
+        <!-- Category breakdown pills (populated by JS) -->
+        <div id="category-breakdown" class="category-pills-bar" aria-label="Resource category breakdown">
+            <!-- populated dynamically -->
+        </div>
+
+        <!-- Filter bar -->
+        <section class="section-card">
+            <div class="filter-bar">
+                <span class="filter-bar__title">Filters</span>
+                <input type="search" id="search-resources"
+                       placeholder="Search resources by name or type…"
+                       class="glass-input"
+                       oninput="onSearchInput()"
+                       aria-label="Search resources">
+
+                <select id="category-filter" onchange="filterResources()" class="glass-input" aria-label="Category filter">
+                    <option value="all">All Categories</option>
+                    <optgroup label="── Compute &amp; Storage ──">
+                        <option value="virtual_machines">🖥️ Virtual Machines</option>
+                        <option value="disks">💾 Disks</option>
+                        <option value="storage_accounts">🗄️ Storage Accounts</option>
+                    </optgroup>
+                    <optgroup label="── Networking &amp; Hosting ──">
+                        <option value="network_resources">🌐 Network Resources</option>
+                        <option value="app_services">⚙️ App Services</option>
+                        <option value="functions">⚡ Functions</option>
+                        <option value="kubernetes">☸️ Kubernetes (AKS)</option>
+                    </optgroup>
+                    <optgroup label="── Databases &amp; Security ──">
+                        <option value="databases">📊 Databases</option>
+                        <option value="key_vaults">🔐 Key Vaults</option>
+                    </optgroup>
+                    <optgroup label="── Integration &amp; Intelligence ──">
+                        <option value="messaging">📡 Messaging &amp; Events</option>
+                        <option value="cognitive_services">🧠 Cognitive Services</option>
+                        <option value="monitoring">📈 App Insights (Monitoring)</option>
+                    </optgroup>
+                    <optgroup label="── Other ──">
+                        <option value="other_resources">❓ Other Resources</option>
+                    </optgroup>
+                </select>
+
+                <select id="status-filter" onchange="filterResources()" class="glass-input" aria-label="Status filter">
+                    <option value="all">All Statuses</option>
+                    <option value="Active">✅ Active</option>
+                    <option value="Idle">⚠️ Idle</option>
+                    <option value="Orphaned">🔴 Orphaned</option>
+                    <option value="Unassociated">🔴 Unassociated</option>
+                    <option value="Empty">🟡 Empty</option>
+                    <option value="Stopped">🟠 Stopped</option>
+                    <option value="Disabled">⛔ Disabled</option>
+                    <option value="Cold">🔵 Cold Tier</option>
+                </select>
+            </div>
+        </section>
+
+        <!-- Resource cards -->
+        <div id="resources-container">
+            {% with title="Loading resource inventory", description="Fetching real-time Azure resources from your subscription…", icon="cloud" %}
+            {% include "components/_empty_state.html" %}
+            {% endwith %}
+        </div>
+
+        <!-- Pagination controls (shown/hidden by JS) -->
+        <div id="pagination-controls" class="pagination-bar" style="display:none;" aria-label="Pagination">
+            <!-- populated dynamically -->
+        </div>
+
+    </div>
+</main>
+
+<style>
+/* ── Category pills bar ──────────────────────────────────────────── */
+.category-pills-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem 0;
+    margin-bottom: 0.5rem;
+}
+.category-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.8);
+    transition: background 0.15s, border-color 0.15s;
+    letter-spacing: 0.02em;
+}
+.category-pill:hover {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.3);
+}
+.category-pill strong {
+    color: #fff;
+    margin-left: 0.15rem;
+}
+
+/* ── Pagination bar ─────────────────────────────────────────────── */
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1.5rem 0 0.5rem;
+}
+.pagination-info {
+    font-size: 0.8rem;
+    color: var(--color-text-muted, rgba(255,255,255,0.5));
+    white-space: nowrap;
+}
+</style>
+
+<script src="/static/js/resource-inventory.js"></script>
+{% endblock %}

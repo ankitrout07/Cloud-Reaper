@@ -26,6 +26,64 @@ from azure.mgmt.web import WebSiteManagementClient
 from dotenv import load_dotenv
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+# Extended Azure SDK imports (lazy-loaded to avoid startup overhead for unused services)
+try:
+    from azure.mgmt.containerservice import ContainerServiceClient
+except ImportError:
+    ContainerServiceClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.containerinstance import ContainerInstanceManagementClient
+except ImportError:
+    ContainerInstanceManagementClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.keyvault import KeyVaultManagementClient
+except ImportError:
+    KeyVaultManagementClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.redis import RedisManagementClient
+except ImportError:
+    RedisManagementClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.cosmosdb import CosmosDBManagementClient
+except ImportError:
+    CosmosDBManagementClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.datafactory import DataFactoryManagementClient
+except ImportError:
+    DataFactoryManagementClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.logic import LogicManagementClient
+except ImportError:
+    LogicManagementClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.eventhub import EventHubManagementClient
+except ImportError:
+    EventHubManagementClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.servicebus import ServiceBusManagementClient
+except ImportError:
+    ServiceBusManagementClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.iothub import IotHubClient
+except ImportError:
+    IotHubClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
+except ImportError:
+    CognitiveServicesManagementClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.applicationinsights import ApplicationInsightsManagementClient
+except ImportError:
+    ApplicationInsightsManagementClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.cdn import CdnManagementClient
+except ImportError:
+    CdnManagementClient = None  # type: ignore[assignment,misc]
+try:
+    from azure.mgmt.apimanagement import ApiManagementClient
+except ImportError:
+    ApiManagementClient = None  # type: ignore[assignment,misc]
+
 from reaper.collectors.prices.azure import AzurePriceClient
 from reaper.engine.core.logic import BudgetForecaster
 from reaper.engine.models.resources import CostHistory, RegionPriceCache, SessionLocal
@@ -142,6 +200,25 @@ class AzureCollector:
             self.cost_management = CostManagementClient(self.credentials)
         except ImportError:
             self.cost_management = None  # pyrefly: ignore [bad-assignment]
+
+        # Extended clients — lazily initialized via properties
+        self._container_service: Any | None = None
+        self._container_instance: Any | None = None
+        self._keyvault: Any | None = None
+        self._redis: Any | None = None
+        self._cosmosdb: Any | None = None
+        self._datafactory: Any | None = None
+        self._logic: Any | None = None
+        self._eventhub: Any | None = None
+        self._servicebus: Any | None = None
+        self._iothub: Any | None = None
+        self._cognitive: Any | None = None
+        self._appinsights: Any | None = None
+        self._cdn: Any | None = None
+        self._apim: Any | None = None
+
+        # In-memory cost price cache: (resource_type, sku, region) -> (timestamp, monthly_cost)
+        self._price_cache: dict[tuple[str, str, str], tuple[float, float]] = {}
 
     @retry(
         wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3), reraise=True
@@ -1693,6 +1770,713 @@ class AzureCollector:
             return []
         finally:
             db.close()
+
+
+    # ========== LAZY CLIENT PROPERTIES ==========
+
+    def _get_container_service(self):
+        if self._container_service is None and ContainerServiceClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._container_service = ContainerServiceClient(self.credentials, self.subscription_id)
+        return self._container_service
+
+    def _get_container_instance(self):
+        if self._container_instance is None and ContainerInstanceManagementClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._container_instance = ContainerInstanceManagementClient(self.credentials, self.subscription_id)
+        return self._container_instance
+
+    def _get_keyvault(self):
+        if self._keyvault is None and KeyVaultManagementClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._keyvault = KeyVaultManagementClient(self.credentials, self.subscription_id)
+        return self._keyvault
+
+    def _get_redis(self):
+        if self._redis is None and RedisManagementClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._redis = RedisManagementClient(self.credentials, self.subscription_id)
+        return self._redis
+
+    def _get_cosmosdb(self):
+        if self._cosmosdb is None and CosmosDBManagementClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._cosmosdb = CosmosDBManagementClient(self.credentials, self.subscription_id)
+        return self._cosmosdb
+
+    def _get_datafactory(self):
+        if self._datafactory is None and DataFactoryManagementClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._datafactory = DataFactoryManagementClient(self.credentials, self.subscription_id)
+        return self._datafactory
+
+    def _get_logic(self):
+        if self._logic is None and LogicManagementClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._logic = LogicManagementClient(self.credentials, self.subscription_id)
+        return self._logic
+
+    def _get_eventhub(self):
+        if self._eventhub is None and EventHubManagementClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._eventhub = EventHubManagementClient(self.credentials, self.subscription_id)
+        return self._eventhub
+
+    def _get_servicebus(self):
+        if self._servicebus is None and ServiceBusManagementClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._servicebus = ServiceBusManagementClient(self.credentials, self.subscription_id)
+        return self._servicebus
+
+    def _get_iothub(self):
+        if self._iothub is None and IotHubClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._iothub = IotHubClient(self.credentials, self.subscription_id)
+        return self._iothub
+
+    def _get_cognitive(self):
+        if self._cognitive is None and CognitiveServicesManagementClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._cognitive = CognitiveServicesManagementClient(self.credentials, self.subscription_id)
+        return self._cognitive
+
+    def _get_appinsights(self):
+        if self._appinsights is None and ApplicationInsightsManagementClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._appinsights = ApplicationInsightsManagementClient(self.credentials, self.subscription_id)
+        return self._appinsights
+
+    def _get_cdn(self):
+        if self._cdn is None and CdnManagementClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._cdn = CdnManagementClient(self.credentials, self.subscription_id)
+        return self._cdn
+
+    def _get_apim(self):
+        if self._apim is None and ApiManagementClient:
+            # pyrefly: ignore [bad-argument-type]
+            self._apim = ApiManagementClient(self.credentials, self.subscription_id)
+        return self._apim
+
+    # ========== UNIFIED RESOURCE GRAPH DISCOVERY ==========
+
+    def get_all_resources_via_resource_graph(self, resource_types: list[str] | None = None) -> list[dict]:
+        """
+        Discover ALL resources in the subscription using a single Azure Resource Graph KQL query.
+        This is dramatically faster than per-service API calls for large inventories.
+        Optionally filter by ``resource_types`` (e.g. ["microsoft.compute/virtualmachines"]).
+        """
+        cache_key = f"resource_graph_all_{self.subscription_id}"
+
+        def fetch() -> list[dict]:
+            try:
+                from azure.mgmt.resourcegraph import ResourceGraphClient
+                from azure.mgmt.resourcegraph.models import QueryRequest
+
+                client = ResourceGraphClient(self.credentials)
+
+                type_filter = ""
+                if resource_types:
+                    quoted = ", ".join(f"'{t.lower()}'" for t in resource_types)
+                    type_filter = f"| where type in~ ({quoted})"
+
+                query = f"""
+                Resources
+                {type_filter}
+                | project id, name, type, location, tags, sku, kind, resourceGroup,
+                          properties
+                | order by name asc
+                """
+
+                request = QueryRequest(
+                    subscriptions=[self.subscription_id],  # pyrefly: ignore [bad-argument-type]
+                    query=query,
+                )
+
+                all_items: list[dict] = []
+                skip_token: str | None = None
+
+                while True:
+                    if skip_token:
+                        request.options = {"skipToken": skip_token}  # type: ignore[assignment]
+                    response = client.resources(request)
+
+                    if hasattr(response, "data") and response.data:
+                        all_items.extend(
+                            row if isinstance(row, dict) else dict(row)
+                            for row in response.data
+                        )
+
+                    skip_token = getattr(response, "skip_token", None)
+                    if not skip_token:
+                        break
+
+                return all_items
+            except Exception as exc:
+                print(f"[-] Resource Graph query failed: {exc}")
+                return []
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_all_resources_by_resource_graph(self):
+        """Get ALL resources using Azure Resource Graph"""
+        from azure.mgmt.resourcegraph import ResourceGraphClient
+        from azure.mgmt.resourcegraph.models import QueryRequest
+
+        resource_graph_client = ResourceGraphClient(self.credentials)
+
+        query = """
+        Resources
+        | project id, name, type, location, tags, sku, kind
+        | order by name asc
+        """
+
+        result = resource_graph_client.resources(
+            QueryRequest(subscriptions=[self.subscription_id], query=query)
+        )
+
+        return result.data
+
+    # ========== COST ESTIMATION ==========
+
+    # Approximate monthly cost multipliers (USD) by resource type when no Retail API match.
+    # Values are conservative midpoints for common SKUs — used only as fallback.
+    _COST_FALLBACK: dict[str, float] = {
+        "microsoft.compute/virtualmachines": 120.0,
+        "microsoft.compute/disks": 8.0,
+        "microsoft.storage/storageaccounts": 20.0,
+        "microsoft.network/publicipaddresses": 3.65,
+        "microsoft.network/loadbalancers": 18.0,
+        "microsoft.containerservice/managedclusters": 200.0,
+        "microsoft.containerinstance/containergroups": 30.0,
+        "microsoft.web/sites": 54.0,
+        "microsoft.web/serverfarms": 54.0,
+        "microsoft.sql/servers/databases": 150.0,
+        "microsoft.keyvault/vaults": 5.0,
+        "microsoft.cache/redis": 55.0,
+        "microsoft.documentdb/databaseaccounts": 24.0,
+        "microsoft.datafactory/factories": 5.0,
+        "microsoft.logic/workflows": 2.0,
+        "microsoft.eventhub/namespaces": 11.0,
+        "microsoft.servicebus/namespaces": 10.0,
+        "microsoft.devices/iothubs": 25.0,
+        "microsoft.cognitiveservices/accounts": 10.0,
+        "microsoft.insights/components": 2.0,
+        "microsoft.cdn/profiles": 5.0,
+        "microsoft.apimanagement/service": 250.0,
+        "microsoft.recoveryservices/vaults": 5.0,
+    }
+
+    def estimate_resource_cost(self, resource_type: str, sku: str, region: str) -> float:
+        """
+        Estimate monthly cost (USD) for a resource using the Azure Retail Prices API.
+        Falls back to curated static table when the API returns nothing.
+        Results are cached for 1 hour to prevent quota exhaustion.
+        """
+        rt = resource_type.lower()
+        sku_clean = (sku or "").strip()
+        region_clean = (region or "").strip().lower().replace(" ", "")
+        cache_key_tuple = (rt, sku_clean, region_clean)
+
+        now = time.time()
+        cached = self._price_cache.get(cache_key_tuple)
+        if cached and (now - cached[0]) < 3600:
+            return cached[1]
+
+        price = 0.0
+        try:
+            # Map resource type to service-name filter for the Retail Prices API
+            _type_to_service: dict[str, str] = {
+                "microsoft.compute/virtualmachines": "Virtual Machines",
+                "microsoft.storage/storageaccounts": "Storage",
+                "microsoft.containerservice/managedclusters": "Azure Kubernetes Service",
+                "microsoft.containerinstance/containergroups": "Container Instances",
+                "microsoft.web/sites": "Functions",
+                "microsoft.web/serverfarms": "App Service",
+                "microsoft.sql/servers/databases": "SQL Database",
+                "microsoft.keyvault/vaults": "Key Vault",
+                "microsoft.cache/redis": "Cache for Redis",
+                "microsoft.documentdb/databaseaccounts": "Azure Cosmos DB",
+                "microsoft.eventhub/namespaces": "Event Hubs",
+                "microsoft.servicebus/namespaces": "Service Bus",
+                "microsoft.cognitiveservices/accounts": "Cognitive Services",
+                "microsoft.insights/components": "Azure Monitor",
+                "microsoft.cdn/profiles": "Azure Front Door Service",
+                "microsoft.apimanagement/service": "API Management",
+            }
+            service_name = _type_to_service.get(rt)
+            if service_name and sku_clean and region_clean:
+                filter_q = (
+                    f"serviceName eq '{service_name}' "
+                    f"and armRegionName eq '{region_clean}' "
+                    f"and priceType eq 'Consumption'"
+                )
+                if sku_clean:
+                    filter_q += f" and contains(armSkuName, '{sku_clean}')"
+
+                results = AzurePriceClient().get_prices(filter_query=filter_q, max_pages=1)
+                hourly_hits = [
+                    r.get("retailPrice", 0.0)
+                    for r in results
+                    if r.get("unitOfMeasure", "").startswith("1 Hour") and r.get("retailPrice", 0) > 0
+                ]
+                if hourly_hits:
+                    price = round(min(hourly_hits) * 730, 2)  # 730 hrs/month
+        except Exception as exc:
+            print(f"[-] Retail price lookup failed for {rt}: {exc}")
+
+        if price == 0.0:
+            price = self._COST_FALLBACK.get(rt, 0.0)
+
+        self._price_cache[cache_key_tuple] = (now, price)
+        return price
+
+    # ========== NEW SERVICE COLLECTORS ==========
+
+    def get_storage_accounts(self) -> list[dict]:
+        """List all Storage Accounts with tier, kind, and replication info."""
+        cache_key = f"storage_accounts_{self.subscription_id}"
+
+        def fetch():
+            results = []
+            try:
+                accounts = self.storage.storage_accounts.list()
+                for acc in accounts:
+                    results.append({
+                        "id": acc.id,
+                        "name": acc.name,
+                        "location": acc.location,
+                        "kind": acc.kind,
+                        "sku": acc.sku.name if acc.sku else "Unknown",
+                        "access_tier": getattr(acc, "access_tier", "Hot"),
+                        "tags": dict(acc.tags) if acc.tags else {},
+                        "provisioning_state": getattr(acc, "provisioning_state", "Succeeded"),
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching storage accounts: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_aks_clusters(self) -> list[dict]:
+        """List all Azure Kubernetes Service managed clusters."""
+        cache_key = f"aks_clusters_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_container_service()
+            if not client:
+                return []
+            results = []
+            try:
+                clusters = client.managed_clusters.list()
+                for c in clusters:
+                    agent_count = sum(
+                        getattr(p, "count", 0) or 0
+                        for p in (c.agent_pool_profiles or [])
+                    )
+                    results.append({
+                        "id": c.id,
+                        "name": c.name,
+                        "location": c.location,
+                        "kubernetes_version": getattr(c, "kubernetes_version", "Unknown"),
+                        "node_count": agent_count,
+                        "sku": getattr(c.sku, "name", "Free") if c.sku else "Free",
+                        "power_state": getattr(getattr(c, "power_state", None), "code", "Running"),
+                        "tags": dict(c.tags) if c.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching AKS clusters: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_container_instances(self) -> list[dict]:
+        """List all Container Instance groups."""
+        cache_key = f"container_instances_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_container_instance()
+            if not client:
+                return []
+            results = []
+            try:
+                groups = client.container_groups.list()
+                for g in groups:
+                    results.append({
+                        "id": g.id,
+                        "name": g.name,
+                        "location": g.location,
+                        "os_type": getattr(g, "os_type", "Linux"),
+                        "restart_policy": getattr(g, "restart_policy", "Always"),
+                        "provisioning_state": getattr(g, "provisioning_state", "Succeeded"),
+                        "container_count": len(g.containers) if g.containers else 0,
+                        "tags": dict(g.tags) if g.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching container instances: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_function_apps(self) -> list[dict]:
+        """List all Azure Function Apps (kind contains 'functionapp')."""
+        cache_key = f"function_apps_{self.subscription_id}"
+
+        def fetch():
+            results = []
+            try:
+                apps = self.web.web_apps.list()
+                for app in apps:
+                    kind = (app.kind or "").lower()
+                    if "functionapp" not in kind:
+                        continue
+                    results.append({
+                        "id": app.id,
+                        "name": app.name,
+                        "location": app.location,
+                        "state": getattr(app, "state", "Running"),
+                        "runtime": (app.site_config.linux_fx_version or "") if app.site_config else "",
+                        "kind": app.kind,
+                        "tags": dict(app.tags) if app.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching function apps: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_key_vaults(self) -> list[dict]:
+        """List all Key Vault instances."""
+        cache_key = f"key_vaults_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_keyvault()
+            if not client:
+                return []
+            results = []
+            try:
+                vaults = client.vaults.list()
+                for v in vaults:
+                    # Full details require list_by_resource_group, but list() returns VaultListResult
+                    results.append({
+                        "id": v.id,
+                        "name": v.name,
+                        "location": v.location,
+                        "tags": dict(v.tags) if v.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching key vaults: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_redis_caches(self) -> list[dict]:
+        """List all Redis Cache instances."""
+        cache_key = f"redis_caches_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_redis()
+            if not client:
+                return []
+            results = []
+            try:
+                caches = client.redis.list()
+                for r in caches:
+                    sku = r.sku if r.sku else None
+                    results.append({
+                        "id": r.id,
+                        "name": r.name,
+                        "location": r.location,
+                        "sku_name": sku.name if sku else "Unknown",
+                        "sku_family": sku.family if sku else "",
+                        "sku_capacity": sku.capacity if sku else 0,
+                        "redis_version": getattr(r, "redis_version", ""),
+                        "provisioning_state": getattr(r, "provisioning_state", "Succeeded"),
+                        "tags": dict(r.tags) if r.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching Redis caches: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_cosmos_db_accounts(self) -> list[dict]:
+        """List all Cosmos DB database accounts."""
+        cache_key = f"cosmos_db_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_cosmosdb()
+            if not client:
+                return []
+            results = []
+            try:
+                accounts = client.database_accounts.list()
+                for acc in accounts:
+                    results.append({
+                        "id": acc.id,
+                        "name": acc.name,
+                        "location": acc.location,
+                        "kind": getattr(acc, "kind", "GlobalDocumentDB"),
+                        "consistency_level": (
+                            getattr(acc.consistency_policy, "default_consistency_level", "Session")
+                            if acc.consistency_policy else "Session"
+                        ),
+                        "locations": [
+                            getattr(loc, "location_name", "") for loc in (acc.locations or [])
+                        ],
+                        "tags": dict(acc.tags) if acc.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching Cosmos DB accounts: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_data_factories(self) -> list[dict]:
+        """List all Azure Data Factory instances."""
+        cache_key = f"data_factories_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_datafactory()
+            if not client:
+                return []
+            results = []
+            try:
+                factories = client.factories.list()
+                for f in factories:
+                    results.append({
+                        "id": f.id,
+                        "name": f.name,
+                        "location": f.location,
+                        "provisioning_state": getattr(f, "provisioning_state", "Succeeded"),
+                        "tags": dict(f.tags) if f.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching Data Factories: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_logic_apps(self) -> list[dict]:
+        """List all Logic App workflows."""
+        cache_key = f"logic_apps_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_logic()
+            if not client:
+                return []
+            results = []
+            try:
+                workflows = client.workflows.list_by_subscription()
+                for w in workflows:
+                    results.append({
+                        "id": w.id,
+                        "name": w.name,
+                        "location": w.location,
+                        "state": getattr(w, "state", "Enabled"),
+                        "sku": getattr(w.sku, "name", "Consumption") if w.sku else "Consumption",
+                        "tags": dict(w.tags) if w.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching Logic Apps: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_event_hubs(self) -> list[dict]:
+        """List all Event Hub namespaces."""
+        cache_key = f"event_hubs_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_eventhub()
+            if not client:
+                return []
+            results = []
+            try:
+                namespaces = client.namespaces.list()
+                for ns in namespaces:
+                    sku = ns.sku if ns.sku else None
+                    results.append({
+                        "id": ns.id,
+                        "name": ns.name,
+                        "location": ns.location,
+                        "sku_name": sku.name if sku else "Basic",
+                        "sku_tier": sku.tier if sku else "Basic",
+                        "throughput_units": getattr(ns, "maximum_throughput_units", 0),
+                        "provisioning_state": getattr(ns, "provisioning_state", "Succeeded"),
+                        "tags": dict(ns.tags) if ns.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching Event Hubs: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_service_bus_namespaces(self) -> list[dict]:
+        """List all Service Bus namespaces."""
+        cache_key = f"service_bus_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_servicebus()
+            if not client:
+                return []
+            results = []
+            try:
+                namespaces = client.namespaces.list()
+                for ns in namespaces:
+                    sku = ns.sku if ns.sku else None
+                    results.append({
+                        "id": ns.id,
+                        "name": ns.name,
+                        "location": ns.location,
+                        "sku_name": sku.name if sku else "Basic",
+                        "messaging_units": getattr(sku, "capacity", 1) if sku else 1,
+                        "provisioning_state": getattr(ns, "provisioning_state", "Succeeded"),
+                        "tags": dict(ns.tags) if ns.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching Service Bus namespaces: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_iot_hubs(self) -> list[dict]:
+        """List all IoT Hub instances."""
+        cache_key = f"iot_hubs_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_iothub()
+            if not client:
+                return []
+            results = []
+            try:
+                hubs = client.iot_hub_resource.list_by_subscription()
+                for hub in hubs:
+                    sku_info = hub.sku if hub.sku else None
+                    results.append({
+                        "id": hub.id,
+                        "name": hub.name,
+                        "location": hub.location,
+                        "sku_name": sku_info.name if sku_info else "F1",
+                        "sku_capacity": sku_info.capacity if sku_info else 1,
+                        "state": getattr(hub, "state", "Active"),
+                        "tags": dict(hub.tags) if hub.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching IoT Hubs: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_cognitive_services(self) -> list[dict]:
+        """List all Cognitive Services accounts (includes Azure OpenAI)."""
+        cache_key = f"cognitive_services_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_cognitive()
+            if not client:
+                return []
+            results = []
+            try:
+                accounts = client.accounts.list()
+                for acc in accounts:
+                    sku = acc.sku if acc.sku else None
+                    results.append({
+                        "id": acc.id,
+                        "name": acc.name,
+                        "location": acc.location,
+                        "kind": getattr(acc, "kind", "Unknown"),
+                        "sku_name": sku.name if sku else "S0",
+                        "provisioning_state": getattr(acc, "provisioning_state", "Succeeded"),
+                        "tags": dict(acc.tags) if acc.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching Cognitive Services: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_application_insights(self) -> list[dict]:
+        """List all Application Insights components."""
+        cache_key = f"app_insights_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_appinsights()
+            if not client:
+                return []
+            results = []
+            try:
+                components = client.components.list()
+                for c in components:
+                    results.append({
+                        "id": c.id,
+                        "name": c.name,
+                        "location": c.location,
+                        "application_type": getattr(c, "application_type", "web"),
+                        "retention_in_days": getattr(c, "retention_in_days", 90),
+                        "ingestion_mode": getattr(c, "ingestion_mode", "ApplicationInsights"),
+                        "tags": dict(c.tags) if c.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching Application Insights: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_cdn_profiles(self) -> list[dict]:
+        """List all CDN profiles."""
+        cache_key = f"cdn_profiles_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_cdn()
+            if not client:
+                return []
+            results = []
+            try:
+                profiles = client.profiles.list()
+                for p in profiles:
+                    sku = p.sku if p.sku else None
+                    results.append({
+                        "id": p.id,
+                        "name": p.name,
+                        "location": p.location,
+                        "sku_name": sku.name if sku else "Standard_Microsoft",
+                        "resource_state": getattr(p, "resource_state", "Active"),
+                        "tags": dict(p.tags) if p.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching CDN profiles: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_api_management_instances(self) -> list[dict]:
+        """List all API Management instances."""
+        cache_key = f"apim_{self.subscription_id}"
+
+        def fetch():
+            client = self._get_apim()
+            if not client:
+                return []
+            results = []
+            try:
+                services = client.api_management_service.list()
+                for svc in services:
+                    sku = svc.sku if svc.sku else None
+                    results.append({
+                        "id": svc.id,
+                        "name": svc.name,
+                        "location": svc.location,
+                        "sku_name": sku.name if sku else "Developer",
+                        "sku_capacity": sku.capacity if sku else 1,
+                        "provisioning_state": getattr(svc, "provisioning_state", "Succeeded"),
+                        "tags": dict(svc.tags) if svc.tags else {},
+                    })
+            except Exception as exc:
+                print(f"[-] Error fetching API Management instances: {exc}")
+            return results
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
 
 
 if __name__ == "__main__":
