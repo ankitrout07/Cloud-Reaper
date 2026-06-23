@@ -103,7 +103,7 @@ _web_dir = Path(__file__).resolve().parent
 app = FastAPI(title="Cloud-Reaper", docs_url=None, redoc_url=None)
 templates = Jinja2Templates(directory=str(_web_dir / "templates"))
 
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from starlette.requests import Request as StarletteRequest
 
 
@@ -112,7 +112,8 @@ def jsonify(*args, **kwargs):
         content = args[0]
     else:
         content = kwargs
-    return JSONResponse(content=content)
+    status_code = kwargs.pop("status_code", 200)
+    return JSONResponse(content=content, status_code=status_code)
 
 
 def redirect(url: str):
@@ -185,6 +186,16 @@ thread_lock = threading.Lock()
 
 # Azure standard metrics rarely refresh faster than ~1 minute; 5–10s is a safe UI throttle.
 SOCKET_METRICS_INTERVAL_SEC = int(os.getenv("REAPER_METRICS_EMIT_SEC", "8"))
+
+# Global Provider Authentication State (In-Memory Runtime Config)
+# This provides a low-overhead way to track active provider authentication status
+# across all requests without hitting the database on every request.
+PROVIDER_AUTH_STATE = {
+    "provider": None,  # "azure", "aws", "gcp", "k8s"
+    "authenticated": False,
+    "subscription_id": None,
+    "last_sync": None,
+}
 
 
 async def background_metrics_worker():
@@ -573,6 +584,12 @@ async def connect_azure(request: Request):
         list(sub_client.subscriptions.list())
 
         if save_config(*[data.get(f) for f in fields]):
+            # Update global provider authentication state
+            PROVIDER_AUTH_STATE["provider"] = "azure"
+            PROVIDER_AUTH_STATE["authenticated"] = True
+            PROVIDER_AUTH_STATE["subscription_id"] = data.get("subscription_id")
+            PROVIDER_AUTH_STATE["last_sync"] = datetime.datetime.now(datetime.UTC).isoformat()
+
             return {"status": "success", "message": "Azure Cloud Connected Successfully!"}
         raise Exception("Failed to write to .env file")
 
@@ -867,8 +884,9 @@ async def connect_cloud(request: Request):
             {
                 "status": "error",
                 "message": f"Missing required credential fields: {', '.join(missing)}",
-            }
-        ), 400
+            },
+            status_code=400
+        )
 
     try:
         # Validate credentials by actually connecting to the cloud service
@@ -879,8 +897,9 @@ async def connect_cloud(request: Request):
                 {
                     "status": "error",
                     "message": f"Connection validation failed: {validation_result['message']}",
-                }
-            ), 400
+                },
+                status_code=400
+            )
 
         _set_cloud_env(provider, credentials)
         db = SessionLocal()
@@ -895,6 +914,13 @@ async def connect_cloud(request: Request):
             )
             db.add(conn)
             db.commit()
+
+            # Update global provider authentication state
+            PROVIDER_AUTH_STATE["provider"] = provider
+            PROVIDER_AUTH_STATE["authenticated"] = True
+            PROVIDER_AUTH_STATE["subscription_id"] = credentials.get("subscription_id") if provider == "azure" else credentials.get("project_id") if provider == "gcp" else None
+            PROVIDER_AUTH_STATE["last_sync"] = datetime.datetime.now(datetime.UTC).isoformat()
+
             return jsonify(
                 {
                     "status": "success",
@@ -918,6 +944,22 @@ async def list_cloud_connections(request: Request):
             "status": "success",
             "connections": summary,
             "active_provider": active_provider,
+        }
+    )
+
+
+@app.get("/api/v1/auth/status")
+async def auth_status(request: Request):
+    """
+    Unified authentication status endpoint for global provider state.
+    Returns the current provider authentication status with subscription details.
+    """
+    return jsonify(
+        {
+            "provider": PROVIDER_AUTH_STATE.get("provider"),
+            "authenticated": PROVIDER_AUTH_STATE.get("authenticated", False),
+            "subscription_id": PROVIDER_AUTH_STATE.get("subscription_id"),
+            "last_sync": PROVIDER_AUTH_STATE.get("last_sync"),
         }
     )
 
@@ -949,12 +991,14 @@ async def vault_setup(request: Request):
     if passcode_type == "pin":
         if len(passcode) != 4:
             return jsonify(
-                {"status": "error", "message": "PIN passcode must be exactly 4 digits/characters."}
-            ), 400
+                {"status": "error", "message": "PIN passcode must be exactly 4 digits/characters."},
+                status_code=400
+            )
     elif len(passcode) < 8:
         return jsonify(
-            {"status": "error", "message": "Password passcode must be at least 8 characters."}
-        ), 400
+            {"status": "error", "message": "Password passcode must be at least 8 characters."},
+            status_code=400
+        )
 
     if passcode != confirm:
         return JSONResponse(
@@ -1318,7 +1362,7 @@ async def calculate_target_margin(request: Request):
         if is_first_run():
             return jsonify(
                 {"status": "unconfigured", "message": "Please configure cloud credentials first"}
-            ), 200
+            )
 
         collector = AzureCollector()
 
@@ -1434,7 +1478,7 @@ async def calculate_target_margin(request: Request):
                     "remaining_gap": gap - total_potential,
                     "available_opportunities": len(optimization_opportunities),
                 }
-            ), 200
+            )
 
         # Smart gap-closing algorithm: prioritize high-ROI opportunities
         selected_optimizations = []
@@ -3142,7 +3186,7 @@ async def api_architect_status(request: Request):
     status = architect_manager.verify_api_status()
     return jsonify(
         {"status": "success", "openai": status["openai"], "gemini": status["gemini"]}
-    ), 200
+    )
 
 
 @app.post("/api/v1/architect/estimate")
@@ -3772,16 +3816,16 @@ async def export_bom(request: Request):
                 {
                     "status": "error",
                     "message": "WeasyPrint is not available on this platform (native libraries like libgobject may be missing).",
-                }
-            ), 500
+                },
+                status_code=500
+            )
         HTML(string=rendered_html).write_pdf(pdf_out)
         pdf_out.seek(0)
 
-        return send_file(
+        return StreamingResponse(
             pdf_out,
-            mimetype="application/pdf",
-            as_attachment=True,
-            download_name="Cloud_Reaper_BOM.pdf",
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=Cloud_Reaper_BOM.pdf"}
         )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -4246,7 +4290,7 @@ async def analyze_cost_optimization(request: Request):
         if is_first_run():
             return jsonify(
                 {"status": "unconfigured", "message": "Please configure cloud credentials first"}
-            ), 200
+            )
 
         # Initialize collector based on provider
         if provider == "azure":
@@ -4256,8 +4300,9 @@ async def analyze_cost_optimization(request: Request):
                 {
                     "status": "error",
                     "message": f"Provider {provider} not yet supported in comprehensive analysis",
-                }
-            ), 400
+                },
+                status_code=400
+            )
 
         cost_optimizer.recommendations.clear()
 
@@ -5260,8 +5305,9 @@ async def get_resource_optimizations(request: Request, resource_id):
                 {
                     "status": "error",
                     "message": f"No recommendations found for resource {resource_id}",
-                }
-            ), 404
+                },
+                status_code=404
+            )
 
         total_savings = sum(rec["estimated_monthly_savings"] for rec in resource_recs)
 

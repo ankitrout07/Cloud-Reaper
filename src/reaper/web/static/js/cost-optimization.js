@@ -6,6 +6,7 @@
 
     let allRecommendations = [];
     let filteredRecommendations = [];
+    let isAuthRequired = true; // This page requires authentication
 
     const PRIORITY_BADGE = {
         critical: 'badge-error',
@@ -519,9 +520,88 @@
             });
     }
 
-    document.addEventListener('DOMContentLoaded', loadInitialData);
+    // ── Cloud Provider Authentication Event Handlers ───────────────────────────────
+    function handleProviderActivated(event) {
+        const { authenticated, subscription_id } = event.detail;
+
+        if (authenticated) {
+            console.log('[cost-optimization] Provider activated, loading data...');
+            // Enable page features
+            const authElements = document.querySelectorAll('.auth-required');
+            authElements.forEach(el => {
+                el.disabled = false;
+                el.classList.remove('opacity-40', 'pointer-events-none');
+            });
+
+            // Un-hide content
+            const hiddenElements = document.querySelectorAll('[data-auth-hidden="true"]');
+            hiddenElements.forEach(el => el.classList.remove('hidden'));
+
+            // Load data automatically
+            loadInitialData();
+        }
+    }
+
+    function handleProviderDeactivated(event) {
+        const { authenticated } = event.detail;
+
+        if (!authenticated && isAuthRequired) {
+            console.log('[cost-optimization] Provider deactivated, disabling features...');
+            // Disable page features
+            const authElements = document.querySelectorAll('.auth-required');
+            authElements.forEach(el => {
+                el.disabled = true;
+                el.classList.add('opacity-40', 'pointer-events-none');
+            });
+
+            // Hide content
+            const hiddenElements = document.querySelectorAll('[data-auth-hidden="true"]');
+            hiddenElements.forEach(el => el.classList.add('hidden'));
+
+            // Show auth prompt
+            if (typeof window.setAuthOverlay === 'function') {
+                window.setAuthOverlay(true);
+            }
+        }
+    }
+
+    // ── Initialization ───────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        // Listen for cloud provider activation events
+        window.addEventListener('cloudProviderActivated', function (event) {
+            if (event.detail.authenticated) {
+                handleProviderActivated(event);
+            } else {
+                handleProviderDeactivated(event);
+            }
+        });
+
+        // Check initial authentication state
+        if (typeof window.getAuthState === 'function') {
+            const initialState = window.getAuthState();
+            if (initialState.authenticated) {
+                handleProviderActivated({ detail: initialState });
+            } else if (isAuthRequired) {
+                handleProviderDeactivated({ detail: initialState });
+            }
+        }
+
+        // Load initial data if authenticated
+        loadInitialData();
+    });
+
     document.body.addEventListener('htmx:afterSwap', function () {
+        // Re-attach event listeners after SPA navigation
         if (document.getElementById('recommendations-container')) {
+            // Check authentication state again after navigation
+            if (typeof window.getAuthState === 'function') {
+                const currentState = window.getAuthState();
+                if (currentState.authenticated) {
+                    handleProviderActivated({ detail: currentState });
+                } else if (isAuthRequired) {
+                    handleProviderDeactivated({ detail: currentState });
+                }
+            }
             loadInitialData();
         }
     });
