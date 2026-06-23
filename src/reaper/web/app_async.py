@@ -1357,12 +1357,12 @@ async def simulate_policy(request: Request):
 
 @app.post("/api/financial/target-margin/calculate")
 async def calculate_target_margin(request: Request):
-    """Calculate optimal resource modifications to close the gap between current and target spend."""
+    """Calculate optimal resource modifications to close the gap between current and target spend using actual Azure resource costs."""
     try:
         data = (await request.json() if await request.body() else {}) or {}
 
-        current_spend = data.get("current_spend", 3420.50)
-        target_spend = data.get("target_spend", 2500.0)
+        current_spend = data.get("current_spend", 0.0)
+        target_spend = data.get("target_spend", 0.0)
 
         # Get current resource inventory for analysis
         if is_first_run():
@@ -1372,10 +1372,22 @@ async def calculate_target_margin(request: Request):
 
         collector = AzureCollector()
 
-        # Get current resources
+        # Get actual resource costs and inventory
+        resource_summary = collector.get_resource_cost_summary()
         vms = collector.get_vm_inventory()
         idle_vms = collector.get_idle_vms()
         orphaned_disks = collector.get_orphaned_disks()
+
+        # Use actual current spend from resource summary if available
+        if resource_summary and resource_summary.get("total_monthly_cost", 0) > 0:
+            current_spend = resource_summary["total_monthly_cost"]
+            print(f"[TMF] Using current spend from resource summary: ${current_spend:.2f}")
+        elif current_spend == 0.0:
+            # If no current spend provided and no resource summary, return error
+            print("[TMF] No current spend available - cannot calculate target margin")
+            return jsonify(
+                {"status": "error", "message": "Unable to determine current spend. Please ensure Azure credentials are configured and resources are available."}
+            )
 
         # Enhanced savings calculation with risk-weighted optimization
         optimization_opportunities = []
@@ -1383,30 +1395,47 @@ async def calculate_target_margin(request: Request):
         # VM Rightsizing Analysis (High Impact, Low Risk)
         if vms:
             for vm in vms:
-                vm_cost = vm.get("cost", 50)  # Default $50 if cost not available
+                vm_cost = vm.get("cost", 0)  # Use actual cost from inventory
+                if vm_cost == 0:
+                    continue
+                    
                 cpu_utilization = vm.get("cpu_utilization", 50)
                 memory_utilization = vm.get("memory_utilization", 50)
 
                 # Calculate rightsizing potential based on utilization
                 if cpu_utilization < 30 or memory_utilization < 30:
-                    potential_savings = vm_cost * 0.4  # 40% savings possible
+                    # More precise savings calculation based on actual utilization
+                    utilization_factor = min(cpu_utilization, memory_utilization) / 100
+                    potential_savings = vm_cost * (1 - utilization_factor) * 0.8  # 80% of unused capacity
                     risk_score = 0.2  # Low risk
+                    
+                    # Suggest specific size downgrade based on utilization
+                    suggested_action = "Downsize to smaller VM size"
+                    if cpu_utilization < 10:
+                        suggested_action = "Downsize to 1/4 size or consider serverless"
+                    elif cpu_utilization < 20:
+                        suggested_action = "Downsize to 1/2 size"
+                    
                     optimization_opportunities.append(
                         {
                             "type": "rightsizing",
                             "resource_id": vm.get("id"),
                             "resource_name": vm.get("name"),
-                            "potential_savings": potential_savings,
+                            "potential_savings": round(potential_savings, 2),
                             "risk_score": risk_score,
                             "implementation_complexity": "low",
-                            "description": f"Downsize VM {vm.get('name')} (CPU: {cpu_utilization}%, Memory: {memory_utilization}%)",
+                            "description": f"{vm.get('name')} ({vm.get('size')}) - CPU: {cpu_utilization}%, {suggested_action}",
+                            "current_cost": round(vm_cost, 2),
                         }
                     )
 
         # Idle Resource Elimination (High Impact, Very Low Risk)
         if idle_vms:
             for vm in idle_vms:
-                vm_cost = vm.get("cost", 100)  # Default $100 for idle VMs
+                vm_cost = vm.get("cost", 0)  # Use actual cost from enhanced idle VM data
+                if vm_cost == 0:
+                    continue
+                    
                 potential_savings = vm_cost  # 100% savings by eliminating
                 risk_score = 0.1  # Very low risk
                 optimization_opportunities.append(
@@ -1414,52 +1443,92 @@ async def calculate_target_margin(request: Request):
                         "type": "idle_elimination",
                         "resource_id": vm.get("id"),
                         "resource_name": vm.get("name"),
-                        "potential_savings": potential_savings,
+                        "potential_savings": round(potential_savings, 2),
                         "risk_score": risk_score,
                         "implementation_complexity": "very_low",
-                        "description": f"Delete idle VM {vm.get('name')}",
+                        "description": f"Delete or deallocate idle VM {vm.get('name')} ({vm.get('size')}, {vm.get('location')})",
+                        "current_cost": round(vm_cost, 2),
                     }
                 )
 
         # Storage Tier Optimization (Medium Impact, Low Risk)
         if orphaned_disks and orphaned_disks.get("disks"):
             for disk in orphaned_disks["disks"]:
-                disk_cost = disk.get("cost", 20)
+                disk_cost = disk.get("cost", 0)  # Use actual cost from enhanced orphaned disk data
+                if disk_cost == 0:
+                    continue
+                    
                 current_tier = disk.get("tier", "premium")
 
                 # Calculate savings based on tier downgrades
                 tier_savings_map = {
-                    "premium": 0.6,  # 60% savings by moving to standard
-                    "standard": 0.4,  # 40% savings by moving to cool
-                    "cool": 0.2,  # 20% savings by moving to archive
+                    "Premium_LRS": 0.6,  # 60% savings by moving to standard
+                    "Premium_ZRS": 0.6,
+                    "Standard_LRS": 0.4,  # 40% savings by moving to cool
+                    "Standard_GRS": 0.4,
+                    "Standard_ZRS": 0.4,
                 }
 
                 potential_savings = disk_cost * tier_savings_map.get(current_tier, 0.3)
                 risk_score = 0.15  # Low risk
+                
+                # Suggest specific tier based on current tier
+                suggested_tier = "Standard HDD"
+                if "Premium" in current_tier:
+                    suggested_tier = "Standard SSD"
+                elif "Standard" in current_tier:
+                    suggested_tier = "Cool tier (if infrequently accessed)"
+                
                 optimization_opportunities.append(
                     {
                         "type": "storage_optimization",
                         "resource_id": disk.get("id"),
                         "resource_name": disk.get("name"),
-                        "potential_savings": potential_savings,
+                        "potential_savings": round(potential_savings, 2),
                         "risk_score": risk_score,
                         "implementation_complexity": "low",
-                        "description": f"Move disk {disk.get('name')} from {current_tier} to cooler tier",
+                        "description": f"Move {disk.get('name')} ({disk.get('size_gb', 0)}GB) from {current_tier} to {suggested_tier}",
+                        "current_cost": round(disk_cost, 2),
                     }
                 )
 
+        # Network Resource Cleanup (Medium Impact, Low Risk)
+        if resource_summary:
+            networking_resources = resource_summary.get("networking", {}).get("resources", [])
+            for resource in networking_resources:
+                if resource.get("is_waste", False):
+                    resource_cost = resource.get("cost", 0)
+                    if resource_cost > 0:
+                        potential_savings = resource_cost
+                        risk_score = 0.1  # Very low risk for orphaned resources
+                        optimization_opportunities.append(
+                            {
+                                "type": "network_cleanup",
+                                "resource_id": resource.get("name"),
+                                "resource_name": resource.get("name"),
+                                "potential_savings": round(potential_savings, 2),
+                                "risk_score": risk_score,
+                                "implementation_complexity": "very_low",
+                                "description": f"Delete orphaned {resource.get('type')} {resource.get('name')}",
+                                "current_cost": round(resource_cost, 2),
+                            }
+                        )
+
         # Commitment Adoption (High Impact, Medium Risk)
-        commitment_potential = current_spend * 0.20  # Up to 20% savings with reservations
-        if commitment_potential > 0:
+        # Calculate based on actual VM compute costs from resource summary
+        compute_costs = resource_summary.get("virtual_machines", {}).get("total_cost", 0) if resource_summary else 0
+        if compute_costs > 50:  # Only recommend if compute spend is significant
+            commitment_potential = compute_costs * 0.30  # Up to 30% savings with reservations on compute
             optimization_opportunities.append(
                 {
                     "type": "commitment_adoption",
                     "resource_id": "commitment_pool",
                     "resource_name": "Azure Reserved Instances",
-                    "potential_savings": commitment_potential,
+                    "potential_savings": round(commitment_potential, 2),
                     "risk_score": 0.4,  # Medium risk (commitment period)
                     "implementation_complexity": "medium",
-                    "description": "Purchase Azure Reserved Instances for predictable workloads",
+                    "description": f"Purchase Azure Reserved Instances for ${compute_costs:.2f}/month compute spend (save ~30%)",
+                    "current_cost": round(compute_costs, 2),
                 }
             )
 
@@ -1544,6 +1613,11 @@ async def calculate_target_margin(request: Request):
                 opt["potential_savings"]
                 for opt in optimization_opportunities
                 if opt["type"] == "storage_optimization"
+            ),
+            "network_cleanup": sum(
+                opt["potential_savings"]
+                for opt in optimization_opportunities
+                if opt["type"] == "network_cleanup"
             ),
             "commitment_adoption": sum(
                 opt["potential_savings"]
@@ -1727,15 +1801,16 @@ async def apply_target_margin_optimizations(request: Request):
 
 @app.get("/api/financial/spend/current")
 async def get_current_spend(request: Request):
-    """Fetch current monthly spend from Azure and return persisted target spend.
+    """Fetch current monthly spend from Azure resources and return persisted target spend.
 
     Returns:
-        current_spend  – live cumulative spend from Azure (or cached override)
+        current_spend  – live cumulative spend from Azure resources (or cached override)
         target_spend   – last persisted target spend (default: 80% of budget_threshold)
         budget_cap     – the budget threshold configured in Settings
         burn_rate      – daily burn rate
         forecast       – 30-day forecast
         source         – 'azure' | 'override' | 'fallback'
+        resource_breakdown – detailed cost breakdown by resource type
     """
     try:
         budget_threshold = float(settings_state.get("budget_threshold", 1000.0))
@@ -1745,22 +1820,65 @@ async def get_current_spend(request: Request):
         current_override = settings_state.get("current_spend_override")
 
         source = "fallback"
-        current_spend = float(current_override) if current_override is not None else 3420.50
-        burn_rate = current_spend / 30
-        forecast = burn_rate * 30
+        current_spend = 0.0
+        burn_rate = 0.0
+        forecast = 0.0
+        resource_breakdown = None
 
-        if current_override is None:
-            # Try to pull live data from Azure
+        if current_override is not None:
+            # Use manual override if provided
+            current_spend = float(current_override)
+            burn_rate = current_spend / 30
+            forecast = burn_rate * 30
+            source = "override"
+        else:
+            # Try to pull live data from Azure resources
             try:
                 az = AzureCollector()
+                
+                # Get detailed resource cost summary
+                resource_cost_summary = az.get_resource_cost_summary()
+                current_spend = float(resource_cost_summary.get("total_monthly_cost", 0.0))
+                resource_breakdown = resource_cost_summary
+                
+                # Also get cost vs budget data for burn rate and forecast
                 cost_data = az.get_cost_vs_budget()
-                current_spend = float(cost_data.get("cumulative_spend", current_spend))
-                burn_rate = float(cost_data.get("burn_rate", current_spend / 30))
-                forecast = float(cost_data.get("forecast", burn_rate * 30))
-                source = "azure"
-            except Exception:
-                # Azure not configured – keep fallback
-                source = "fallback"
+                burn_rate = float(cost_data.get("burn_rate", current_spend / 30 if current_spend > 0 else 0))
+                forecast = float(cost_data.get("forecast", burn_rate * 30 if burn_rate > 0 else 0))
+                
+                if current_spend > 0:
+                    source = "azure"
+                else:
+                    # If Azure returns 0 costs, return error to user
+                    return jsonify(
+                        {
+                            "status": "error",
+                            "message": "Unable to fetch current spend from Azure. Please ensure Azure credentials are configured and Cost Management API is accessible.",
+                            "current_spend": 0.0,
+                            "target_spend": round(target_spend, 2),
+                            "budget_cap": round(budget_threshold, 2),
+                            "burn_rate": 0.0,
+                            "forecast": 0.0,
+                            "source": "error",
+                            "resource_breakdown": None,
+                        }
+                    )
+            except Exception as e:
+                print(f"[!] Error fetching Azure resource costs: {e}")
+                # Azure not configured – return error to user
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": f"Error fetching Azure resource costs: {str(e)}. Please ensure Azure credentials are configured.",
+                        "current_spend": 0.0,
+                        "target_spend": round(target_spend, 2),
+                        "budget_cap": round(budget_threshold, 2),
+                        "burn_rate": 0.0,
+                        "forecast": 0.0,
+                        "source": "error",
+                        "resource_breakdown": None,
+                    }
+                )
 
         return jsonify(
             {
@@ -1771,6 +1889,7 @@ async def get_current_spend(request: Request):
                 "burn_rate": round(burn_rate, 4),
                 "forecast": round(forecast, 2),
                 "source": source,
+                "resource_breakdown": resource_breakdown,
             }
         )
     except Exception as e:

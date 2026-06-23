@@ -648,12 +648,13 @@ input[type="range"].tmf-range::-moz-range-thumb {
 //  TARGET-MARGIN FORECASTING ENGINE  —  Full Backend-Wired Logic
 // =============================================================================
 const TMF = {
-  currentSpend: 3420.50,     // loaded from backend on init
+  currentSpend: 0.0,        // loaded from backend on init
   lastCalcResult: null,
   targetPersistTimer: null,
+  resourceBreakdown: null,  // detailed cost breakdown by resource type
 
-  // Local max-savings model (used as fallback for instant slider feedback)
-  maxSavings: { rs: 500, idle: 300, st: 200, cm: 400 },
+  // Local max-savings model (populated from backend resource analysis)
+  maxSavings: { rs: 0, idle: 0, st: 0, cm: 0 },
 
   fmt(n) {
     return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -700,29 +701,74 @@ async function tmfRefreshSpend() {
       const srcText = document.getElementById('data-source-text');
       const srcIcon = document.getElementById('data-source-icon');
       chip.className = `tmf-src-chip src-${src}`;
-      srcText.textContent = src === 'azure' ? 'Live Azure' : src === 'override' ? 'Manual Override' : 'Fallback Data';
-      srcIcon.textContent = src === 'azure' ? '⬡' : src === 'override' ? '✎' : '⊙';
+      srcText.textContent = src === 'azure' ? 'Live Azure' : src === 'override' ? 'Manual Override' : 'Error';
+      srcIcon.textContent = src === 'azure' ? '⬡' : src === 'override' ? '✎' : '⚠';
 
-      // Sub-line
+      // Sub-line with resource breakdown info
       const sub = document.getElementById('current-sub');
-      if (src === 'azure')    sub.textContent = 'Live from Azure Cost Management';
-      else if (src === 'override') sub.textContent = 'Manual override — click ✎ to change';
-      else                    sub.textContent = 'Demo data — connect Azure to see live figures';
+      if (src === 'azure') {
+        if (data.resource_breakdown) {
+          const totalResources = (
+            (data.resource_breakdown.virtual_machines?.count || 0) +
+            (data.resource_breakdown.storage?.count || 0) +
+            (data.resource_breakdown.networking?.count || 0) +
+            (data.resource_breakdown.databases?.count || 0) +
+            (data.resource_breakdown.other?.count || 0)
+          );
+          sub.textContent = `Live from ${totalResources} Azure resources`;
+        } else {
+          sub.textContent = 'Live from Azure Cost Management';
+        }
+      } else if (src === 'override') {
+        sub.textContent = 'Manual override — click ✎ to change';
+      } else {
+        sub.textContent = 'Error fetching Azure data';
+      }
 
+      // Store resource breakdown for detailed analysis
+      TMF.resourceBreakdown = data.resource_breakdown;
+      
+      // Populate max savings model from actual resource data
+      if (data.resource_breakdown) {
+        // Estimate maximum savings potential from each category
+        const rb = data.resource_breakdown;
+        TMF.maxSavings.rs = Math.round((rb.virtual_machines?.total_cost || 0) * 0.4);  // Up to 40% from rightsizing
+        TMF.maxSavings.idle = Math.round((rb.virtual_machines?.total_cost || 0) * 0.2); // Up to 20% from idle elimination
+        TMF.maxSavings.st = Math.round((rb.storage?.total_cost || 0) * 0.3);       // Up to 30% from storage optimization
+        TMF.maxSavings.cm = Math.round((rb.virtual_machines?.total_cost || 0) * 0.25); // Up to 25% from commitments
+        console.log('[TMF] Max savings model updated from Azure data:', TMF.maxSavings);
+      }
+      
       tmfUpdate();
       setStatus('Engine ready — adjust levers or click Calculate Optimal Path');
-    } else {
-      setStatus('Could not fetch spend data — using local fallback');
-      _setCurrentDisplay(TMF.currentSpend);
-      document.getElementById('hdr-current').textContent = TMF.fmt(TMF.currentSpend);
-      tmfUpdate();
+    } else if (data.status === 'error') {
+      // Handle error case
+      TMF.currentSpend = 0.0;
+      _setCurrentDisplay(0.0);
+      document.getElementById('hdr-current').textContent = '$0.00';
+      
+      const chip = document.getElementById('data-source-chip');
+      const srcText = document.getElementById('data-source-text');
+      const srcIcon = document.getElementById('data-source-icon');
+      chip.className = 'tmf-src-chip src-fallback';
+      srcText.textContent = 'Error';
+      srcIcon.textContent = '⚠';
+      
+      const sub = document.getElementById('current-sub');
+      sub.textContent = data.message || 'Unable to fetch Azure data';
+      
+      // Show error toast
+      tmfToast('error', data.message || 'Unable to fetch Azure data');
+      setStatus('Error: ' + (data.message || 'Unable to fetch Azure data'));
+      return;
     }
   } catch (err) {
     console.warn('[TMF] Init error:', err);
-    _setCurrentDisplay(TMF.currentSpend);
-    document.getElementById('hdr-current').textContent = TMF.fmt(TMF.currentSpend);
+    _setCurrentDisplay(0.0);
+    document.getElementById('hdr-current').textContent = '$0.00';
     tmfUpdate();
-    setStatus('Backend unreachable — using local data');
+    setStatus('Backend unreachable — unable to fetch Azure data');
+    tmfToast('error', 'Backend unreachable — unable to fetch Azure data');
   }
 }
 
@@ -1001,6 +1047,9 @@ async function tmfCalculate() {
       setStatus(`Calculated — ${nOpp} opportunities analyzed, ${nSel} selected`);
       tmfToast(`Optimal path found — ${nOpp} opportunities analyzed.`, 'success');
 
+    } else if (data.status === 'error') {
+      setStatus('Error: ' + (data.message || 'Unable to calculate'));
+      tmfToast('error', data.message || 'Unable to calculate optimal path');
     } else if (data.status === 'warning') {
       tmfToast(`⚠ ${data.message}. Gap $${(data.gap||0).toFixed(2)}, max potential $${(data.total_potential||0).toFixed(2)}`, 'error');
       _localOptimalPath(current, target);
@@ -1013,10 +1062,8 @@ async function tmfCalculate() {
     }
   } catch (err) {
     console.warn('[TMF] Backend error:', err);
-    tmfToast('Backend unavailable — using local estimation', 'info');
-    _localOptimalPath(current, target);
-    document.getElementById('tmf-apply-btn').disabled = false;
-    setStatus('Local estimation applied (backend offline)');
+    tmfToast('Backend unavailable — unable to calculate optimal path', 'error');
+    setStatus('Error: Backend unavailable');
   } finally {
     btn.innerHTML = orig;
     btn.disabled  = false;

@@ -72,6 +72,16 @@ class FinancialRoutesTestCase(unittest.TestCase):
         mock_collector_instance = MagicMock()
         mock_azure_collector.return_value = mock_collector_instance
 
+        # Mock resource cost summary with actual Azure costs
+        mock_collector_instance.get_resource_cost_summary.return_value = {
+            "virtual_machines": {"count": 2, "total_cost": 180.0, "resources": []},
+            "storage": {"count": 1, "total_cost": 30.0, "resources": []},
+            "networking": {"count": 0, "total_cost": 0.0, "resources": []},
+            "databases": {"count": 0, "total_cost": 0.0, "resources": []},
+            "other": {"count": 0, "total_cost": 0.0, "resources": []},
+            "total_monthly_cost": 210.0
+        }
+
         # Mock VM inventory with utilization data
         mock_collector_instance.get_vm_inventory.return_value = [
             {
