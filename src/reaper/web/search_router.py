@@ -13,9 +13,10 @@ search_router = APIRouter()
 search_engine = None
 try:
     from reaper.rag import DocSearchEngine
+
     if os.getenv("GEMINI_API_KEY"):
         search_engine = DocSearchEngine()
-        
+
         # Find project root relative to this file
         base_dir = Path(__file__).resolve().parent.parent.parent.parent
         docs_dir_path = base_dir / "docs"

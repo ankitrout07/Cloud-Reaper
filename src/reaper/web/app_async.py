@@ -885,7 +885,7 @@ async def connect_cloud(request: Request):
                 "status": "error",
                 "message": f"Missing required credential fields: {', '.join(missing)}",
             },
-            status_code=400
+            status_code=400,
         )
 
     try:
@@ -898,7 +898,7 @@ async def connect_cloud(request: Request):
                     "status": "error",
                     "message": f"Connection validation failed: {validation_result['message']}",
                 },
-                status_code=400
+                status_code=400,
             )
 
         _set_cloud_env(provider, credentials)
@@ -918,7 +918,13 @@ async def connect_cloud(request: Request):
             # Update global provider authentication state
             PROVIDER_AUTH_STATE["provider"] = provider
             PROVIDER_AUTH_STATE["authenticated"] = True
-            PROVIDER_AUTH_STATE["subscription_id"] = credentials.get("subscription_id") if provider == "azure" else credentials.get("project_id") if provider == "gcp" else None
+            PROVIDER_AUTH_STATE["subscription_id"] = (
+                credentials.get("subscription_id")
+                if provider == "azure"
+                else credentials.get("project_id")
+                if provider == "gcp"
+                else None
+            )
             PROVIDER_AUTH_STATE["last_sync"] = datetime.datetime.now(datetime.UTC).isoformat()
 
             return jsonify(
@@ -992,12 +998,12 @@ async def vault_setup(request: Request):
         if len(passcode) != 4:
             return jsonify(
                 {"status": "error", "message": "PIN passcode must be exactly 4 digits/characters."},
-                status_code=400
+                status_code=400,
             )
     elif len(passcode) < 8:
         return jsonify(
             {"status": "error", "message": "Password passcode must be at least 8 characters."},
-            status_code=400
+            status_code=400,
         )
 
     if passcode != confirm:
@@ -3184,9 +3190,7 @@ async def build_with_ai(request: Request):
 async def api_architect_status(request: Request):
     """Returns the validation state of the configured OpenAI and Gemini API keys."""
     status = architect_manager.verify_api_status()
-    return jsonify(
-        {"status": "success", "openai": status["openai"], "gemini": status["gemini"]}
-    )
+    return jsonify({"status": "success", "openai": status["openai"], "gemini": status["gemini"]})
 
 
 @app.post("/api/v1/architect/estimate")
@@ -3817,7 +3821,7 @@ async def export_bom(request: Request):
                     "status": "error",
                     "message": "WeasyPrint is not available on this platform (native libraries like libgobject may be missing).",
                 },
-                status_code=500
+                status_code=500,
             )
         HTML(string=rendered_html).write_pdf(pdf_out)
         pdf_out.seek(0)
@@ -3825,7 +3829,7 @@ async def export_bom(request: Request):
         return StreamingResponse(
             pdf_out,
             media_type="application/pdf",
-            headers={"Content-Disposition": "attachment; filename=Cloud_Reaper_BOM.pdf"}
+            headers={"Content-Disposition": "attachment; filename=Cloud_Reaper_BOM.pdf"},
         )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -4301,7 +4305,7 @@ async def analyze_cost_optimization(request: Request):
                     "status": "error",
                     "message": f"Provider {provider} not yet supported in comprehensive analysis",
                 },
-                status_code=400
+                status_code=400,
             )
 
         cost_optimizer.recommendations.clear()
@@ -5306,7 +5310,7 @@ async def get_resource_optimizations(request: Request, resource_id):
                     "status": "error",
                     "message": f"No recommendations found for resource {resource_id}",
                 },
-                status_code=404
+                status_code=404,
             )
 
         total_savings = sum(rec["estimated_monthly_savings"] for rec in resource_recs)

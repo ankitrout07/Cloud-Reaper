@@ -108,7 +108,7 @@ class FinancialRoutesTestCase(unittest.TestCase):
         data = response.json()
         # Accept both success and warning status since the calculation logic may vary
         self.assertIn(data["status"], ["success", "warning"])
-        
+
         # For success status, verify all fields
         if data["status"] == "success":
             self.assertIn("optimal_levers", data)
