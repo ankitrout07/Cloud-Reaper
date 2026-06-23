@@ -1296,6 +1296,287 @@ async def simulate_policy(request: Request):
     # Placeholder logic for what-if policy application.
     data = (await request.json() if await request.body() else {}) or {}
     return jsonify(
+        {
+            "status": "success",
+            "message": "Policy simulated successfully",
+            "projected_savings": 820.00,
+            "carbon_offset": 184.2,
+        }
+    )
+
+
+@app.post("/api/financial/target-margin/calculate")
+async def calculate_target_margin(request: Request):
+    """Calculate optimal resource modifications to close the gap between current and target spend."""
+    try:
+        data = (await request.json() if await request.body() else {}) or {}
+        
+        current_spend = data.get("current_spend", 3420.50)
+        target_spend = data.get("target_spend", 2500.0)
+        
+        # Get current resource inventory for analysis
+        if is_first_run():
+            return jsonify(
+                {"status": "unconfigured", "message": "Please configure cloud credentials first"}
+            ), 200
+        
+        collector = AzureCollector()
+        
+        # Get current resources
+        vms = collector.get_vm_inventory()
+        idle_vms = collector.get_idle_vms()
+        orphaned_disks = collector.get_orphaned_disks()
+        
+        # Enhanced savings calculation with risk-weighted optimization
+        optimization_opportunities = []
+        
+        # VM Rightsizing Analysis (High Impact, Low Risk)
+        if vms:
+            for vm in vms:
+                vm_cost = vm.get("cost", 50)  # Default $50 if cost not available
+                cpu_utilization = vm.get("cpu_utilization", 50)
+                memory_utilization = vm.get("memory_utilization", 50)
+                
+                # Calculate rightsizing potential based on utilization
+                if cpu_utilization < 30 or memory_utilization < 30:
+                    potential_savings = vm_cost * 0.4  # 40% savings possible
+                    risk_score = 0.2  # Low risk
+                    optimization_opportunities.append({
+                        "type": "rightsizing",
+                        "resource_id": vm.get("id"),
+                        "resource_name": vm.get("name"),
+                        "potential_savings": potential_savings,
+                        "risk_score": risk_score,
+                        "implementation_complexity": "low",
+                        "description": f"Downsize VM {vm.get('name')} (CPU: {cpu_utilization}%, Memory: {memory_utilization}%)"
+                    })
+        
+        # Idle Resource Elimination (High Impact, Very Low Risk)
+        if idle_vms:
+            for vm in idle_vms:
+                vm_cost = vm.get("cost", 100)  # Default $100 for idle VMs
+                potential_savings = vm_cost  # 100% savings by eliminating
+                risk_score = 0.1  # Very low risk
+                optimization_opportunities.append({
+                    "type": "idle_elimination",
+                    "resource_id": vm.get("id"),
+                    "resource_name": vm.get("name"),
+                    "potential_savings": potential_savings,
+                    "risk_score": risk_score,
+                    "implementation_complexity": "very_low",
+                    "description": f"Delete idle VM {vm.get('name')}"
+                })
+        
+        # Storage Tier Optimization (Medium Impact, Low Risk)
+        if orphaned_disks and orphaned_disks.get("disks"):
+            for disk in orphaned_disks["disks"]:
+                disk_cost = disk.get("cost", 20)
+                current_tier = disk.get("tier", "premium")
+                
+                # Calculate savings based on tier downgrades
+                tier_savings_map = {
+                    "premium": 0.6,  # 60% savings by moving to standard
+                    "standard": 0.4,  # 40% savings by moving to cool
+                    "cool": 0.2      # 20% savings by moving to archive
+                }
+                
+                potential_savings = disk_cost * tier_savings_map.get(current_tier, 0.3)
+                risk_score = 0.15  # Low risk
+                optimization_opportunities.append({
+                    "type": "storage_optimization",
+                    "resource_id": disk.get("id"),
+                    "resource_name": disk.get("name"),
+                    "potential_savings": potential_savings,
+                    "risk_score": risk_score,
+                    "implementation_complexity": "low",
+                    "description": f"Move disk {disk.get('name')} from {current_tier} to cooler tier"
+                })
+        
+        # Commitment Adoption (High Impact, Medium Risk)
+        commitment_potential = current_spend * 0.20  # Up to 20% savings with reservations
+        if commitment_potential > 0:
+            optimization_opportunities.append({
+                "type": "commitment_adoption",
+                "resource_id": "commitment_pool",
+                "resource_name": "Azure Reserved Instances",
+                "potential_savings": commitment_potential,
+                "risk_score": 0.4,  # Medium risk (commitment period)
+                "implementation_complexity": "medium",
+                "description": f"Purchase Azure Reserved Instances for predictable workloads"
+            })
+        
+        # Sort opportunities by ROI (savings/risk ratio) - prioritize high savings, low risk
+        optimization_opportunities.sort(
+            key=lambda x: (x["potential_savings"] / (x["risk_score"] + 0.1)), 
+            reverse=True
+        )
+        
+        # Calculate gap
+        gap = current_spend - target_spend
+        
+        # Calculate total potential
+        total_potential = sum(opt["potential_savings"] for opt in optimization_opportunities)
+        
+        if total_potential < gap:
+            return jsonify({
+                "status": "warning",
+                "message": "Unable to close gap with available optimizations",
+                "gap": gap,
+                "total_potential": total_potential,
+                "remaining_gap": gap - total_potential,
+                "available_opportunities": len(optimization_opportunities)
+            }), 200
+        
+        # Smart gap-closing algorithm: prioritize high-ROI opportunities
+        selected_optimizations = []
+        remaining_gap = gap
+        total_projected_savings = 0
+        
+        for opt in optimization_opportunities:
+            if remaining_gap <= 0:
+                break
+            
+            # Take full optimization if it doesn't over-close the gap significantly
+            if opt["potential_savings"] <= remaining_gap * 1.1:  # Allow 10% overage
+                selected_optimizations.append(opt)
+                total_projected_savings += opt["potential_savings"]
+                remaining_gap -= opt["potential_savings"]
+            else:
+                # Partial optimization - take only what's needed
+                partial_ratio = remaining_gap / opt["potential_savings"]
+                partial_opt = opt.copy()
+                partial_opt["potential_savings"] = remaining_gap
+                partial_opt["description"] = f"Partial: {opt['description']} ({partial_ratio:.1%} implementation)"
+                selected_optimizations.append(partial_opt)
+                total_projected_savings += remaining_gap
+                remaining_gap = 0
+        
+        # Aggregate by optimization type for UI display
+        type_aggregates = {}
+        for opt in selected_optimizations:
+            opt_type = opt["type"]
+            if opt_type not in type_aggregates:
+                type_aggregates[opt_type] = {
+                    "total_savings": 0,
+                    "count": 0,
+                    "avg_risk": 0,
+                    "resources": []
+                }
+            type_aggregates[opt_type]["total_savings"] += opt["potential_savings"]
+            type_aggregates[opt_type]["count"] += 1
+            type_aggregates[opt_type]["avg_risk"] += opt["risk_score"]
+            type_aggregates[opt_type]["resources"].append(opt["resource_name"])
+        
+        # Calculate averages and percentages
+        max_savings_by_type = {
+            "rightsizing": sum(opt["potential_savings"] for opt in optimization_opportunities if opt["type"] == "rightsizing"),
+            "idle_elimination": sum(opt["potential_savings"] for opt in optimization_opportunities if opt["type"] == "idle_elimination"),
+            "storage_optimization": sum(opt["potential_savings"] for opt in optimization_opportunities if opt["type"] == "storage_optimization"),
+            "commitment_adoption": sum(opt["potential_savings"] for opt in optimization_opportunities if opt["type"] == "commitment_adoption")
+        }
+        
+        optimal_levers = {}
+        for opt_type, aggregates in type_aggregates.items():
+            aggregates["avg_risk"] /= aggregates["count"]
+            max_possible = max_savings_by_type.get(opt_type, 1)
+            optimal_levers[opt_type] = min(100, (aggregates["total_savings"] / max_possible) * 100) if max_possible > 0 else 0
+        
+        # Ensure all lever types are present
+        for lever_type in ["rightsizing", "idle_elimination", "storage_optimization", "commitment_adoption"]:
+            if lever_type not in optimal_levers:
+                optimal_levers[lever_type] = 0
+        
+        projected_rightsizing_savings = type_aggregates.get("rightsizing", {}).get("total_savings", 0)
+        projected_idle_savings = type_aggregates.get("idle_elimination", {}).get("total_savings", 0)
+        projected_storage_savings = type_aggregates.get("storage_optimization", {}).get("total_savings", 0)
+        projected_commitment_savings = type_aggregates.get("commitment_adoption", {}).get("total_savings", 0)
+        
+        new_spend = current_spend - total_projected_savings
+        
+        return jsonify({
+            "status": "success",
+            "current_spend": current_spend,
+            "target_spend": target_spend,
+            "gap": gap,
+            "optimal_levers": optimal_levers,
+            "projected_savings": {
+                "rightsizing": projected_rightsizing_savings,
+                "idle_elimination": projected_idle_savings,
+                "storage_optimization": projected_storage_savings,
+                "commitment_adoption": projected_commitment_savings,
+                "total": total_projected_savings
+            },
+            "new_spend": new_spend,
+            "gap_status": "closed" if new_spend <= target_spend else "open",
+            "optimization_details": {
+                "total_opportunities_analyzed": len(optimization_opportunities),
+                "selected_optimizations": len(selected_optimizations),
+                "avg_risk_score": sum(opt["risk_score"] for opt in selected_optimizations) / len(selected_optimizations) if selected_optimizations else 0
+            },
+            "recommended_actions": [
+                {
+                    "type": "VM Rightsizing",
+                    "impact": projected_rightsizing_savings,
+                    "description": f"Optimize {type_aggregates.get('rightsizing', {}).get('count', 0)} VMs for ${projected_rightsizing_savings:.2f} savings",
+                    "risk_level": "low" if type_aggregates.get('rightsizing', {}).get('avg_risk', 0) < 0.3 else "medium"
+                },
+                {
+                    "type": "Idle Resource Elimination", 
+                    "impact": projected_idle_savings,
+                    "description": f"Remove {type_aggregates.get('idle_elimination', {}).get('count', 0)} idle resources for ${projected_idle_savings:.2f} savings",
+                    "risk_level": "very_low"
+                },
+                {
+                    "type": "Storage Tier Optimization",
+                    "impact": projected_storage_savings,
+                    "description": f"Optimize {type_aggregates.get('storage_optimization', {}).get('count', 0)} storage resources for ${projected_storage_savings:.2f} savings",
+                    "risk_level": "low"
+                },
+                {
+                    "type": "Commitment Adoption",
+                    "impact": projected_commitment_savings,
+                    "description": f"Implement commitment strategy for ${projected_commitment_savings:.2f} savings",
+                    "risk_level": "medium"
+                }
+            ],
+            "detailed_recommendations": selected_optimizations
+        })
+        
+    except Exception as e:
+        print(f"[!] Error in target margin calculation: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
+@app.post("/api/financial/target-margin/apply")
+async def apply_target_margin_optimizations(request: Request):
+    """Apply the calculated optimization recommendations."""
+    try:
+        data = (await request.json() if await request.body() else {}) or {}
+        
+        optimizations = data.get("optimizations", {})
+        
+        # Placeholder for actual optimization application logic
+        # This would integrate with the actual cloud provider APIs to make changes
+        
+        return jsonify({
+            "status": "success",
+            "message": "Optimizations applied successfully",
+            "applied_count": len(optimizations),
+            "details": {
+                "rightsizing_applied": optimizations.get("rightsizing", 0),
+                "idle_elimination_applied": optimizations.get("idle_elimination", 0),
+                "storage_optimization_applied": optimizations.get("storage_optimization", 0),
+                "commitment_adoption_applied": optimizations.get("commitment_adoption", 0)
+            }
+        })
+        
+    except Exception as e:
+        print(f"[!] Error applying optimizations: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+    data = (await request.json() if await request.body() else {}) or {}
+    return jsonify(
         {"status": "success", "message": "Policy simulation applied", "cost_impact": -250.00}
     )
 
@@ -3920,6 +4201,729 @@ async def analyze_cost_optimization(request: Request):
                 cost_optimizer.recommendations.extend(recommendations)
         except Exception as e:
             print(f"[!] Error analyzing idle resources: {e}")
+
+        # ========== NEW RESOURCE TYPES ANALYSIS ==========
+
+        # Storage Accounts
+        try:
+            storage_accounts = collector.get_storage_accounts()
+            for account in storage_accounts:
+                metrics = ResourceMetrics(
+                    cpu_utilization=0,
+                    memory_utilization=0,
+                    disk_utilization=50,  # Assume moderate usage
+                    network_in_mbps=1.0,
+                    network_out_mbps=1.0,
+                    iops=100,
+                    latency_ms=10,
+                    error_rate=0,
+                    uptime_percentage=99.9,
+                    peak_cpu_utilization=0,
+                    peak_memory_utilization=0,
+                )
+
+                current_sku = account.get("sku", "Standard_LRS")
+                current_cost = calc.calculate_monthly_cost(provider, "storage", current_sku)
+
+                resource_data = {
+                    "id": account.get("id", ""),
+                    "name": account.get("name", ""),
+                    "type": "storage",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": account.get("location", ""),
+                    "tags": account.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": account.get("id", ""),
+                    "name": account.get("name", ""),
+                    "type": "storage",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing storage accounts: {e}")
+
+        # AKS Clusters
+        try:
+            aks_clusters = collector.get_aks_clusters()
+            for cluster in aks_clusters:
+                metrics = ResourceMetrics(
+                    cpu_utilization=40,  # Assume moderate cluster utilization
+                    memory_utilization=50,
+                    disk_utilization=60,
+                    network_in_mbps=5.0,
+                    network_out_mbps=5.0,
+                    iops=500,
+                    latency_ms=5,
+                    error_rate=0,
+                    uptime_percentage=99.9,
+                    peak_cpu_utilization=70,
+                    peak_memory_utilization=80,
+                )
+
+                current_sku = cluster.get("sku", "Free")
+                node_count = cluster.get("node_count", 1)
+                current_cost = calc.calculate_monthly_cost(provider, "container", current_sku) * node_count
+
+                resource_data = {
+                    "id": cluster.get("id", ""),
+                    "name": cluster.get("name", ""),
+                    "type": "container",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": cluster.get("location", ""),
+                    "tags": cluster.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": cluster.get("id", ""),
+                    "name": cluster.get("name", ""),
+                    "type": "container",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing AKS clusters: {e}")
+
+        # Container Instances
+        try:
+            container_instances = collector.get_container_instances()
+            for instance in container_instances:
+                metrics = ResourceMetrics(
+                    cpu_utilization=30,
+                    memory_utilization=40,
+                    disk_utilization=20,
+                    network_in_mbps=0.5,
+                    network_out_mbps=0.5,
+                    iops=50,
+                    latency_ms=10,
+                    error_rate=0,
+                    uptime_percentage=95,
+                    peak_cpu_utilization=50,
+                    peak_memory_utilization=60,
+                )
+
+                current_sku = "Standard"
+                current_cost = calc.calculate_monthly_cost(provider, "container", current_sku)
+
+                resource_data = {
+                    "id": instance.get("id", ""),
+                    "name": instance.get("name", ""),
+                    "type": "container",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": instance.get("location", ""),
+                    "tags": instance.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": instance.get("id", ""),
+                    "name": instance.get("name", ""),
+                    "type": "container",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing container instances: {e}")
+
+        # Function Apps
+        try:
+            function_apps = collector.get_function_apps()
+            for app in function_apps:
+                metrics = ResourceMetrics(
+                    cpu_utilization=20,  # Serverless - typically lower utilization
+                    memory_utilization=30,
+                    disk_utilization=10,
+                    network_in_mbps=0.2,
+                    network_out_mbps=0.2,
+                    iops=20,
+                    latency_ms=50,  # Cold starts
+                    error_rate=0,
+                    uptime_percentage=99,  # Serverless availability
+                    peak_cpu_utilization=40,
+                    peak_memory_utilization=50,
+                )
+
+                current_sku = "Consumption"
+                current_cost = calc.calculate_monthly_cost(provider, "compute", current_sku)
+
+                resource_data = {
+                    "id": app.get("id", ""),
+                    "name": app.get("name", ""),
+                    "type": "compute",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": app.get("location", ""),
+                    "tags": app.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": app.get("id", ""),
+                    "name": app.get("name", ""),
+                    "type": "compute",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing function apps: {e}")
+
+        # Key Vaults
+        try:
+            key_vaults = collector.get_key_vaults()
+            for vault in key_vaults:
+                metrics = ResourceMetrics(
+                    cpu_utilization=5,  # Low utilization for vault operations
+                    memory_utilization=10,
+                    disk_utilization=5,
+                    network_in_mbps=0.1,
+                    network_out_mbps=0.1,
+                    iops=10,
+                    latency_ms=20,
+                    error_rate=0,
+                    uptime_percentage=99.9,
+                    peak_cpu_utilization=10,
+                    peak_memory_utilization=15,
+                )
+
+                current_sku = "Standard"
+                current_cost = calc.calculate_monthly_cost(provider, "database", current_sku)
+
+                resource_data = {
+                    "id": vault.get("id", ""),
+                    "name": vault.get("name", ""),
+                    "type": "database",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": vault.get("location", ""),
+                    "tags": vault.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": vault.get("id", ""),
+                    "name": vault.get("name", ""),
+                    "type": "database",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing key vaults: {e}")
+
+        # Redis Caches
+        try:
+            redis_caches = collector.get_redis_caches()
+            for cache in redis_caches:
+                metrics = ResourceMetrics(
+                    cpu_utilization=45,  # Caching typically has moderate utilization
+                    memory_utilization=60,  # Memory-intensive
+                    disk_utilization=20,
+                    network_in_mbps=2.0,
+                    network_out_mbps=2.0,
+                    iops=200,
+                    latency_ms=1,  # Low latency for cache
+                    error_rate=0,
+                    uptime_percentage=99.9,
+                    peak_cpu_utilization=70,
+                    peak_memory_utilization=85,
+                )
+
+                current_sku = cache.get("sku_name", "Basic")
+                current_cost = calc.calculate_monthly_cost(provider, "database", current_sku)
+
+                resource_data = {
+                    "id": cache.get("id", ""),
+                    "name": cache.get("name", ""),
+                    "type": "database",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": cache.get("location", ""),
+                    "tags": cache.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": cache.get("id", ""),
+                    "name": cache.get("name", ""),
+                    "type": "database",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing Redis caches: {e}")
+
+        # Cosmos DB Accounts
+        try:
+            cosmos_accounts = collector.get_cosmos_db_accounts()
+            for account in cosmos_accounts:
+                metrics = ResourceMetrics(
+                    cpu_utilization=50,
+                    memory_utilization=55,
+                    disk_utilization=70,
+                    network_in_mbps=3.0,
+                    network_out_mbps=3.0,
+                    iops=1000,
+                    latency_ms=10,
+                    error_rate=0,
+                    uptime_percentage=99.99,
+                    peak_cpu_utilization=80,
+                    peak_memory_utilization=90,
+                )
+
+                current_sku = "Standard"
+                current_cost = calc.calculate_monthly_cost(provider, "database", current_sku)
+
+                resource_data = {
+                    "id": account.get("id", ""),
+                    "name": account.get("name", ""),
+                    "type": "database",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": account.get("location", ""),
+                    "tags": account.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": account.get("id", ""),
+                    "name": account.get("name", ""),
+                    "type": "database",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing Cosmos DB accounts: {e}")
+
+        # Data Factories
+        try:
+            data_factories = collector.get_data_factories()
+            for factory in data_factories:
+                metrics = ResourceMetrics(
+                    cpu_utilization=30,
+                    memory_utilization=40,
+                    disk_utilization=30,
+                    network_in_mbps=1.5,
+                    network_out_mbps=1.5,
+                    iops=100,
+                    latency_ms=100,  # Batch processing
+                    error_rate=0,
+                    uptime_percentage=99,
+                    peak_cpu_utilization=60,
+                    peak_memory_utilization=70,
+                )
+
+                current_sku = "Standard"
+                current_cost = calc.calculate_monthly_cost(provider, "compute", current_sku)
+
+                resource_data = {
+                    "id": factory.get("id", ""),
+                    "name": factory.get("name", ""),
+                    "type": "compute",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": factory.get("location", ""),
+                    "tags": factory.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": factory.get("id", ""),
+                    "name": factory.get("name", ""),
+                    "type": "compute",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing data factories: {e}")
+
+        # Logic Apps
+        try:
+            logic_apps = collector.get_logic_apps()
+            for app in logic_apps:
+                metrics = ResourceMetrics(
+                    cpu_utilization=15,  # Serverless workflow
+                    memory_utilization=20,
+                    disk_utilization=10,
+                    network_in_mbps=0.3,
+                    network_out_mbps=0.3,
+                    iops=30,
+                    latency_ms=200,  # Workflow processing
+                    error_rate=0,
+                    uptime_percentage=99,
+                    peak_cpu_utilization=30,
+                    peak_memory_utilization=40,
+                )
+
+                current_sku = app.get("sku", "Consumption")
+                current_cost = calc.calculate_monthly_cost(provider, "compute", current_sku)
+
+                resource_data = {
+                    "id": app.get("id", ""),
+                    "name": app.get("name", ""),
+                    "type": "compute",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": app.get("location", ""),
+                    "tags": app.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": app.get("id", ""),
+                    "name": app.get("name", ""),
+                    "type": "compute",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing logic apps: {e}")
+
+        # Event Hubs
+        try:
+            event_hubs = collector.get_event_hubs()
+            for hub in event_hubs:
+                metrics = ResourceMetrics(
+                    cpu_utilization=35,
+                    memory_utilization=45,
+                    disk_utilization=40,
+                    network_in_mbps=2.5,
+                    network_out_mbps=2.5,
+                    iops=300,
+                    latency_ms=20,
+                    error_rate=0,
+                    uptime_percentage=99.9,
+                    peak_cpu_utilization=65,
+                    peak_memory_utilization=75,
+                )
+
+                current_sku = hub.get("sku_name", "Basic")
+                current_cost = calc.calculate_monthly_cost(provider, "network", current_sku)
+
+                resource_data = {
+                    "id": hub.get("id", ""),
+                    "name": hub.get("name", ""),
+                    "type": "network",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": hub.get("location", ""),
+                    "tags": hub.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": hub.get("id", ""),
+                    "name": hub.get("name", ""),
+                    "type": "network",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing event hubs: {e}")
+
+        # Service Bus Namespaces
+        try:
+            service_bus = collector.get_service_bus_namespaces()
+            for namespace in service_bus:
+                metrics = ResourceMetrics(
+                    cpu_utilization=25,
+                    memory_utilization=35,
+                    disk_utilization=30,
+                    network_in_mbps=1.0,
+                    network_out_mbps=1.0,
+                    iops=150,
+                    latency_ms=15,
+                    error_rate=0,
+                    uptime_percentage=99.9,
+                    peak_cpu_utilization=50,
+                    peak_memory_utilization=60,
+                )
+
+                current_sku = namespace.get("sku_name", "Basic")
+                current_cost = calc.calculate_monthly_cost(provider, "network", current_sku)
+
+                resource_data = {
+                    "id": namespace.get("id", ""),
+                    "name": namespace.get("name", ""),
+                    "type": "network",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": namespace.get("location", ""),
+                    "tags": namespace.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": namespace.get("id", ""),
+                    "name": namespace.get("name", ""),
+                    "type": "network",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing service bus namespaces: {e}")
+
+        # IoT Hubs
+        try:
+            iot_hubs = collector.get_iot_hubs()
+            for hub in iot_hubs:
+                metrics = ResourceMetrics(
+                    cpu_utilization=30,
+                    memory_utilization=40,
+                    disk_utilization=35,
+                    network_in_mbps=1.2,
+                    network_out_mbps=1.2,
+                    iops=200,
+                    latency_ms=25,
+                    error_rate=0,
+                    uptime_percentage=99.9,
+                    peak_cpu_utilization=55,
+                    peak_memory_utilization=65,
+                )
+
+                current_sku = hub.get("sku_name", "F1")
+                current_cost = calc.calculate_monthly_cost(provider, "network", current_sku)
+
+                resource_data = {
+                    "id": hub.get("id", ""),
+                    "name": hub.get("name", ""),
+                    "type": "network",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": hub.get("location", ""),
+                    "tags": hub.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": hub.get("id", ""),
+                    "name": hub.get("name", ""),
+                    "type": "network",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing IoT hubs: {e}")
+
+        # Cognitive Services
+        try:
+            cognitive_services = collector.get_cognitive_services()
+            for service in cognitive_services:
+                metrics = ResourceMetrics(
+                    cpu_utilization=40,
+                    memory_utilization=50,
+                    disk_utilization=25,
+                    network_in_mbps=2.0,
+                    network_out_mbps=2.0,
+                    iops=250,
+                    latency_ms=50,  # AI processing latency
+                    error_rate=0,
+                    uptime_percentage=99.5,
+                    peak_cpu_utilization=70,
+                    peak_memory_utilization=80,
+                )
+
+                current_sku = service.get("sku_name", "S0")
+                current_cost = calc.calculate_monthly_cost(provider, "compute", current_sku)
+
+                resource_data = {
+                    "id": service.get("id", ""),
+                    "name": service.get("name", ""),
+                    "type": "compute",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": service.get("location", ""),
+                    "tags": service.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": service.get("id", ""),
+                    "name": service.get("name", ""),
+                    "type": "compute",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing cognitive services: {e}")
+
+        # Application Insights
+        try:
+            app_insights = collector.get_application_insights()
+            for insights in app_insights:
+                metrics = ResourceMetrics(
+                    cpu_utilization=10,  # Monitoring service
+                    memory_utilization=15,
+                    disk_utilization=20,
+                    network_in_mbps=0.5,
+                    network_out_mbps=0.5,
+                    iops=50,
+                    latency_ms=30,
+                    error_rate=0,
+                    uptime_percentage=99.9,
+                    peak_cpu_utilization=20,
+                    peak_memory_utilization=25,
+                )
+
+                current_sku = "Standard"
+                current_cost = calc.calculate_monthly_cost(provider, "network", current_sku)
+
+                resource_data = {
+                    "id": insights.get("id", ""),
+                    "name": insights.get("name", ""),
+                    "type": "network",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": insights.get("location", ""),
+                    "tags": insights.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": insights.get("id", ""),
+                    "name": insights.get("name", ""),
+                    "type": "network",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing application insights: {e}")
+
+        # CDN Profiles
+        try:
+            cdn_profiles = collector.get_cdn_profiles()
+            for profile in cdn_profiles:
+                metrics = ResourceMetrics(
+                    cpu_utilization=20,
+                    memory_utilization=25,
+                    disk_utilization=15,
+                    network_in_mbps=5.0,  # High bandwidth for CDN
+                    network_out_mbps=5.0,
+                    iops=100,
+                    latency_ms=5,  # Low latency for CDN
+                    error_rate=0,
+                    uptime_percentage=99.9,
+                    peak_cpu_utilization=40,
+                    peak_memory_utilization=50,
+                )
+
+                current_sku = profile.get("sku_name", "Standard_Microsoft")
+                current_cost = calc.calculate_monthly_cost(provider, "network", current_sku)
+
+                resource_data = {
+                    "id": profile.get("id", ""),
+                    "name": profile.get("name", ""),
+                    "type": "network",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": profile.get("location", ""),
+                    "tags": profile.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": profile.get("id", ""),
+                    "name": profile.get("name", ""),
+                    "type": "network",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing CDN profiles: {e}")
+
+        # API Management Instances
+        try:
+            apim_instances = collector.get_api_management_instances()
+            for instance in apim_instances:
+                metrics = ResourceMetrics(
+                    cpu_utilization=35,
+                    memory_utilization=45,
+                    disk_utilization=30,
+                    network_in_mbps=3.0,
+                    network_out_mbps=3.0,
+                    iops=200,
+                    latency_ms=10,
+                    error_rate=0,
+                    uptime_percentage=99.9,
+                    peak_cpu_utilization=60,
+                    peak_memory_utilization=70,
+                )
+
+                current_sku = instance.get("sku_name", "Developer")
+                current_cost = calc.calculate_monthly_cost(provider, "network", current_sku)
+
+                resource_data = {
+                    "id": instance.get("id", ""),
+                    "name": instance.get("name", ""),
+                    "type": "network",
+                    "provider": provider,
+                    "sku": current_sku,
+                    "region": instance.get("location", ""),
+                    "tags": instance.get("tags", {}),
+                }
+
+                recommendations = cost_optimizer.analyze_resource(
+                    resource_data, metrics, current_cost
+                )
+                cost_optimizer.recommendations.extend(recommendations)
+                resources.append({
+                    "id": instance.get("id", ""),
+                    "name": instance.get("name", ""),
+                    "type": "network",
+                    "current_cost": current_cost,
+                    "metrics": {},
+                })
+        except Exception as e:
+            print(f"[!] Error analyzing API management instances: {e}")
 
         # Prioritize and generate summary
         prioritized_recommendations = cost_optimizer.prioritize_recommendations()

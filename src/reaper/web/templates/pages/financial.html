@@ -1,443 +1,1417 @@
 {% extends "layouts/_base.html" if not request.headers.get("HX-Request") else "layouts/_empty.html" %}
 {% block content %}
-<main class="app-main flex-1 p-8 lg:p-12">
-        <!-- Toast Container -->
-        <div id="toast-container" class="toast-container"></div>
 
-        <!-- Upper Page Header -->
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
-            <div>
-                <h1 class="text-4xl font-bold tracking-tight text-white uppercase">
-                    Financial <span class="text-cyan-400">Intelligence</span>
-                </h1>
-                <p class="text-slate-400 mt-2 text-lg">
-                    Comprehensive budget management, cost analysis, and financial planning tools
-                </p>
+<style>
+  /* ========== TARGET-MARGIN ENGINE — PAGE STYLES ========== */
+  @keyframes tmf-glow-pulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(6,182,212,0.15), 0 0 60px rgba(6,182,212,0.05); }
+    50%       { box-shadow: 0 0 40px rgba(6,182,212,0.30), 0 0 80px rgba(6,182,212,0.10); }
+  }
+  @keyframes tmf-scan-line {
+    0%   { transform: translateY(-100%); opacity: 0; }
+    10%  { opacity: 0.4; }
+    90%  { opacity: 0.4; }
+    100% { transform: translateY(100%); opacity: 0; }
+  }
+  @keyframes tmf-float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-6px); }
+  }
+  @keyframes tmf-count-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes tmf-bar-fill {
+    from { width: 0%; }
+  }
+  @keyframes tmf-shimmer {
+    0%   { background-position: -600px 0; }
+    100% { background-position: 600px 0; }
+  }
+  @keyframes tmf-spin-slow {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  @keyframes tmf-dash {
+    to { stroke-dashoffset: 0; }
+  }
+
+  .tmf-page-bg {
+    background: radial-gradient(ellipse 120% 60% at 50% -10%, rgba(6,182,212,0.06) 0%, transparent 60%),
+                radial-gradient(ellipse 80% 40% at 90% 80%, rgba(139,92,246,0.04) 0%, transparent 50%),
+                var(--bg-primary);
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .tmf-header-title {
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+  .tmf-header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.75rem;
+    background: rgba(6,182,212,0.1);
+    border: 1px solid rgba(6,182,212,0.3);
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #22d3ee;
+  }
+  .tmf-header-badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #22d3ee;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  /* Summary pills in header */
+  .tmf-summary-pill {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 1rem;
+    padding: 0.75rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    backdrop-filter: blur(8px);
+  }
+  .tmf-summary-pill-divider {
+    width: 1px; height: 2rem;
+    background: rgba(255,255,255,0.08);
+  }
+
+  /* ——— MAIN ENGINE BOARD ——— */
+  .tmf-board {
+    background: linear-gradient(145deg, #12161f 0%, #0d1117 60%, #101520 100%);
+    border: 1px solid rgba(6,182,212,0.15);
+    border-radius: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    animation: tmf-glow-pulse 4s ease-in-out infinite;
+  }
+  .tmf-board::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(6,182,212,0.04) 0%, transparent 40%);
+    pointer-events: none;
+  }
+  /* Corner accents */
+  .tmf-corner {
+    position: absolute;
+    width: 60px; height: 60px;
+    pointer-events: none;
+  }
+  .tmf-corner-tl { top: 0; left: 0; border-top: 2px solid rgba(6,182,212,0.4); border-left: 2px solid rgba(6,182,212,0.4); border-radius: 1.5rem 0 0 0; }
+  .tmf-corner-tr { top: 0; right: 0; border-top: 2px solid rgba(6,182,212,0.4); border-right: 2px solid rgba(6,182,212,0.4); border-radius: 0 1.5rem 0 0; }
+  .tmf-corner-bl { bottom: 0; left: 0; border-bottom: 2px solid rgba(6,182,212,0.4); border-left: 2px solid rgba(6,182,212,0.4); border-radius: 0 0 0 1.5rem; }
+  .tmf-corner-br { bottom: 0; right: 0; border-bottom: 2px solid rgba(6,182,212,0.4); border-right: 2px solid rgba(6,182,212,0.4); border-radius: 0 0 1.5rem 0; }
+
+  /* Board header strip */
+  .tmf-board-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .tmf-board-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .tmf-board-icon {
+    width: 44px; height: 44px;
+    border-radius: 0.875rem;
+    background: linear-gradient(135deg, #06b6d4, #3b82f6);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 20px rgba(6,182,212,0.3);
+    flex-shrink: 0;
+  }
+  .tmf-engine-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #22d3ee;
+    opacity: 0.7;
+  }
+
+  /* ——— SPEND TRIAD (Current / Target / Gap) ——— */
+  .tmf-spend-triad {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr;
+    gap: 0;
+    padding: 2rem;
+    align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .tmf-spend-card {
+    padding: 1.25rem 1.5rem;
+    border-radius: 1.25rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease;
+  }
+  .tmf-spend-card:hover { transform: translateY(-2px); }
+  .tmf-spend-card--current {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+  .tmf-spend-card--target {
+    background: rgba(6,182,212,0.06);
+    border: 1px solid rgba(6,182,212,0.25);
+    box-shadow: 0 0 30px rgba(6,182,212,0.08);
+  }
+  .tmf-spend-card--gap {
+    background: rgba(239,68,68,0.05);
+    border: 1px solid rgba(239,68,68,0.2);
+  }
+  .tmf-spend-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+  }
+  .tmf-spend-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.9rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .tmf-spend-sub {
+    font-size: 0.7rem;
+    color: #475569;
+    margin-top: 0.35rem;
+  }
+
+  /* Target input styled */
+  .tmf-target-input {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.9rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #22d3ee;
+    background: transparent;
+    border: none;
+    outline: none;
+    width: 100%;
+    line-height: 1;
+  }
+  .tmf-target-input::-webkit-inner-spin-button,
+  .tmf-target-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .tmf-target-input-wrap {
+    position: relative;
+  }
+  .tmf-target-input-wrap::after {
+    content: 'click to edit';
+    position: absolute;
+    bottom: -1.1rem;
+    left: 0;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(34,211,238,0.4);
+    pointer-events: none;
+  }
+
+  .tmf-arrow-sep {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1rem;
+    color: rgba(255,255,255,0.12);
+  }
+
+  /* ——— GAP CLOSURE TRACK ——— */
+  .tmf-gap-track-section {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .tmf-track-labels {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+  .tmf-track-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #94a3b8;
+  }
+  .tmf-track-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #f1f5f9;
+  }
+  .tmf-track-bar-bg {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+  }
+  .tmf-track-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ef4444 0%, #f97316 40%, #22c55e 100%);
+    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+  }
+  .tmf-track-bar-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: tmf-shimmer 2s ease-in-out infinite;
+    background-size: 600px 100%;
+  }
+  .tmf-track-markers {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.4rem;
+    font-size: 0.6rem;
+    color: #334155;
+    font-weight: 600;
+  }
+
+  /* ——— LEVERS + OUTCOMES GRID ——— */
+  .tmf-levers-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  @media (max-width: 900px) {
+    .tmf-levers-section { grid-template-columns: 1fr; }
+    .tmf-spend-triad { grid-template-columns: 1fr; }
+    .tmf-arrow-sep { display: none; }
+  }
+
+  .tmf-levers-panel {
+    padding: 2rem;
+    border-right: 1px solid rgba(255,255,255,0.05);
+  }
+  .tmf-outcomes-panel {
+    padding: 2rem;
+  }
+
+  .tmf-panel-heading {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #475569;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .tmf-panel-heading::before {
+    content: '';
+    display: inline-block;
+    width: 12px; height: 2px;
+    background: var(--accent-primary);
+    border-radius: 1px;
+  }
+
+  /* Lever rows */
+  .tmf-lever {
+    margin-bottom: 1.5rem;
+  }
+  .tmf-lever:last-child { margin-bottom: 0; }
+  .tmf-lever-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .tmf-lever-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .tmf-lever-icon {
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.6rem;
+    flex-shrink: 0;
+  }
+  .tmf-lever-vals {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .tmf-lever-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #22d3ee;
+    min-width: 2.5rem;
+    text-align: right;
+  }
+  .tmf-lever-saving {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #10b981;
+    min-width: 4rem;
+    text-align: right;
+  }
+
+  /* Custom range slider */
+  input[type="range"].tmf-range {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    cursor: pointer;
+    position: relative;
+    outline: none;
+  }
+  input[type="range"].tmf-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #22d3ee, #3b82f6);
+    box-shadow: 0 0 10px rgba(6,182,212,0.5);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  input[type="range"].tmf-range::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
+    box-shadow: 0 0 16px rgba(6,182,212,0.7);
+  }
+  input[type="range"].tmf-range::-moz-range-thumb {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #22d3ee, #3b82f6);
+    box-shadow: 0 0 10px rgba(6,182,212,0.5);
+    cursor: pointer;
+  }
+
+  /* Outcomes panel */
+  .tmf-outcome-hero {
+    background: linear-gradient(145deg, rgba(16,185,129,0.08), rgba(6,182,212,0.04));
+    border: 1px solid rgba(16,185,129,0.2);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .tmf-outcome-hero::before {
+    content: '';
+    position: absolute;
+    top: -20px; right: -20px;
+    width: 80px; height: 80px;
+    background: radial-gradient(circle, rgba(16,185,129,0.15), transparent 70%);
+    pointer-events: none;
+  }
+  .tmf-outcome-savings-label {
+    font-size: 0.6rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #6ee7b7;
+    opacity: 0.7;
+    margin-bottom: 0.25rem;
+  }
+  .tmf-outcome-savings-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #34d399;
+    letter-spacing: -0.03em;
+  }
+  .tmf-outcome-savings-pct {
+    font-size: 0.7rem;
+    color: #10b981;
+    margin-top: 0.3rem;
+    font-weight: 600;
+  }
+
+  .tmf-outcome-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  .tmf-outcome-stat {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 0.75rem;
+    padding: 0.875rem;
+  }
+  .tmf-outcome-stat-label {
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #475569;
+    margin-bottom: 0.25rem;
+  }
+  .tmf-outcome-stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #f1f5f9;
+  }
+
+  /* Gap status badge */
+  .tmf-gap-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: all 0.3s ease;
+  }
+  .tmf-gap-badge--open {
+    background: rgba(239,68,68,0.12);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: #f87171;
+  }
+  .tmf-gap-badge--closed {
+    background: rgba(16,185,129,0.12);
+    border: 1px solid rgba(16,185,129,0.3);
+    color: #34d399;
+  }
+
+  /* ——— RECOMMENDATIONS TABLE ——— */
+  .tmf-recs-section {
+    padding: 1.75rem 2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .tmf-rec-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.875rem 1rem;
+    border-radius: 0.875rem;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.04);
+    margin-bottom: 0.5rem;
+    transition: all 0.2s ease;
+    gap: 1rem;
+  }
+  .tmf-rec-row:last-child { margin-bottom: 0; }
+  .tmf-rec-row:hover {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.08);
+    transform: translateX(2px);
+  }
+  .tmf-rec-type-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .tmf-rec-info { flex: 1; min-width: 0; }
+  .tmf-rec-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tmf-rec-desc {
+    font-size: 0.7rem;
+    color: #475569;
+  }
+  .tmf-rec-impact {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .tmf-rec-impact-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #34d399;
+  }
+  .tmf-rec-impact-label {
+    font-size: 0.58rem;
+    color: #334155;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .tmf-rec-risk {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+  .risk-very-low { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
+  .risk-low      { background: rgba(6,182,212,0.12); color: #22d3ee; border: 1px solid rgba(6,182,212,0.2); }
+  .risk-medium   { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
+  .risk-high     { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+  .risk-critical { background: rgba(220,38,38,0.15); color: #f87171; border: 1px solid rgba(220,38,38,0.3); }
+
+  .tmf-empty-recs {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1rem;
+    color: #334155;
+    gap: 0.5rem;
+    text-align: center;
+  }
+  .tmf-empty-recs svg { opacity: 0.2; }
+  .tmf-empty-recs p { font-size: 0.8rem; font-weight: 500; }
+  .tmf-empty-recs span { font-size: 0.7rem; opacity: 0.6; }
+
+  /* ——— ACTION BAR ——— */
+  .tmf-action-bar {
+    padding: 1.25rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .tmf-status-line {
+    font-size: 0.7rem;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+  }
+  .tmf-status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #22d3ee;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .tmf-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.25rem;
+    border-radius: 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    outline: none;
+  }
+  .tmf-btn-primary {
+    background: linear-gradient(135deg, #06b6d4, #3b82f6);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(6,182,212,0.3);
+  }
+  .tmf-btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(6,182,212,0.45);
+    transform: translateY(-1px);
+  }
+  .tmf-btn-primary:active { transform: translateY(0); }
+  .tmf-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+  .tmf-btn-success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(16,185,129,0.25);
+  }
+  .tmf-btn-success:hover {
+    box-shadow: 0 6px 20px rgba(16,185,129,0.4);
+    transform: translateY(-1px);
+  }
+  .tmf-btn-success:active { transform: translateY(0); }
+  .tmf-btn-success:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+  .tmf-btn-ghost {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #94a3b8;
+  }
+  .tmf-btn-ghost:hover {
+    background: rgba(255,255,255,0.08);
+    color: #e2e8f0;
+  }
+
+  /* Spinner */
+  .tmf-spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: tmf-spin-slow 0.7s linear infinite;
+  }
+
+  /* Toast */
+  .tmf-toast-container {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    pointer-events: none;
+  }
+  .tmf-toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1.25rem;
+    border-radius: 1rem;
+    backdrop-filter: blur(16px);
+    border: 1px solid;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    font-size: 0.82rem;
+    font-weight: 600;
+    min-width: 280px;
+    max-width: 380px;
+    transform: translateX(120%);
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .tmf-toast.show { transform: translateX(0); }
+  .tmf-toast--success {
+    background: rgba(16,185,129,0.15);
+    border-color: rgba(16,185,129,0.3);
+    color: #d1fae5;
+  }
+  .tmf-toast--error {
+    background: rgba(239,68,68,0.15);
+    border-color: rgba(239,68,68,0.3);
+    color: #fee2e2;
+  }
+  .tmf-toast--info {
+    background: rgba(6,182,212,0.12);
+    border-color: rgba(6,182,212,0.3);
+    color: #e0f7fa;
+  }
+
+  /* Quick auto-calc badge */
+  .tmf-auto-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.6rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #7c3aed;
+    background: rgba(139,92,246,0.1);
+    border: 1px solid rgba(139,92,246,0.25);
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+  }
+</style>
+
+<main class="tmf-page-bg flex-1 p-6 lg:p-10">
+
+  <!-- Toast Container -->
+  <div class="tmf-toast-container" id="tmf-toast-container"></div>
+
+  <!-- ====== PAGE HEADER ====== -->
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+    <div>
+      <div class="flex items-center gap-3 mb-3">
+        <span class="tmf-header-badge">
+          <span class="dot"></span>
+          Financial Intelligence
+        </span>
+        <span class="tmf-auto-badge">
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><circle cx="4" cy="4" r="4"/></svg>
+          AI-Powered
+        </span>
+      </div>
+      <h1 class="tmf-header-title text-white">
+        Target-Margin<br>
+        <span style="background: linear-gradient(90deg, #22d3ee, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+          Forecasting Engine
+        </span>
+      </h1>
+      <p class="text-slate-400 mt-2 text-sm leading-relaxed" style="max-width: 440px;">
+        Calculate the exact combination of resource modifications to close the gap between your Current Spend and your Target Spend.
+      </p>
+    </div>
+
+    <!-- Summary Pills -->
+    <div class="tmf-summary-pill">
+      <div>
+        <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Total MTD Spend</p>
+        <p class="text-white font-bold text-lg metric-value" id="hdr-mtd">$3,420.50</p>
+      </div>
+      <div class="tmf-summary-pill-divider"></div>
+      <div>
+        <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Projected Savings</p>
+        <p class="text-emerald-400 font-bold text-lg metric-value" id="hdr-savings">$0.00</p>
+      </div>
+      <div class="tmf-summary-pill-divider"></div>
+      <div>
+        <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Gap Status</p>
+        <p class="font-bold text-lg metric-value" id="hdr-gap-status" style="color: #f87171;">Open</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== MAIN ENGINE BOARD ====== -->
+  <div class="tmf-board">
+    <!-- Corner decorations -->
+    <div class="tmf-corner tmf-corner-tl"></div>
+    <div class="tmf-corner tmf-corner-tr"></div>
+    <div class="tmf-corner tmf-corner-bl"></div>
+    <div class="tmf-corner tmf-corner-br"></div>
+
+    <!-- Board Header -->
+    <div class="tmf-board-header">
+      <div class="tmf-board-title">
+        <div class="tmf-board-icon">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="tmf-engine-label">Cloud-Reaper // Target-Margin Engine v2</div>
+          <h2 class="text-base font-bold text-white">Gap-Closure Optimizer</h2>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="tmf-reset-btn" onclick="tmfReset()" class="tmf-btn tmf-btn-ghost text-xs py-2 px-3">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Reset
+        </button>
+      </div>
+    </div>
+
+    <!-- ── SPEND TRIAD ── -->
+    <div class="tmf-spend-triad">
+
+      <!-- Current Spend -->
+      <div class="tmf-spend-card tmf-spend-card--current">
+        <div class="tmf-spend-label">Current Monthly Spend</div>
+        <div class="tmf-spend-value text-white" id="disp-current">$3,420.50</div>
+        <div class="tmf-spend-sub">Live baseline — this month</div>
+        <div style="position:absolute;top:0;right:0;width:60px;height:60px;background:radial-gradient(circle,rgba(148,163,184,0.08),transparent 70%);border-radius:0 1.25rem 0 0;pointer-events:none;"></div>
+      </div>
+
+      <!-- Arrow -->
+      <div class="tmf-arrow-sep">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <path d="M6 14h16M16 8l6 6-6 6" stroke="rgba(255,255,255,0.18)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <!-- Target Spend — editable price setter -->
+      <div class="tmf-spend-card tmf-spend-card--target">
+        <div class="tmf-spend-label" style="color:#22d3ee;opacity:0.8;">
+          ⊕ Set Your Target Spend
+        </div>
+        <div class="tmf-target-input-wrap flex items-center gap-1">
+          <span class="tmf-spend-value" style="color:#22d3ee;">$</span>
+          <input
+            type="number"
+            id="target-spend"
+            class="tmf-target-input"
+            value="2500"
+            min="0"
+            step="50"
+            oninput="tmfUpdate()"
+            title="Set your target monthly spend"
+          >
+        </div>
+        <div class="tmf-spend-sub" style="color:#0e7490;margin-top:0.7rem;">/ month target</div>
+        <div style="position:absolute;top:0;right:0;width:70px;height:70px;background:radial-gradient(circle,rgba(6,182,212,0.15),transparent 70%);border-radius:0 1.25rem 0 0;pointer-events:none;"></div>
+      </div>
+
+      <!-- Arrow -->
+      <div class="tmf-arrow-sep">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <path d="M6 14h16M16 8l6 6-6 6" stroke="rgba(255,255,255,0.18)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <!-- Gap to Close -->
+      <div class="tmf-spend-card tmf-spend-card--gap">
+        <div class="tmf-spend-label" style="color:#f87171;opacity:0.8;">Gap to Close</div>
+        <div class="tmf-spend-value" id="disp-gap" style="color:#f87171;">$920.50</div>
+        <div class="tmf-spend-sub" id="disp-gap-sub">reduction required</div>
+        <div id="gap-badge-wrap" style="margin-top:0.6rem;">
+          <span class="tmf-gap-badge tmf-gap-badge--open" id="tmf-gap-badge">
+            <span>●</span> Gap Open
+          </span>
+        </div>
+        <div style="position:absolute;top:0;right:0;width:60px;height:60px;background:radial-gradient(circle,rgba(239,68,68,0.1),transparent 70%);border-radius:0 1.25rem 0 0;pointer-events:none;"></div>
+      </div>
+    </div>
+
+    <!-- ── GAP CLOSURE PROGRESS TRACK ── -->
+    <div class="tmf-gap-track-section">
+      <div class="tmf-track-labels">
+        <span class="tmf-track-title">Gap Closure Progress</span>
+        <div class="flex items-center gap-3">
+          <span class="tmf-track-pct" id="gap-pct-text">0.0% closed</span>
+          <span class="text-xs text-slate-600 font-semibold" id="gap-remaining-text">$920.50 remaining</span>
+        </div>
+      </div>
+      <div class="tmf-track-bar-bg">
+        <div class="tmf-track-bar-fill" id="gap-progress-bar" style="width:0%;"></div>
+      </div>
+      <div class="tmf-track-markers">
+        <span>$0</span>
+        <span>25%</span>
+        <span>50%</span>
+        <span>75%</span>
+        <span>100% Target</span>
+      </div>
+    </div>
+
+    <!-- ── LEVERS + OUTCOMES ── -->
+    <div class="tmf-levers-section">
+
+      <!-- LEFT: Resource Modification Levers -->
+      <div class="tmf-levers-panel">
+        <div class="tmf-panel-heading">Resource Modification Levers</div>
+
+        <!-- Lever 1: VM Rightsizing -->
+        <div class="tmf-lever">
+          <div class="tmf-lever-header">
+            <div class="tmf-lever-name">
+              <div class="tmf-lever-icon" style="background:rgba(59,130,246,0.15);color:#60a5fa;">
+                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              </div>
+              VM Rightsizing
             </div>
-            
-            <!-- Quick Summary Dashboard Pill -->
-            <div class="flex gap-4">
-                <div class="glass-card px-6 py-3 flex items-center gap-4 text-sm border-white/5">
-                    <div>
-                        <p class="text-slate-400 text-xs uppercase font-bold tracking-wider">Total MTD Spend</p>
-                        <p class="text-white font-bold text-lg metric-value mt-0.5">$3,420.50</p>
-                    </div>
-                    <div class="h-8 w-[1px] bg-white/10"></div>
-                    <div>
-                        <p class="text-slate-400 text-xs uppercase font-bold tracking-wider">Active Commitments</p>
-                        <p class="text-cyan-400 font-bold text-lg metric-value mt-0.5">3 Plans</p>
-                    </div>
-                </div>
+            <div class="tmf-lever-vals">
+              <span class="tmf-lever-pct" id="lv-pct-rs">0%</span>
+              <span class="tmf-lever-saving" id="lv-sav-rs">$0.00</span>
             </div>
+          </div>
+          <input type="range" id="input-rightsizing" class="tmf-range" min="0" max="100" value="0" oninput="tmfUpdate()">
+          <div class="flex justify-between text-xs text-slate-600 mt-1 font-medium">
+            <span>Off</span><span>Downsize overprovisioned VMs</span><span>Max</span>
+          </div>
         </div>
 
-        <!-- Financial Intelligence Grid Layout -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            <!-- SECTION 1: Budget Management -->
-            <div class="glass-card p-6 border-white/5">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-white">Budget Pacing & Alerts</h2>
-                        <p class="text-slate-400 text-sm">Track spending against budget and configure alert notifications</p>
-                    </div>
-                </div>
-
-                <!-- Budget Overview -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
-                        <p class="text-slate-400 text-xs font-bold uppercase">Monthly Budget Cap</p>
-                        <div class="flex items-baseline gap-2 mt-1">
-                            <p class="text-2xl font-bold metric-value text-white" id="display-budget-cap">{{ settings.budget_threshold }}</p>
-                            <p class="text-slate-500 text-xs">USD</p>
-                        </div>
-                    </div>
-                    <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
-                        <p class="text-slate-400 text-xs font-bold uppercase">Current Burn Rate</p>
-                        <div class="flex items-baseline gap-2 mt-1">
-                            <p class="text-2xl font-bold metric-value text-cyan-400" id="display-burn-rate">$114.02</p>
-                            <p class="text-slate-500 text-xs">/ day</p>
-                        </div>
-                    </div>
-                    <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
-                        <p class="text-slate-400 text-xs font-bold uppercase">Month-End Forecast</p>
-                        <div class="flex items-baseline gap-2 mt-1">
-                            <p class="text-2xl font-bold metric-value text-emerald-400" id="display-forecast">$3,420.50</p>
-                            <p class="text-slate-500 text-xs">MTD</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Budget Progress -->
-                <div class="mb-6">
-                    <div class="flex justify-between text-sm mb-2">
-                        <span class="text-slate-300 font-semibold">Spend Pacing Utilization</span>
-                        <span class="text-white font-bold metric-value" id="budget-percentage-text">0.0% used</span>
-                    </div>
-                    <div class="w-full h-3 bg-white/10 rounded-full overflow-hidden">
-                        <div id="budget-progress-bar" class="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500" style="width: 0%"></div>
-                    </div>
-                </div>
-
-                <div class="h-[220px] w-full relative">
-                    <canvas id="budgetChart"></canvas>
-                </div>
+        <!-- Lever 2: Idle Elimination -->
+        <div class="tmf-lever">
+          <div class="tmf-lever-header">
+            <div class="tmf-lever-name">
+              <div class="tmf-lever-icon" style="background:rgba(239,68,68,0.12);color:#f87171;">
+                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </div>
+              Idle Resource Elimination
             </div>
-
-            <!-- SECTION 2: Business Metrics -->
-            <div class="glass-card p-6 border-white/5">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                    </div>
-                    <div class="flex-1">
-                        <h2 class="text-xl font-bold text-white">Business Metrics</h2>
-                        <p class="text-slate-400 text-sm">Align cloud expenditure with actual business drivers</p>
-                    </div>
-                    <button onclick="openAddMetricModal()" class="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-semibold transition">
-                        + Record Metric
-                    </button>
-                </div>
-                
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="border-b border-white/10 text-slate-400">
-                                <th class="py-3 px-4">Metric Driver</th>
-                                <th class="py-3 px-4">Current Value</th>
-                                <th class="py-3 px-4">Allocated Spend</th>
-                                <th class="py-3 px-4">Unit Cost Ratio</th>
-                                <th class="py-3 px-4">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="metrics-table-tbody">
-                            {% for m in db_metrics %}
-                            <tr class="border-b border-white/5">
-                                <td class="py-3.5 px-4 font-semibold text-white uppercase tracking-wide">{{ m.metric_name.replace('_', ' ') }}</td>
-                                <td class="py-3.5 px-4 text-slate-300 metric-value">{{ "{:,.0f}".format(m.value) }} {{ m.unit }}</td>
-                                <td class="py-3.5 px-4 text-slate-300 metric-value">$855.12</td>
-                                <td class="py-3.5 px-4 text-cyan-400 font-bold metric-value">
-                                    {% if 'K' in m.unit %}
-                                        ${{ "{:.3f}".format(855.12 / (m.value / 1000)) }}
-                                    {% else %}
-                                        ${{ "{:.3f}".format(855.12 / m.value) }}
-                                    {% endif %}
-                                    <span class="text-slate-500 text-xs font-normal"> / {{ m.unit.split(' ')[-1] }}</span>
-                                </td>
-                                <td class="py-3.5 px-4"><span class="px-2 py-0.5 bg-emerald-400/10 text-emerald-400 text-xs rounded-full border border-emerald-400/20">Optimal</span></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+            <div class="tmf-lever-vals">
+              <span class="tmf-lever-pct" id="lv-pct-idle">0%</span>
+              <span class="tmf-lever-saving" id="lv-sav-idle">$0.00</span>
             </div>
-
-            <!-- SECTION 3: Commitment Reports -->
-            <div class="glass-card p-6 border-white/5">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-white">Commitment Reports</h2>
-                        <p class="text-slate-400 text-sm">RI and Savings Plan coverage analysis</p>
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="h-[200px] w-full relative">
-                        <h4 class="text-slate-400 text-xs font-bold uppercase mb-4 text-center">Compute RI Coverage Profile</h4>
-                        <canvas id="coverageChart"></canvas>
-                    </div>
-                    <div class="flex flex-col justify-center gap-4">
-                        <div class="bg-white/5 p-4 rounded-xl border border-white/5">
-                            <span class="text-xs text-slate-400 block uppercase font-semibold">Overall Coverage Ratio</span>
-                            <span class="text-2xl font-bold text-cyan-400 metric-value">62.4%</span>
-                            <span class="text-slate-500 text-xs block mt-1">Goal target of 90.0% suggested</span>
-                        </div>
-                        <div class="bg-white/5 p-4 rounded-xl border border-white/5">
-                            <span class="text-xs text-slate-400 block uppercase font-semibold">Estimated Waste / On-Demand Premium</span>
-                            <span class="text-2xl font-bold text-rose-400 metric-value">$1,185.00 / mo</span>
-                            <span class="text-slate-500 text-xs block mt-1">Convertible to regional commitment coverage</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- SECTION 4: Issues Inbox -->
-            <div class="glass-card p-6 border-white/5">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-white">Issues Inbox</h2>
-                        <p class="text-slate-400 text-sm">Cost governance issues requiring optimization action</p>
-                    </div>
-                </div>
-
-                <div class="flex flex-col gap-4">
-                    <!-- Issue 1 -->
-                    <div id="issue-1" class="border border-red-500/20 bg-red-500/5 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
-                        <div>
-                            <div class="flex items-center gap-2 mb-1.5">
-                                <span class="px-2.5 py-0.5 bg-red-500/10 text-red-400 text-xs font-bold rounded border border-red-500/20">Critical</span>
-                                <span class="text-slate-400 text-xs font-semibold">Compliance Tag Violation</span>
-                            </div>
-                            <h4 class="text-base font-bold text-white">Untagged Dev-Instance in EastUS</h4>
-                            <p class="text-xs text-slate-400 mt-1">Resource ID: <span class="metric-value">vm-az-dev-1052</span> | Daily waste: <span class="text-red-400 font-bold">$22.40/day</span></p>
-                        </div>
-                        <div class="flex gap-2 flex-wrap">
-                            <button onclick="remediateIssue('issue-1', 'DISMISS')" class="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold rounded-lg border border-white/10 transition">Bypass</button>
-                            <button onclick="remediateIssue('issue-1', 'KILL')" class="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-bold rounded-lg border border-red-500/30 transition">Authorize Kill</button>
-                        </div>
-                    </div>
-
-                    <!-- Issue 2 -->
-                    <div id="issue-2" class="border border-amber-500/20 bg-amber-500/5 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
-                        <div>
-                            <div class="flex items-center gap-2 mb-1.5">
-                                <span class="px-2.5 py-0.5 bg-amber-500/10 text-amber-400 text-xs font-bold rounded border border-amber-500/20">Warning</span>
-                                <span class="text-slate-400 text-xs font-semibold">Idle Machine Alert</span>
-                            </div>
-                            <h4 class="text-base font-bold text-white">Underutilized compute core instances (Average CPU < 2%)</h4>
-                            <p class="text-xs text-slate-400 mt-1">Resource ID: <span class="metric-value">vm-test-db-replica</span> | Potential monthly savings: <span class="text-amber-400 font-bold">$180.00</span></p>
-                        </div>
-                        <div class="flex gap-2 flex-wrap">
-                            <button onclick="remediateIssue('issue-2', 'DISMISS')" class="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold rounded-lg border border-white/10 transition">Dismiss</button>
-                            <button onclick="remediateIssue('issue-2', 'RIGHTSIZE')" class="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-bold rounded-lg border border-amber-500/30 transition">Rightsize SKU</button>
-                        </div>
-                    </div>
-
-                    <!-- Issue 3 -->
-                    <div id="issue-3" class="border border-blue-500/20 bg-blue-500/5 p-5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
-                        <div>
-                            <div class="flex items-center gap-2 mb-1.5">
-                                <span class="px-2.5 py-0.5 bg-blue-500/10 text-blue-400 text-xs font-bold rounded border border-blue-500/20">Info</span>
-                                <span class="text-slate-400 text-xs font-semibold">Storage Optimization</span>
-                            </div>
-                            <h4 class="text-base font-bold text-white">Orphaned Snapshot Volumes (Unattached to any disks)</h4>
-                            <p class="text-xs text-slate-400 mt-1">Volume count: <span class="metric-value">5 snapshots</span> | Potential saving: <span class="text-cyan-400 font-bold">$45.00/mo</span></p>
-                        </div>
-                        <div class="flex gap-2 flex-wrap">
-                            <button onclick="remediateIssue('issue-3', 'DISMISS')" class="px-3.5 py-2 bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold rounded-lg border border-white/10 transition">Keep snapshot</button>
-                            <button onclick="remediateIssue('issue-3', 'KILL')" class="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-xs font-bold rounded-lg border border-blue-500/30 transition">Clean Volumes</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- SECTION 5: Commitments Manager -->
-            <div class="glass-card p-6 border-white/5">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-white">Commitments Manager</h2>
-                        <p class="text-slate-400 text-sm">Active commitment portfolio and new commitment simulation</p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Active Commitment List -->
-                    <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
-                        <h3 class="text-lg font-bold text-white mb-4">Active Commitment Portfolio</h3>
-                        
-                        <div class="flex flex-col gap-4">
-                            <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="px-2 py-0.5 bg-cyan-400/10 text-cyan-400 rounded text-[10px] font-bold">AWS</span>
-                                    <span class="text-slate-500 text-[10px] font-semibold">Active</span>
-                                </div>
-                                <h4 class="text-sm font-bold text-white">Compute Savings Plan</h4>
-                                <div class="flex justify-between text-xs mt-2 text-slate-400">
-                                    <span>Commit: <strong class="text-white font-normal metric-value">$2.50/hr</strong></span>
-                                    <span>Savings: <strong class="text-emerald-400 font-bold metric-value">32%</strong></span>
-                                </div>
-                            </div>
-
-                            <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
-                                <div class="flex justify-between items-center mb-1">
-                                    <span class="px-2 py-0.5 bg-blue-400/10 text-blue-400 rounded text-[10px] font-bold">Azure</span>
-                                    <span class="text-slate-500 text-[10px] font-semibold">Active</span>
-                                </div>
-                                <h4 class="text-sm font-bold text-white">D4s_v5 RI Reservation</h4>
-                                <div class="flex justify-between text-xs mt-2 text-slate-400">
-                                    <span>Quantity: <strong class="text-white font-normal metric-value">6 Instances</strong></span>
-                                    <span>Savings: <strong class="text-emerald-400 font-bold metric-value">41%</strong></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Commitment Simulator -->
-                    <div class="bg-white/5 border border-white/5 p-4 rounded-xl">
-                        <h3 class="text-lg font-bold text-white mb-4">Simulate New Commitment</h3>
-                        
-                        <div class="flex flex-col gap-3">
-                            <select id="sim-provider" class="glass-input w-full bg-slate-900 border-white/10 text-sm">
-                                <option value="AWS">Amazon Web Services</option>
-                                <option value="Azure">Microsoft Azure</option>
-                            </select>
-                            <select id="sim-type" class="glass-input w-full bg-slate-900 border-white/10 text-sm" onchange="updateSimSavings()">
-                                <option value="Savings Plan">Compute Savings Plan (Flexible)</option>
-                                <option value="RI">Reserved Instance SKU (Specific)</option>
-                            </select>
-                            <select id="sim-term" class="glass-input w-full bg-slate-900 border-white/10 text-sm" onchange="updateSimSavings()">
-                                <option value="1">1 Year Term (Standard)</option>
-                                <option value="3">3 Years Term (High discount)</option>
-                            </select>
-                            <input type="number" id="sim-hourly-spend" class="glass-input w-full metric-value" value="5.0" oninput="updateSimSavings()">
-                            
-                            <div class="bg-cyan-500/10 border border-cyan-400/20 p-3 rounded-xl flex justify-between items-center gap-4">
-                                <div>
-                                    <p class="text-cyan-400 text-xs uppercase font-bold">Est. Savings</p>
-                                    <p class="text-xl font-bold text-white metric-value" id="sim-est-annually">$12,264.00</p>
-                                </div>
-                                <button onclick="purchaseSimCommitment()" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-semibold transition text-sm">
-                                    Purchase
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- SECTION 6: What-If Simulator -->
-            <div class="glass-card p-6 border-white/5">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-white">What-If Simulator</h2>
-                        <p class="text-slate-400 text-sm">Governance policy simulation with cost and carbon impact projections</p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <!-- Policy Controls -->
-                    <div class="flex flex-col gap-6 justify-center">
-                        <div>
-                            <div class="flex justify-between text-sm mb-2 font-semibold">
-                                <span class="text-slate-300">Policy Aggressiveness Level</span>
-                                <span class="text-cyan-400 metric-value" id="val-policy-level">50%</span>
-                            </div>
-                            <input type="range" id="input-policy-level" min="0" max="100" value="50" oninput="updateWhatIfModel()">
-                            <p class="text-xs text-slate-500 mt-1">Adjust policy severity rules for shutting down unused assets.</p>
-                        </div>
-
-                        <div>
-                            <div class="flex justify-between text-sm mb-2 font-semibold">
-                                <span class="text-slate-300">Target Spot Instance Adoption</span>
-                                <span class="text-cyan-400 metric-value" id="val-spot-level">30%</span>
-                            </div>
-                            <input type="range" id="input-spot-level" min="0" max="100" value="30" oninput="updateWhatIfModel()">
-                            <p class="text-xs text-slate-500 mt-1">Replace standard production/development instances with cheaper spot cores.</p>
-                        </div>
-                    </div>
-
-                    <!-- Outcomes -->
-                    <div class="bg-white/5 p-6 rounded-2xl border border-white/10 flex flex-col justify-between gap-6 relative overflow-hidden">
-                        <div class="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl"></div>
-                        <div>
-                            <span class="text-slate-400 text-xs font-bold uppercase tracking-wider block">Projected Monthly Savings</span>
-                            <span class="text-4xl font-extrabold text-emerald-400 mt-1 block metric-value animate-pulse-soft" id="display-model-savings">$820.00</span>
-                            <span class="text-slate-500 text-xs block mt-1">Equivalent to 24.5% of total budget spend</span>
-                        </div>
-
-                        <div class="flex justify-between gap-4 border-t border-white/5 pt-4">
-                            <div>
-                                <span class="text-slate-400 text-xs font-bold uppercase tracking-wider block">Carbon Footprint Offsets</span>
-                                <span class="text-lg font-bold text-white mt-0.5 block metric-value" id="display-model-co2">184.2 kg CO2e</span>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-slate-400 text-xs font-bold uppercase tracking-wider block">Equivalent Tree Seeds</span>
-                                <span class="text-lg font-bold text-cyan-400 mt-0.5 block metric-value" id="display-model-trees">8.2 Trees / mo</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex justify-end">
-                    <button onclick="applyWhatIfPolicy()" class="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-bold transition">
-                        Apply governance policy
-                    </button>
-                </div>
-            </div>
-
-            <!-- Full-Width Alert Configuration Section -->
-            <div class="glass-card p-6 border-white/5 lg:col-span-2">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-500 to-gray-600 flex items-center justify-center text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-white">Alert Configuration</h2>
-                        <p class="text-slate-400 text-sm">Configure webhook notifications for budget alerts and compliance warnings</p>
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="p-4 rounded-xl border border-[#5865F2]/25 bg-[#5865F2]/5">
-                        <label class="text-[#a5b4fc] text-xs uppercase font-bold flex items-center gap-2 mb-2">
-                            <i class="fab fa-discord text-[#5865F2] text-lg"></i> Discord Webhook URL
-                        </label>
-                        <input type="text" id="discord-webhook-url" class="glass-input w-full border-[#5865F2]/20 focus:border-[#5865F2]/50" placeholder="https://discord.com/api/webhooks/..." value="{{ settings.discord_webhook_url or '' }}">
-                    </div>
-                    
-                    <div class="p-4 rounded-xl border border-[#E01E5A]/25 bg-[#E01E5A]/5">
-                        <label class="text-[#fda4af] text-xs uppercase font-bold flex items-center gap-2 mb-2">
-                            <i class="fab fa-slack text-[#E01E5A] text-lg"></i> Slack Webhook URL
-                        </label>
-                        <input type="text" id="slack-webhook-url" class="glass-input w-full border-[#E01E5A]/20 focus:border-[#E01E5A]/50" placeholder="https://hooks.slack.com/services/..." value="{{ settings.slack_webhook_url or '' }}">
-                    </div>
-                </div>
-
-                <div class="flex gap-4">
-                    <button onclick="saveWebhooks()" class="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl font-semibold transition">
-                        Save Configurations
-                    </button>
-                    <button onclick="triggerTestAlert()" class="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-semibold transition text-slate-300">
-                        Trigger Test Alert
-                    </button>
-                </div>
-            </div>
+          </div>
+          <input type="range" id="input-idle" class="tmf-range" min="0" max="100" value="0" oninput="tmfUpdate()">
+          <div class="flex justify-between text-xs text-slate-600 mt-1 font-medium">
+            <span>Off</span><span>Remove idle / zombie resources</span><span>Max</span>
+          </div>
         </div>
 
-        <!-- Modal for Adding Metric -->
-        <div id="add-metric-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm hidden">
-            <div class="glass-card p-6 border-white/10 w-full max-w-md">
-                <h3 class="text-xl font-bold text-white mb-4">Record Business Metric Driver</h3>
-                
-                <div class="flex flex-col gap-4 mb-6">
-                    <div>
-                        <label class="text-slate-400 text-xs font-bold block mb-1">Metric Identifier Name</label>
-                        <input type="text" id="modal-metric-name" class="glass-input w-full" placeholder="e.g. ACTIVE_USERS or API_REQUESTS">
-                    </div>
-                    <div>
-                        <label class="text-slate-400 text-xs font-bold block mb-1">Total Unit Volume</label>
-                        <input type="number" id="modal-metric-value" class="glass-input w-full metric-value" placeholder="e.g. 15000">
-                    </div>
-                    <div>
-                        <label class="text-slate-400 text-xs font-bold block mb-1">Unit Term</label>
-                        <input type="text" id="modal-metric-unit" class="glass-input w-full" placeholder="e.g. 1 User or 1K Requests">
-                    </div>
-                </div>
-
-                <div class="flex justify-end gap-3">
-                    <button onclick="closeAddMetricModal()" class="px-4 py-2 border border-white/10 rounded-lg font-semibold text-slate-400 hover:bg-white/5 transition text-sm">
-                        Cancel
-                    </button>
-                    <button onclick="submitNewMetric()" class="px-5 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-semibold transition text-sm">
-                        Add Driver
-                    </button>
-                </div>
+        <!-- Lever 3: Storage Tier -->
+        <div class="tmf-lever">
+          <div class="tmf-lever-header">
+            <div class="tmf-lever-name">
+              <div class="tmf-lever-icon" style="background:rgba(245,158,11,0.12);color:#fbbf24;">
+                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                </svg>
+              </div>
+              Storage Tier Optimization
             </div>
+            <div class="tmf-lever-vals">
+              <span class="tmf-lever-pct" id="lv-pct-st">0%</span>
+              <span class="tmf-lever-saving" id="lv-sav-st">$0.00</span>
+            </div>
+          </div>
+          <input type="range" id="input-storage" class="tmf-range" min="0" max="100" value="0" oninput="tmfUpdate()">
+          <div class="flex justify-between text-xs text-slate-600 mt-1 font-medium">
+            <span>Off</span><span>Move data to cooler tiers</span><span>Max</span>
+          </div>
         </div>
-    </main>
+
+        <!-- Lever 4: Commitment Adoption -->
+        <div class="tmf-lever">
+          <div class="tmf-lever-header">
+            <div class="tmf-lever-name">
+              <div class="tmf-lever-icon" style="background:rgba(139,92,246,0.12);color:#a78bfa;">
+                <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              Commitment Adoption
+            </div>
+            <div class="tmf-lever-vals">
+              <span class="tmf-lever-pct" id="lv-pct-cm">0%</span>
+              <span class="tmf-lever-saving" id="lv-sav-cm">$0.00</span>
+            </div>
+          </div>
+          <input type="range" id="input-commitments" class="tmf-range" min="0" max="100" value="0" oninput="tmfUpdate()">
+          <div class="flex justify-between text-xs text-slate-600 mt-1 font-medium">
+            <span>Off</span><span>Reserved instances / savings plans</span><span>Max</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Projected Outcomes -->
+      <div class="tmf-outcomes-panel">
+        <div class="tmf-panel-heading">Projected Outcomes</div>
+
+        <!-- Hero Savings Block -->
+        <div class="tmf-outcome-hero">
+          <div class="tmf-outcome-savings-label">Projected Monthly Savings</div>
+          <div class="tmf-outcome-savings-value" id="proj-savings">$0.00</div>
+          <div class="tmf-outcome-savings-pct" id="proj-savings-pct">0.0% of current spend</div>
+        </div>
+
+        <!-- Stats grid -->
+        <div class="tmf-outcome-stats">
+          <div class="tmf-outcome-stat">
+            <div class="tmf-outcome-stat-label">New Monthly Spend</div>
+            <div class="tmf-outcome-stat-value text-white" id="proj-new-spend">$3,420.50</div>
+          </div>
+          <div class="tmf-outcome-stat">
+            <div class="tmf-outcome-stat-label">Annual Impact</div>
+            <div class="tmf-outcome-stat-value text-emerald-400" id="proj-annual">$0.00</div>
+          </div>
+          <div class="tmf-outcome-stat">
+            <div class="tmf-outcome-stat-label">Gap Remaining</div>
+            <div class="tmf-outcome-stat-value" id="proj-gap-rem" style="color:#f87171;">$920.50</div>
+          </div>
+          <div class="tmf-outcome-stat">
+            <div class="tmf-outcome-stat-label">Efficiency Gain</div>
+            <div class="tmf-outcome-stat-value text-cyan-400" id="proj-efficiency">0%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RECOMMENDED RESOURCE MODIFICATIONS ── -->
+    <div class="tmf-recs-section">
+      <div class="flex items-center justify-between mb-4">
+        <div class="tmf-panel-heading mb-0">Recommended Resource Modifications</div>
+        <span class="text-xs text-slate-600 font-semibold" id="recs-count-text"></span>
+      </div>
+      <div id="tmf-recs-list">
+        <!-- Empty state -->
+        <div class="tmf-empty-recs" id="tmf-empty-recs">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <rect x="8" y="8" width="24" height="24" rx="4" stroke="#475569" stroke-width="1.5"/>
+            <path d="M14 20h12M20 14v12" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <p>No modifications selected yet</p>
+          <span>Adjust the optimization levers above, or click<br><strong style="color:#22d3ee;">Calculate Optimal Path</strong> to auto-configure</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ACTION BAR ── -->
+    <div class="tmf-action-bar">
+      <div class="tmf-status-line">
+        <span class="tmf-status-dot"></span>
+        Engine ready — adjust levers or auto-calculate
+      </div>
+      <div class="flex gap-3 flex-wrap">
+        <button id="tmf-calc-btn" onclick="tmfCalculate(event)" class="tmf-btn tmf-btn-primary">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+          </svg>
+          Calculate Optimal Path
+        </button>
+        <button id="tmf-apply-btn" onclick="tmfApply(event)" class="tmf-btn tmf-btn-success" disabled>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M5 13l4 4L19 7"/>
+          </svg>
+          Apply Optimizations
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /tmf-board -->
+</main>
+
+<script>
+// ============================================================
+//  TARGET-MARGIN FORECASTING ENGINE  —  Logic
+// ============================================================
+const TMF = {
+  currentSpend: 3420.50,
+  lastCalcResult: null,
+
+  // Max-savings model per lever (used for immediate slider feedback)
+  maxSavings: {
+    rightsizing: 500,
+    idle:        300,
+    storage:     200,
+    commitments: 400
+  },
+
+  fmt(n) {
+    return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  },
+
+  get targetSpend() {
+    return parseFloat(document.getElementById('target-spend').value) || 2500;
+  },
+
+  levers() {
+    return {
+      rs:  parseInt(document.getElementById('input-rightsizing').value),
+      idle: parseInt(document.getElementById('input-idle').value),
+      st:  parseInt(document.getElementById('input-storage').value),
+      cm:  parseInt(document.getElementById('input-commitments').value),
+    };
+  }
+};
+
+function tmfUpdate() {
+  const { rs, idle, st, cm } = TMF.levers();
+  const target = TMF.targetSpend;
+  const current = TMF.currentSpend;
+
+  // Lever displays
+  document.getElementById('lv-pct-rs').textContent   = rs   + '%';
+  document.getElementById('lv-pct-idle').textContent = idle + '%';
+  document.getElementById('lv-pct-st').textContent   = st   + '%';
+  document.getElementById('lv-pct-cm').textContent   = cm   + '%';
+
+  const savRs   = (rs   / 100) * TMF.maxSavings.rightsizing;
+  const savIdle = (idle / 100) * TMF.maxSavings.idle;
+  const savSt   = (st   / 100) * TMF.maxSavings.storage;
+  const savCm   = (cm   / 100) * TMF.maxSavings.commitments;
+
+  document.getElementById('lv-sav-rs').textContent   = TMF.fmt(savRs);
+  document.getElementById('lv-sav-idle').textContent = TMF.fmt(savIdle);
+  document.getElementById('lv-sav-st').textContent   = TMF.fmt(savSt);
+  document.getElementById('lv-sav-cm').textContent   = TMF.fmt(savCm);
+
+  const totalSav  = savRs + savIdle + savSt + savCm;
+  const newSpend  = current - totalSav;
+  const gap       = current - target;
+  const gapClosed = gap > 0 ? Math.min(100, (totalSav / gap) * 100) : 100;
+  const remGap    = Math.max(0, newSpend - target);
+
+  // Header KPIs
+  document.getElementById('hdr-savings').textContent = TMF.fmt(totalSav);
+
+  // Gap display
+  document.getElementById('disp-gap').textContent = TMF.fmt(gap);
+  document.getElementById('disp-gap').style.color = gap > 0 ? '#f87171' : '#34d399';
+  document.getElementById('disp-gap-sub').textContent = gap > 0 ? 'reduction required' : 'already at target!';
+
+  // Gap badge
+  const badge = document.getElementById('tmf-gap-badge');
+  const hdrStatus = document.getElementById('hdr-gap-status');
+  if (newSpend <= target) {
+    badge.className = 'tmf-gap-badge tmf-gap-badge--closed';
+    badge.innerHTML = '<span>✔</span> Gap Closed';
+    hdrStatus.textContent = 'Closed';
+    hdrStatus.style.color = '#34d399';
+  } else {
+    badge.className = 'tmf-gap-badge tmf-gap-badge--open';
+    badge.innerHTML = '<span>●</span> Gap Open';
+    hdrStatus.textContent = 'Open';
+    hdrStatus.style.color = '#f87171';
+  }
+
+  // Progress bar
+  document.getElementById('gap-progress-bar').style.width = gapClosed + '%';
+  document.getElementById('gap-pct-text').textContent = gapClosed.toFixed(1) + '% closed';
+  document.getElementById('gap-remaining-text').textContent = TMF.fmt(remGap) + ' remaining';
+
+  // Outcomes
+  document.getElementById('proj-savings').textContent     = TMF.fmt(totalSav);
+  document.getElementById('proj-savings-pct').textContent = ((totalSav / current) * 100).toFixed(1) + '% of current spend';
+  document.getElementById('proj-new-spend').textContent   = TMF.fmt(newSpend);
+  document.getElementById('proj-annual').textContent      = TMF.fmt(totalSav * 12);
+  document.getElementById('proj-gap-rem').textContent     = TMF.fmt(remGap);
+  document.getElementById('proj-gap-rem').style.color     = remGap <= 0 ? '#34d399' : '#f87171';
+  document.getElementById('proj-efficiency').textContent  = ((totalSav / current) * 100).toFixed(1) + '%';
+
+  // Recommendations
+  _renderRecs(rs, idle, st, cm, savRs, savIdle, savSt, savCm);
+}
+
+function _renderRecs(rs, idle, st, cm, savRs, savIdle, savSt, savCm) {
+  const container = document.getElementById('tmf-recs-list');
+  const empty     = document.getElementById('tmf-empty-recs');
+
+  const actions = [];
+  if (rs   > 0) actions.push({ color:'#60a5fa', name:'VM Rightsizing',            desc:`Downsize ${rs}% of overprovisioned virtual machines`,       impact: savRs,  risk:'low' });
+  if (idle > 0) actions.push({ color:'#f87171', name:'Idle Resource Elimination', desc:`Remove ${idle}% of idle, zombie, or abandoned resources`,    impact: savIdle, risk:'very_low' });
+  if (st   > 0) actions.push({ color:'#fbbf24', name:'Storage Tier Optimization', desc:`Migrate ${st}% of storage volumes to cooler, cheaper tiers`, impact: savSt,  risk:'low' });
+  if (cm   > 0) actions.push({ color:'#a78bfa', name:'Commitment Adoption',       desc:`Convert ${cm}% of on-demand spend to reserved instances`,    impact: savCm,  risk:'medium' });
+
+  const countEl = document.getElementById('recs-count-text');
+  if (actions.length === 0) {
+    container.innerHTML = '';
+    container.appendChild(empty || _makeEmptyEl());
+    empty && (empty.style.display = 'flex');
+    countEl.textContent = '';
+    return;
+  }
+
+  empty && (empty.style.display = 'none');
+  countEl.textContent = actions.length + ' modification' + (actions.length > 1 ? 's' : '') + ' planned';
+
+  const riskMap = {
+    very_low: ['risk-very-low', 'Very Low'],
+    low:      ['risk-low',      'Low'],
+    medium:   ['risk-medium',   'Medium'],
+    high:     ['risk-high',     'High'],
+    critical: ['risk-critical', 'Critical'],
+  };
+
+  container.innerHTML = actions.map(a => {
+    const [riskCls, riskLabel] = riskMap[a.risk] || ['risk-low','Low'];
+    return `
+      <div class="tmf-rec-row">
+        <div class="tmf-rec-type-dot" style="background:${a.color};box-shadow:0 0 6px ${a.color}88;"></div>
+        <div class="tmf-rec-info">
+          <div class="tmf-rec-name">${a.name}</div>
+          <div class="tmf-rec-desc">${a.desc}</div>
+        </div>
+        <span class="tmf-rec-risk ${riskCls}">${riskLabel} Risk</span>
+        <div class="tmf-rec-impact">
+          <div class="tmf-rec-impact-val">${TMF.fmt(a.impact)}</div>
+          <div class="tmf-rec-impact-label">/ month saved</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function _makeEmptyEl() {
+  const d = document.createElement('div');
+  d.id = 'tmf-empty-recs';
+  d.className = 'tmf-empty-recs';
+  d.innerHTML = `
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+      <rect x="8" y="8" width="24" height="24" rx="4" stroke="#475569" stroke-width="1.5"/>
+      <path d="M14 20h12M20 14v12" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <p>No modifications selected yet</p>
+    <span>Adjust levers or click <strong style="color:#22d3ee">Calculate Optimal Path</strong></span>`;
+  return d;
+}
+
+// ── Backend: Calculate Optimal Path ──
+async function tmfCalculate(e) {
+  const btn = document.getElementById('tmf-calc-btn');
+  const orig = btn.innerHTML;
+  btn.innerHTML = `<div class="tmf-spinner"></div> Calculating...`;
+  btn.disabled = true;
+
+  const target  = TMF.targetSpend;
+  const current = TMF.currentSpend;
+
+  try {
+    const res  = await fetch('/api/financial/target-margin/calculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_spend: current, target_spend: target })
+    });
+    const data = await res.json();
+
+    if (data.status === 'success') {
+      TMF.lastCalcResult = data;
+
+      // Push lever positions from backend
+      document.getElementById('input-rightsizing').value  = (data.optimal_levers.rightsizing         || 0).toFixed(0);
+      document.getElementById('input-idle').value         = (data.optimal_levers.idle_elimination    || 0).toFixed(0);
+      document.getElementById('input-storage').value      = (data.optimal_levers.storage_optimization|| 0).toFixed(0);
+      document.getElementById('input-commitments').value  = (data.optimal_levers.commitment_adoption || 0).toFixed(0);
+      tmfUpdate();
+
+      // If backend returned recommended_actions, overlay them
+      if (data.recommended_actions && data.recommended_actions.length) {
+        _renderRecsFromBackend(data.recommended_actions);
+      }
+
+      document.getElementById('tmf-apply-btn').disabled = false;
+      tmfToast(`Optimal path calculated — ${data.optimization_details?.total_opportunities_analyzed ?? 0} opportunities analyzed.`, 'success');
+
+    } else if (data.status === 'warning') {
+      tmfToast(`Warning: ${data.message}. Gap $${(data.gap||0).toFixed(2)}, max potential $${(data.total_potential||0).toFixed(2)}`, 'error');
+      // Fall back to local model
+      _localOptimalPath(current, target);
+
+    } else {
+      tmfToast('Error: ' + (data.message || 'Unknown error'), 'error');
+      _localOptimalPath(current, target);
+    }
+  } catch (err) {
+    console.warn('[TMF] Backend unavailable, using local model.', err);
+    tmfToast('Backend unavailable — using local estimation.', 'info');
+    _localOptimalPath(current, target);
+    document.getElementById('tmf-apply-btn').disabled = false;
+  } finally {
+    btn.innerHTML = orig;
+    btn.disabled  = false;
+  }
+}
+
+function _localOptimalPath(current, target) {
+  const gap   = current - target;
+  if (gap <= 0) { tmfUpdate(); return; }
+  const total = Object.values(TMF.maxSavings).reduce((a,b)=>a+b,0);
+  const ratio = Math.min(1, gap / total);
+  document.getElementById('input-rightsizing').value  = Math.min(100, Math.ceil(ratio * 100));
+  document.getElementById('input-idle').value         = Math.min(100, Math.ceil(ratio * 100));
+  document.getElementById('input-storage').value      = Math.min(100, Math.ceil(ratio * 100));
+  document.getElementById('input-commitments').value  = Math.min(100, Math.ceil(ratio * 100));
+  tmfUpdate();
+}
+
+function _renderRecsFromBackend(actions) {
+  const container = document.getElementById('tmf-recs-list');
+  const empty     = document.getElementById('tmf-empty-recs');
+  const countEl   = document.getElementById('recs-count-text');
+
+  if (!actions || !actions.length) return;
+  empty && (empty.style.display = 'none');
+  countEl.textContent = actions.length + ' modification' + (actions.length > 1 ? 's' : '') + ' recommended';
+
+  const colorMap = { 'VM Rightsizing':'#60a5fa', 'Idle Resource Elimination':'#f87171', 'Storage Tier Optimization':'#fbbf24', 'Commitment Adoption':'#a78bfa' };
+  const riskMap  = { very_low:['risk-very-low','Very Low'], low:['risk-low','Low'], medium:['risk-medium','Medium'], high:['risk-high','High'], critical:['risk-critical','Critical'] };
+
+  container.innerHTML = actions.map(a => {
+    const col = colorMap[a.type] || '#94a3b8';
+    const [rCls, rLabel] = riskMap[a.risk_level] || ['risk-low','Low'];
+    const impact = typeof a.impact === 'number' ? TMF.fmt(a.impact) : a.impact;
+    return `
+      <div class="tmf-rec-row">
+        <div class="tmf-rec-type-dot" style="background:${col};box-shadow:0 0 6px ${col}88;"></div>
+        <div class="tmf-rec-info">
+          <div class="tmf-rec-name">${a.type}</div>
+          <div class="tmf-rec-desc">${a.description}</div>
+        </div>
+        <span class="tmf-rec-risk ${rCls}">${rLabel} Risk</span>
+        <div class="tmf-rec-impact">
+          <div class="tmf-rec-impact-val">${impact}</div>
+          <div class="tmf-rec-impact-label">/ month saved</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Apply Optimizations ──
+async function tmfApply(e) {
+  if (!TMF.lastCalcResult) { tmfToast('Please calculate optimal path first', 'error'); return; }
+
+  const btn = document.getElementById('tmf-apply-btn');
+  const orig = btn.innerHTML;
+  btn.innerHTML = `<div class="tmf-spinner"></div> Applying...`;
+  btn.disabled = true;
+
+  try {
+    const res  = await fetch('/api/financial/target-margin/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        optimizations: TMF.lastCalcResult.optimal_levers,
+        detailed_recommendations: TMF.lastCalcResult.detailed_recommendations
+      })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      tmfToast('Optimizations applied successfully!', 'success');
+    } else {
+      tmfToast('Error applying: ' + (data.message || 'Unknown'), 'error');
+    }
+  } catch (err) {
+    tmfToast('Error connecting to server', 'error');
+  } finally {
+    btn.innerHTML = orig;
+    btn.disabled  = false;
+  }
+}
+
+// ── Reset ──
+function tmfReset() {
+  ['input-rightsizing','input-idle','input-storage','input-commitments'].forEach(id => {
+    document.getElementById(id).value = 0;
+  });
+  document.getElementById('target-spend').value = 2500;
+  TMF.lastCalcResult = null;
+  document.getElementById('tmf-apply-btn').disabled = true;
+  tmfUpdate();
+  tmfToast('Engine reset to defaults', 'info');
+}
+
+// ── Toast ──
+function tmfToast(msg, type = 'info') {
+  const container = document.getElementById('tmf-toast-container');
+  const icons = {
+    success: `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`,
+    error:   `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`,
+    info:    `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+  };
+  const t = document.createElement('div');
+  t.className = `tmf-toast tmf-toast--${type}`;
+  t.innerHTML = `<span style="flex-shrink:0;opacity:0.8;">${icons[type]||''}</span><span>${msg}</span>`;
+  container.appendChild(t);
+  requestAnimationFrame(() => { requestAnimationFrame(() => { t.classList.add('show'); }); });
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 400);
+  }, 4000);
+}
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', tmfUpdate);
+// Also run immediately if DOM already ready (HTMX swap)
+if (document.readyState !== 'loading') tmfUpdate();
+</script>
+
 {% endblock %}

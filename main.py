@@ -15,6 +15,11 @@ def main():
         "--metrics", action="store_true", help="Display live performance FinOps analysis data"
     )
     parser.add_argument(
+        "--provider", 
+        choices=["azure", "aws", "gcp"],
+        help="Cloud provider to fetch metrics from (auto-detects if not specified)"
+    )
+    parser.add_argument(
         "--enhanced-pipeline",
         action="store_true",
         help="Use enhanced sequential FinOps pipeline with workload differentiation",
@@ -23,7 +28,7 @@ def main():
     args, unknown = parser.parse_known_args()
 
     if args.metrics:
-        display_finops_performance_metrics()
+        display_finops_performance_metrics(cloud_provider=args.provider)
         sys.exit(0)
 
     if args.enhanced_pipeline:
