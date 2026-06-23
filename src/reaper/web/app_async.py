@@ -1606,23 +1606,6 @@ async def apply_target_margin_optimizations(request: Request):
         data = (await request.json() if await request.body() else {}) or {}
 
         optimizations = data.get("optimizations", {})
-<<<<<<< HEAD
-
-        # Placeholder for actual optimization application logic
-        # This would integrate with the actual cloud provider APIs to make changes
-
-        return jsonify(
-            {
-                "status": "success",
-                "message": "Optimizations applied successfully",
-                "applied_count": len(optimizations),
-                "details": {
-                    "rightsizing_applied": optimizations.get("rightsizing", 0),
-                    "idle_elimination_applied": optimizations.get("idle_elimination", 0),
-                    "storage_optimization_applied": optimizations.get("storage_optimization", 0),
-                    "commitment_adoption_applied": optimizations.get("commitment_adoption", 0),
-                },
-=======
         detailed_recommendations = data.get("detailed_recommendations", [])
         
         if not detailed_recommendations:
@@ -1670,9 +1653,8 @@ async def apply_target_margin_optimizations(request: Request):
                 "idle_elimination_applied": optimizations.get("idle_elimination", 0),
                 "storage_optimization_applied": optimizations.get("storage_optimization", 0),
                 "commitment_adoption_applied": optimizations.get("commitment_adoption", 0)
->>>>>>> 1127031 (Added Target Margin Engine02)
             }
-        )
+        })
 
     except Exception as e:
         print(f"[!] Error applying optimizations: {e}")
