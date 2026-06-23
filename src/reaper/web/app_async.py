@@ -1415,19 +1415,22 @@ async def get_resource_inventory(request: Request):
                 cost = az.estimate_resource_cost(
                     "microsoft.compute/virtualmachines", vm.get("size", ""), vm.get("location", "")
                 )
-                _add("virtual_machines", {
-                    "id": vm["id"],
-                    "name": vm["name"],
-                    "type": "Microsoft.Compute/virtualMachines",
-                    "location": vm["location"],
-                    "size": vm["size"],
-                    "status": "Idle" if is_idle else "Active",
-                    "tags": vm["tags"],
-                    "category": "compute",
-                    "can_dismiss": is_idle,
-                    "dismiss_reason": "Idle VM with low CPU utilization" if is_idle else None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "virtual_machines",
+                    {
+                        "id": vm["id"],
+                        "name": vm["name"],
+                        "type": "Microsoft.Compute/virtualMachines",
+                        "location": vm["location"],
+                        "size": vm["size"],
+                        "status": "Idle" if is_idle else "Active",
+                        "tags": vm["tags"],
+                        "category": "compute",
+                        "can_dismiss": is_idle,
+                        "dismiss_reason": "Idle VM with low CPU utilization" if is_idle else None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching VMs: {e}")
 
@@ -1443,19 +1446,24 @@ async def get_resource_inventory(request: Request):
                     disk.sku.name if disk.sku else "",
                     disk.location,
                 )
-                _add("disks", {
-                    "id": disk.id,
-                    "name": disk.name,
-                    "type": "Microsoft.Compute/disks",
-                    "location": disk.location,
-                    "size_gb": disk.disk_size_gb,
-                    "sku": disk.sku.name if disk.sku else "Unknown",
-                    "status": "Orphaned" if is_orphaned else "Attached",
-                    "category": "storage",
-                    "can_dismiss": is_orphaned,
-                    "dismiss_reason": "Unattached disk with no associated VM" if is_orphaned else None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "disks",
+                    {
+                        "id": disk.id,
+                        "name": disk.name,
+                        "type": "Microsoft.Compute/disks",
+                        "location": disk.location,
+                        "size_gb": disk.disk_size_gb,
+                        "sku": disk.sku.name if disk.sku else "Unknown",
+                        "status": "Orphaned" if is_orphaned else "Attached",
+                        "category": "storage",
+                        "can_dismiss": is_orphaned,
+                        "dismiss_reason": "Unattached disk with no associated VM"
+                        if is_orphaned
+                        else None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching disks: {e}")
 
@@ -1466,20 +1474,23 @@ async def get_resource_inventory(request: Request):
                     "microsoft.storage/storageaccounts", acc.get("sku", ""), acc.get("location", "")
                 )
                 tier = acc.get("access_tier", "Hot")
-                _add("storage_accounts", {
-                    "id": acc["id"],
-                    "name": acc["name"],
-                    "type": "Microsoft.Storage/storageAccounts",
-                    "location": acc["location"],
-                    "sku": acc.get("sku", "Unknown"),
-                    "kind": acc.get("kind", ""),
-                    "access_tier": tier,
-                    "status": "Cold" if tier in ("Cool", "Archive") else "Active",
-                    "category": "storage",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "storage_accounts",
+                    {
+                        "id": acc["id"],
+                        "name": acc["name"],
+                        "type": "Microsoft.Storage/storageAccounts",
+                        "location": acc["location"],
+                        "sku": acc.get("sku", "Unknown"),
+                        "kind": acc.get("kind", ""),
+                        "access_tier": tier,
+                        "status": "Cold" if tier in ("Cool", "Archive") else "Active",
+                        "category": "storage",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching storage accounts: {e}")
 
@@ -1489,34 +1500,40 @@ async def get_resource_inventory(request: Request):
                 cost = az.estimate_resource_cost(
                     "microsoft.network/publicipaddresses", ip.get("sku", ""), ip.get("location", "")
                 )
-                _add("network_resources", {
-                    "id": f"/subscriptions/{az.subscription_id}/providers/Microsoft.Network/publicIPAddresses/{ip['name']}",
-                    "name": ip["name"],
-                    "type": "Microsoft.Network/publicIPAddresses",
-                    "location": ip["location"],
-                    "sku": ip["sku"],
-                    "status": "Unassociated",
-                    "category": "network",
-                    "can_dismiss": True,
-                    "dismiss_reason": "Public IP with no associated resources",
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "network_resources",
+                    {
+                        "id": f"/subscriptions/{az.subscription_id}/providers/Microsoft.Network/publicIPAddresses/{ip['name']}",
+                        "name": ip["name"],
+                        "type": "Microsoft.Network/publicIPAddresses",
+                        "location": ip["location"],
+                        "sku": ip["sku"],
+                        "status": "Unassociated",
+                        "category": "network",
+                        "can_dismiss": True,
+                        "dismiss_reason": "Public IP with no associated resources",
+                        "estimated_cost": cost,
+                    },
+                )
             for lb in az.get_idle_load_balancers():
                 cost = az.estimate_resource_cost(
                     "microsoft.network/loadbalancers", lb.get("sku", ""), lb.get("location", "")
                 )
-                _add("network_resources", {
-                    "id": f"/subscriptions/{az.subscription_id}/providers/Microsoft.Network/loadBalancers/{lb['name']}",
-                    "name": lb["name"],
-                    "type": "Microsoft.Network/loadBalancers",
-                    "location": lb["location"],
-                    "sku": lb["sku"],
-                    "status": "Idle",
-                    "category": "network",
-                    "can_dismiss": True,
-                    "dismiss_reason": "Load balancer with no backend pool members",
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "network_resources",
+                    {
+                        "id": f"/subscriptions/{az.subscription_id}/providers/Microsoft.Network/loadBalancers/{lb['name']}",
+                        "name": lb["name"],
+                        "type": "Microsoft.Network/loadBalancers",
+                        "location": lb["location"],
+                        "sku": lb["sku"],
+                        "status": "Idle",
+                        "category": "network",
+                        "can_dismiss": True,
+                        "dismiss_reason": "Load balancer with no backend pool members",
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching network resources: {e}")
 
@@ -1526,19 +1543,24 @@ async def get_resource_inventory(request: Request):
                 cost = az.estimate_resource_cost(
                     "microsoft.sql/servers/databases", db.get("sku", ""), db.get("location", "")
                 )
-                _add("databases", {
-                    "id": db.get("id", ""),
-                    "name": db.get("name", ""),
-                    "type": "Microsoft.Sql/servers/databases",
-                    "location": db.get("location", ""),
-                    "sku": db.get("sku", "Unknown"),
-                    "status": "Idle" if db.get("is_idle") else "Active",
-                    "average_cpu": db.get("average_cpu", 0.0),
-                    "category": "database",
-                    "can_dismiss": db.get("is_idle", False),
-                    "dismiss_reason": "Idle database with low utilization" if db.get("is_idle") else None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "databases",
+                    {
+                        "id": db.get("id", ""),
+                        "name": db.get("name", ""),
+                        "type": "Microsoft.Sql/servers/databases",
+                        "location": db.get("location", ""),
+                        "sku": db.get("sku", "Unknown"),
+                        "status": "Idle" if db.get("is_idle") else "Active",
+                        "average_cpu": db.get("average_cpu", 0.0),
+                        "category": "database",
+                        "can_dismiss": db.get("is_idle", False),
+                        "dismiss_reason": "Idle database with low utilization"
+                        if db.get("is_idle")
+                        else None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching SQL databases: {e}")
 
@@ -1548,42 +1570,46 @@ async def get_resource_inventory(request: Request):
                 cost = az.estimate_resource_cost(
                     "microsoft.web/serverfarms", plan.get("sku", ""), plan.get("location", "")
                 )
-                _add("app_services", {
-                    "id": f"/subscriptions/{az.subscription_id}/providers/Microsoft.Web/serverfarms/{plan['name']}",
-                    "name": plan["name"],
-                    "type": "Microsoft.Web/serverfarms",
-                    "location": plan["location"],
-                    "sku": plan["sku"],
-                    "tier": plan.get("tier", ""),
-                    "status": "Empty",
-                    "category": "app_services",
-                    "can_dismiss": True,
-                    "dismiss_reason": "App Service Plan with no assigned apps",
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "app_services",
+                    {
+                        "id": f"/subscriptions/{az.subscription_id}/providers/Microsoft.Web/serverfarms/{plan['name']}",
+                        "name": plan["name"],
+                        "type": "Microsoft.Web/serverfarms",
+                        "location": plan["location"],
+                        "sku": plan["sku"],
+                        "tier": plan.get("tier", ""),
+                        "status": "Empty",
+                        "category": "app_services",
+                        "can_dismiss": True,
+                        "dismiss_reason": "App Service Plan with no assigned apps",
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching app services: {e}")
 
         # ---- Azure Functions ----
         try:
             for fn in az.get_function_apps():
-                cost = az.estimate_resource_cost(
-                    "microsoft.web/sites", "", fn.get("location", "")
-                )
+                cost = az.estimate_resource_cost("microsoft.web/sites", "", fn.get("location", ""))
                 is_stopped = fn.get("state", "Running") not in ("Running",)
-                _add("functions", {
-                    "id": fn["id"],
-                    "name": fn["name"],
-                    "type": "Microsoft.Web/sites (Function)",
-                    "location": fn["location"],
-                    "state": fn.get("state", "Running"),
-                    "runtime": fn.get("runtime", ""),
-                    "status": "Stopped" if is_stopped else "Active",
-                    "category": "functions",
-                    "can_dismiss": is_stopped,
-                    "dismiss_reason": "Function app is stopped" if is_stopped else None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "functions",
+                    {
+                        "id": fn["id"],
+                        "name": fn["name"],
+                        "type": "Microsoft.Web/sites (Function)",
+                        "location": fn["location"],
+                        "state": fn.get("state", "Running"),
+                        "runtime": fn.get("runtime", ""),
+                        "status": "Stopped" if is_stopped else "Active",
+                        "category": "functions",
+                        "can_dismiss": is_stopped,
+                        "dismiss_reason": "Function app is stopped" if is_stopped else None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching function apps: {e}")
 
@@ -1596,19 +1622,22 @@ async def get_resource_inventory(request: Request):
                     cluster.get("location", ""),
                 )
                 power = cluster.get("power_state", "Running")
-                _add("kubernetes", {
-                    "id": cluster["id"],
-                    "name": cluster["name"],
-                    "type": "Microsoft.ContainerService/managedClusters",
-                    "location": cluster["location"],
-                    "kubernetes_version": cluster.get("kubernetes_version", ""),
-                    "node_count": cluster.get("node_count", 0),
-                    "status": "Stopped" if power == "Stopped" else "Active",
-                    "category": "kubernetes",
-                    "can_dismiss": power == "Stopped",
-                    "dismiss_reason": "AKS cluster is stopped" if power == "Stopped" else None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "kubernetes",
+                    {
+                        "id": cluster["id"],
+                        "name": cluster["name"],
+                        "type": "Microsoft.ContainerService/managedClusters",
+                        "location": cluster["location"],
+                        "kubernetes_version": cluster.get("kubernetes_version", ""),
+                        "node_count": cluster.get("node_count", 0),
+                        "status": "Stopped" if power == "Stopped" else "Active",
+                        "category": "kubernetes",
+                        "can_dismiss": power == "Stopped",
+                        "dismiss_reason": "AKS cluster is stopped" if power == "Stopped" else None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching AKS clusters: {e}")
 
@@ -1618,19 +1647,22 @@ async def get_resource_inventory(request: Request):
                 cost = az.estimate_resource_cost(
                     "microsoft.containerinstance/containergroups", "", cg.get("location", "")
                 )
-                _add("container_instances", {
-                    "id": cg["id"],
-                    "name": cg["name"],
-                    "type": "Microsoft.ContainerInstance/containerGroups",
-                    "location": cg["location"],
-                    "os_type": cg.get("os_type", "Linux"),
-                    "container_count": cg.get("container_count", 0),
-                    "status": cg.get("provisioning_state", "Succeeded"),
-                    "category": "container_instances",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "container_instances",
+                    {
+                        "id": cg["id"],
+                        "name": cg["name"],
+                        "type": "Microsoft.ContainerInstance/containerGroups",
+                        "location": cg["location"],
+                        "os_type": cg.get("os_type", "Linux"),
+                        "container_count": cg.get("container_count", 0),
+                        "status": cg.get("provisioning_state", "Succeeded"),
+                        "category": "container_instances",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching container instances: {e}")
 
@@ -1640,17 +1672,20 @@ async def get_resource_inventory(request: Request):
                 cost = az.estimate_resource_cost(
                     "microsoft.keyvault/vaults", "Standard", kv.get("location", "")
                 )
-                _add("key_vaults", {
-                    "id": kv["id"],
-                    "name": kv["name"],
-                    "type": "Microsoft.KeyVault/vaults",
-                    "location": kv["location"],
-                    "status": "Active",
-                    "category": "key_vaults",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "key_vaults",
+                    {
+                        "id": kv["id"],
+                        "name": kv["name"],
+                        "type": "Microsoft.KeyVault/vaults",
+                        "location": kv["location"],
+                        "status": "Active",
+                        "category": "key_vaults",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching key vaults: {e}")
 
@@ -1660,18 +1695,21 @@ async def get_resource_inventory(request: Request):
                 cost = az.estimate_resource_cost(
                     "microsoft.cache/redis", cache.get("sku_name", ""), cache.get("location", "")
                 )
-                _add("redis_caches", {
-                    "id": cache["id"],
-                    "name": cache["name"],
-                    "type": "Microsoft.Cache/Redis",
-                    "location": cache["location"],
-                    "sku": f"{cache.get('sku_name', '')} C{cache.get('sku_capacity', '')}",
-                    "status": cache.get("provisioning_state", "Succeeded"),
-                    "category": "redis_caches",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "redis_caches",
+                    {
+                        "id": cache["id"],
+                        "name": cache["name"],
+                        "type": "Microsoft.Cache/Redis",
+                        "location": cache["location"],
+                        "sku": f"{cache.get('sku_name', '')} C{cache.get('sku_capacity', '')}",
+                        "status": cache.get("provisioning_state", "Succeeded"),
+                        "category": "redis_caches",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching Redis caches: {e}")
 
@@ -1681,19 +1719,22 @@ async def get_resource_inventory(request: Request):
                 cost = az.estimate_resource_cost(
                     "microsoft.documentdb/databaseaccounts", "", acc.get("location", "")
                 )
-                _add("cosmos_db", {
-                    "id": acc["id"],
-                    "name": acc["name"],
-                    "type": "Microsoft.DocumentDB/databaseAccounts",
-                    "location": acc["location"],
-                    "kind": acc.get("kind", "GlobalDocumentDB"),
-                    "consistency": acc.get("consistency_level", "Session"),
-                    "status": "Active",
-                    "category": "cosmos_db",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "cosmos_db",
+                    {
+                        "id": acc["id"],
+                        "name": acc["name"],
+                        "type": "Microsoft.DocumentDB/databaseAccounts",
+                        "location": acc["location"],
+                        "kind": acc.get("kind", "GlobalDocumentDB"),
+                        "consistency": acc.get("consistency_level", "Session"),
+                        "status": "Active",
+                        "category": "cosmos_db",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching Cosmos DB: {e}")
 
@@ -1703,17 +1744,20 @@ async def get_resource_inventory(request: Request):
                 cost = az.estimate_resource_cost(
                     "microsoft.datafactory/factories", "", factory.get("location", "")
                 )
-                _add("data_factories", {
-                    "id": factory["id"],
-                    "name": factory["name"],
-                    "type": "Microsoft.DataFactory/factories",
-                    "location": factory["location"],
-                    "status": factory.get("provisioning_state", "Succeeded"),
-                    "category": "data_factories",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "data_factories",
+                    {
+                        "id": factory["id"],
+                        "name": factory["name"],
+                        "type": "Microsoft.DataFactory/factories",
+                        "location": factory["location"],
+                        "status": factory.get("provisioning_state", "Succeeded"),
+                        "category": "data_factories",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching Data Factories: {e}")
 
@@ -1724,18 +1768,21 @@ async def get_resource_inventory(request: Request):
                     "microsoft.logic/workflows", wf.get("sku", ""), wf.get("location", "")
                 )
                 state = wf.get("state", "Enabled")
-                _add("logic_apps", {
-                    "id": wf["id"],
-                    "name": wf["name"],
-                    "type": "Microsoft.Logic/workflows",
-                    "location": wf["location"],
-                    "state": state,
-                    "status": "Disabled" if state == "Disabled" else "Active",
-                    "category": "logic_apps",
-                    "can_dismiss": state == "Disabled",
-                    "dismiss_reason": "Logic App is disabled" if state == "Disabled" else None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "logic_apps",
+                    {
+                        "id": wf["id"],
+                        "name": wf["name"],
+                        "type": "Microsoft.Logic/workflows",
+                        "location": wf["location"],
+                        "state": state,
+                        "status": "Disabled" if state == "Disabled" else "Active",
+                        "category": "logic_apps",
+                        "can_dismiss": state == "Disabled",
+                        "dismiss_reason": "Logic App is disabled" if state == "Disabled" else None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching Logic Apps: {e}")
 
@@ -1745,18 +1792,21 @@ async def get_resource_inventory(request: Request):
                 cost = az.estimate_resource_cost(
                     "microsoft.eventhub/namespaces", ns.get("sku_name", ""), ns.get("location", "")
                 )
-                _add("event_hubs", {
-                    "id": ns["id"],
-                    "name": ns["name"],
-                    "type": "Microsoft.EventHub/namespaces",
-                    "location": ns["location"],
-                    "sku": ns.get("sku_name", "Basic"),
-                    "status": ns.get("provisioning_state", "Succeeded"),
-                    "category": "event_hubs",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "event_hubs",
+                    {
+                        "id": ns["id"],
+                        "name": ns["name"],
+                        "type": "Microsoft.EventHub/namespaces",
+                        "location": ns["location"],
+                        "sku": ns.get("sku_name", "Basic"),
+                        "status": ns.get("provisioning_state", "Succeeded"),
+                        "category": "event_hubs",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching Event Hubs: {e}")
 
@@ -1764,20 +1814,25 @@ async def get_resource_inventory(request: Request):
         try:
             for ns in az.get_service_bus_namespaces():
                 cost = az.estimate_resource_cost(
-                    "microsoft.servicebus/namespaces", ns.get("sku_name", ""), ns.get("location", "")
+                    "microsoft.servicebus/namespaces",
+                    ns.get("sku_name", ""),
+                    ns.get("location", ""),
                 )
-                _add("service_bus", {
-                    "id": ns["id"],
-                    "name": ns["name"],
-                    "type": "Microsoft.ServiceBus/namespaces",
-                    "location": ns["location"],
-                    "sku": ns.get("sku_name", "Basic"),
-                    "status": ns.get("provisioning_state", "Succeeded"),
-                    "category": "service_bus",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "service_bus",
+                    {
+                        "id": ns["id"],
+                        "name": ns["name"],
+                        "type": "Microsoft.ServiceBus/namespaces",
+                        "location": ns["location"],
+                        "sku": ns.get("sku_name", "Basic"),
+                        "status": ns.get("provisioning_state", "Succeeded"),
+                        "category": "service_bus",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching Service Bus: {e}")
 
@@ -1787,18 +1842,21 @@ async def get_resource_inventory(request: Request):
                 cost = az.estimate_resource_cost(
                     "microsoft.devices/iothubs", hub.get("sku_name", ""), hub.get("location", "")
                 )
-                _add("iot_hubs", {
-                    "id": hub["id"],
-                    "name": hub["name"],
-                    "type": "Microsoft.Devices/IotHubs",
-                    "location": hub["location"],
-                    "sku": hub.get("sku_name", "F1"),
-                    "status": hub.get("state", "Active"),
-                    "category": "iot_hubs",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "iot_hubs",
+                    {
+                        "id": hub["id"],
+                        "name": hub["name"],
+                        "type": "Microsoft.Devices/IotHubs",
+                        "location": hub["location"],
+                        "sku": hub.get("sku_name", "F1"),
+                        "status": hub.get("state", "Active"),
+                        "category": "iot_hubs",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching IoT Hubs: {e}")
 
@@ -1806,21 +1864,26 @@ async def get_resource_inventory(request: Request):
         try:
             for acc in az.get_cognitive_services():
                 cost = az.estimate_resource_cost(
-                    "microsoft.cognitiveservices/accounts", acc.get("sku_name", ""), acc.get("location", "")
+                    "microsoft.cognitiveservices/accounts",
+                    acc.get("sku_name", ""),
+                    acc.get("location", ""),
                 )
-                _add("cognitive_services", {
-                    "id": acc["id"],
-                    "name": acc["name"],
-                    "type": f"Microsoft.CognitiveServices/accounts ({acc.get('kind', 'Unknown')})",
-                    "location": acc["location"],
-                    "sku": acc.get("sku_name", "S0"),
-                    "kind": acc.get("kind", "Unknown"),
-                    "status": acc.get("provisioning_state", "Succeeded"),
-                    "category": "cognitive_services",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "cognitive_services",
+                    {
+                        "id": acc["id"],
+                        "name": acc["name"],
+                        "type": f"Microsoft.CognitiveServices/accounts ({acc.get('kind', 'Unknown')})",
+                        "location": acc["location"],
+                        "sku": acc.get("sku_name", "S0"),
+                        "kind": acc.get("kind", "Unknown"),
+                        "status": acc.get("provisioning_state", "Succeeded"),
+                        "category": "cognitive_services",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching Cognitive Services: {e}")
 
@@ -1830,19 +1893,22 @@ async def get_resource_inventory(request: Request):
                 cost = az.estimate_resource_cost(
                     "microsoft.insights/components", "", comp.get("location", "")
                 )
-                _add("monitoring", {
-                    "id": comp["id"],
-                    "name": comp["name"],
-                    "type": "Microsoft.Insights/components",
-                    "location": comp["location"],
-                    "application_type": comp.get("application_type", "web"),
-                    "retention_days": comp.get("retention_in_days", 90),
-                    "status": "Active",
-                    "category": "monitoring",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "monitoring",
+                    {
+                        "id": comp["id"],
+                        "name": comp["name"],
+                        "type": "Microsoft.Insights/components",
+                        "location": comp["location"],
+                        "application_type": comp.get("application_type", "web"),
+                        "retention_days": comp.get("retention_in_days", 90),
+                        "status": "Active",
+                        "category": "monitoring",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching Application Insights: {e}")
 
@@ -1850,20 +1916,25 @@ async def get_resource_inventory(request: Request):
         try:
             for profile in az.get_cdn_profiles():
                 cost = az.estimate_resource_cost(
-                    "microsoft.cdn/profiles", profile.get("sku_name", ""), profile.get("location", "")
+                    "microsoft.cdn/profiles",
+                    profile.get("sku_name", ""),
+                    profile.get("location", ""),
                 )
-                _add("cdn_profiles", {
-                    "id": profile["id"],
-                    "name": profile["name"],
-                    "type": "Microsoft.Cdn/profiles",
-                    "location": profile["location"],
-                    "sku": profile.get("sku_name", "Standard_Microsoft"),
-                    "status": profile.get("resource_state", "Active"),
-                    "category": "cdn_profiles",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "cdn_profiles",
+                    {
+                        "id": profile["id"],
+                        "name": profile["name"],
+                        "type": "Microsoft.Cdn/profiles",
+                        "location": profile["location"],
+                        "sku": profile.get("sku_name", "Standard_Microsoft"),
+                        "status": profile.get("resource_state", "Active"),
+                        "category": "cdn_profiles",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching CDN profiles: {e}")
 
@@ -1871,20 +1942,25 @@ async def get_resource_inventory(request: Request):
         try:
             for svc in az.get_api_management_instances():
                 cost = az.estimate_resource_cost(
-                    "microsoft.apimanagement/service", svc.get("sku_name", ""), svc.get("location", "")
+                    "microsoft.apimanagement/service",
+                    svc.get("sku_name", ""),
+                    svc.get("location", ""),
                 )
-                _add("api_management", {
-                    "id": svc["id"],
-                    "name": svc["name"],
-                    "type": "Microsoft.ApiManagement/service",
-                    "location": svc["location"],
-                    "sku": svc.get("sku_name", "Developer"),
-                    "status": svc.get("provisioning_state", "Succeeded"),
-                    "category": "api_management",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "api_management",
+                    {
+                        "id": svc["id"],
+                        "name": svc["name"],
+                        "type": "Microsoft.ApiManagement/service",
+                        "location": svc["location"],
+                        "sku": svc.get("sku_name", "Developer"),
+                        "status": svc.get("provisioning_state", "Succeeded"),
+                        "category": "api_management",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching API Management: {e}")
 
@@ -1892,20 +1968,25 @@ async def get_resource_inventory(request: Request):
         try:
             for vault in az.get_recovery_vaults():
                 cost = az.estimate_resource_cost(
-                    "microsoft.recoveryservices/vaults", vault.get("sku", ""), vault.get("location", "")
+                    "microsoft.recoveryservices/vaults",
+                    vault.get("sku", ""),
+                    vault.get("location", ""),
                 )
-                _add("recovery_vaults", {
-                    "id": f"/subscriptions/{az.subscription_id}/providers/Microsoft.RecoveryServices/vaults/{vault['name']}",
-                    "name": vault["name"],
-                    "type": "Microsoft.RecoveryServices/vaults",
-                    "location": vault["location"],
-                    "sku": vault["sku"],
-                    "status": "Active",
-                    "category": "backup",
-                    "can_dismiss": False,
-                    "dismiss_reason": None,
-                    "estimated_cost": cost,
-                })
+                _add(
+                    "recovery_vaults",
+                    {
+                        "id": f"/subscriptions/{az.subscription_id}/providers/Microsoft.RecoveryServices/vaults/{vault['name']}",
+                        "name": vault["name"],
+                        "type": "Microsoft.RecoveryServices/vaults",
+                        "location": vault["location"],
+                        "sku": vault["sku"],
+                        "status": "Active",
+                        "category": "backup",
+                        "can_dismiss": False,
+                        "dismiss_reason": None,
+                        "estimated_cost": cost,
+                    },
+                )
         except Exception as e:
             print(f"[!] Error fetching recovery vaults: {e}")
 
@@ -1947,36 +2028,44 @@ async def get_resource_inventory(request: Request):
                     r_type = r.get("type", "").lower()
 
                     category = "other_resources"
-                    if r_type == "microsoft.web/sites" and "functionapp" in str(r.get("kind", "")).lower():
+                    if (
+                        r_type == "microsoft.web/sites"
+                        and "functionapp" in str(r.get("kind", "")).lower()
+                    ):
                         category = "functions"
                     else:
                         category = _type_to_cat.get(r_type, "other_resources")
 
                     # Estimate cost
-                    sku_name = r.get("sku", {}).get("name", "") if isinstance(r.get("sku"), dict) else (r.get("sku") or "")
+                    sku_name = (
+                        r.get("sku", {}).get("name", "")
+                        if isinstance(r.get("sku"), dict)
+                        else (r.get("sku") or "")
+                    )
                     cost = az.estimate_resource_cost(r_type, sku_name, r.get("location", ""))
 
-                    _add(category, {
-                        "id": r_id,
-                        "name": r.get("name", "Unnamed"),
-                        "type": r.get("type", "Unknown"),
-                        "location": r.get("location", "global"),
-                        "status": "Active",
-                        "category": category,
-                        "can_dismiss": False,
-                        "dismiss_reason": None,
-                        "estimated_cost": cost,
-                        "sku": sku_name,
-                        "kind": r.get("kind", ""),
-                        "tags": r.get("tags") or {},
-                    })
+                    _add(
+                        category,
+                        {
+                            "id": r_id,
+                            "name": r.get("name", "Unnamed"),
+                            "type": r.get("type", "Unknown"),
+                            "location": r.get("location", "global"),
+                            "status": "Active",
+                            "category": category,
+                            "can_dismiss": False,
+                            "dismiss_reason": None,
+                            "estimated_cost": cost,
+                            "sku": sku_name,
+                            "kind": r.get("kind", ""),
+                            "tags": r.get("tags") or {},
+                        },
+                    )
         except Exception as e:
             print(f"[!] Error in Resource Graph fallback: {e}")
 
         # ---- Flatten all resources for pagination + filtering ----
-        all_categories = [
-            k for k in inventory if k not in ("summary", "other_resources")
-        ]
+        all_categories = [k for k in inventory if k not in ("summary", "other_resources")]
         all_flat: list[dict] = []
         for cat in all_categories:
             all_flat.extend(inventory[cat])  # type: ignore[union-attr]
@@ -1988,7 +2077,8 @@ async def get_resource_inventory(request: Request):
             all_flat = [r for r in all_flat if r.get("status", "") == status_filter]
         if search_q:
             all_flat = [
-                r for r in all_flat
+                r
+                for r in all_flat
                 if search_q in r.get("name", "").lower() or search_q in r.get("type", "").lower()
             ]
 
@@ -1999,19 +2089,22 @@ async def get_resource_inventory(request: Request):
 
         # Round estimated cost
         inventory["summary"]["estimated_monthly_cost"] = round(  # type: ignore[index]
-            inventory["summary"]["estimated_monthly_cost"], 2  # type: ignore[index]
+            inventory["summary"]["estimated_monthly_cost"],
+            2,  # type: ignore[index]
         )
 
-        return jsonify({
-            "status": "success",
-            "data": inventory,
-            "resources": paginated_flat,
-            "page": page,
-            "page_size": page_size,
-            "total": total,
-            "total_pages": max(1, (total + page_size - 1) // page_size),
-            "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
-        })
+        return jsonify(
+            {
+                "status": "success",
+                "data": inventory,
+                "resources": paginated_flat,
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+                "total_pages": max(1, (total + page_size - 1) // page_size),
+                "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
+            }
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -2061,12 +2154,14 @@ async def get_resource_inventory_summary(request: Request):
             cat = _type_to_cat.get(rt, "other")
             by_category[cat] = by_category.get(cat, 0) + count
 
-        return jsonify({
-            "status": "success",
-            "total_resources": len(all_resources),
-            "by_category": by_category,
-            "by_type": type_counts,
-        })
+        return jsonify(
+            {
+                "status": "success",
+                "total_resources": len(all_resources),
+                "by_category": by_category,
+                "by_type": type_counts,
+            }
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -2114,27 +2209,27 @@ async def search_resources(request: Request):
 
         if category_filter:
             from reaper.collectors.providers.azure_collector import AzureCollector as _AC
+
             _type_to_cat = _AC._COST_FALLBACK  # borrow the type map keys for category matching
-            results = [
-                r for r in results
-                if category_filter in r.get("type", "").lower()
-            ]
+            results = [r for r in results if category_filter in r.get("type", "").lower()]
         if status_filter:
             results = [r for r in results if r.get("status", "") == status_filter]
 
         total = len(results)
         start = (page - 1) * page_size
-        paginated = results[start: start + page_size]
+        paginated = results[start : start + page_size]
 
-        return jsonify({
-            "status": "success",
-            "query": q,
-            "results": paginated,
-            "page": page,
-            "page_size": page_size,
-            "total": total,
-            "total_pages": max(1, (total + page_size - 1) // page_size),
-        })
+        return jsonify(
+            {
+                "status": "success",
+                "query": q,
+                "results": paginated,
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+                "total_pages": max(1, (total + page_size - 1) // page_size),
+            }
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -2145,19 +2240,21 @@ async def dismiss_resource(request: Request, resource_id: str):
     try:
         data = await request.json() if request.body() else {}
         reason = data.get("reason", "Manual dismissal")
-        
+
         # In a real implementation, this would:
         # 1. Log the dismissal action
         # 2. Create a cleanup ticket
         # 3. Optionally trigger actual resource deletion
-        
-        return jsonify({
-            "status": "success",
-            "message": f"Resource {resource_id} marked for dismissal",
-            "resource_id": resource_id,
-            "reason": reason,
-            "action_taken": "marked_for_cleanup"
-        })
+
+        return jsonify(
+            {
+                "status": "success",
+                "message": f"Resource {resource_id} marked for dismissal",
+                "resource_id": resource_id,
+                "reason": reason,
+                "action_taken": "marked_for_cleanup",
+            }
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -4015,7 +4112,9 @@ async def cost_optimization_page(request: Request):
 @app.get("/resource-inventory")
 async def resource_inventory_page(request: Request):
     """Render the resource inventory page"""
-    return templates.TemplateResponse(request, "pages/resource-inventory.html", {"request": request})
+    return templates.TemplateResponse(
+        request, "pages/resource-inventory.html", {"request": request}
+    )
 
 
 @app.get("/api/cost-reports/executive-summary")

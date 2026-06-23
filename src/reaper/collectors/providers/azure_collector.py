@@ -1771,7 +1771,6 @@ class AzureCollector:
         finally:
             db.close()
 
-
     # ========== LAZY CLIENT PROPERTIES ==========
 
     def _get_container_service(self):
@@ -1783,7 +1782,9 @@ class AzureCollector:
     def _get_container_instance(self):
         if self._container_instance is None and ContainerInstanceManagementClient:
             # pyrefly: ignore [bad-argument-type]
-            self._container_instance = ContainerInstanceManagementClient(self.credentials, self.subscription_id)
+            self._container_instance = ContainerInstanceManagementClient(
+                self.credentials, self.subscription_id
+            )
         return self._container_instance
 
     def _get_keyvault(self):
@@ -1837,13 +1838,17 @@ class AzureCollector:
     def _get_cognitive(self):
         if self._cognitive is None and CognitiveServicesManagementClient:
             # pyrefly: ignore [bad-argument-type]
-            self._cognitive = CognitiveServicesManagementClient(self.credentials, self.subscription_id)
+            self._cognitive = CognitiveServicesManagementClient(
+                self.credentials, self.subscription_id
+            )
         return self._cognitive
 
     def _get_appinsights(self):
         if self._appinsights is None and ApplicationInsightsManagementClient:
             # pyrefly: ignore [bad-argument-type]
-            self._appinsights = ApplicationInsightsManagementClient(self.credentials, self.subscription_id)
+            self._appinsights = ApplicationInsightsManagementClient(
+                self.credentials, self.subscription_id
+            )
         return self._appinsights
 
     def _get_cdn(self):
@@ -1860,7 +1865,9 @@ class AzureCollector:
 
     # ========== UNIFIED RESOURCE GRAPH DISCOVERY ==========
 
-    def get_all_resources_via_resource_graph(self, resource_types: list[str] | None = None) -> list[dict]:
+    def get_all_resources_via_resource_graph(
+        self, resource_types: list[str] | None = None
+    ) -> list[dict]:
         """
         Discover ALL resources in the subscription using a single Azure Resource Graph KQL query.
         This is dramatically faster than per-service API calls for large inventories.
@@ -1903,8 +1910,7 @@ class AzureCollector:
 
                     if hasattr(response, "data") and response.data:
                         all_items.extend(
-                            row if isinstance(row, dict) else dict(row)
-                            for row in response.data
+                            row if isinstance(row, dict) else dict(row) for row in response.data
                         )
 
                     skip_token = getattr(response, "skip_token", None)
@@ -2018,7 +2024,8 @@ class AzureCollector:
                 hourly_hits = [
                     r.get("retailPrice", 0.0)
                     for r in results
-                    if r.get("unitOfMeasure", "").startswith("1 Hour") and r.get("retailPrice", 0) > 0
+                    if r.get("unitOfMeasure", "").startswith("1 Hour")
+                    and r.get("retailPrice", 0) > 0
                 ]
                 if hourly_hits:
                     price = round(min(hourly_hits) * 730, 2)  # 730 hrs/month
@@ -2042,16 +2049,18 @@ class AzureCollector:
             try:
                 accounts = self.storage.storage_accounts.list()
                 for acc in accounts:
-                    results.append({
-                        "id": acc.id,
-                        "name": acc.name,
-                        "location": acc.location,
-                        "kind": acc.kind,
-                        "sku": acc.sku.name if acc.sku else "Unknown",
-                        "access_tier": getattr(acc, "access_tier", "Hot"),
-                        "tags": dict(acc.tags) if acc.tags else {},
-                        "provisioning_state": getattr(acc, "provisioning_state", "Succeeded"),
-                    })
+                    results.append(
+                        {
+                            "id": acc.id,
+                            "name": acc.name,
+                            "location": acc.location,
+                            "kind": acc.kind,
+                            "sku": acc.sku.name if acc.sku else "Unknown",
+                            "access_tier": getattr(acc, "access_tier", "Hot"),
+                            "tags": dict(acc.tags) if acc.tags else {},
+                            "provisioning_state": getattr(acc, "provisioning_state", "Succeeded"),
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching storage accounts: {exc}")
             return results
@@ -2071,19 +2080,22 @@ class AzureCollector:
                 clusters = client.managed_clusters.list()
                 for c in clusters:
                     agent_count = sum(
-                        getattr(p, "count", 0) or 0
-                        for p in (c.agent_pool_profiles or [])
+                        getattr(p, "count", 0) or 0 for p in (c.agent_pool_profiles or [])
                     )
-                    results.append({
-                        "id": c.id,
-                        "name": c.name,
-                        "location": c.location,
-                        "kubernetes_version": getattr(c, "kubernetes_version", "Unknown"),
-                        "node_count": agent_count,
-                        "sku": getattr(c.sku, "name", "Free") if c.sku else "Free",
-                        "power_state": getattr(getattr(c, "power_state", None), "code", "Running"),
-                        "tags": dict(c.tags) if c.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": c.id,
+                            "name": c.name,
+                            "location": c.location,
+                            "kubernetes_version": getattr(c, "kubernetes_version", "Unknown"),
+                            "node_count": agent_count,
+                            "sku": getattr(c.sku, "name", "Free") if c.sku else "Free",
+                            "power_state": getattr(
+                                getattr(c, "power_state", None), "code", "Running"
+                            ),
+                            "tags": dict(c.tags) if c.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching AKS clusters: {exc}")
             return results
@@ -2102,16 +2114,18 @@ class AzureCollector:
             try:
                 groups = client.container_groups.list()
                 for g in groups:
-                    results.append({
-                        "id": g.id,
-                        "name": g.name,
-                        "location": g.location,
-                        "os_type": getattr(g, "os_type", "Linux"),
-                        "restart_policy": getattr(g, "restart_policy", "Always"),
-                        "provisioning_state": getattr(g, "provisioning_state", "Succeeded"),
-                        "container_count": len(g.containers) if g.containers else 0,
-                        "tags": dict(g.tags) if g.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": g.id,
+                            "name": g.name,
+                            "location": g.location,
+                            "os_type": getattr(g, "os_type", "Linux"),
+                            "restart_policy": getattr(g, "restart_policy", "Always"),
+                            "provisioning_state": getattr(g, "provisioning_state", "Succeeded"),
+                            "container_count": len(g.containers) if g.containers else 0,
+                            "tags": dict(g.tags) if g.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching container instances: {exc}")
             return results
@@ -2130,15 +2144,19 @@ class AzureCollector:
                     kind = (app.kind or "").lower()
                     if "functionapp" not in kind:
                         continue
-                    results.append({
-                        "id": app.id,
-                        "name": app.name,
-                        "location": app.location,
-                        "state": getattr(app, "state", "Running"),
-                        "runtime": (app.site_config.linux_fx_version or "") if app.site_config else "",
-                        "kind": app.kind,
-                        "tags": dict(app.tags) if app.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": app.id,
+                            "name": app.name,
+                            "location": app.location,
+                            "state": getattr(app, "state", "Running"),
+                            "runtime": (app.site_config.linux_fx_version or "")
+                            if app.site_config
+                            else "",
+                            "kind": app.kind,
+                            "tags": dict(app.tags) if app.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching function apps: {exc}")
             return results
@@ -2158,12 +2176,14 @@ class AzureCollector:
                 vaults = client.vaults.list()
                 for v in vaults:
                     # Full details require list_by_resource_group, but list() returns VaultListResult
-                    results.append({
-                        "id": v.id,
-                        "name": v.name,
-                        "location": v.location,
-                        "tags": dict(v.tags) if v.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": v.id,
+                            "name": v.name,
+                            "location": v.location,
+                            "tags": dict(v.tags) if v.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching key vaults: {exc}")
             return results
@@ -2183,17 +2203,19 @@ class AzureCollector:
                 caches = client.redis.list()
                 for r in caches:
                     sku = r.sku if r.sku else None
-                    results.append({
-                        "id": r.id,
-                        "name": r.name,
-                        "location": r.location,
-                        "sku_name": sku.name if sku else "Unknown",
-                        "sku_family": sku.family if sku else "",
-                        "sku_capacity": sku.capacity if sku else 0,
-                        "redis_version": getattr(r, "redis_version", ""),
-                        "provisioning_state": getattr(r, "provisioning_state", "Succeeded"),
-                        "tags": dict(r.tags) if r.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": r.id,
+                            "name": r.name,
+                            "location": r.location,
+                            "sku_name": sku.name if sku else "Unknown",
+                            "sku_family": sku.family if sku else "",
+                            "sku_capacity": sku.capacity if sku else 0,
+                            "redis_version": getattr(r, "redis_version", ""),
+                            "provisioning_state": getattr(r, "provisioning_state", "Succeeded"),
+                            "tags": dict(r.tags) if r.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching Redis caches: {exc}")
             return results
@@ -2212,20 +2234,25 @@ class AzureCollector:
             try:
                 accounts = client.database_accounts.list()
                 for acc in accounts:
-                    results.append({
-                        "id": acc.id,
-                        "name": acc.name,
-                        "location": acc.location,
-                        "kind": getattr(acc, "kind", "GlobalDocumentDB"),
-                        "consistency_level": (
-                            getattr(acc.consistency_policy, "default_consistency_level", "Session")
-                            if acc.consistency_policy else "Session"
-                        ),
-                        "locations": [
-                            getattr(loc, "location_name", "") for loc in (acc.locations or [])
-                        ],
-                        "tags": dict(acc.tags) if acc.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": acc.id,
+                            "name": acc.name,
+                            "location": acc.location,
+                            "kind": getattr(acc, "kind", "GlobalDocumentDB"),
+                            "consistency_level": (
+                                getattr(
+                                    acc.consistency_policy, "default_consistency_level", "Session"
+                                )
+                                if acc.consistency_policy
+                                else "Session"
+                            ),
+                            "locations": [
+                                getattr(loc, "location_name", "") for loc in (acc.locations or [])
+                            ],
+                            "tags": dict(acc.tags) if acc.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching Cosmos DB accounts: {exc}")
             return results
@@ -2244,13 +2271,15 @@ class AzureCollector:
             try:
                 factories = client.factories.list()
                 for f in factories:
-                    results.append({
-                        "id": f.id,
-                        "name": f.name,
-                        "location": f.location,
-                        "provisioning_state": getattr(f, "provisioning_state", "Succeeded"),
-                        "tags": dict(f.tags) if f.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": f.id,
+                            "name": f.name,
+                            "location": f.location,
+                            "provisioning_state": getattr(f, "provisioning_state", "Succeeded"),
+                            "tags": dict(f.tags) if f.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching Data Factories: {exc}")
             return results
@@ -2269,14 +2298,18 @@ class AzureCollector:
             try:
                 workflows = client.workflows.list_by_subscription()
                 for w in workflows:
-                    results.append({
-                        "id": w.id,
-                        "name": w.name,
-                        "location": w.location,
-                        "state": getattr(w, "state", "Enabled"),
-                        "sku": getattr(w.sku, "name", "Consumption") if w.sku else "Consumption",
-                        "tags": dict(w.tags) if w.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": w.id,
+                            "name": w.name,
+                            "location": w.location,
+                            "state": getattr(w, "state", "Enabled"),
+                            "sku": getattr(w.sku, "name", "Consumption")
+                            if w.sku
+                            else "Consumption",
+                            "tags": dict(w.tags) if w.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching Logic Apps: {exc}")
             return results
@@ -2296,16 +2329,18 @@ class AzureCollector:
                 namespaces = client.namespaces.list()
                 for ns in namespaces:
                     sku = ns.sku if ns.sku else None
-                    results.append({
-                        "id": ns.id,
-                        "name": ns.name,
-                        "location": ns.location,
-                        "sku_name": sku.name if sku else "Basic",
-                        "sku_tier": sku.tier if sku else "Basic",
-                        "throughput_units": getattr(ns, "maximum_throughput_units", 0),
-                        "provisioning_state": getattr(ns, "provisioning_state", "Succeeded"),
-                        "tags": dict(ns.tags) if ns.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": ns.id,
+                            "name": ns.name,
+                            "location": ns.location,
+                            "sku_name": sku.name if sku else "Basic",
+                            "sku_tier": sku.tier if sku else "Basic",
+                            "throughput_units": getattr(ns, "maximum_throughput_units", 0),
+                            "provisioning_state": getattr(ns, "provisioning_state", "Succeeded"),
+                            "tags": dict(ns.tags) if ns.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching Event Hubs: {exc}")
             return results
@@ -2325,15 +2360,17 @@ class AzureCollector:
                 namespaces = client.namespaces.list()
                 for ns in namespaces:
                     sku = ns.sku if ns.sku else None
-                    results.append({
-                        "id": ns.id,
-                        "name": ns.name,
-                        "location": ns.location,
-                        "sku_name": sku.name if sku else "Basic",
-                        "messaging_units": getattr(sku, "capacity", 1) if sku else 1,
-                        "provisioning_state": getattr(ns, "provisioning_state", "Succeeded"),
-                        "tags": dict(ns.tags) if ns.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": ns.id,
+                            "name": ns.name,
+                            "location": ns.location,
+                            "sku_name": sku.name if sku else "Basic",
+                            "messaging_units": getattr(sku, "capacity", 1) if sku else 1,
+                            "provisioning_state": getattr(ns, "provisioning_state", "Succeeded"),
+                            "tags": dict(ns.tags) if ns.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching Service Bus namespaces: {exc}")
             return results
@@ -2353,15 +2390,17 @@ class AzureCollector:
                 hubs = client.iot_hub_resource.list_by_subscription()
                 for hub in hubs:
                     sku_info = hub.sku if hub.sku else None
-                    results.append({
-                        "id": hub.id,
-                        "name": hub.name,
-                        "location": hub.location,
-                        "sku_name": sku_info.name if sku_info else "F1",
-                        "sku_capacity": sku_info.capacity if sku_info else 1,
-                        "state": getattr(hub, "state", "Active"),
-                        "tags": dict(hub.tags) if hub.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": hub.id,
+                            "name": hub.name,
+                            "location": hub.location,
+                            "sku_name": sku_info.name if sku_info else "F1",
+                            "sku_capacity": sku_info.capacity if sku_info else 1,
+                            "state": getattr(hub, "state", "Active"),
+                            "tags": dict(hub.tags) if hub.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching IoT Hubs: {exc}")
             return results
@@ -2381,15 +2420,17 @@ class AzureCollector:
                 accounts = client.accounts.list()
                 for acc in accounts:
                     sku = acc.sku if acc.sku else None
-                    results.append({
-                        "id": acc.id,
-                        "name": acc.name,
-                        "location": acc.location,
-                        "kind": getattr(acc, "kind", "Unknown"),
-                        "sku_name": sku.name if sku else "S0",
-                        "provisioning_state": getattr(acc, "provisioning_state", "Succeeded"),
-                        "tags": dict(acc.tags) if acc.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": acc.id,
+                            "name": acc.name,
+                            "location": acc.location,
+                            "kind": getattr(acc, "kind", "Unknown"),
+                            "sku_name": sku.name if sku else "S0",
+                            "provisioning_state": getattr(acc, "provisioning_state", "Succeeded"),
+                            "tags": dict(acc.tags) if acc.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching Cognitive Services: {exc}")
             return results
@@ -2408,15 +2449,17 @@ class AzureCollector:
             try:
                 components = client.components.list()
                 for c in components:
-                    results.append({
-                        "id": c.id,
-                        "name": c.name,
-                        "location": c.location,
-                        "application_type": getattr(c, "application_type", "web"),
-                        "retention_in_days": getattr(c, "retention_in_days", 90),
-                        "ingestion_mode": getattr(c, "ingestion_mode", "ApplicationInsights"),
-                        "tags": dict(c.tags) if c.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": c.id,
+                            "name": c.name,
+                            "location": c.location,
+                            "application_type": getattr(c, "application_type", "web"),
+                            "retention_in_days": getattr(c, "retention_in_days", 90),
+                            "ingestion_mode": getattr(c, "ingestion_mode", "ApplicationInsights"),
+                            "tags": dict(c.tags) if c.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching Application Insights: {exc}")
             return results
@@ -2436,14 +2479,16 @@ class AzureCollector:
                 profiles = client.profiles.list()
                 for p in profiles:
                     sku = p.sku if p.sku else None
-                    results.append({
-                        "id": p.id,
-                        "name": p.name,
-                        "location": p.location,
-                        "sku_name": sku.name if sku else "Standard_Microsoft",
-                        "resource_state": getattr(p, "resource_state", "Active"),
-                        "tags": dict(p.tags) if p.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": p.id,
+                            "name": p.name,
+                            "location": p.location,
+                            "sku_name": sku.name if sku else "Standard_Microsoft",
+                            "resource_state": getattr(p, "resource_state", "Active"),
+                            "tags": dict(p.tags) if p.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching CDN profiles: {exc}")
             return results
@@ -2463,15 +2508,17 @@ class AzureCollector:
                 services = client.api_management_service.list()
                 for svc in services:
                     sku = svc.sku if svc.sku else None
-                    results.append({
-                        "id": svc.id,
-                        "name": svc.name,
-                        "location": svc.location,
-                        "sku_name": sku.name if sku else "Developer",
-                        "sku_capacity": sku.capacity if sku else 1,
-                        "provisioning_state": getattr(svc, "provisioning_state", "Succeeded"),
-                        "tags": dict(svc.tags) if svc.tags else {},
-                    })
+                    results.append(
+                        {
+                            "id": svc.id,
+                            "name": svc.name,
+                            "location": svc.location,
+                            "sku_name": sku.name if sku else "Developer",
+                            "sku_capacity": sku.capacity if sku else 1,
+                            "provisioning_state": getattr(svc, "provisioning_state", "Succeeded"),
+                            "tags": dict(svc.tags) if svc.tags else {},
+                        }
+                    )
             except Exception as exc:
                 print(f"[-] Error fetching API Management instances: {exc}")
             return results
