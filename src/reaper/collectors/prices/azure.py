@@ -86,13 +86,24 @@ class AzurePriceClient:
     def get_catalog_prices(self):
         """Fetch the Azure Retail Prices API catalog for all supported service categories."""
         all_prices = []
-        for service in AZURE_RETAIL_SERVICE_NAMES:
-            all_prices.extend(self.get_prices_by_service(service))
+        import concurrent.futures
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_svc = {
+                executor.submit(self.get_prices_by_service, service, 2): service 
+                for service in AZURE_RETAIL_SERVICE_NAMES
+            }
+            for future in concurrent.futures.as_completed(future_to_svc):
+                try:
+                    all_prices.extend(future.result())
+                except Exception as exc:
+                    self.logger.error(f"Error fetching Azure catalog prices: {exc}")
+                    
         return all_prices
 
-    def get_prices_by_service(self, service_name):
+    def get_prices_by_service(self, service_name, max_pages=None):
         filter_query = f"serviceName eq '{service_name}' and priceType eq 'Consumption'"
-        return self.get_prices(filter_query)
+        return self.get_prices(filter_query, max_pages=max_pages)
 
     def get_prices_by_resource_name(self, sku_name):
         # Using armSkuName is often more reliable than armResourceName for many services
