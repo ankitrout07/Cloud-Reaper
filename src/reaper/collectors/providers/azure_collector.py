@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+from datetime import timezone
 import json
 import os
 import platform
@@ -258,7 +259,7 @@ class AzureCollector:
         if not vms:
             return []
 
-        end_time = datetime.datetime.now(timezone.utc)
+        end_time = datetime.datetime.now(datetime.timezone.utc)
         start_time = end_time - datetime.timedelta(days=7)
         timespan = (
             f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
@@ -496,7 +497,7 @@ class AzureCollector:
             return default
 
         scope = f"/subscriptions/{self.subscription_id}"
-        end_date = datetime.datetime.now(timezone.utc)
+        end_date = datetime.datetime.now(datetime.timezone.utc)
         start_date = end_date - datetime.timedelta(days=30)
 
         from azure.mgmt.costmanagement.models import (
@@ -622,7 +623,7 @@ class AzureCollector:
             f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
             f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
         )
-        end_time = datetime.datetime.now(timezone.utc)
+        end_time = datetime.datetime.now(datetime.timezone.utc)
         start_time = end_time - datetime.timedelta(hours=24)
         span = (
             f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
@@ -717,7 +718,7 @@ class AzureCollector:
 
     def get_recovery_vaults(self):
         """Finds Recovery Service Vaults"""
-        vaults = self.recovery.vaults.list_by_subscription_id(self.subscription_id)
+        vaults = self.recovery.vaults.list_by_subscription()
         return [{"name": v.name, "location": v.location, "sku": v.sku.name} for v in vaults]
 
     def get_empty_app_service_plans(self):
@@ -823,7 +824,7 @@ class AzureCollector:
         """Identify 'zombie' VMs based on age and lack of activity (CPU < 1% for 7 days)."""
         vms = self.compute.virtual_machines.list_all()
         zombies = []
-        end_time = datetime.datetime.now(timezone.utc)
+        end_time = datetime.datetime.now(datetime.timezone.utc)
         start_time = end_time - datetime.timedelta(days=7)
 
         for vm in vms:
@@ -869,7 +870,7 @@ class AzureCollector:
         except Exception:
             return []
 
-        end_time = datetime.datetime.now(timezone.utc)
+        end_time = datetime.datetime.now(datetime.timezone.utc)
         start_time = end_time - datetime.timedelta(days=1)
         timespan = (
             f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
@@ -912,7 +913,7 @@ class AzureCollector:
             return []
 
         scope = f"/subscriptions/{self.subscription_id}"
-        end_date = datetime.datetime.now(timezone.utc)
+        end_date = datetime.datetime.now(datetime.timezone.utc)
         start_date = end_date - datetime.timedelta(days=30)
 
         from azure.mgmt.costmanagement.models import (
@@ -1115,7 +1116,7 @@ class AzureCollector:
                             "severity": "HIGH",
                             "rule": "Tagging Compliance",
                             "action": "FLAGGED",
-                            "detected_at": datetime.datetime.now(timezone.utc).strftime(
+                            "detected_at": datetime.datetime.now(datetime.timezone.utc).strftime(
                                 "%Y-%m-%d %H:%M:%S"
                             ),
                         }
@@ -1234,7 +1235,7 @@ class AzureCollector:
 
     def get_burn_rate_forecast(self):
         """Calculates burn rate and EOM forecast using real Azure Cost data and ARIMA."""
-        now = datetime.datetime.now(timezone.utc)
+        now = datetime.datetime.now(datetime.timezone.utc)
         spend_data = []
 
         # Check in-memory cache first to avoid rate-limiting (429)
@@ -1244,7 +1245,7 @@ class AzureCollector:
 
         if not spend_data and self.cost_management:
             scope = f"/subscriptions/{self.subscription_id}"
-            end_date = datetime.datetime.now(timezone.utc)
+            end_date = datetime.datetime.now(datetime.timezone.utc)
             start_date = end_date - datetime.timedelta(days=30)
 
             from azure.mgmt.costmanagement.models import (
@@ -2200,7 +2201,7 @@ class AzureCollector:
                 return []
             results = []
             try:
-                caches = client.redis.list()
+                caches = client.redis.list_by_subscription()
                 for r in caches:
                     sku = r.sku if r.sku else None
                     results.append(

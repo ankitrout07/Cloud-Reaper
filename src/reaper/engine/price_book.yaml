@@ -10,6 +10,7 @@ providers:
   azure:
     compute:
       standard_d2s_v3: 0.096
+      standard_d4s_v3: 0.192
       standard_b2s: 0.0416
     storage:
       premium_ssd_p6_64gb: 5.89
