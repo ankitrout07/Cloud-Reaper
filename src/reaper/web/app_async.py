@@ -1310,132 +1310,141 @@ async def calculate_target_margin(request: Request):
     """Calculate optimal resource modifications to close the gap between current and target spend."""
     try:
         data = (await request.json() if await request.body() else {}) or {}
-        
+
         current_spend = data.get("current_spend", 3420.50)
         target_spend = data.get("target_spend", 2500.0)
-        
+
         # Get current resource inventory for analysis
         if is_first_run():
             return jsonify(
                 {"status": "unconfigured", "message": "Please configure cloud credentials first"}
             ), 200
-        
+
         collector = AzureCollector()
-        
+
         # Get current resources
         vms = collector.get_vm_inventory()
         idle_vms = collector.get_idle_vms()
         orphaned_disks = collector.get_orphaned_disks()
-        
+
         # Enhanced savings calculation with risk-weighted optimization
         optimization_opportunities = []
-        
+
         # VM Rightsizing Analysis (High Impact, Low Risk)
         if vms:
             for vm in vms:
                 vm_cost = vm.get("cost", 50)  # Default $50 if cost not available
                 cpu_utilization = vm.get("cpu_utilization", 50)
                 memory_utilization = vm.get("memory_utilization", 50)
-                
+
                 # Calculate rightsizing potential based on utilization
                 if cpu_utilization < 30 or memory_utilization < 30:
                     potential_savings = vm_cost * 0.4  # 40% savings possible
                     risk_score = 0.2  # Low risk
-                    optimization_opportunities.append({
-                        "type": "rightsizing",
-                        "resource_id": vm.get("id"),
-                        "resource_name": vm.get("name"),
-                        "potential_savings": potential_savings,
-                        "risk_score": risk_score,
-                        "implementation_complexity": "low",
-                        "description": f"Downsize VM {vm.get('name')} (CPU: {cpu_utilization}%, Memory: {memory_utilization}%)"
-                    })
-        
+                    optimization_opportunities.append(
+                        {
+                            "type": "rightsizing",
+                            "resource_id": vm.get("id"),
+                            "resource_name": vm.get("name"),
+                            "potential_savings": potential_savings,
+                            "risk_score": risk_score,
+                            "implementation_complexity": "low",
+                            "description": f"Downsize VM {vm.get('name')} (CPU: {cpu_utilization}%, Memory: {memory_utilization}%)",
+                        }
+                    )
+
         # Idle Resource Elimination (High Impact, Very Low Risk)
         if idle_vms:
             for vm in idle_vms:
                 vm_cost = vm.get("cost", 100)  # Default $100 for idle VMs
                 potential_savings = vm_cost  # 100% savings by eliminating
                 risk_score = 0.1  # Very low risk
-                optimization_opportunities.append({
-                    "type": "idle_elimination",
-                    "resource_id": vm.get("id"),
-                    "resource_name": vm.get("name"),
-                    "potential_savings": potential_savings,
-                    "risk_score": risk_score,
-                    "implementation_complexity": "very_low",
-                    "description": f"Delete idle VM {vm.get('name')}"
-                })
-        
+                optimization_opportunities.append(
+                    {
+                        "type": "idle_elimination",
+                        "resource_id": vm.get("id"),
+                        "resource_name": vm.get("name"),
+                        "potential_savings": potential_savings,
+                        "risk_score": risk_score,
+                        "implementation_complexity": "very_low",
+                        "description": f"Delete idle VM {vm.get('name')}",
+                    }
+                )
+
         # Storage Tier Optimization (Medium Impact, Low Risk)
         if orphaned_disks and orphaned_disks.get("disks"):
             for disk in orphaned_disks["disks"]:
                 disk_cost = disk.get("cost", 20)
                 current_tier = disk.get("tier", "premium")
-                
+
                 # Calculate savings based on tier downgrades
                 tier_savings_map = {
                     "premium": 0.6,  # 60% savings by moving to standard
                     "standard": 0.4,  # 40% savings by moving to cool
-                    "cool": 0.2      # 20% savings by moving to archive
+                    "cool": 0.2,  # 20% savings by moving to archive
                 }
-                
+
                 potential_savings = disk_cost * tier_savings_map.get(current_tier, 0.3)
                 risk_score = 0.15  # Low risk
-                optimization_opportunities.append({
-                    "type": "storage_optimization",
-                    "resource_id": disk.get("id"),
-                    "resource_name": disk.get("name"),
-                    "potential_savings": potential_savings,
-                    "risk_score": risk_score,
-                    "implementation_complexity": "low",
-                    "description": f"Move disk {disk.get('name')} from {current_tier} to cooler tier"
-                })
-        
+                optimization_opportunities.append(
+                    {
+                        "type": "storage_optimization",
+                        "resource_id": disk.get("id"),
+                        "resource_name": disk.get("name"),
+                        "potential_savings": potential_savings,
+                        "risk_score": risk_score,
+                        "implementation_complexity": "low",
+                        "description": f"Move disk {disk.get('name')} from {current_tier} to cooler tier",
+                    }
+                )
+
         # Commitment Adoption (High Impact, Medium Risk)
         commitment_potential = current_spend * 0.20  # Up to 20% savings with reservations
         if commitment_potential > 0:
-            optimization_opportunities.append({
-                "type": "commitment_adoption",
-                "resource_id": "commitment_pool",
-                "resource_name": "Azure Reserved Instances",
-                "potential_savings": commitment_potential,
-                "risk_score": 0.4,  # Medium risk (commitment period)
-                "implementation_complexity": "medium",
-                "description": f"Purchase Azure Reserved Instances for predictable workloads"
-            })
-        
+            optimization_opportunities.append(
+                {
+                    "type": "commitment_adoption",
+                    "resource_id": "commitment_pool",
+                    "resource_name": "Azure Reserved Instances",
+                    "potential_savings": commitment_potential,
+                    "risk_score": 0.4,  # Medium risk (commitment period)
+                    "implementation_complexity": "medium",
+                    "description": "Purchase Azure Reserved Instances for predictable workloads",
+                }
+            )
+
         # Sort opportunities by ROI (savings/risk ratio) - prioritize high savings, low risk
         optimization_opportunities.sort(
-            key=lambda x: (x["potential_savings"] / (x["risk_score"] + 0.1)), 
-            reverse=True
+            key=lambda x: x["potential_savings"] / (x["risk_score"] + 0.1), reverse=True
         )
-        
+
         # Calculate gap
         gap = current_spend - target_spend
-        
+
         # Calculate total potential
         total_potential = sum(opt["potential_savings"] for opt in optimization_opportunities)
-        
+
         if total_potential < gap:
-            return jsonify({
-                "status": "warning",
-                "message": "Unable to close gap with available optimizations",
-                "gap": gap,
-                "total_potential": total_potential,
-                "remaining_gap": gap - total_potential,
-                "available_opportunities": len(optimization_opportunities)
-            }), 200
-        
+            return jsonify(
+                {
+                    "status": "warning",
+                    "message": "Unable to close gap with available optimizations",
+                    "gap": gap,
+                    "total_potential": total_potential,
+                    "remaining_gap": gap - total_potential,
+                    "available_opportunities": len(optimization_opportunities),
+                }
+            ), 200
+
         # Smart gap-closing algorithm: prioritize high-ROI opportunities
         selected_optimizations = []
         remaining_gap = gap
         total_projected_savings = 0
-        
+
         for opt in optimization_opportunities:
             if remaining_gap <= 0:
                 break
-            
+
             # Take full optimization if it doesn't over-close the gap significantly
             if opt["potential_savings"] <= remaining_gap * 1.1:  # Allow 10% overage
                 selected_optimizations.append(opt)
@@ -1446,11 +1455,13 @@ async def calculate_target_margin(request: Request):
                 partial_ratio = remaining_gap / opt["potential_savings"]
                 partial_opt = opt.copy()
                 partial_opt["potential_savings"] = remaining_gap
-                partial_opt["description"] = f"Partial: {opt['description']} ({partial_ratio:.1%} implementation)"
+                partial_opt["description"] = (
+                    f"Partial: {opt['description']} ({partial_ratio:.1%} implementation)"
+                )
                 selected_optimizations.append(partial_opt)
                 total_projected_savings += remaining_gap
                 remaining_gap = 0
-        
+
         # Aggregate by optimization type for UI display
         type_aggregates = {}
         for opt in selected_optimizations:
@@ -1460,91 +1471,130 @@ async def calculate_target_margin(request: Request):
                     "total_savings": 0,
                     "count": 0,
                     "avg_risk": 0,
-                    "resources": []
+                    "resources": [],
                 }
             type_aggregates[opt_type]["total_savings"] += opt["potential_savings"]
             type_aggregates[opt_type]["count"] += 1
             type_aggregates[opt_type]["avg_risk"] += opt["risk_score"]
             type_aggregates[opt_type]["resources"].append(opt["resource_name"])
-        
+
         # Calculate averages and percentages
         max_savings_by_type = {
-            "rightsizing": sum(opt["potential_savings"] for opt in optimization_opportunities if opt["type"] == "rightsizing"),
-            "idle_elimination": sum(opt["potential_savings"] for opt in optimization_opportunities if opt["type"] == "idle_elimination"),
-            "storage_optimization": sum(opt["potential_savings"] for opt in optimization_opportunities if opt["type"] == "storage_optimization"),
-            "commitment_adoption": sum(opt["potential_savings"] for opt in optimization_opportunities if opt["type"] == "commitment_adoption")
+            "rightsizing": sum(
+                opt["potential_savings"]
+                for opt in optimization_opportunities
+                if opt["type"] == "rightsizing"
+            ),
+            "idle_elimination": sum(
+                opt["potential_savings"]
+                for opt in optimization_opportunities
+                if opt["type"] == "idle_elimination"
+            ),
+            "storage_optimization": sum(
+                opt["potential_savings"]
+                for opt in optimization_opportunities
+                if opt["type"] == "storage_optimization"
+            ),
+            "commitment_adoption": sum(
+                opt["potential_savings"]
+                for opt in optimization_opportunities
+                if opt["type"] == "commitment_adoption"
+            ),
         }
-        
+
         optimal_levers = {}
         for opt_type, aggregates in type_aggregates.items():
             aggregates["avg_risk"] /= aggregates["count"]
             max_possible = max_savings_by_type.get(opt_type, 1)
-            optimal_levers[opt_type] = min(100, (aggregates["total_savings"] / max_possible) * 100) if max_possible > 0 else 0
-        
+            optimal_levers[opt_type] = (
+                min(100, (aggregates["total_savings"] / max_possible) * 100)
+                if max_possible > 0
+                else 0
+            )
+
         # Ensure all lever types are present
-        for lever_type in ["rightsizing", "idle_elimination", "storage_optimization", "commitment_adoption"]:
+        for lever_type in [
+            "rightsizing",
+            "idle_elimination",
+            "storage_optimization",
+            "commitment_adoption",
+        ]:
             if lever_type not in optimal_levers:
                 optimal_levers[lever_type] = 0
-        
-        projected_rightsizing_savings = type_aggregates.get("rightsizing", {}).get("total_savings", 0)
+
+        projected_rightsizing_savings = type_aggregates.get("rightsizing", {}).get(
+            "total_savings", 0
+        )
         projected_idle_savings = type_aggregates.get("idle_elimination", {}).get("total_savings", 0)
-        projected_storage_savings = type_aggregates.get("storage_optimization", {}).get("total_savings", 0)
-        projected_commitment_savings = type_aggregates.get("commitment_adoption", {}).get("total_savings", 0)
-        
+        projected_storage_savings = type_aggregates.get("storage_optimization", {}).get(
+            "total_savings", 0
+        )
+        projected_commitment_savings = type_aggregates.get("commitment_adoption", {}).get(
+            "total_savings", 0
+        )
+
         new_spend = current_spend - total_projected_savings
-        
-        return jsonify({
-            "status": "success",
-            "current_spend": current_spend,
-            "target_spend": target_spend,
-            "gap": gap,
-            "optimal_levers": optimal_levers,
-            "projected_savings": {
-                "rightsizing": projected_rightsizing_savings,
-                "idle_elimination": projected_idle_savings,
-                "storage_optimization": projected_storage_savings,
-                "commitment_adoption": projected_commitment_savings,
-                "total": total_projected_savings
-            },
-            "new_spend": new_spend,
-            "gap_status": "closed" if new_spend <= target_spend else "open",
-            "optimization_details": {
-                "total_opportunities_analyzed": len(optimization_opportunities),
-                "selected_optimizations": len(selected_optimizations),
-                "avg_risk_score": sum(opt["risk_score"] for opt in selected_optimizations) / len(selected_optimizations) if selected_optimizations else 0
-            },
-            "recommended_actions": [
-                {
-                    "type": "VM Rightsizing",
-                    "impact": projected_rightsizing_savings,
-                    "description": f"Optimize {type_aggregates.get('rightsizing', {}).get('count', 0)} VMs for ${projected_rightsizing_savings:.2f} savings",
-                    "risk_level": "low" if type_aggregates.get('rightsizing', {}).get('avg_risk', 0) < 0.3 else "medium"
+
+        return jsonify(
+            {
+                "status": "success",
+                "current_spend": current_spend,
+                "target_spend": target_spend,
+                "gap": gap,
+                "optimal_levers": optimal_levers,
+                "projected_savings": {
+                    "rightsizing": projected_rightsizing_savings,
+                    "idle_elimination": projected_idle_savings,
+                    "storage_optimization": projected_storage_savings,
+                    "commitment_adoption": projected_commitment_savings,
+                    "total": total_projected_savings,
                 },
-                {
-                    "type": "Idle Resource Elimination", 
-                    "impact": projected_idle_savings,
-                    "description": f"Remove {type_aggregates.get('idle_elimination', {}).get('count', 0)} idle resources for ${projected_idle_savings:.2f} savings",
-                    "risk_level": "very_low"
+                "new_spend": new_spend,
+                "gap_status": "closed" if new_spend <= target_spend else "open",
+                "optimization_details": {
+                    "total_opportunities_analyzed": len(optimization_opportunities),
+                    "selected_optimizations": len(selected_optimizations),
+                    "avg_risk_score": sum(opt["risk_score"] for opt in selected_optimizations)
+                    / len(selected_optimizations)
+                    if selected_optimizations
+                    else 0,
                 },
-                {
-                    "type": "Storage Tier Optimization",
-                    "impact": projected_storage_savings,
-                    "description": f"Optimize {type_aggregates.get('storage_optimization', {}).get('count', 0)} storage resources for ${projected_storage_savings:.2f} savings",
-                    "risk_level": "low"
-                },
-                {
-                    "type": "Commitment Adoption",
-                    "impact": projected_commitment_savings,
-                    "description": f"Implement commitment strategy for ${projected_commitment_savings:.2f} savings",
-                    "risk_level": "medium"
-                }
-            ],
-            "detailed_recommendations": selected_optimizations
-        })
-        
+                "recommended_actions": [
+                    {
+                        "type": "VM Rightsizing",
+                        "impact": projected_rightsizing_savings,
+                        "description": f"Optimize {type_aggregates.get('rightsizing', {}).get('count', 0)} VMs for ${projected_rightsizing_savings:.2f} savings",
+                        "risk_level": "low"
+                        if type_aggregates.get("rightsizing", {}).get("avg_risk", 0) < 0.3
+                        else "medium",
+                    },
+                    {
+                        "type": "Idle Resource Elimination",
+                        "impact": projected_idle_savings,
+                        "description": f"Remove {type_aggregates.get('idle_elimination', {}).get('count', 0)} idle resources for ${projected_idle_savings:.2f} savings",
+                        "risk_level": "very_low",
+                    },
+                    {
+                        "type": "Storage Tier Optimization",
+                        "impact": projected_storage_savings,
+                        "description": f"Optimize {type_aggregates.get('storage_optimization', {}).get('count', 0)} storage resources for ${projected_storage_savings:.2f} savings",
+                        "risk_level": "low",
+                    },
+                    {
+                        "type": "Commitment Adoption",
+                        "impact": projected_commitment_savings,
+                        "description": f"Implement commitment strategy for ${projected_commitment_savings:.2f} savings",
+                        "risk_level": "medium",
+                    },
+                ],
+                "detailed_recommendations": selected_optimizations,
+            }
+        )
+
     except Exception as e:
         print(f"[!] Error in target margin calculation: {e}")
         import traceback
+
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -1554,24 +1604,26 @@ async def apply_target_margin_optimizations(request: Request):
     """Apply the calculated optimization recommendations."""
     try:
         data = (await request.json() if await request.body() else {}) or {}
-        
+
         optimizations = data.get("optimizations", {})
-        
+
         # Placeholder for actual optimization application logic
         # This would integrate with the actual cloud provider APIs to make changes
-        
-        return jsonify({
-            "status": "success",
-            "message": "Optimizations applied successfully",
-            "applied_count": len(optimizations),
-            "details": {
-                "rightsizing_applied": optimizations.get("rightsizing", 0),
-                "idle_elimination_applied": optimizations.get("idle_elimination", 0),
-                "storage_optimization_applied": optimizations.get("storage_optimization", 0),
-                "commitment_adoption_applied": optimizations.get("commitment_adoption", 0)
+
+        return jsonify(
+            {
+                "status": "success",
+                "message": "Optimizations applied successfully",
+                "applied_count": len(optimizations),
+                "details": {
+                    "rightsizing_applied": optimizations.get("rightsizing", 0),
+                    "idle_elimination_applied": optimizations.get("idle_elimination", 0),
+                    "storage_optimization_applied": optimizations.get("storage_optimization", 0),
+                    "commitment_adoption_applied": optimizations.get("commitment_adoption", 0),
+                },
             }
-        })
-        
+        )
+
     except Exception as e:
         print(f"[!] Error applying optimizations: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -4239,13 +4291,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": account.get("id", ""),
-                    "name": account.get("name", ""),
-                    "type": "storage",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": account.get("id", ""),
+                        "name": account.get("name", ""),
+                        "type": "storage",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing storage accounts: {e}")
 
@@ -4269,7 +4323,9 @@ async def analyze_cost_optimization(request: Request):
 
                 current_sku = cluster.get("sku", "Free")
                 node_count = cluster.get("node_count", 1)
-                current_cost = calc.calculate_monthly_cost(provider, "container", current_sku) * node_count
+                current_cost = (
+                    calc.calculate_monthly_cost(provider, "container", current_sku) * node_count
+                )
 
                 resource_data = {
                     "id": cluster.get("id", ""),
@@ -4285,13 +4341,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": cluster.get("id", ""),
-                    "name": cluster.get("name", ""),
-                    "type": "container",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": cluster.get("id", ""),
+                        "name": cluster.get("name", ""),
+                        "type": "container",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing AKS clusters: {e}")
 
@@ -4330,13 +4388,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": instance.get("id", ""),
-                    "name": instance.get("name", ""),
-                    "type": "container",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": instance.get("id", ""),
+                        "name": instance.get("name", ""),
+                        "type": "container",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing container instances: {e}")
 
@@ -4375,13 +4435,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": app.get("id", ""),
-                    "name": app.get("name", ""),
-                    "type": "compute",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": app.get("id", ""),
+                        "name": app.get("name", ""),
+                        "type": "compute",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing function apps: {e}")
 
@@ -4420,13 +4482,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": vault.get("id", ""),
-                    "name": vault.get("name", ""),
-                    "type": "database",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": vault.get("id", ""),
+                        "name": vault.get("name", ""),
+                        "type": "database",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing key vaults: {e}")
 
@@ -4465,13 +4529,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": cache.get("id", ""),
-                    "name": cache.get("name", ""),
-                    "type": "database",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": cache.get("id", ""),
+                        "name": cache.get("name", ""),
+                        "type": "database",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing Redis caches: {e}")
 
@@ -4510,13 +4576,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": account.get("id", ""),
-                    "name": account.get("name", ""),
-                    "type": "database",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": account.get("id", ""),
+                        "name": account.get("name", ""),
+                        "type": "database",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing Cosmos DB accounts: {e}")
 
@@ -4555,13 +4623,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": factory.get("id", ""),
-                    "name": factory.get("name", ""),
-                    "type": "compute",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": factory.get("id", ""),
+                        "name": factory.get("name", ""),
+                        "type": "compute",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing data factories: {e}")
 
@@ -4600,13 +4670,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": app.get("id", ""),
-                    "name": app.get("name", ""),
-                    "type": "compute",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": app.get("id", ""),
+                        "name": app.get("name", ""),
+                        "type": "compute",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing logic apps: {e}")
 
@@ -4645,13 +4717,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": hub.get("id", ""),
-                    "name": hub.get("name", ""),
-                    "type": "network",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": hub.get("id", ""),
+                        "name": hub.get("name", ""),
+                        "type": "network",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing event hubs: {e}")
 
@@ -4690,13 +4764,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": namespace.get("id", ""),
-                    "name": namespace.get("name", ""),
-                    "type": "network",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": namespace.get("id", ""),
+                        "name": namespace.get("name", ""),
+                        "type": "network",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing service bus namespaces: {e}")
 
@@ -4735,13 +4811,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": hub.get("id", ""),
-                    "name": hub.get("name", ""),
-                    "type": "network",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": hub.get("id", ""),
+                        "name": hub.get("name", ""),
+                        "type": "network",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing IoT hubs: {e}")
 
@@ -4780,13 +4858,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": service.get("id", ""),
-                    "name": service.get("name", ""),
-                    "type": "compute",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": service.get("id", ""),
+                        "name": service.get("name", ""),
+                        "type": "compute",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing cognitive services: {e}")
 
@@ -4825,13 +4905,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": insights.get("id", ""),
-                    "name": insights.get("name", ""),
-                    "type": "network",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": insights.get("id", ""),
+                        "name": insights.get("name", ""),
+                        "type": "network",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing application insights: {e}")
 
@@ -4870,13 +4952,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": profile.get("id", ""),
-                    "name": profile.get("name", ""),
-                    "type": "network",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": profile.get("id", ""),
+                        "name": profile.get("name", ""),
+                        "type": "network",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing CDN profiles: {e}")
 
@@ -4915,13 +4999,15 @@ async def analyze_cost_optimization(request: Request):
                     resource_data, metrics, current_cost
                 )
                 cost_optimizer.recommendations.extend(recommendations)
-                resources.append({
-                    "id": instance.get("id", ""),
-                    "name": instance.get("name", ""),
-                    "type": "network",
-                    "current_cost": current_cost,
-                    "metrics": {},
-                })
+                resources.append(
+                    {
+                        "id": instance.get("id", ""),
+                        "name": instance.get("name", ""),
+                        "type": "network",
+                        "current_cost": current_cost,
+                        "metrics": {},
+                    }
+                )
         except Exception as e:
             print(f"[!] Error analyzing API management instances: {e}")
 

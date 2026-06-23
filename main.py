@@ -15,9 +15,9 @@ def main():
         "--metrics", action="store_true", help="Display live performance FinOps analysis data"
     )
     parser.add_argument(
-        "--provider", 
+        "--provider",
         choices=["azure", "aws", "gcp"],
-        help="Cloud provider to fetch metrics from (auto-detects if not specified)"
+        help="Cloud provider to fetch metrics from (auto-detects if not specified)",
     )
     parser.add_argument(
         "--enhanced-pipeline",
