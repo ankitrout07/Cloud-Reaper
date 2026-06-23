@@ -1386,7 +1386,10 @@ async def calculate_target_margin(request: Request):
             # If no current spend provided and no resource summary, return error
             print("[TMF] No current spend available - cannot calculate target margin")
             return jsonify(
-                {"status": "error", "message": "Unable to determine current spend. Please ensure Azure credentials are configured and resources are available."}
+                {
+                    "status": "error",
+                    "message": "Unable to determine current spend. Please ensure Azure credentials are configured and resources are available.",
+                }
             )
 
         # Enhanced savings calculation with risk-weighted optimization
@@ -1398,7 +1401,7 @@ async def calculate_target_margin(request: Request):
                 vm_cost = vm.get("cost", 0)  # Use actual cost from inventory
                 if vm_cost == 0:
                     continue
-                    
+
                 cpu_utilization = vm.get("cpu_utilization", 50)
                 memory_utilization = vm.get("memory_utilization", 50)
 
@@ -1406,16 +1409,18 @@ async def calculate_target_margin(request: Request):
                 if cpu_utilization < 30 or memory_utilization < 30:
                     # More precise savings calculation based on actual utilization
                     utilization_factor = min(cpu_utilization, memory_utilization) / 100
-                    potential_savings = vm_cost * (1 - utilization_factor) * 0.8  # 80% of unused capacity
+                    potential_savings = (
+                        vm_cost * (1 - utilization_factor) * 0.8
+                    )  # 80% of unused capacity
                     risk_score = 0.2  # Low risk
-                    
+
                     # Suggest specific size downgrade based on utilization
                     suggested_action = "Downsize to smaller VM size"
                     if cpu_utilization < 10:
                         suggested_action = "Downsize to 1/4 size or consider serverless"
                     elif cpu_utilization < 20:
                         suggested_action = "Downsize to 1/2 size"
-                    
+
                     optimization_opportunities.append(
                         {
                             "type": "rightsizing",
@@ -1435,7 +1440,7 @@ async def calculate_target_margin(request: Request):
                 vm_cost = vm.get("cost", 0)  # Use actual cost from enhanced idle VM data
                 if vm_cost == 0:
                     continue
-                    
+
                 potential_savings = vm_cost  # 100% savings by eliminating
                 risk_score = 0.1  # Very low risk
                 optimization_opportunities.append(
@@ -1457,7 +1462,7 @@ async def calculate_target_margin(request: Request):
                 disk_cost = disk.get("cost", 0)  # Use actual cost from enhanced orphaned disk data
                 if disk_cost == 0:
                     continue
-                    
+
                 current_tier = disk.get("tier", "premium")
 
                 # Calculate savings based on tier downgrades
@@ -1471,14 +1476,14 @@ async def calculate_target_margin(request: Request):
 
                 potential_savings = disk_cost * tier_savings_map.get(current_tier, 0.3)
                 risk_score = 0.15  # Low risk
-                
+
                 # Suggest specific tier based on current tier
                 suggested_tier = "Standard HDD"
                 if "Premium" in current_tier:
                     suggested_tier = "Standard SSD"
                 elif "Standard" in current_tier:
                     suggested_tier = "Cool tier (if infrequently accessed)"
-                
+
                 optimization_opportunities.append(
                     {
                         "type": "storage_optimization",
@@ -1516,9 +1521,15 @@ async def calculate_target_margin(request: Request):
 
         # Commitment Adoption (High Impact, Medium Risk)
         # Calculate based on actual VM compute costs from resource summary
-        compute_costs = resource_summary.get("virtual_machines", {}).get("total_cost", 0) if resource_summary else 0
+        compute_costs = (
+            resource_summary.get("virtual_machines", {}).get("total_cost", 0)
+            if resource_summary
+            else 0
+        )
         if compute_costs > 50:  # Only recommend if compute spend is significant
-            commitment_potential = compute_costs * 0.30  # Up to 30% savings with reservations on compute
+            commitment_potential = (
+                compute_costs * 0.30
+            )  # Up to 30% savings with reservations on compute
             optimization_opportunities.append(
                 {
                     "type": "commitment_adoption",
@@ -1835,17 +1846,19 @@ async def get_current_spend(request: Request):
             # Try to pull live data from Azure resources
             try:
                 az = AzureCollector()
-                
+
                 # Get detailed resource cost summary
                 resource_cost_summary = az.get_resource_cost_summary()
                 current_spend = float(resource_cost_summary.get("total_monthly_cost", 0.0))
                 resource_breakdown = resource_cost_summary
-                
+
                 # Also get cost vs budget data for burn rate and forecast
                 cost_data = az.get_cost_vs_budget()
-                burn_rate = float(cost_data.get("burn_rate", current_spend / 30 if current_spend > 0 else 0))
+                burn_rate = float(
+                    cost_data.get("burn_rate", current_spend / 30 if current_spend > 0 else 0)
+                )
                 forecast = float(cost_data.get("forecast", burn_rate * 30 if burn_rate > 0 else 0))
-                
+
                 if current_spend > 0:
                     source = "azure"
                 else:
@@ -1869,7 +1882,7 @@ async def get_current_spend(request: Request):
                 return jsonify(
                     {
                         "status": "error",
-                        "message": f"Error fetching Azure resource costs: {str(e)}. Please ensure Azure credentials are configured.",
+                        "message": f"Error fetching Azure resource costs: {e!s}. Please ensure Azure credentials are configured.",
                         "current_spend": 0.0,
                         "target_spend": round(target_spend, 2),
                         "budget_cap": round(budget_threshold, 2),

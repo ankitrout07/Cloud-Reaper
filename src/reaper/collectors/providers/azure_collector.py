@@ -230,37 +230,33 @@ class AzureCollector:
         def fetch():
             vms = self.compute.virtual_machines.list_all()
             inventory = []
-            
+
             for vm in vms:
                 # Extract basic VM info
                 vm_size = vm.hardware_profile.vm_size if vm.hardware_profile else "Unknown"
                 location = vm.location or "Unknown"
-                
+
                 # Estimate monthly cost using the retail prices API
                 estimated_cost = self.estimate_resource_cost(
-                    "microsoft.compute/virtualmachines", 
-                    vm_size, 
-                    location
+                    "microsoft.compute/virtualmachines", vm_size, location
                 )
-                
+
                 # Get CPU utilization metrics for cost optimization insights
                 cpu_utilization = 50  # Default fallback
                 memory_utilization = 50  # Default fallback
-                
+
                 try:
                     resource_group = vm.id.split("/")[4] if len(vm.id.split("/")) > 4 else "unknown"
                     resource_id = (
                         f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
                         f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
                     )
-                    
+
                     # Get last 7 days of CPU metrics
-                    end_time = datetime.datetime.now(datetime.timezone.utc)
+                    end_time = datetime.datetime.now(datetime.UTC)
                     start_time = end_time - datetime.timedelta(days=7)
-                    timespan = (
-                        f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
-                    )
-                    
+                    timespan = f"{start_time.strftime('%Y-%m-%dT%H:%M:%SZ')}/{end_time.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+
                     metrics = self.monitor.metrics.list(
                         resource_id,
                         timespan=timespan,
@@ -268,18 +264,18 @@ class AzureCollector:
                         metricnames="Percentage CPU",
                         aggregation="Average",
                     )
-                    
+
                     if metrics.value and metrics.value[0].timeseries:
                         data_points = [
-                            point.average 
-                            for point in metrics.value[0].timeseries[0].data 
+                            point.average
+                            for point in metrics.value[0].timeseries[0].data
                             if point.average is not None
                         ]
                         if data_points:
                             cpu_utilization = sum(data_points) / len(data_points)
                 except Exception as e:
                     print(f"[!] Error fetching metrics for VM {vm.name}: {e}")
-                
+
                 inventory.append(
                     {
                         "name": vm.name,
@@ -344,14 +340,14 @@ class AzureCollector:
                         avg_usage = sum(data_points) / len(data_points)
                         if avg_usage < cpu_threshold:
                             # Estimate cost for this idle VM
-                            vm_size = vm.hardware_profile.vm_size if vm.hardware_profile else "Unknown"
+                            vm_size = (
+                                vm.hardware_profile.vm_size if vm.hardware_profile else "Unknown"
+                            )
                             location = vm.location or "Unknown"
                             estimated_cost = self.estimate_resource_cost(
-                                "microsoft.compute/virtualmachines",
-                                vm_size,
-                                location
+                                "microsoft.compute/virtualmachines", vm_size, location
                             )
-                            
+
                             return {
                                 "name": vm.name,
                                 "resource_group": resource_group,
@@ -407,18 +403,18 @@ class AzureCollector:
                 disk_tier = disk.sku.name if disk.sku else "Standard_LRS"
                 disk_size = disk.disk_size_gb or 128  # Default to 128GB if unknown
                 location = disk.location or "eastus"
-                
+
                 # Estimate monthly cost based on tier and size
                 tier_cost_map = {
-                    "Standard_LRS": 0.05,      # $0.05 per GB/month
-                    "Standard_GRS": 0.10,     # $0.10 per GB/month
-                    "Standard_ZRS": 0.12,     # $0.12 per GB/month
-                    "Premium_LRS": 0.20,      # $0.20 per GB/month
-                    "Premium_ZRS": 0.25,      # $0.25 per GB/month
+                    "Standard_LRS": 0.05,  # $0.05 per GB/month
+                    "Standard_GRS": 0.10,  # $0.10 per GB/month
+                    "Standard_ZRS": 0.12,  # $0.12 per GB/month
+                    "Premium_LRS": 0.20,  # $0.20 per GB/month
+                    "Premium_ZRS": 0.25,  # $0.25 per GB/month
                 }
                 cost_per_gb = tier_cost_map.get(disk_tier, 0.05)
                 estimated_monthly_cost = disk_size * cost_per_gb
-                
+
                 orphaned_disks.append(
                     {
                         "name": disk.name,
@@ -1556,7 +1552,7 @@ class AzureCollector:
                         print(f"[TMF] Using actual current month spend: ${current_month_spend:.2f}")
                 except Exception as e:
                     print(f"[!] Error fetching actual current month spend: {e}")
-            
+
             # Fall back to get_cost_vs_budget_series if actual costs not available
             if current_month_spend == 0.0:
                 budget = 5000.0  # Default budget
@@ -1567,11 +1563,11 @@ class AzureCollector:
             else:
                 # Get daily breakdown for current month
                 daily_spend = self._get_current_month_daily_spend()
-            
+
             # Calculate burn rate and forecast from actual data
             if current_month_spend > 0:
                 # Get current day of month to calculate accurate burn rate
-                current_day = datetime.datetime.now(datetime.timezone.utc).day
+                current_day = datetime.datetime.now(datetime.UTC).day
                 if current_day > 0:
                     burn_rate = current_month_spend / current_day
                     # Project to end of month (30 days)
@@ -1597,11 +1593,11 @@ class AzureCollector:
             # Fallback to simulated data
             fallback_spend = 3420.50
             return {
-                "cumulative_spend": fallback_spend, 
-                "budget_pace": 114.02, 
+                "cumulative_spend": fallback_spend,
+                "budget_pace": 114.02,
                 "daily_spend": [],
                 "burn_rate": fallback_spend / 30,
-                "forecast": fallback_spend
+                "forecast": fallback_spend,
             }
 
     def _get_current_month_daily_spend(self) -> list:
@@ -1610,19 +1606,21 @@ class AzureCollector:
         """
         if not self.cost_management:
             return []
-            
+
         try:
             scope = f"/subscriptions/{self.subscription_id}"
-            now = datetime.datetime.now(datetime.timezone.utc)
-            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)  # First day of current month
-            
+            now = datetime.datetime.now(datetime.UTC)
+            start_date = now.replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )  # First day of current month
+
             from azure.mgmt.costmanagement.models import (
                 QueryAggregation,
                 QueryDataset,
                 QueryDefinition,
                 QueryTimePeriod,
             )
-            
+
             # Query for daily costs in current month
             query = QueryDefinition(
                 type="Usage",
@@ -1633,15 +1631,15 @@ class AzureCollector:
                     aggregation={"totalCost": QueryAggregation(name="PreTaxCost", function="Sum")},
                 ),
             )
-            
+
             result = self.cost_management.query.usage(scope, query)
-            
+
             daily_spend = []
             if result.rows:
                 daily_spend = [float(row[0]) for row in result.rows]
-            
+
             return daily_spend
-            
+
         except Exception as e:
             print(f"[!] Error in _get_current_month_daily_spend: {e}")
             return []
@@ -2219,9 +2217,9 @@ class AzureCollector:
                 "networking": {"count": 0, "total_cost": 0.0, "resources": []},
                 "databases": {"count": 0, "total_cost": 0.0, "resources": []},
                 "other": {"count": 0, "total_cost": 0.0, "resources": []},
-                "total_monthly_cost": 0.0
+                "total_monthly_cost": 0.0,
             }
-            
+
             # Try to get actual costs from Azure Cost Management API first
             actual_costs_fetched = False
             if self.cost_management:
@@ -2233,11 +2231,11 @@ class AzureCollector:
                         print("[TMF] Using actual Azure Cost Management data")
                 except Exception as e:
                     print(f"[!] Error fetching actual costs from Cost Management: {e}")
-            
+
             # Fall back to estimated costs if actual costs not available
             if not actual_costs_fetched:
                 print("[TMF] Falling back to estimated costs from resource inventory")
-                
+
                 # Get VM costs
                 try:
                     vms = self.get_vm_inventory()
@@ -2247,32 +2245,40 @@ class AzureCollector:
                         if vm_cost > 0:
                             resource_costs["virtual_machines"]["count"] += 1
                             resource_costs["virtual_machines"]["total_cost"] += vm_cost
-                            resource_costs["virtual_machines"]["resources"].append({
-                                "name": vm.get("name"),
-                                "type": "Virtual Machine",
-                                "size": vm.get("size"),
-                                "location": vm.get("location"),
-                                "cost": vm_cost,
-                                "cpu_utilization": vm.get("cpu_utilization", 0)
-                            })
+                            resource_costs["virtual_machines"]["resources"].append(
+                                {
+                                    "name": vm.get("name"),
+                                    "type": "Virtual Machine",
+                                    "size": vm.get("size"),
+                                    "location": vm.get("location"),
+                                    "cost": vm_cost,
+                                    "cpu_utilization": vm.get("cpu_utilization", 0),
+                                }
+                            )
                 except Exception as e:
                     print(f"[!] Error fetching VM costs: {e}")
-                
+
                 # Get storage costs
                 try:
                     storage_accounts = self.get_storage_accounts()
-                    print(f"[TMF] Found {len(storage_accounts)} storage accounts for cost estimation")
+                    print(
+                        f"[TMF] Found {len(storage_accounts)} storage accounts for cost estimation"
+                    )
                     for account in storage_accounts:
                         # Try to get actual storage metrics instead of assuming 100GB
                         try:
                             # Get actual storage usage if possible
                             account_name = account.get("name")
-                            resource_group = account.get("id", "").split("resourceGroups/")[1].split("/")[0] if "resourceGroups/" in account.get("id", "") else "unknown"
-                            
+                            resource_group = (
+                                account.get("id", "").split("resourceGroups/")[1].split("/")[0]
+                                if "resourceGroups/" in account.get("id", "")
+                                else "unknown"
+                            )
+
                             # Use the pricing client to get actual storage costs
                             sku = account.get("sku", "Standard_LRS")
                             location = account.get("location", "eastus")
-                            
+
                             # Estimate based on SKU tier (conservative estimate)
                             # Premium SSD: ~$0.20/GB, Standard SSD: ~$0.10/GB, Standard HDD: ~$0.05/GB
                             if "Premium" in sku:
@@ -2281,25 +2287,29 @@ class AzureCollector:
                                 cost_per_gb = 0.10
                             else:
                                 cost_per_gb = 0.05
-                            
+
                             # Assume average 50GB for estimation (conservative)
                             estimated_cost = 50 * cost_per_gb
-                            
+
                             resource_costs["storage"]["count"] += 1
                             resource_costs["storage"]["total_cost"] += estimated_cost
-                            resource_costs["storage"]["resources"].append({
-                                "name": account.get("name"),
-                                "type": "Storage Account",
-                                "sku": sku,
-                                "location": location,
-                                "cost": round(estimated_cost, 2),
-                                "estimated_gb": 50
-                            })
+                            resource_costs["storage"]["resources"].append(
+                                {
+                                    "name": account.get("name"),
+                                    "type": "Storage Account",
+                                    "sku": sku,
+                                    "location": location,
+                                    "cost": round(estimated_cost, 2),
+                                    "estimated_gb": 50,
+                                }
+                            )
                         except Exception as inner_e:
-                            print(f"[!] Error estimating cost for storage account {account.get('name')}: {inner_e}")
+                            print(
+                                f"[!] Error estimating cost for storage account {account.get('name')}: {inner_e}"
+                            )
                 except Exception as e:
                     print(f"[!] Error fetching storage costs: {e}")
-                
+
                 # Get orphaned disk costs (these are pure waste)
                 try:
                     orphaned = self.get_orphaned_disks()
@@ -2310,68 +2320,81 @@ class AzureCollector:
                         if disk_cost > 0:
                             resource_costs["storage"]["count"] += 1
                             resource_costs["storage"]["total_cost"] += disk_cost
-                            resource_costs["storage"]["resources"].append({
-                                "name": disk.get("name"),
-                                "type": "Orphaned Disk",
-                                "size_gb": disk.get("size_gb"),
-                                "tier": disk.get("tier"),
-                                "location": disk.get("location"),
-                                "cost": disk_cost,
-                                "is_waste": True
-                            })
+                            resource_costs["storage"]["resources"].append(
+                                {
+                                    "name": disk.get("name"),
+                                    "type": "Orphaned Disk",
+                                    "size_gb": disk.get("size_gb"),
+                                    "tier": disk.get("tier"),
+                                    "location": disk.get("location"),
+                                    "cost": disk_cost,
+                                    "is_waste": True,
+                                }
+                            )
                 except Exception as e:
                     print(f"[!] Error fetching orphaned disk costs: {e}")
-                
+
                 # Get network resource costs
                 try:
                     orphaned_network = self.get_orphaned_network_resources()
                     ips = orphaned_network.get("ips", [])
                     lbs = orphaned_network.get("lbs", [])
-                    print(f"[TMF] Found {len(ips)} orphaned IPs and {len(lbs)} orphaned load balancers for cost estimation")
-                    
+                    print(
+                        f"[TMF] Found {len(ips)} orphaned IPs and {len(lbs)} orphaned load balancers for cost estimation"
+                    )
+
                     # Each orphaned IP costs ~$3/month
                     for ip_name in ips:
                         ip_cost = 3.0
                         resource_costs["networking"]["count"] += 1
                         resource_costs["networking"]["total_cost"] += ip_cost
-                        resource_costs["networking"]["resources"].append({
-                            "name": ip_name,
-                            "type": "Orphaned Public IP",
-                            "cost": ip_cost,
-                            "is_waste": True
-                        })
-                    
+                        resource_costs["networking"]["resources"].append(
+                            {
+                                "name": ip_name,
+                                "type": "Orphaned Public IP",
+                                "cost": ip_cost,
+                                "is_waste": True,
+                            }
+                        )
+
                     # Each orphaned LB costs ~$18/month
                     for lb_name in lbs:
                         lb_cost = 18.0
                         resource_costs["networking"]["count"] += 1
                         resource_costs["networking"]["total_cost"] += lb_cost
-                        resource_costs["networking"]["resources"].append({
-                            "name": lb_name,
-                            "type": "Orphaned Load Balancer",
-                            "cost": lb_cost,
-                            "is_waste": True
-                        })
+                        resource_costs["networking"]["resources"].append(
+                            {
+                                "name": lb_name,
+                                "type": "Orphaned Load Balancer",
+                                "cost": lb_cost,
+                                "is_waste": True,
+                            }
+                        )
                 except Exception as e:
                     print(f"[!] Error fetching network costs: {e}")
-                
+
                 # Calculate total
                 resource_costs["total_monthly_cost"] = (
-                    resource_costs["virtual_machines"]["total_cost"] +
-                    resource_costs["storage"]["total_cost"] +
-                    resource_costs["networking"]["total_cost"] +
-                    resource_costs["databases"]["total_cost"] +
-                    resource_costs["other"]["total_cost"]
+                    resource_costs["virtual_machines"]["total_cost"]
+                    + resource_costs["storage"]["total_cost"]
+                    + resource_costs["networking"]["total_cost"]
+                    + resource_costs["databases"]["total_cost"]
+                    + resource_costs["other"]["total_cost"]
                 )
-                
-                print(f"[TMF] Estimated total monthly cost: ${resource_costs['total_monthly_cost']:.2f}")
-                print(f"[TMF] Estimated breakdown - VMs: ${resource_costs['virtual_machines']['total_cost']:.2f}, Storage: ${resource_costs['storage']['total_cost']:.2f}, Network: ${resource_costs['networking']['total_cost']:.2f}, DB: ${resource_costs['databases']['total_cost']:.2f}, Other: ${resource_costs['other']['total_cost']:.2f}")
-            
+
+                print(
+                    f"[TMF] Estimated total monthly cost: ${resource_costs['total_monthly_cost']:.2f}"
+                )
+                print(
+                    f"[TMF] Estimated breakdown - VMs: ${resource_costs['virtual_machines']['total_cost']:.2f}, Storage: ${resource_costs['storage']['total_cost']:.2f}, Network: ${resource_costs['networking']['total_cost']:.2f}, DB: ${resource_costs['databases']['total_cost']:.2f}, Other: ${resource_costs['other']['total_cost']:.2f}"
+                )
+
             return resource_costs
-            
+
         except Exception as e:
             print(f"[!] Error in resource cost summary: {e}")
             import traceback
+
             traceback.print_exc()
             # Return empty data instead of fallback
             return {
@@ -2380,7 +2403,7 @@ class AzureCollector:
                 "networking": {"count": 0, "total_cost": 0.0, "resources": []},
                 "databases": {"count": 0, "total_cost": 0.0, "resources": []},
                 "other": {"count": 0, "total_cost": 0.0, "resources": []},
-                "total_monthly_cost": 0.0
+                "total_monthly_cost": 0.0,
             }
 
     def _get_current_month_daily_spend(self) -> list:
@@ -2388,18 +2411,18 @@ class AzureCollector:
         try:
             if not self.cost_management:
                 return []
-                
+
             scope = f"/subscriptions/{self.subscription_id}"
-            now = datetime.datetime.now(datetime.timezone.utc)
+            now = datetime.datetime.now(datetime.UTC)
             start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            
+
             from azure.mgmt.costmanagement.models import (
                 QueryAggregation,
                 QueryDataset,
                 QueryDefinition,
                 QueryTimePeriod,
             )
-            
+
             query = QueryDefinition(
                 type="Usage",
                 timeframe="Custom",
@@ -2409,9 +2432,9 @@ class AzureCollector:
                     aggregation={"totalCost": QueryAggregation(name="PreTaxCost", function="Sum")},
                 ),
             )
-            
+
             result = self.cost_management.query.usage(scope, query)
-            
+
             daily_spend = []
             if result.rows:
                 for row in result.rows:
@@ -2419,9 +2442,9 @@ class AzureCollector:
                         date = row[1]
                         cost = float(row[0])
                         daily_spend.append({"date": str(date), "cost": round(cost, 2)})
-            
+
             return daily_spend
-            
+
         except Exception as e:
             print(f"[!] Error fetching daily spend: {e}")
             return []
@@ -2434,14 +2457,18 @@ class AzureCollector:
         if not self.cost_management:
             print("[TMF] Cost Management client not available")
             return None
-            
+
         try:
             scope = f"/subscriptions/{self.subscription_id}"
-            now = datetime.datetime.now(datetime.timezone.utc)
-            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)  # First day of current month
-            
-            print(f"[TMF] Fetching cost data from {start_date.date()} to {now.date()} for scope {scope}")
-            
+            now = datetime.datetime.now(datetime.UTC)
+            start_date = now.replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )  # First day of current month
+
+            print(
+                f"[TMF] Fetching cost data from {start_date.date()} to {now.date()} for scope {scope}"
+            )
+
             from azure.mgmt.costmanagement.models import (
                 QueryAggregation,
                 QueryDataset,
@@ -2449,7 +2476,7 @@ class AzureCollector:
                 QueryGrouping,
                 QueryTimePeriod,
             )
-            
+
             # Query for current month costs grouped by resource type
             query = QueryDefinition(
                 type="Usage",
@@ -2461,87 +2488,126 @@ class AzureCollector:
                     grouping=[QueryGrouping(type="Dimension", name="ServiceName")],
                 ),
             )
-            
+
             result = self.cost_management.query.usage(scope, query)
-            
+
             resource_costs = {
                 "virtual_machines": {"count": 0, "total_cost": 0.0, "resources": []},
                 "storage": {"count": 0, "total_cost": 0.0, "resources": []},
                 "networking": {"count": 0, "total_cost": 0.0, "resources": []},
                 "databases": {"count": 0, "total_cost": 0.0, "resources": []},
                 "other": {"count": 0, "total_cost": 0.0, "resources": []},
-                "total_monthly_cost": 0.0
+                "total_monthly_cost": 0.0,
             }
-            
+
             if result.rows:
                 print(f"[TMF] Retrieved {len(result.rows)} cost records from Azure Cost Management")
                 for row in result.rows:
                     if len(row) >= 3:
                         cost = float(row[0])
                         service_name = str(row[2]).lower()
-                        
+
                         # Categorize by service name
-                        if any(k in service_name for k in ("virtual machines", "compute", "containerservice", "containerinstance", "batch")):
+                        if any(
+                            k in service_name
+                            for k in (
+                                "virtual machines",
+                                "compute",
+                                "containerservice",
+                                "containerinstance",
+                                "batch",
+                            )
+                        ):
                             resource_costs["virtual_machines"]["total_cost"] += cost
                             resource_costs["virtual_machines"]["count"] += 1
-                            resource_costs["virtual_machines"]["resources"].append({
-                                "name": service_name,
-                                "type": "Compute Service",
-                                "cost": round(cost, 2)
-                            })
-                        elif any(k in service_name for k in ("storage", "disk", "blob", "files", "backup")):
+                            resource_costs["virtual_machines"]["resources"].append(
+                                {
+                                    "name": service_name,
+                                    "type": "Compute Service",
+                                    "cost": round(cost, 2),
+                                }
+                            )
+                        elif any(
+                            k in service_name
+                            for k in ("storage", "disk", "blob", "files", "backup")
+                        ):
                             resource_costs["storage"]["total_cost"] += cost
                             resource_costs["storage"]["count"] += 1
-                            resource_costs["storage"]["resources"].append({
-                                "name": service_name,
-                                "type": "Storage Service",
-                                "cost": round(cost, 2)
-                            })
-                        elif any(k in service_name for k in ("network", "traffic", "bandwidth", "load balancer", "vpn", "cdn", "expressroute", "firewall")):
+                            resource_costs["storage"]["resources"].append(
+                                {
+                                    "name": service_name,
+                                    "type": "Storage Service",
+                                    "cost": round(cost, 2),
+                                }
+                            )
+                        elif any(
+                            k in service_name
+                            for k in (
+                                "network",
+                                "traffic",
+                                "bandwidth",
+                                "load balancer",
+                                "vpn",
+                                "cdn",
+                                "expressroute",
+                                "firewall",
+                            )
+                        ):
                             resource_costs["networking"]["total_cost"] += cost
                             resource_costs["networking"]["count"] += 1
-                            resource_costs["networking"]["resources"].append({
-                                "name": service_name,
-                                "type": "Network Service",
-                                "cost": round(cost, 2)
-                            })
-                        elif any(k in service_name for k in ("sql", "database", "cosmos", "redis", "cache")):
+                            resource_costs["networking"]["resources"].append(
+                                {
+                                    "name": service_name,
+                                    "type": "Network Service",
+                                    "cost": round(cost, 2),
+                                }
+                            )
+                        elif any(
+                            k in service_name
+                            for k in ("sql", "database", "cosmos", "redis", "cache")
+                        ):
                             resource_costs["databases"]["total_cost"] += cost
                             resource_costs["databases"]["count"] += 1
-                            resource_costs["databases"]["resources"].append({
-                                "name": service_name,
-                                "type": "Database Service",
-                                "cost": round(cost, 2)
-                            })
+                            resource_costs["databases"]["resources"].append(
+                                {
+                                    "name": service_name,
+                                    "type": "Database Service",
+                                    "cost": round(cost, 2),
+                                }
+                            )
                         else:
                             resource_costs["other"]["total_cost"] += cost
                             resource_costs["other"]["count"] += 1
-                            resource_costs["other"]["resources"].append({
-                                "name": service_name,
-                                "type": "Other Service",
-                                "cost": round(cost, 2)
-                            })
-                
+                            resource_costs["other"]["resources"].append(
+                                {
+                                    "name": service_name,
+                                    "type": "Other Service",
+                                    "cost": round(cost, 2),
+                                }
+                            )
+
                 # Calculate total
                 resource_costs["total_monthly_cost"] = (
-                    resource_costs["virtual_machines"]["total_cost"] +
-                    resource_costs["storage"]["total_cost"] +
-                    resource_costs["networking"]["total_cost"] +
-                    resource_costs["databases"]["total_cost"] +
-                    resource_costs["other"]["total_cost"]
+                    resource_costs["virtual_machines"]["total_cost"]
+                    + resource_costs["storage"]["total_cost"]
+                    + resource_costs["networking"]["total_cost"]
+                    + resource_costs["databases"]["total_cost"]
+                    + resource_costs["other"]["total_cost"]
                 )
-                
+
                 print(f"[TMF] Total monthly cost: ${resource_costs['total_monthly_cost']:.2f}")
-                print(f"[TMF] Breakdown - VMs: ${resource_costs['virtual_machines']['total_cost']:.2f}, Storage: ${resource_costs['storage']['total_cost']:.2f}, Network: ${resource_costs['networking']['total_cost']:.2f}, DB: ${resource_costs['databases']['total_cost']:.2f}, Other: ${resource_costs['other']['total_cost']:.2f}")
-                
+                print(
+                    f"[TMF] Breakdown - VMs: ${resource_costs['virtual_machines']['total_cost']:.2f}, Storage: ${resource_costs['storage']['total_cost']:.2f}, Network: ${resource_costs['networking']['total_cost']:.2f}, DB: ${resource_costs['databases']['total_cost']:.2f}, Other: ${resource_costs['other']['total_cost']:.2f}"
+                )
+
                 return resource_costs
-            else:
-                print("[TMF] No cost records returned from Azure Cost Management API")
-                return None
-            
+            print("[TMF] No cost records returned from Azure Cost Management API")
+            return None
+
         except Exception as e:
             print(f"[!] Error in _get_actual_cost_management_costs: {e}")
             import traceback
+
             traceback.print_exc()
             return None
 

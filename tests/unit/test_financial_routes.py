@@ -79,7 +79,7 @@ class FinancialRoutesTestCase(unittest.TestCase):
             "networking": {"count": 0, "total_cost": 0.0, "resources": []},
             "databases": {"count": 0, "total_cost": 0.0, "resources": []},
             "other": {"count": 0, "total_cost": 0.0, "resources": []},
-            "total_monthly_cost": 210.0
+            "total_monthly_cost": 210.0,
         }
 
         # Mock VM inventory with utilization data
