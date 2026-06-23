@@ -1607,13 +1607,20 @@ async def apply_target_margin_optimizations(request: Request):
 
         optimizations = data.get("optimizations", {})
         detailed_recommendations = data.get("detailed_recommendations", [])
-        
+
         if not detailed_recommendations:
-            return JSONResponse(status_code=400, content={"status": "error", "message": "No detailed recommendations provided to apply."})
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "message": "No detailed recommendations provided to apply.",
+                },
+            )
 
         from reaper.remediators.azure_remediator import AzureRemediator
+
         remediator = AzureRemediator()
-        
+
         results = []
         applied_count = 0
 
@@ -1621,13 +1628,18 @@ async def apply_target_margin_optimizations(request: Request):
             rec_type = rec.get("type")
             res_id = rec.get("resource_id")
             res_name = rec.get("resource_name", "unknown")
-            
+
             if not res_id or res_id == "commitment_pool":
                 # Skip commitments or invalid resources for automated physical remediation
                 continue
-                
-            op_result = {"resource": res_name, "type": rec_type, "status": "skipped", "message": "Unsupported type"}
-            
+
+            op_result = {
+                "resource": res_name,
+                "type": rec_type,
+                "status": "skipped",
+                "message": "Unsupported type",
+            }
+
             if rec_type == "rightsizing":
                 op_result = remediator.downsize_vm(res_id)
                 op_result["resource"] = res_name
@@ -1637,24 +1649,26 @@ async def apply_target_margin_optimizations(request: Request):
             elif rec_type == "storage_optimization":
                 op_result = remediator.downgrade_disk(res_id, target_tier="Standard_LRS")
                 op_result["resource"] = res_name
-                
+
             results.append(op_result)
             if op_result.get("status") in ["processing", "dry_run"]:
                 applied_count += 1
-        
-        return jsonify({
-            "status": "success",
-            "message": "Optimization operations initiated",
-            "applied_count": applied_count,
-            "is_dry_run": remediator.is_dry_run,
-            "results": results,
-            "details": {
-                "rightsizing_applied": optimizations.get("rightsizing", 0),
-                "idle_elimination_applied": optimizations.get("idle_elimination", 0),
-                "storage_optimization_applied": optimizations.get("storage_optimization", 0),
-                "commitment_adoption_applied": optimizations.get("commitment_adoption", 0)
+
+        return jsonify(
+            {
+                "status": "success",
+                "message": "Optimization operations initiated",
+                "applied_count": applied_count,
+                "is_dry_run": remediator.is_dry_run,
+                "results": results,
+                "details": {
+                    "rightsizing_applied": optimizations.get("rightsizing", 0),
+                    "idle_elimination_applied": optimizations.get("idle_elimination", 0),
+                    "storage_optimization_applied": optimizations.get("storage_optimization", 0),
+                    "commitment_adoption_applied": optimizations.get("commitment_adoption", 0),
+                },
             }
-        })
+        )
 
     except Exception as e:
         print(f"[!] Error applying optimizations: {e}")
@@ -1676,9 +1690,7 @@ async def get_current_spend(request: Request):
     try:
         budget_threshold = float(settings_state.get("budget_threshold", 1000.0))
         # Persisted target_spend – default 80 % of budget_threshold if not set
-        target_spend = float(
-            settings_state.get("target_spend", round(budget_threshold * 0.80, 2))
-        )
+        target_spend = float(settings_state.get("target_spend", round(budget_threshold * 0.80, 2)))
         # Persisted current_spend override (manual entry takes precedence)
         current_override = settings_state.get("current_spend_override")
 
@@ -1700,15 +1712,17 @@ async def get_current_spend(request: Request):
                 # Azure not configured – keep fallback
                 source = "fallback"
 
-        return jsonify({
-            "status": "success",
-            "current_spend": round(current_spend, 2),
-            "target_spend": round(target_spend, 2),
-            "budget_cap": round(budget_threshold, 2),
-            "burn_rate": round(burn_rate, 4),
-            "forecast": round(forecast, 2),
-            "source": source,
-        })
+        return jsonify(
+            {
+                "status": "success",
+                "current_spend": round(current_spend, 2),
+                "target_spend": round(target_spend, 2),
+                "budget_cap": round(budget_threshold, 2),
+                "burn_rate": round(burn_rate, 4),
+                "forecast": round(forecast, 2),
+                "source": source,
+            }
+        )
     except Exception as e:
         print(f"[!] Error fetching current spend: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -1755,13 +1769,17 @@ async def update_spend_config(request: Request):
                 content={"status": "error", "message": "Provide current_spend and/or target_spend"},
             )
 
-        return jsonify({
-            "status": "success",
-            "message": "Spend configuration updated",
-            "updated": updated,
-        })
+        return jsonify(
+            {
+                "status": "success",
+                "message": "Spend configuration updated",
+                "updated": updated,
+            }
+        )
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"status": "error", "message": f"Invalid value: {e}"})
+        return JSONResponse(
+            status_code=400, content={"status": "error", "message": f"Invalid value: {e}"}
+        )
     except Exception as e:
         print(f"[!] Error updating spend config: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
