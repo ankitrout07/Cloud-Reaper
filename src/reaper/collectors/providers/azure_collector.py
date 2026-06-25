@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import Any
 
 from azure.identity import DefaultAzureCredential
-from azure.mgmt.authorization import AuthorizationManagementClient
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.consumption import ConsumptionManagementClient
 from azure.mgmt.monitor import MonitorManagementClient
@@ -340,13 +339,11 @@ class AzureCollector:
                         ]
                         if data_points:
                             avg_usages.append(sum(data_points) / len(data_points))
-                            
+
                 if avg_usages and (sum(avg_usages) / len(avg_usages)) < cpu_threshold:
                     avg_usage = sum(avg_usages) / len(avg_usages)
                     # Estimate cost for this idle VM
-                    vm_size = (
-                        vm.hardware_profile.vm_size if vm.hardware_profile else "Unknown"
-                    )
+                    vm_size = vm.hardware_profile.vm_size if vm.hardware_profile else "Unknown"
                     location = vm.location or "Unknown"
                     estimated_cost = self.estimate_resource_cost(
                         "microsoft.compute/virtualmachines", vm_size, location
@@ -921,7 +918,9 @@ class AzureCollector:
                 all_points = []
                 for item in metrics.value:
                     for timeseries in item.timeseries:
-                        all_points.extend(p.average for p in timeseries.data if p.average is not None)
+                        all_points.extend(
+                            p.average for p in timeseries.data if p.average is not None
+                        )
 
                 has_data = bool(all_points)
                 avg_usage = sum(all_points) / len(all_points) if has_data else 0.0
@@ -969,7 +968,9 @@ class AzureCollector:
                 all_points = []
                 for item in metrics.value:
                     for timeseries in item.timeseries:
-                        all_points.extend(p.average for p in timeseries.data if p.average is not None)
+                        all_points.extend(
+                            p.average for p in timeseries.data if p.average is not None
+                        )
                 avg_usage = sum(all_points) / len(all_points) if all_points else 0.0
                 return {"name": vm.name, "usage": round(avg_usage, 1), "rg": resource_group}
             except Exception:
@@ -1113,10 +1114,12 @@ class AzureCollector:
                         )
                         for item in metrics.value:
                             for timeseries in item.timeseries:
-                                data_points = [p.average for p in timeseries.data if p.average is not None]
+                                data_points = [
+                                    p.average for p in timeseries.data if p.average is not None
+                                ]
                                 if data_points:
                                     size_bytes = sum(data_points) / len(data_points)
-                                    size_gb = size_bytes / (1024 ** 3)
+                                    size_gb = size_bytes / (1024**3)
                     except Exception as e:
                         print(f"[!] Error getting storage size for {acc.name}: {e}")
 
@@ -1125,7 +1128,9 @@ class AzureCollector:
                             {
                                 "bucket": acc.name,
                                 "size_gb": round(size_gb, 2),
-                                "monthly_savings": round(size_gb * 0.01, 2),  # Hot->Cool saves ~$0.01/GB
+                                "monthly_savings": round(
+                                    size_gb * 0.01, 2
+                                ),  # Hot->Cool saves ~$0.01/GB
                             }
                         )
         except Exception as e:
@@ -1231,7 +1236,9 @@ class AzureCollector:
             budgets = self.consumption.budgets.list(scope)
             results = []
             burn = self.get_burn_rate_forecast()
-            forecast_val = sum(burn.get("forecast_points", [])) if burn.get("forecast_points") else 0
+            forecast_val = (
+                sum(burn.get("forecast_points", [])) if burn.get("forecast_points") else 0
+            )
             for b in budgets:
                 # Note: 'current_spend' might require a separate call in some SDK versions
                 # but we can try to get it from the object if present
@@ -1555,7 +1562,7 @@ class AzureCollector:
         from reaper.remediators.azure_remediator import AzureRemediator
 
         remediator = AzureRemediator()
-        
+
         # Parse resource info to find action to take. Since this is an un-specific
         # entry point, we default to deleting virtual machines if the type is compute.
         # More specific remediation should use the AzureRemediator class directly.
@@ -1563,7 +1570,7 @@ class AzureCollector:
             rg_name = resource_id.split("/")[4]
             vm_name = resource_id.split("/")[-1]
             return remediator.delete_vm(rg_name, vm_name)
-        
+
         return {
             "status": "failed",
             "message": f"Execute reap not fully supported here for {resource_type}. Use AzureRemediator directly.",
@@ -1635,7 +1642,6 @@ class AzureCollector:
                 "burn_rate": fallback_spend / 30,
                 "forecast": fallback_spend,
             }
-
 
     def get_cost_vs_budget_chart(self) -> dict:
         """
@@ -2082,8 +2088,6 @@ class AzureCollector:
                 return []
 
         return get_cached_data(cache_key, fetch, ttl_seconds=120)
-
-
 
     # ========== COST ESTIMATION ==========
 

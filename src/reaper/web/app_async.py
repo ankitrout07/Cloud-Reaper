@@ -216,6 +216,7 @@ async def background_metrics_worker():
 
             try:
                 if not is_first_run():
+
                     def _get_cpu():
                         c = AzureCollector()
                         return c.get_live_subscription_cpu_average(max_vms=6)
@@ -351,6 +352,7 @@ async def _get_cached_user_info(request: Request) -> tuple[str, str]:
 
     # Fetch fresh data and cache it
     try:
+
         def _get_user_info():
             c = AzureCollector()
             return c.get_user_name(), c.get_subscription_name()
@@ -1265,7 +1267,9 @@ async def vault_delete_entry(request: Request, entry_id: int):
 @app.get("/api/settings/auth")
 async def check_auth(request: Request):
     try:
-        await asyncio.to_thread(subprocess.run, ["az", "account", "show"], capture_output=True, check=True)
+        await asyncio.to_thread(
+            subprocess.run, ["az", "account", "show"], capture_output=True, check=True
+        )
         return jsonify(
             {"status": "healthy", "message": "Connected: Azure CLI (Active Subscription)"}
         )
@@ -1858,6 +1862,7 @@ async def get_current_spend(request: Request):
         else:
             # Try to pull live data from Azure resources
             try:
+
                 def _fetch_cost_data():
                     c = AzureCollector()
                     return c.get_resource_cost_summary(), c.get_cost_vs_budget()
@@ -2797,6 +2802,7 @@ async def get_resource_inventory_summary(request: Request):
     Suitable for dashboard widgets that don't need full resource data.
     """
     try:
+
         def _fetch_resources():
             c = AzureCollector()
             return c.get_all_resources_via_resource_graph()
@@ -3019,6 +3025,7 @@ async def update_budget_threshold(request: Request):
 async def get_budget_chart_data(request: Request):
     """Get chart data for budget pacing visualization."""
     try:
+
         def _fetch_chart_data():
             c = AzureCollector()
             return c.get_cost_vs_budget_chart()
@@ -3044,6 +3051,7 @@ async def get_budget_chart_data(request: Request):
 async def get_commitments_data(request: Request):
     """Get active commitment portfolio and recommendations."""
     try:
+
         def _fetch_commitments():
             c = AzureCollector()
             return c.get_active_commitments(), c.get_ri_coverage(), c.get_ri_recommendations()
@@ -3097,6 +3105,7 @@ async def get_commitments_data(request: Request):
 async def get_issues_data(request: Request):
     """Get cost governance issues requiring action."""
     try:
+
         def _fetch_issues():
             c = AzureCollector()
             return c.get_cost_governance_issues()
@@ -3467,6 +3476,7 @@ async def api_dashboard_finops_charts(request: Request):
             return {"status": "ok", "charts": cached_charts, "cached": True}
 
     try:
+
         def _fetch_charts():
             c = AzureCollector()
             budget = float(settings_state.get("budget_threshold", 1000.0))
@@ -3583,6 +3593,7 @@ async def _async_perform_subscription_scan(target_subs: list[str], events: list[
     are non-blocking.  Results are merged in the same shape as the sync
     version so format_scan_results() works unchanged.
     """
+
     def _get_collector():
         return AzureCollector()
 
@@ -4045,6 +4056,7 @@ async def tag_health(request: Request):
 @app.get("/api/finops/anomalies")
 async def anomalies(request: Request):
     try:
+
         def _get_anomalies():
             c = AzureCollector()
             return c.get_anomaly_data()
@@ -4142,6 +4154,7 @@ async def unit_economics(request: Request):
 @app.get("/api/finops/ri-advisor")
 async def ri_advisor(request: Request):
     try:
+
         def _get_candidates():
             c = AzureCollector()
             return c.get_ri_sp_candidates()
@@ -4161,6 +4174,7 @@ async def ri_advisor(request: Request):
 @app.get("/api/finops/cold-storage")
 async def cold_storage(request: Request):
     try:
+
         def _get_buckets():
             c = AzureCollector()
             return c.get_cold_storage_candidates()
@@ -4180,6 +4194,7 @@ async def cold_storage(request: Request):
 @app.get("/api/finops/modernization")
 async def modernization(request: Request):
     try:
+
         def _get_suggestions():
             c = AzureCollector()
             return c.get_modernization_candidates()
@@ -4199,6 +4214,7 @@ async def modernization(request: Request):
 @app.get("/api/finops/policy-violations")
 async def policy_violations(request: Request):
     try:
+
         def _get_violations():
             c = AzureCollector()
             return c.get_policy_violations()
@@ -4218,6 +4234,7 @@ async def policy_violations(request: Request):
 @app.get("/api/finops/budget-status")
 async def budget_status(request: Request):
     try:
+
         def _get_budget_status():
             c = AzureCollector()
             return c.get_budget_status()
@@ -4249,6 +4266,7 @@ async def budget_killswitch(request: Request):
 @app.get("/api/finops/burn-rate-forecast")
 async def burn_rate_forecast(request: Request):
     try:
+
         def _get_forecast():
             c = AzureCollector()
             return c.get_burn_rate_forecast()
@@ -4262,6 +4280,7 @@ async def burn_rate_forecast(request: Request):
 @app.get("/api/finops/virtual-tags")
 async def virtual_tags(request: Request):
     try:
+
         def _get_virtual_tags():
             c = AzureCollector()
             return c.get_virtual_tags()
@@ -4278,7 +4297,9 @@ async def greenops(request: Request):
         return jsonify(
             {
                 "status": "success",
-                "recommendations": await asyncio.to_thread(_run_collector, "get_greenops_recommendations"),
+                "recommendations": await asyncio.to_thread(
+                    _run_collector, "get_greenops_recommendations"
+                ),
             }
         )
     except Exception as e:
@@ -4294,6 +4315,7 @@ async def approve_reap(request: Request):
             return JSONResponse(
                 status_code=400, content={"status": "error", "message": "Missing resource_id"}
             )
+
         def _execute_reap():
             c = AzureCollector()
             return c.execute_reap(res_id, res_type)
@@ -4375,6 +4397,7 @@ async def get_activity(request: Request):
 @app.get("/api/finops/utilization")
 async def utilization(request: Request):
     try:
+
         def _get_utilization():
             c = AzureCollector()
             return c.get_utilization_report()
@@ -4516,6 +4539,7 @@ async def analyze_cost_optimization(request: Request):
 
         # Initialize collector based on provider
         if provider == "azure":
+
             def _get_collector():
                 return AzureCollector()
 

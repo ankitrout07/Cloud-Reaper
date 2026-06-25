@@ -1,14 +1,18 @@
-import re
-
 app_file = "src/reaper/web/app_async.py"
 
-with open(app_file, "r") as f:
+with open(app_file) as f:
     content = f.read()
 
 # Fix _get_cached_user_info
-content = content.replace("def _get_cached_user_info(request: Request) -> tuple[str, str]:", "async def _get_cached_user_info(request: Request) -> tuple[str, str]:")
+content = content.replace(
+    "def _get_cached_user_info(request: Request) -> tuple[str, str]:",
+    "async def _get_cached_user_info(request: Request) -> tuple[str, str]:",
+)
 
-content = content.replace("user_name, sub_name = _get_cached_user_info(request)", "user_name, sub_name = await _get_cached_user_info(request)")
+content = content.replace(
+    "user_name, sub_name = _get_cached_user_info(request)",
+    "user_name, sub_name = await _get_cached_user_info(request)",
+)
 
 old_fetch_block = """    # Fetch fresh data and cache it
     try:
