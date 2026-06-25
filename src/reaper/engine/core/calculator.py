@@ -304,21 +304,20 @@ class RightsizingAgent:
             current_sku: Current SKU identifier
             environment_type: 'production' or 'dev-test' (overrides instance setting)
         """
-        # Update environment if provided
-        if environment_type:
-            self.environment_type = environment_type
-            if self.environment_type == "production":
-                self.risk_thresholds = {
-                    "high_utilization": 80.0,
-                    "medium_utilization": 60.0,
-                    "low_utilization": 30.0,
-                }
-            else:
-                self.risk_thresholds = {
-                    "high_utilization": 70.0,
-                    "medium_utilization": 50.0,
-                    "low_utilization": 20.0,
-                }
+        # Use provided environment_type or fall back to instance setting
+        env = environment_type or self.environment_type
+        if env == "production":
+            risk_thresholds = {
+                "high_utilization": 80.0,
+                "medium_utilization": 60.0,
+                "low_utilization": 30.0,
+            }
+        else:
+            risk_thresholds = {
+                "high_utilization": 70.0,
+                "medium_utilization": 50.0,
+                "low_utilization": 20.0,
+            }
 
         cpu_util = metrics.get("cpu", 0)
         mem_util = metrics.get("mem", 0)
@@ -335,23 +334,23 @@ class RightsizingAgent:
         risk_profile = "Low"
         if action == "migrate_family":
             if (
-                mem_util > self.risk_thresholds["high_utilization"]
-                or cpu_util > self.risk_thresholds["high_utilization"]
+                mem_util > risk_thresholds["high_utilization"]
+                or cpu_util > risk_thresholds["high_utilization"]
             ):
                 risk_profile = "High"
             elif (
-                mem_util > self.risk_thresholds["medium_utilization"]
-                or cpu_util > self.risk_thresholds["medium_utilization"]
+                mem_util > risk_thresholds["medium_utilization"]
+                or cpu_util > risk_thresholds["medium_utilization"]
             ):
                 risk_profile = "Medium"
         elif action == "downscale":
-            if max(cpu_util, mem_util) > self.risk_thresholds["medium_utilization"]:
+            if max(cpu_util, mem_util) > risk_thresholds["medium_utilization"]:
                 risk_profile = "Medium"
-            if max(cpu_util, mem_util) > self.risk_thresholds["high_utilization"]:
+            if max(cpu_util, mem_util) > risk_thresholds["high_utilization"]:
                 risk_profile = "High"
 
         # Production safety override
-        if self.environment_type == "production" and risk_profile == "High":
+        if env == "production" and risk_profile == "High":
             action = "stay"  # Override to stay for production safety
 
         return {
@@ -359,8 +358,8 @@ class RightsizingAgent:
             "risk_profile": risk_profile,
             "sla_maintained": risk_profile != "High",
             "current_sku": current_sku,
-            "environment_type": self.environment_type,
-            "thresholds_used": self.risk_thresholds,
+            "environment_type": env,
+            "thresholds_used": risk_thresholds,
         }
 
     def batch_evaluate_migration(self, metrics_df: "pd.DataFrame") -> "pd.DataFrame":

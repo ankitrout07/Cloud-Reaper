@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 
 import numpy as np
@@ -9,6 +10,8 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from reaper.engine.core.calculator import RightsizingAgent
 from reaper.engine.core.workload import WorkloadPersonality
 from reaper.engine.notifications.notifier import send_discord_alert
+
+logger = logging.getLogger(__name__)
 
 
 def analyze_compute_telemetry(cpu_matrix, memory_matrix, env_type="dev-test", lookback_days=7):
@@ -25,9 +28,11 @@ def analyze_compute_telemetry(cpu_matrix, memory_matrix, env_type="dev-test", lo
     Returns:
         List of recommendation dictionaries with action, impact, and reason
     """
-    # Slice the input matrices to target the exact user lookback timeframe
-    cpu_slice = cpu_matrix[:, -lookback_days:]
-    mem_slice = memory_matrix[:, -lookback_days:]
+    # BUG-07 fix: clip lookback to the number of columns actually present so that
+    # requesting more days than the matrix has doesn't silently include all columns.
+    actual_days = min(lookback_days, cpu_matrix.shape[1])
+    cpu_slice = cpu_matrix[:, -actual_days:]
+    mem_slice = memory_matrix[:, -actual_days:]
 
     # High-velocity vectorized average calculations bypassing the Python GIL
     avg_cpu = np.mean(cpu_slice, axis=1)
@@ -166,7 +171,10 @@ class ZombieScorer:
         total_scores = attachment_scores + iops_scores
         is_zombie_arr = total_scores >= self.threshold
 
+        # BUG-08 fix: collect zombie summaries and send ONE batched Discord alert after
+        # the loop instead of firing a separate webhook call per zombie resource.
         results = []
+        zombie_summaries: list[str] = []
         for i, r in enumerate(resources):
             reasons = []
             if is_unattached[i]:
@@ -178,17 +186,19 @@ class ZombieScorer:
 
             is_zombie = bool(is_zombie_arr[i])
             if is_zombie:
-                title = "ZOMBIE RESOURCE DETECTED"
-                msg = (
-                    f"**Resource:** `{r['name']}`\n"
-                    f"**Type:** `{r['type']}`\n"
-                    f"**Heuristic Score:** `{int(total_scores[i])}`\n\n"
-                    "**Reasons:**\n" + "\n".join([f"• {rsn}" for rsn in reasons])
+                zombie_summaries.append(
+                    f"• `{r['name']}` ({r['type']}) — score {int(total_scores[i])}"
                 )
-                send_discord_alert(title, msg, color=0xEF4444)
 
             results.append(
                 {"is_zombie": is_zombie, "score": int(total_scores[i]), "reasons": reasons}
+            )
+
+        if zombie_summaries:
+            send_discord_alert(
+                f"ZOMBIE RESOURCES DETECTED ({len(zombie_summaries)})",
+                "**Zombie resources found in batch scan:**\n" + "\n".join(zombie_summaries),
+                color=0xEF4444,
             )
 
         return results
@@ -222,7 +232,9 @@ class BudgetForecaster:
                 "forecast_points": np.round(forecast_arr, 2).tolist(),
                 "confidence": "high" if len(daily_spend_history) > 14 else "medium",
             }
-        except Exception:
+        except Exception as exc:
+            # BUG-09 fix: log the suppressed exception so failures aren't invisible.
+            logger.warning("ARIMA forecasting failed (%r); falling back to linear trend", exc)
             return self._linear_fallback(daily_spend_history, days_to_predict)
 
     def _linear_fallback(self, history, days):
@@ -258,7 +270,9 @@ class RightSizer:
                 break
 
         # Extract vCPU-ish number from SKU (e.g., D2s_v3 -> 2)
-        match = re.search(r"(\d+)", sku_name)
+        # Match only the primary digits in the family segment to avoid matching versions like v3
+        family_part = sku_name.split("_")[1] if "_" in sku_name else sku_name
+        match = re.search(r"(\d+)", family_part)
         vcpus = int(match.group(1)) if match else 1
 
         return base_score * vcpus
@@ -424,7 +438,7 @@ class AnomalyDetector:
 
         df = pd.Series(history)
         rolling_mean = df.rolling(window=7, min_periods=1).mean()
-        rolling_std = df.rolling(window=7, min_periods=1).std()
+        rolling_std = df.rolling(window=7, min_periods=2).std().fillna(0)
 
         latest_val = history[-1]
         latest_mean = rolling_mean.iloc[-1]

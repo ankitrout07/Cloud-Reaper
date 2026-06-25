@@ -240,7 +240,7 @@ class FinOpsPipeline:
                 memory_matrix = np.array([memory_history[-lookback_days:]], dtype=np.float64)
 
                 # Perform vectorized compute telemetry analysis
-                telemetry_analysis = self.analyze_compute_telemetry(
+                telemetry_analysis = self._analyze_single_resource_telemetry(
                     cpu_matrix, memory_matrix, env_type=env_type, lookback_days=lookback_days
                 )
 
@@ -299,7 +299,7 @@ class FinOpsPipeline:
             logger.error(f"Rightsizing analysis failed: {e}")
             return {"success": False, "error": str(e)}
 
-    def analyze_compute_telemetry(
+    def _analyze_single_resource_telemetry(
         self,
         cpu_matrix: np.ndarray,
         memory_matrix: np.ndarray,

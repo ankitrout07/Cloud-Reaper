@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import contextlib
 import datetime
@@ -215,8 +216,11 @@ async def background_metrics_worker():
 
             try:
                 if not is_first_run():
-                    az = AzureCollector()
-                    cpu_usage = az.get_live_subscription_cpu_average(max_vms=6)
+                    def _get_cpu():
+                        c = AzureCollector()
+                        return c.get_live_subscription_cpu_average(max_vms=6)
+
+                    cpu_usage = await asyncio.to_thread(_get_cpu)
                     error_count = 0  # Reset error count on success
                     backoff_time = SOCKET_METRICS_INTERVAL_SEC  # Reset backoff on success
             except Exception as e:
@@ -245,16 +249,12 @@ async def background_metrics_worker():
             print(f"[!] Critical error in metrics worker: {e}")
             # Prevent rapid crash loops by sleeping longer on critical errors
             backoff_time = min(backoff_time * 2, max_backoff)
-            import asyncio
-
             await asyncio.sleep(backoff_time)
 
 
 # Start the worker after the app is ready
 @app.on_event("startup")
 async def startup_event():
-    import asyncio
-
     asyncio.create_task(background_metrics_worker())
 
 
@@ -276,6 +276,13 @@ settings_state = {
 }
 
 ENV_PATH = str(_repo_root() / ".env")
+
+
+def _run_collector(method_name: str, *args, **kwargs) -> Any:
+    """Helper to run AzureCollector methods in thread pool to avoid blocking event loop."""
+    c = AzureCollector()
+    method = getattr(c, method_name)
+    return method(*args, **kwargs)
 
 
 @app.post("/api/settings/sync")
@@ -327,7 +334,7 @@ async def favicon_png(request: Request):
     )
 
 
-def _get_cached_user_info(request: Request) -> tuple[str, str]:
+async def _get_cached_user_info(request: Request) -> tuple[str, str]:
     """Get cached user/subscription info with 5-minute TTL to avoid blocking Azure API calls."""
     cache_key_prefix = "azure_user_info"
     cache_ttl = 300  # 5 minutes
@@ -344,9 +351,11 @@ def _get_cached_user_info(request: Request) -> tuple[str, str]:
 
     # Fetch fresh data and cache it
     try:
-        az = AzureCollector()
-        user_name = az.get_user_name()
-        sub_name = az.get_subscription_name()
+        def _get_user_info():
+            c = AzureCollector()
+            return c.get_user_name(), c.get_subscription_name()
+
+        user_name, sub_name = await asyncio.to_thread(_get_user_info)
 
         # Cache in session
         request.session[f"{cache_key_prefix}_user"] = user_name
@@ -1256,7 +1265,7 @@ async def vault_delete_entry(request: Request, entry_id: int):
 @app.get("/api/settings/auth")
 async def check_auth(request: Request):
     try:
-        subprocess.run(["az", "account", "show"], capture_output=True, check=True)
+        await asyncio.to_thread(subprocess.run, ["az", "account", "show"], capture_output=True, check=True)
         return jsonify(
             {"status": "healthy", "message": "Connected: Azure CLI (Active Subscription)"}
         )
@@ -1271,7 +1280,8 @@ async def list_subscriptions(request: Request):
         if not binary_path:
             return []
 
-        result = subprocess.run(
+        result = await asyncio.to_thread(
+            subprocess.run,
             [str(binary_path), "--list-subs"],
             capture_output=True,
             text=True,
@@ -1370,13 +1380,16 @@ async def calculate_target_margin(request: Request):
                 {"status": "unconfigured", "message": "Please configure cloud credentials first"}
             )
 
-        collector = AzureCollector()
+        def _fetch_tmf_data():
+            c = AzureCollector()
+            return (
+                c.get_resource_cost_summary(),
+                c.get_vm_inventory(),
+                c.get_idle_vms(),
+                c.get_orphaned_disks(),
+            )
 
-        # Get actual resource costs and inventory
-        resource_summary = collector.get_resource_cost_summary()
-        vms = collector.get_vm_inventory()
-        idle_vms = collector.get_idle_vms()
-        orphaned_disks = collector.get_orphaned_disks()
+        resource_summary, vms, idle_vms, orphaned_disks = await asyncio.to_thread(_fetch_tmf_data)
 
         # Use actual current spend from resource summary if available
         if resource_summary and resource_summary.get("total_monthly_cost", 0) > 0:
@@ -1845,15 +1858,14 @@ async def get_current_spend(request: Request):
         else:
             # Try to pull live data from Azure resources
             try:
-                az = AzureCollector()
+                def _fetch_cost_data():
+                    c = AzureCollector()
+                    return c.get_resource_cost_summary(), c.get_cost_vs_budget()
 
-                # Get detailed resource cost summary
-                resource_cost_summary = az.get_resource_cost_summary()
+                resource_cost_summary, cost_data = await asyncio.to_thread(_fetch_cost_data)
                 current_spend = float(resource_cost_summary.get("total_monthly_cost", 0.0))
                 resource_breakdown = resource_cost_summary
 
-                # Also get cost vs budget data for burn rate and forecast
-                cost_data = az.get_cost_vs_budget()
                 burn_rate = float(
                     cost_data.get("burn_rate", current_spend / 30 if current_spend > 0 else 0)
                 )
@@ -2001,7 +2013,10 @@ async def get_resource_inventory(request: Request):
         status_filter = request.query_params.get("status", "").strip()
         search_q = request.query_params.get("q", "").strip().lower()
 
-        az = AzureCollector()
+        def _get_collector():
+            return AzureCollector()
+
+        az = await asyncio.to_thread(_get_collector)
 
         inventory: dict[str, list | dict] = {
             "virtual_machines": [],
@@ -2782,9 +2797,11 @@ async def get_resource_inventory_summary(request: Request):
     Suitable for dashboard widgets that don't need full resource data.
     """
     try:
-        az = AzureCollector()
-        # Kick off a lightweight Resource Graph ALL query for counts
-        all_resources = az.get_all_resources_via_resource_graph()
+        def _fetch_resources():
+            c = AzureCollector()
+            return c.get_all_resources_via_resource_graph()
+
+        all_resources = await asyncio.to_thread(_fetch_resources)
         type_counts: dict[str, int] = {}
         for r in all_resources:
             rt = str(r.get("type", "other")).lower()
@@ -2857,8 +2874,11 @@ async def search_resources(request: Request):
         category_filter = request.query_params.get("category", "").strip().lower()
         status_filter = request.query_params.get("status", "").strip()
 
-        az = AzureCollector()
-        all_resources = az.get_all_resources_via_resource_graph()
+        def _fetch_resources():
+            c = AzureCollector()
+            return c.get_all_resources_via_resource_graph()
+
+        all_resources = await asyncio.to_thread(_fetch_resources)
 
         results = [
             {
@@ -2933,9 +2953,12 @@ async def get_budget_data(request: Request):
         budget_threshold = float(settings_state.get("budget_threshold", 1000.0))
 
         # Get actual spend data from Azure Collector if available
-        az = AzureCollector()
+        def _fetch_cost_data():
+            c = AzureCollector()
+            return c.get_cost_vs_budget()
+
         try:
-            cost_data = az.get_cost_vs_budget()
+            cost_data = await asyncio.to_thread(_fetch_cost_data)
             cumulative_spend = cost_data.get("cumulative_spend", 0)
             budget_pace = cost_data.get("budget_pace", 0)
             daily_spend = cost_data.get("daily_spend", [])
@@ -2996,9 +3019,12 @@ async def update_budget_threshold(request: Request):
 async def get_budget_chart_data(request: Request):
     """Get chart data for budget pacing visualization."""
     try:
-        az = AzureCollector()
+        def _fetch_chart_data():
+            c = AzureCollector()
+            return c.get_cost_vs_budget_chart()
+
         try:
-            chart_data = az.get_cost_vs_budget_chart()
+            chart_data = await asyncio.to_thread(_fetch_chart_data)
         except Exception:
             # Fallback simulated data
             import random
@@ -3018,11 +3044,12 @@ async def get_budget_chart_data(request: Request):
 async def get_commitments_data(request: Request):
     """Get active commitment portfolio and recommendations."""
     try:
-        az = AzureCollector()
+        def _fetch_commitments():
+            c = AzureCollector()
+            return c.get_active_commitments(), c.get_ri_coverage(), c.get_ri_recommendations()
+
         try:
-            commitments = az.get_active_commitments()
-            coverage = az.get_ri_coverage()
-            recommendations = az.get_ri_recommendations()
+            commitments, coverage, recommendations = await asyncio.to_thread(_fetch_commitments)
         except Exception:
             # Fallback simulated data
             commitments = [
@@ -3070,9 +3097,12 @@ async def get_commitments_data(request: Request):
 async def get_issues_data(request: Request):
     """Get cost governance issues requiring action."""
     try:
-        az = AzureCollector()
+        def _fetch_issues():
+            c = AzureCollector()
+            return c.get_cost_governance_issues()
+
         try:
-            issues = az.get_cost_governance_issues()
+            issues = await asyncio.to_thread(_fetch_issues)
         except Exception:
             # Fallback simulated data
             issues = [
@@ -3437,9 +3467,12 @@ async def api_dashboard_finops_charts(request: Request):
             return {"status": "ok", "charts": cached_charts, "cached": True}
 
     try:
-        az = AzureCollector()
-        budget = float(settings_state.get("budget_threshold", 1000.0))
-        charts = az.get_finops_dashboard_snapshot(monthly_budget=budget)
+        def _fetch_charts():
+            c = AzureCollector()
+            budget = float(settings_state.get("budget_threshold", 1000.0))
+            return c.get_finops_dashboard_snapshot(monthly_budget=budget)
+
+        charts = await asyncio.to_thread(_fetch_charts)
 
         # Cache in session
         request.session[cache_key] = charts
@@ -3476,7 +3509,10 @@ def auth_status():
 
 @app.get("/api/rightsizing")
 async def get_rightsizing(request: Request):
-    az = AzureCollector()
+    def _get_collector():
+        return AzureCollector()
+
+    az = await asyncio.to_thread(_get_collector)
 
     try:
         # ── Non-blocking Go engine call ──────────────────────────────────────
@@ -3547,7 +3583,10 @@ async def _async_perform_subscription_scan(target_subs: list[str], events: list[
     are non-blocking.  Results are merged in the same shape as the sync
     version so format_scan_results() works unchanged.
     """
-    az = AzureCollector()
+    def _get_collector():
+        return AzureCollector()
+
+    az = await asyncio.to_thread(_get_collector)
     results: dict = {
         "vms_count": 0,
         "orphans": [],
@@ -3647,6 +3686,7 @@ def _python_fallback_scan(az: Any, results: dict) -> None:
 
 
 def perform_subscription_scan(target_subs, events):
+    # Note: This is a sync function called from sync context, so blocking AzureCollector is acceptable
     az = AzureCollector()
     results = {
         "vms_count": 0,
@@ -4005,7 +4045,11 @@ async def tag_health(request: Request):
 @app.get("/api/finops/anomalies")
 async def anomalies(request: Request):
     try:
-        data = AzureCollector().get_anomaly_data()
+        def _get_anomalies():
+            c = AzureCollector()
+            return c.get_anomaly_data()
+
+        data = await asyncio.to_thread(_get_anomalies)
         return jsonify(
             {
                 "status": "success",
@@ -4098,7 +4142,11 @@ async def unit_economics(request: Request):
 @app.get("/api/finops/ri-advisor")
 async def ri_advisor(request: Request):
     try:
-        candidates = AzureCollector().get_ri_sp_candidates()
+        def _get_candidates():
+            c = AzureCollector()
+            return c.get_ri_sp_candidates()
+
+        candidates = await asyncio.to_thread(_get_candidates)
         return jsonify(
             {
                 "status": "success",
@@ -4113,7 +4161,11 @@ async def ri_advisor(request: Request):
 @app.get("/api/finops/cold-storage")
 async def cold_storage(request: Request):
     try:
-        buckets = AzureCollector().get_cold_storage_candidates()
+        def _get_buckets():
+            c = AzureCollector()
+            return c.get_cold_storage_candidates()
+
+        buckets = await asyncio.to_thread(_get_buckets)
         return jsonify(
             {
                 "status": "success",
@@ -4128,7 +4180,11 @@ async def cold_storage(request: Request):
 @app.get("/api/finops/modernization")
 async def modernization(request: Request):
     try:
-        suggestions = AzureCollector().get_modernization_candidates()
+        def _get_suggestions():
+            c = AzureCollector()
+            return c.get_modernization_candidates()
+
+        suggestions = await asyncio.to_thread(_get_suggestions)
         return jsonify(
             {
                 "status": "success",
@@ -4143,7 +4199,11 @@ async def modernization(request: Request):
 @app.get("/api/finops/policy-violations")
 async def policy_violations(request: Request):
     try:
-        violations = AzureCollector().get_policy_violations()
+        def _get_violations():
+            c = AzureCollector()
+            return c.get_policy_violations()
+
+        violations = await asyncio.to_thread(_get_violations)
         return jsonify(
             {
                 "status": "success",
@@ -4158,7 +4218,12 @@ async def policy_violations(request: Request):
 @app.get("/api/finops/budget-status")
 async def budget_status(request: Request):
     try:
-        return {"status": "success", "budgets": AzureCollector().get_budget_status()}
+        def _get_budget_status():
+            c = AzureCollector()
+            return c.get_budget_status()
+
+        budgets = await asyncio.to_thread(_get_budget_status)
+        return {"status": "success", "budgets": budgets}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -4168,7 +4233,7 @@ async def budget_killswitch(request: Request):
     try:
         data = (await request.json() if await request.body() else {}) or {}
         sub_name = data.get("subscription", "Unknown")
-        time.sleep(0.5)
+        await asyncio.sleep(0.5)
         return jsonify(
             {
                 "status": "success",
@@ -4184,7 +4249,12 @@ async def budget_killswitch(request: Request):
 @app.get("/api/finops/burn-rate-forecast")
 async def burn_rate_forecast(request: Request):
     try:
-        return {"status": "success", "forecast": AzureCollector().get_burn_rate_forecast()}
+        def _get_forecast():
+            c = AzureCollector()
+            return c.get_burn_rate_forecast()
+
+        forecast = await asyncio.to_thread(_get_forecast)
+        return {"status": "success", "forecast": forecast}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -4192,7 +4262,12 @@ async def burn_rate_forecast(request: Request):
 @app.get("/api/finops/virtual-tags")
 async def virtual_tags(request: Request):
     try:
-        return {"status": "success", "virtual_tags": AzureCollector().get_virtual_tags()}
+        def _get_virtual_tags():
+            c = AzureCollector()
+            return c.get_virtual_tags()
+
+        virtual_tags = await asyncio.to_thread(_get_virtual_tags)
+        return {"status": "success", "virtual_tags": virtual_tags}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -4203,7 +4278,7 @@ async def greenops(request: Request):
         return jsonify(
             {
                 "status": "success",
-                "recommendations": AzureCollector().get_greenops_recommendations(),
+                "recommendations": await asyncio.to_thread(_run_collector, "get_greenops_recommendations"),
             }
         )
     except Exception as e:
@@ -4219,7 +4294,11 @@ async def approve_reap(request: Request):
             return JSONResponse(
                 status_code=400, content={"status": "error", "message": "Missing resource_id"}
             )
-        return AzureCollector().execute_reap(res_id, res_type)
+        def _execute_reap():
+            c = AzureCollector()
+            return c.execute_reap(res_id, res_type)
+
+        return await asyncio.to_thread(_execute_reap)
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -4235,8 +4314,11 @@ async def get_regional_prices(request: Request):
                 content={"status": "error", "message": "Missing sku or region parameter"},
             )
 
-        az = AzureCollector()
-        prices = az.fetch_regional_prices(sku, region)
+        def _fetch_prices():
+            c = AzureCollector()
+            return c.fetch_regional_prices(sku, region)
+
+        prices = await asyncio.to_thread(_fetch_prices)
         if prices:
             return {"status": "success", "price": prices[0]}
         return JSONResponse(
@@ -4293,7 +4375,11 @@ async def get_activity(request: Request):
 @app.get("/api/finops/utilization")
 async def utilization(request: Request):
     try:
-        report = AzureCollector().get_utilization_report()
+        def _get_utilization():
+            c = AzureCollector()
+            return c.get_utilization_report()
+
+        report = await asyncio.to_thread(_get_utilization)
         formatted_report = []
         for vm in report:
             waste = 1.0 - (vm["usage"] / 100.0) if vm["usage"] < 100 else 0
@@ -4430,7 +4516,10 @@ async def analyze_cost_optimization(request: Request):
 
         # Initialize collector based on provider
         if provider == "azure":
-            collector = AzureCollector()
+            def _get_collector():
+                return AzureCollector()
+
+            collector = await asyncio.to_thread(_get_collector)
         else:
             return jsonify(
                 {
@@ -5730,8 +5819,6 @@ async def handle_start_log_stream(sid, data):
                     "data": f"✅ Connected to application logger - {len(logger.handlers)} handler(s) found"
                 },
             )
-            import asyncio
-
             await asyncio.sleep(0.3)
 
             # Try to get recent log records if available
@@ -5739,13 +5826,9 @@ async def handle_start_log_stream(sid, data):
             await sio.emit("new_log", {"data": "📊 Application logger connection established"})
         else:
             await sio.emit("new_log", {"data": "⚠️  No application log handlers configured"})
-            import asyncio
-
             await asyncio.sleep(0.3)
     except Exception as e:
         await sio.emit("new_log", {"data": f"❌ Application logger error: {e!s}"})
-        import asyncio
-
         await asyncio.sleep(0.3)
 
     # Try Azure logs
@@ -5756,44 +5839,30 @@ async def handle_start_log_stream(sid, data):
                 "new_log",
                 {"data": f"✅ Connected to Azure Monitor - Found {len(azure_logs)} recent logs"},
             )
-            import asyncio
-
             await asyncio.sleep(0.3)
             for i, log in enumerate(azure_logs):
                 await sio.emit("new_log", {"data": f"[Azure #{i + 1}] {log!s}"})
                 # pyrefly: ignore [bad-argument-type]
-                import asyncio
-
                 await asyncio.sleep(0.3)
         else:
             await sio.emit(
                 "new_log", {"data": "⚠️  No Azure logs found - workspace may not be configured"}
             )
-            import asyncio
-
             await asyncio.sleep(0.3)
     except Exception as e:
         await sio.emit("new_log", {"data": f"❌ Azure logs error: {e!s}"})
-        import asyncio
-
         await asyncio.sleep(0.3)
 
     # Stream actual Cloud-Reaper system information
     await sio.emit("new_log", {"data": "🔄 Streaming Cloud-Reaper system information..."})
-    import asyncio
-
     await asyncio.sleep(0.2)
 
     try:
         # Get actual system information
         await sio.emit("new_log", {"data": f"💻 System: {platform.system()} {platform.release()}"})
-        import asyncio
-
         await asyncio.sleep(0.1)
 
         await sio.emit("new_log", {"data": f"🐍 Python: {platform.python_version()}"})
-        import asyncio
-
         await asyncio.sleep(0.1)
 
         # Check Azure connection status
@@ -5803,8 +5872,6 @@ async def handle_start_log_stream(sid, data):
         await sio.emit(
             "new_log", {"data": f"🔗 Azure Status: {azure_status.get('status', 'unknown')}"}
         )
-        import asyncio
-
         await asyncio.sleep(0.2)
 
         # Get subscription info if available
@@ -5813,67 +5880,50 @@ async def handle_start_log_stream(sid, data):
             await sio.emit("new_log", {"data": f"📋 Subscription: {sub_id[:8]}...{sub_id[-4:]}"})
         else:
             await sio.emit("new_log", {"data": "⚠️  Subscription ID not configured"})
-        import asyncio
-
         await asyncio.sleep(0.2)
 
     except Exception as e:
         await sio.emit("new_log", {"data": f"❌ System info error: {e!s}"})
-        import asyncio
-
         await asyncio.sleep(0.2)
 
     # Stream actual collector information
     try:
         await sio.emit("new_log", {"data": "🔍 Checking Cloud-Reaper collectors..."})
-        import asyncio
-
         await asyncio.sleep(0.2)
 
         from reaper.collectors.providers.azure_collector import AzureCollector
 
-        az = AzureCollector()
-        await sio.emit("new_log", {"data": "✅ AzureCollector initialized successfully"})
-        import asyncio
+        def _get_collector():
+            return AzureCollector()
 
+        az = await asyncio.to_thread(_get_collector)
+        await sio.emit("new_log", {"data": "✅ AzureCollector initialized successfully"})
         await asyncio.sleep(0.2)
 
         # Try to get actual resource counts
         try:
             vms = list(az.compute.virtual_machines.list_all())
             await sio.emit("new_log", {"data": f"🖥️  Virtual Machines found: {len(vms)}"})
-            import asyncio
-
             await asyncio.sleep(0.2)
         except Exception as vm_error:
             await sio.emit("new_log", {"data": f"⚠️  Could not fetch VMs: {vm_error!s}"})
-            import asyncio
-
             await asyncio.sleep(0.2)
 
         try:
             disks = list(az.compute.disks.list())
             await sio.emit("new_log", {"data": f"💾 Disks found: {len(disks)}"})
-            import asyncio
-
             await asyncio.sleep(0.2)
         except Exception as disk_error:
             await sio.emit("new_log", {"data": f"⚠️  Could not fetch disks: {disk_error!s}"})
-            import asyncio
-
             await asyncio.sleep(0.2)
 
     except Exception as collector_error:
         await sio.emit("new_log", {"data": f"❌ Collector error: {collector_error!s}"})
-        import asyncio
-
         await asyncio.sleep(0.2)
 
     # Stream engine information if available
     try:
         await sio.emit("new_log", {"data": "⚙️  Checking Cloud-Reaper engine status..."})
-        import asyncio
-
         await asyncio.sleep(0.2)
 
         binary_path = _reaper_engine_binary()
@@ -5883,14 +5933,10 @@ async def handle_start_log_stream(sid, data):
             await sio.emit(
                 "new_log", {"data": "⚠️  Go engine binary not found - using Python engine"}
             )
-        import asyncio
-
         await asyncio.sleep(0.2)
 
     except Exception as engine_error:
         await sio.emit("new_log", {"data": f"❌ Engine check error: {engine_error!s}"})
-        import asyncio
-
         await asyncio.sleep(0.2)
 
     await sio.emit(

@@ -92,12 +92,13 @@ class AzureRemediator:
             # Apply the new hardware profile
             vm.hardware_profile.vm_size = target_size
 
-            # Initiate async update operation
+            # Initiate async update operation and wait for completion
             poller = self.compute.virtual_machines.begin_create_or_update(rg_name, vm_name, vm)
+            poller.result()
 
             return {
-                "status": "processing",
-                "message": f"Initiated downsizing of {vm_name} to {target_size}",
+                "status": "success",
+                "message": f"Successfully downsized {vm_name} to {target_size}",
                 "operation": "begin_create_or_update",
             }
         except ResourceNotFoundError:
@@ -125,14 +126,15 @@ class AzureRemediator:
             # 1. Power off the VM gracefully
             self.compute.virtual_machines.begin_power_off(rg_name, vm_name)
 
-            # 2. Issue the delete command
+            # 2. Issue the delete command and wait for completion
             # Optionally we could clean up disks and NICs, but standard delete takes care of it
             # if the resources were created with `delete_option = Delete`
             poller = self.compute.virtual_machines.begin_delete(rg_name, vm_name)
+            poller.result()
 
             return {
-                "status": "processing",
-                "message": f"Initiated deletion of idle VM {vm_name}",
+                "status": "success",
+                "message": f"Successfully deleted idle VM {vm_name}",
                 "operation": "begin_delete",
             }
         except Exception as e:
@@ -159,10 +161,11 @@ class AzureRemediator:
 
             disk_update = DiskUpdate(sku=DiskSku(name=target_tier))
             poller = self.compute.disks.begin_update(rg_name, disk_name, disk_update)
+            poller.result()
 
             return {
-                "status": "processing",
-                "message": f"Initiated tier downgrade for disk {disk_name}",
+                "status": "success",
+                "message": f"Successfully downgraded disk {disk_name} to tier {target_tier}",
                 "operation": "begin_update",
             }
         except Exception as e:

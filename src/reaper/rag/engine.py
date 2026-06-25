@@ -7,7 +7,6 @@ import re
 import time
 from collections import Counter
 from pathlib import Path
-from unittest.mock import MagicMock
 
 from google import genai
 
