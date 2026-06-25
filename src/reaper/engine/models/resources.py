@@ -1,6 +1,6 @@
 import os
 import time
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import UTC, datetime
 from functools import wraps
 
@@ -18,6 +18,7 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
 load_dotenv()
@@ -33,17 +34,25 @@ if not DATABASE_URL:
     db_path = os.path.join(data_dir, "reaper.db")
     DATABASE_URL = f"sqlite:///{db_path}"
 
+# Convert to async URL if using PostgreSQL
+ASYNC_DATABASE_URL = None
+if "postgresql" in DATABASE_URL:
+    ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+elif "sqlite" in DATABASE_URL:
+    ASYNC_DATABASE_URL = DATABASE_URL.replace("sqlite:///", "sqlite+aiosqlite://")
+
 # Configure engine with connection pooling for better performance
 engine_config = (
     {
         "connect_args": {"check_same_thread": False},
         "pool_pre_ping": True,  # Verify connections before using
         "echo": False,  # Disable SQL logging for performance
+        "pool_size": 10,  # SQLite connection pool
     }
     if "sqlite" in DATABASE_URL
     else {
-        "pool_size": 20,  # Increased pool size for better concurrency
-        "max_overflow": 30,  # Increased max overflow for peak loads
+        "pool_size": 30,  # Increased pool size for better concurrency
+        "max_overflow": 40,  # Increased max overflow for peak loads
         "pool_pre_ping": True,  # Verify connections before using
         "pool_recycle": 1800,  # Recycle connections after 30 minutes
         "pool_timeout": 30,  # Timeout for getting connection from pool
@@ -51,8 +60,27 @@ engine_config = (
     }
 )
 
+# Sync engine (for backward compatibility)
 engine = create_engine(DATABASE_URL, **engine_config)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Async engine (for async operations)
+async_engine_config = engine_config.copy()
+if "sqlite" in DATABASE_URL:
+    async_engine_config["connect_args"] = {"check_same_thread": False}
+
+if ASYNC_DATABASE_URL:
+    async_engine = create_async_engine(ASYNC_DATABASE_URL, **async_engine_config)
+    AsyncSessionLocal = async_sessionmaker(
+        async_engine, 
+        class_=AsyncSession, 
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False
+    )
+else:
+    async_engine = None
+    AsyncSessionLocal = None
 
 
 class Base(DeclarativeBase):
@@ -315,6 +343,21 @@ def get_db_session():
         raise
     finally:
         session.close()
+
+
+@asynccontextmanager
+async def get_async_db_session():
+    """Async context manager for database sessions to ensure proper cleanup."""
+    if AsyncSessionLocal is None:
+        raise RuntimeError("Async database not configured. Set DATABASE_URL with PostgreSQL or SQLite.")
+    
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
 
 
 def retry_on_db_error(max_retries=3, delay=1.0):

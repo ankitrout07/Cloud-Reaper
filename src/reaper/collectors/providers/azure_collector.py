@@ -141,7 +141,7 @@ def get_cached_data(cache_key, fetch_fn, ttl_seconds=60):
 
 
 # Shared thread pool for concurrent Azure Monitor / API fan-out
-_SHARED_EXECUTOR = ThreadPoolExecutor(max_workers=10, thread_name_prefix="azure_collector")
+_SHARED_EXECUTOR = ThreadPoolExecutor(max_workers=20, thread_name_prefix="azure_collector")
 
 
 class ThreadSafeList:
@@ -2088,6 +2088,66 @@ class AzureCollector:
                 return []
 
         return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
+    def get_resources_by_types_batched(self, resource_types: list[str]) -> dict[str, list[dict]]:
+        """
+        Fetch multiple resource types in a single Resource Graph query for better performance.
+        Returns a dictionary mapping resource type to list of resources.
+        """
+        cache_key = f"resource_graph_batched_{'_'.join(sorted(resource_types))}_{self.subscription_id}"
+
+        def fetch() -> dict[str, list[dict]]:
+            try:
+                from azure.mgmt.resourcegraph import ResourceGraphClient
+                from azure.mgmt.resourcegraph.models import QueryRequest
+
+                client = ResourceGraphClient(self.credentials)
+
+                quoted = ", ".join(f"'{t.lower()}'" for t in resource_types)
+                query = f"""
+                Resources
+                | where type in~ ({quoted})
+                | project id, name, type, location, tags, sku, kind, resourceGroup, properties
+                | order by type asc, name asc
+                """
+
+                request = QueryRequest(
+                    subscriptions=[self.subscription_id],  # pyrefly: ignore [bad-argument-type]
+                    query=query,
+                )
+
+                all_items: list[dict] = []
+                skip_token: str | None = None
+
+                while True:
+                    if skip_token:
+                        request.options = {"skipToken": skip_token}  # type: ignore[assignment]
+                    response = client.resources(request)
+
+                    if hasattr(response, "data") and response.data:
+                        all_items.extend(
+                            row if isinstance(row, dict) else dict(row) for row in response.data
+                        )
+
+                    skip_token = getattr(response, "skip_token", None)
+                    if not skip_token:
+                        break
+
+                # Group by resource type
+                result: dict[str, list[dict]] = {}
+                for item in all_items:
+                    resource_type = item.get("type", "").lower()
+                    if resource_type not in result:
+                        result[resource_type] = []
+                    result[resource_type].append(item)
+
+                return result
+            except Exception as exc:
+                print(f"[-] Batched Resource Graph query failed: {exc}")
+                return {}
+
+        return get_cached_data(cache_key, fetch, ttl_seconds=120)
+
 
     # ========== COST ESTIMATION ==========
 

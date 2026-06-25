@@ -4,10 +4,10 @@
         <div class="max-w-7xl mx-auto">
             <header class="mb-10 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                 <div>
-                    <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">INTELLIGENT DESIGN SYSTEM</p>
+                    <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">INTELLIGENT DESIGN SYSTEM v2.0</p>
                     <h1 class="text-4xl font-black tracking-tighter glow-text-cyan uppercase">Build <span class="text-cyan-400">with AI</span></h1>
                     <p class="text-gray-500 text-xs mt-2 font-bold uppercase tracking-widest">
-                        AI Multi-Cloud Architect Estimator • OpenAI / Gemini Dual Synthesis
+                        AI Multi-Cloud Architect Estimator • OpenAI / Gemini / Claude Triple Synthesis
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
@@ -18,6 +18,10 @@
                     <div id="gemini-status-badge" class="glass-card px-4 py-2 border border-slate-800 text-slate-400 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500">
                         <span id="gemini-status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
                         GEMINI: <span id="gemini-status-text">CHECKING...</span>
+                    </div>
+                    <div id="claude-status-badge" class="glass-card px-4 py-2 border border-slate-800 text-slate-400 font-bold tracking-widest text-xs flex items-center gap-2 transition-all duration-500">
+                        <span id="claude-status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                        CLAUDE: <span id="claude-status-text">CHECKING...</span>
                     </div>
                     <div class="glass-card px-4 py-2 border border-cyan-500/20 text-cyan-400 font-bold tracking-widest text-xs flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
@@ -30,6 +34,27 @@
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     <!-- Left Control Column -->
                     <div class="lg:col-span-5 flex flex-col gap-6">
+                        <!-- Quick Templates -->
+                        <div class="glass-card p-4 border-slate-800">
+                            <h3 class="mb-3 text-xs font-black tracking-widest text-cyan-400 uppercase flex items-center gap-2">
+                                <i class="fas fa-bolt"></i> Quick Templates
+                            </h3>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="loadTemplate('webapp')" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-semibold transition">
+                                    <i class="fas fa-globe mr-1"></i> Web App
+                                </button>
+                                <button onclick="loadTemplate('api')" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-semibold transition">
+                                    <i class="fas fa-server mr-1"></i> API Service
+                                </button>
+                                <button onclick="loadTemplate('ml')" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-semibold transition">
+                                    <i class="fas fa-brain mr-1"></i> ML Pipeline
+                                </button>
+                                <button onclick="loadTemplate('data')" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-semibold transition">
+                                    <i class="fas fa-database mr-1"></i> Data Lake
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="glass-card p-6 glow-border-cyan">
                             <h3 class="mb-5 text-white font-bold text-lg flex items-center gap-2">
                                 <i class="fas fa-sliders text-cyan-400"></i> Architecture Parameters
@@ -43,13 +68,16 @@
                                             <option value="azure">Microsoft Azure</option>
                                             <option value="aws">Amazon Web Services</option>
                                             <option value="gcp">Google Cloud Platform</option>
+                                            <option value="multi">Multi-Cloud Hybrid</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
                                         <label class="text-slate-400 small-caps mb-2 block font-black text-[10px] tracking-wider uppercase">AI Synthesizer Core</label>
                                         <select id="ai-model-provider" class="w-full bg-[#0d0f12] text-white border border-slate-800 focus:border-cyan-400 transition-all rounded-lg p-3 text-sm focus:outline-none">
-                                            <option value="openai">OpenAI GPT-4o-mini</option>
-                                            <option value="gemini">Google Gemini 1.5 Flash</option>
+                                            <option value="openai">OpenAI GPT-4o</option>
+                                            <option value="gemini">Google Gemini 1.5 Pro</option>
+                                            <option value="claude">Anthropic Claude 3.5 Sonnet</option>
+                                            <option value="ensemble">Ensemble (All 3)</option>
                                         </select>
                                     </div>
                                 </div>
@@ -65,6 +93,8 @@
                                         <option value="southeastasia">Southeast Asia / ap-southeast-1 (Singapore)</option>
                                         <option value="australiaeast">Australia East / ap-southeast-2 (Sydney)</option>
                                         <option value="brazilsouth">Brazil South / sa-east-1 (São Paulo)</option>
+                                        <option value="japaneast">Japan East / ap-northeast-1 (Tokyo)</option>
+                                        <option value="canadacentral">Canada Central / ca-central-1 (Toronto)</option>
                                     </select>
                                 </div>
 
@@ -75,6 +105,7 @@
                                             <option value="none">Single Zone</option>
                                             <option value="ha">Multi-AZ HA</option>
                                             <option value="dr">Geo-Redundant DR</option>
+                                            <option value="global">Global Edge Network</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
@@ -83,6 +114,28 @@
                                             <option value="dev">Dev / Sandbox</option>
                                             <option value="production-standard">Standard Prod</option>
                                             <option value="production-heavy">Heavy Enterprise</option>
+                                            <option value="hyperscale">Hyperscale (100k+ RPS)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="form-group">
+                                        <label class="text-slate-400 small-caps mb-2 block font-black text-[10px] tracking-wider uppercase">Security Level</label>
+                                        <select id="ai-security" class="w-full bg-[#0d0f12] text-white border border-slate-800 focus:border-cyan-400 transition-all rounded-lg p-3 text-sm focus:outline-none">
+                                            <option value="basic">Basic</option>
+                                            <option value="standard">Standard (SOC2)</option>
+                                            <option value="advanced">Advanced (PCI-DSS)</option>
+                                            <option value="federal">Federal (FedRAMP)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="text-slate-400 small-caps mb-2 block font-black text-[10px] tracking-wider uppercase">Compliance</label>
+                                        <select id="ai-compliance" class="w-full bg-[#0d0f12] text-white border border-slate-800 focus:border-cyan-400 transition-all rounded-lg p-3 text-sm focus:outline-none">
+                                            <option value="none">None</option>
+                                            <option value="gdpr">GDPR</option>
+                                            <option value="hipaa">HIPAA</option>
+                                            <option value="iso27001">ISO 27001</option>
                                         </select>
                                     </div>
                                 </div>
@@ -93,9 +146,14 @@
                                         placeholder="E.g., A real-time web application with WebSockets handling 10,000 active concurrent connections, utilizing cached state stores and an attached transactional database..."></textarea>
                                 </div>
 
-                                <button id="btn-compile" class="w-full bg-cyan-400 hover:bg-cyan-300 text-black border-none py-3 font-bold rounded-lg transition-all shadow-lg hover:shadow-cyan-400/20 active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2" onclick="triggerArchitectEstimation()">
-                                    <i class="fas fa-brain"></i> Generate Architecture
-                                </button>
+                                <div class="flex gap-3">
+                                    <button id="btn-compile" class="flex-1 bg-cyan-400 hover:bg-cyan-300 text-black border-none py-3 font-bold rounded-lg transition-all shadow-lg hover:shadow-cyan-400/20 active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2" onclick="triggerArchitectEstimation()">
+                                        <i class="fas fa-brain"></i> Generate Architecture
+                                    </button>
+                                    <button id="btn-compare" class="px-4 bg-slate-700 hover:bg-slate-600 text-white border-none py-3 font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2" onclick="triggerCostComparison()">
+                                        <i class="fas fa-balance-scale"></i> Compare
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -104,7 +162,7 @@
                             <div class="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-3xl pointer-events-none"></div>
                             <h3 class="mb-4 text-xs font-black tracking-widest text-cyan-400 uppercase flex items-center justify-between">
                                 <span><i class="fas fa-terminal mr-2"></i> Cognitive Synthesis Console</span>
-                                <span class="text-[9px] text-slate-600 px-2 py-0.5 border border-slate-800/80 rounded bg-slate-900/50">v1.2-beta</span>
+                                <span class="text-[9px] text-slate-600 px-2 py-0.5 border border-slate-800/80 rounded bg-slate-900/50">v2.0-beta</span>
                             </h3>
                             <div id="terminal-log" class="terminal-text text-slate-400 flex-1 overflow-y-auto max-h-[200px] space-y-2 pr-2 scrollbar-thin">
                                 <div class="text-slate-600">&gt; Engine stand-by. Awaiting design inputs...</div>
@@ -122,6 +180,24 @@
                             </div>
                             <h4 class="text-lg font-bold text-cyan-400 uppercase tracking-wider mb-2">Analyzing Architecture Plan</h4>
                             <p class="text-slate-400 text-sm max-w-sm">Querying multi-cloud regional price catalogs, optimizing virtual instance layers, and generating dynamic topology...</p>
+                            <div id="progress-steps" class="mt-6 space-y-2 text-left w-full max-w-sm">
+                                <div class="flex items-center gap-2 text-xs text-slate-500">
+                                    <span id="step-1" class="w-2 h-2 rounded-full bg-slate-600"></span>
+                                    <span id="step-1-text">Initializing AI cores...</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-slate-500">
+                                    <span id="step-2" class="w-2 h-2 rounded-full bg-slate-600"></span>
+                                    <span id="step-2-text">Analyzing requirements...</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-slate-500">
+                                    <span id="step-3" class="w-2 h-2 rounded-full bg-slate-600"></span>
+                                    <span id="step-3-text">Querying price catalogs...</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-slate-500">
+                                    <span id="step-4" class="w-2 h-2 rounded-full bg-slate-600"></span>
+                                    <span id="step-4-text">Generating topology...</span>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Results Output Panel -->
@@ -130,14 +206,29 @@
                             <!-- Financial Overview Card -->
                             <div class="glass-card p-6 glow-border-cyan pulse-card relative overflow-hidden bg-gradient-to-br from-[#12151a] to-[#0e161c]">
                                 <div class="absolute top-0 right-0 w-48 h-48 bg-cyan-400/5 blur-3xl pointer-events-none"></div>
-                                <div class="flex justify-between items-center">
-                                    <div>
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
                                         <h3 class="text-slate-400 font-black uppercase text-[10px] tracking-widest">Calculated Bill of Materials (BOM)</h3>
                                         <h2 class="text-2xl font-black text-white mt-1">Cognitive Architecture Draft</h2>
+                                        <div class="mt-3 flex gap-4">
+                                            <div class="bg-slate-800/50 px-3 py-2 rounded">
+                                                <span class="text-[9px] text-slate-500 uppercase tracking-widest block">Resources</span>
+                                                <span id="lbl-resource-count" class="text-lg font-bold text-white">0</span>
+                                            </div>
+                                            <div class="bg-slate-800/50 px-3 py-2 rounded">
+                                                <span class="text-[9px] text-slate-500 uppercase tracking-widest block">Services</span>
+                                                <span id="lbl-service-count" class="text-lg font-bold text-white">0</span>
+                                            </div>
+                                            <div class="bg-slate-800/50 px-3 py-2 rounded">
+                                                <span class="text-[9px] text-slate-500 uppercase tracking-widest block">Est. Setup Time</span>
+                                                <span id="lbl-setup-time" class="text-lg font-bold text-white">0h</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="text-right">
+                                    <div class="text-right ml-4">
                                         <span class="text-[10px] text-slate-500 uppercase tracking-widest font-black block">Est. Monthly Total</span>
                                         <span id="lbl-total-cost" class="text-3xl font-black text-cyan-400 glow-text-cyan">$0.00</span>
+                                        <span id="lbl-savings" class="text-xs text-green-400 font-semibold block mt-1"></span>
                                     </div>
                                 </div>
 
@@ -145,24 +236,51 @@
                                     <p id="lbl-arch-summary" class="text-slate-300 text-sm leading-relaxed"></p>
                                 </div>
 
-                                <div class="mt-4 flex justify-end">
-                                    <button id="btn-export-bom" type="button" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2" onclick="event.preventDefault(); exportArchitectBOM();">
-                                        <i class="fas fa-file-pdf"></i> Export BOM PDF
+                                <div class="mt-4 flex justify-between items-center">
+                                    <div class="flex gap-2">
+                                        <button id="btn-export-bom" type="button" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2" onclick="event.preventDefault(); exportArchitectBOM();">
+                                            <i class="fas fa-file-pdf"></i> Export BOM PDF
+                                        </button>
+                                        <button id="btn-export-tf" type="button" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2" onclick="event.preventDefault(); exportTerraform();">
+                                            <i class="fas fa-code"></i> Terraform
+                                        </button>
+                                    </div>
+                                    <button id="btn-deploy" type="button" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2" onclick="event.preventDefault(); deployInfrastructure();">
+                                        <i class="fas fa-rocket"></i> Deploy
                                     </button>
+                                </div>
+                            </div>
+
+                            <!-- Cost Breakdown Chart -->
+                            <div class="glass-card p-6 border-slate-800">
+                                <h3 class="mb-4 text-xs font-black tracking-widest text-slate-400 uppercase flex items-center justify-between">
+                                    <span><i class="fas fa-chart-pie mr-2"></i> Cost Distribution</span>
+                                    <span class="text-[9px] text-slate-600">Monthly Breakdown</span>
+                                </h3>
+                                <div id="cost-breakdown" class="space-y-3">
+                                    <!-- Cost bars injected here -->
                                 </div>
                             </div>
 
                             <!-- Topology Visualizer Grid -->
                             <div class="glass-card p-6 border-slate-800">
-                                <h3 class="mb-4 text-xs font-black tracking-widest text-slate-400 uppercase"><i class="fas fa-network-wired mr-2"></i> Infrastructure Topology Map</h3>
-                                <div id="topology-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <h3 class="mb-4 text-xs font-black tracking-widest text-slate-400 uppercase flex items-center justify-between">
+                                    <span><i class="fas fa-network-wired mr-2"></i> Infrastructure Topology Map</span>
+                                    <button class="text-[9px] text-cyan-400 hover:text-cyan-300 transition" onclick="toggleTopologyView()">
+                                        <i class="fas fa-expand mr-1"></i> Expand
+                                    </button>
+                                </h3>
+                                <div id="topology-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     <!-- Dynamic visual node cards will inject here -->
                                 </div>
                             </div>
 
                             <!-- BOM Component List -->
                             <div class="glass-card p-6 border-slate-800 overflow-hidden">
-                                <h3 class="mb-4 text-xs font-black tracking-widest text-slate-400 uppercase"><i class="fas fa-list-check mr-2"></i> Structured Resource Matrix</h3>
+                                <h3 class="mb-4 text-xs font-black tracking-widest text-slate-400 uppercase flex items-center justify-between">
+                                    <span><i class="fas fa-list-check mr-2"></i> Structured Resource Matrix</span>
+                                    <input type="text" id="component-search" placeholder="Search components..." class="bg-slate-800 border border-slate-700 rounded px-3 py-1 text-xs text-white focus:outline-none focus:border-cyan-400">
+                                </h3>
                                 <div class="overflow-x-auto">
                                     <table class="w-full border-collapse text-sm">
                                         <thead>
@@ -171,12 +289,24 @@
                                                 <th class="pb-3 px-2">Service SKU Variant</th>
                                                 <th class="pb-3 px-2 text-center">Qty</th>
                                                 <th class="pb-3 px-2 text-right">Monthly Cost</th>
+                                                <th class="pb-3 px-2 text-center">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody id="list-components" class="divide-y divide-slate-800/40">
                                             <!-- Components injected here -->
                                         </tbody>
                                     </table>
+                                </div>
+                            </div>
+
+                            <!-- Optimization Suggestions -->
+                            <div id="optimization-suggestions" class="glass-card p-6 border-slate-800 bg-gradient-to-r from-green-500/5 to-transparent" style="display: none;">
+                                <div class="flex items-start gap-3">
+                                    <div class="text-green-500 text-lg mt-0.5"><i class="fas fa-lightbulb"></i></div>
+                                    <div class="flex-1">
+                                        <h4 class="text-xs font-black tracking-widest text-green-500 uppercase">Cost Optimization Opportunities</h4>
+                                        <div id="lbl-optimization-tips" class="text-green-200/90 text-sm mt-2 space-y-2"></div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -197,4 +327,110 @@
             </div>
         </div>
     </main>
+
+    <script>
+        // Template presets
+        const templates = {
+            webapp: "A modern web application with React frontend, REST API backend, PostgreSQL database, Redis caching, CDN for static assets, and SSL termination. Expected traffic: 10,000 daily active users with peak concurrency of 500.",
+            api: "A high-performance API service with auto-scaling, rate limiting, API gateway, caching layer, and monitoring. Expected traffic: 100,000 requests per minute with 99.9% SLA requirement.",
+            ml: "A machine learning pipeline with data ingestion, model training infrastructure, inference endpoints, model registry, and experiment tracking. Expected workload: Training on 100GB datasets with daily model updates.",
+            data: "A data lake architecture with data ingestion pipelines, storage tiers (hot/cold), data catalog, ETL jobs, and analytics dashboards. Expected data volume: 10TB monthly growth with 100 concurrent analysts."
+        };
+
+        // Check AI API status on page load
+        async function checkAIStatus() {
+            try {
+                const response = await fetch('/api/v1/architect/status');
+                const data = await response.json();
+                
+                // Update OpenAI status
+                updateStatusBadge('openai', data.openai);
+                
+                // Update Gemini status
+                updateStatusBadge('gemini', data.gemini);
+                
+                // Update Claude status
+                updateStatusBadge('claude', data.claude);
+                
+            } catch (error) {
+                console.error('Failed to check AI status:', error);
+            }
+        }
+
+        function updateStatusBadge(provider, status) {
+            const dot = document.getElementById(`${provider}-status-dot`);
+            const text = document.getElementById(`${provider}-status-text`);
+            
+            if (!dot || !text) return;
+            
+            // Reset classes
+            dot.className = 'w-2 h-2 rounded-full';
+            
+            switch(status) {
+                case 'active':
+                    dot.classList.add('bg-green-400');
+                    text.textContent = 'ACTIVE';
+                    text.classList.remove('text-slate-400', 'text-red-400');
+                    text.classList.add('text-green-400');
+                    break;
+                case 'invalid':
+                    dot.classList.add('bg-red-400');
+                    text.textContent = 'INVALID';
+                    text.classList.remove('text-slate-400', 'text-green-400');
+                    text.classList.add('text-red-400');
+                    break;
+                case 'unconfigured':
+                default:
+                    dot.classList.add('bg-slate-500');
+                    text.textContent = 'NOT CONFIGURED';
+                    text.classList.remove('text-green-400', 'text-red-400');
+                    text.classList.add('text-slate-400');
+                    break;
+            }
+        }
+
+        function loadTemplate(type) {
+            document.getElementById('ai-prompt').value = templates[type] || '';
+            appendTerminalLog(`Loaded ${type} template preset`, 'info');
+        }
+
+        function toggleTopologyView() {
+            const grid = document.getElementById('topology-grid');
+            grid.classList.toggle('grid-cols-1');
+            grid.classList.toggle('grid-cols-2');
+            grid.classList.toggle('lg:grid-cols-3');
+        }
+
+        function triggerCostComparison() {
+            appendTerminalLog('Initiating multi-cloud cost comparison...', 'info');
+            // Implementation for cost comparison
+        }
+
+        function exportTerraform() {
+            appendTerminalLog('Generating Terraform configuration...', 'info');
+            // Implementation for Terraform export
+        }
+
+        function deployInfrastructure() {
+            if (confirm('Are you sure you want to deploy this architecture? This will incur actual cloud costs.')) {
+                appendTerminalLog('Initiating deployment...', 'warning');
+                // Implementation for deployment
+            }
+        }
+
+        // Component search functionality
+        document.getElementById('component-search')?.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const rows = document.querySelectorAll('#list-components tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAIStatus();
+        });
+    </script>
 {% endblock %}

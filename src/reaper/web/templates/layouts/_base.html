@@ -160,15 +160,61 @@
     <!-- Socket.IO client for real-time metrics and log streaming -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
     
-    <!-- Application scripts with defer for non-blocking load -->
+    <!-- Critical application scripts loaded immediately -->
     <script src="/static/js/app_state.js" defer></script>
     <script src="/static/js/theme.js" defer></script>
     <script src="/static/js/setup.js" defer></script>
     <script src="/static/js/ui-interactions.js" defer></script>
-    <script src="/static/js/cloud-providers.js" defer></script>
-    <script src="/static/js/vault.js" defer></script>
-    <script src="/static/js/docs.js?v=3" defer></script>
-    <script src="/static/js/cost-optimization.js" defer></script>
+    <script src="/static/js/performance-utils.js" defer></script>
+    <script src="/static/js/websocket-batcher.js" defer></script>
+    
+    <!-- Lazy-loaded scripts based on page context -->
+    <script>
+        // Lazy load scripts based on current page
+        function lazyLoadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.defer = true;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.body.appendChild(script);
+            });
+        }
+
+        // Determine which scripts to load based on current path
+        const currentPath = window.location.pathname;
+        
+        async function loadPageScripts() {
+            // Always load UI interactions
+            await lazyLoadScript('/static/js/ui-interactions.js');
+            
+            // Page-specific lazy loading
+            if (currentPath.includes('settings') || currentPath.includes('vault')) {
+                await lazyLoadScript('/static/js/cloud-providers.js');
+                await lazyLoadScript('/static/js/vault.js');
+            }
+            
+            if (currentPath.includes('docs')) {
+                await lazyLoadScript('/static/js/docs.js?v=3');
+            }
+            
+            if (currentPath.includes('cost-optimization') || currentPath.includes('financial')) {
+                await lazyLoadScript('/static/js/cost-optimization.js');
+            }
+            
+            if (currentPath.includes('resource-inventory')) {
+                await lazyLoadScript('/static/js/virtual-scroll.js');
+            }
+        }
+
+        // Load scripts after DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadPageScripts);
+        } else {
+            loadPageScripts();
+        }
+    </script>
 
     <!-- SPA Re-init script -->
     <script>
@@ -177,6 +223,19 @@
             if(typeof bindEventListeners === 'function') bindEventListeners();
             if(typeof initializeSidebarHighlighting === 'function') initializeSidebarHighlighting();
         });
+        
+        // Register Service Worker for offline support
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then((registration) => {
+                        console.log('[Service Worker] Registered successfully:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('[Service Worker] Registration failed:', error);
+                    });
+            });
+        }
     </script>
 </body>
 </html>

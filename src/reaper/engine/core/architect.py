@@ -4,6 +4,7 @@ import json
 import os
 
 import requests
+from anthropic import Anthropic
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
@@ -157,18 +158,21 @@ class AIArchitectManager:
         # Gracefully pull the API keys from your environment setup
         self.openai_key = os.getenv("OPENAI_API_KEY")
         self.gemini_key = os.getenv("GEMINI_API_KEY")
+        self.claude_key = os.getenv("ANTHROPIC_API_KEY")
         self.client = None
+        self.claude_client = None
 
     def verify_api_status(self) -> dict:
         """
-        Verifies both OpenAI and Gemini API Key statuses.
+        Verifies OpenAI, Gemini, and Claude API Key statuses.
         Returns:
-            dict containing status of 'openai' and 'gemini' keys: 'active', 'invalid', 'unconfigured'
+            dict containing status of 'openai', 'gemini', and 'claude' keys: 'active', 'invalid', 'unconfigured'
         """
         self.openai_key = os.getenv("OPENAI_API_KEY")
         self.gemini_key = os.getenv("GEMINI_API_KEY")
+        self.claude_key = os.getenv("ANTHROPIC_API_KEY")
 
-        status = {"openai": "unconfigured", "gemini": "unconfigured"}
+        status = {"openai": "unconfigured", "gemini": "unconfigured", "claude": "unconfigured"}
 
         # Verify OpenAI
         if self.openai_key and self.openai_key != "your_actual_openai_api_key_here":
@@ -193,6 +197,19 @@ class AIArchitectManager:
             except Exception:
                 status["gemini"] = "invalid"
 
+        # Verify Claude
+        if self.claude_key and self.claude_key != "your_actual_anthropic_api_key_here":
+            try:
+                self.claude_client = Anthropic(api_key=self.claude_key)
+                self.claude_client.messages.create(
+                    model="claude-3-5-sonnet-20241022",
+                    max_tokens=10,
+                    messages=[{"role": "user", "content": "test"}]
+                )
+                status["claude"] = "active"
+            except Exception:
+                status["claude"] = "invalid"
+
         return status
 
     def generate_blueprint(
@@ -200,6 +217,7 @@ class AIArchitectManager:
     ) -> ArchitectureBlueprint:
         self.openai_key = os.getenv("OPENAI_API_KEY")
         self.gemini_key = os.getenv("GEMINI_API_KEY")
+        self.claude_key = os.getenv("ANTHROPIC_API_KEY")
 
         system_instructions = (
             f"You are the Principal Cloud Architect engine for Cloud-Reaper. "
@@ -214,81 +232,211 @@ class AIArchitectManager:
         )
 
         try:
-            if model_provider == "gemini" or (not self.openai_key and self.gemini_key):
-                if not self.gemini_key or self.gemini_key == "your_actual_gemini_api_key_here":
-                    raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
-
-                # Call Gemini Structured Output API
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={self.gemini_key}"
-                payload = {
-                    "contents": [{"parts": [{"text": system_instructions}, {"text": user_prompt}]}],
-                    "generationConfig": {
-                        "responseMimeType": "application/json",
-                        "responseSchema": {
-                            "type": "OBJECT",
-                            "properties": {
-                                "architecture_summary": {"type": "STRING"},
-                                "components": {
-                                    "type": "ARRAY",
-                                    "items": {
-                                        "type": "OBJECT",
-                                        "properties": {
-                                            "component_type": {"type": "STRING"},
-                                            "generic_name": {"type": "STRING"},
-                                            "provider_sku_keyword": {"type": "STRING"},
-                                            "quantity": {"type": "INTEGER"},
-                                            "reasoning": {"type": "STRING"},
-                                        },
-                                        "required": [
-                                            "component_type",
-                                            "generic_name",
-                                            "provider_sku_keyword",
-                                            "quantity",
-                                            "reasoning",
-                                        ],
-                                    },
-                                },
-                                "security_warning": {"type": "STRING"},
-                            },
-                            "required": ["architecture_summary", "components"],
-                        },
-                    },
-                }
-                res = requests.post(
-                    url, json=payload, headers={"Content-Type": "application/json"}, timeout=30
-                )
-                if res.status_code != 200:
-                    raise ValueError(f"Gemini API returned error: {res.text}")
-
-                data = res.json()
-                try:
-                    text_content = data["candidates"][0]["content"]["parts"][0]["text"]
-                    blueprint_dict = json.loads(text_content)
-                    return ArchitectureBlueprint(**blueprint_dict)
-                except Exception as e:
-                    raise ValueError(
-                        f"Failed to parse structured response from Gemini API: {e!s}"
-                    ) from e
+            # Ensemble mode: use all available AI models and combine results
+            if model_provider == "ensemble":
+                return self._generate_ensemble_blueprint(user_prompt, provider, system_instructions)
+            
+            # Claude mode
+            elif model_provider == "claude":
+                return self._generate_claude_blueprint(user_prompt, provider, system_instructions)
+            
+            # Gemini mode
+            elif model_provider == "gemini" or (not self.openai_key and self.gemini_key):
+                return self._generate_gemini_blueprint(user_prompt, provider, system_instructions)
+            
+            # OpenAI mode (default)
             else:
-                if not self.openai_key or self.openai_key == "your_actual_openai_api_key_here":
-                    raise ValueError("OPENAI_API_KEY is not set in the environment variables.")
-
-                self.client = OpenAI(api_key=self.openai_key)
-                response = self.client.beta.chat.completions.parse(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": system_instructions},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    response_format=ArchitectureBlueprint,
-                )
-                parsed = response.choices[0].message.parsed
-                if parsed is None:
-                    raise ValueError("Failed to parse response from OpenAI API.")
-                return parsed
+                return self._generate_openai_blueprint(user_prompt, provider, system_instructions)
+                
         except Exception as e:
             print(f"[!] AI synthesis error: {e!s}. Activating local offline fallback generator.")
             return _generate_local_fallback(user_prompt, provider)
+
+    def _generate_openai_blueprint(self, user_prompt: str, provider: str, system_instructions: str) -> ArchitectureBlueprint:
+        """Generate blueprint using OpenAI GPT-4o."""
+        if not self.openai_key or self.openai_key == "your_actual_openai_api_key_here":
+            raise ValueError("OPENAI_API_KEY is not set in the environment variables.")
+
+        self.client = OpenAI(api_key=self.openai_key)
+        response = self.client.beta.chat.completions.parse(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_instructions},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format=ArchitectureBlueprint,
+        )
+        parsed = response.choices[0].message.parsed
+        if parsed is None:
+            raise ValueError("Failed to parse response from OpenAI API.")
+        return parsed
+
+    def _generate_gemini_blueprint(self, user_prompt: str, provider: str, system_instructions: str) -> ArchitectureBlueprint:
+        """Generate blueprint using Google Gemini 1.5 Flash."""
+        if not self.gemini_key or self.gemini_key == "your_actual_gemini_api_key_here":
+            raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
+
+        # Call Gemini Structured Output API
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_key}"
+        payload = {
+            "contents": [{"parts": [{"text": system_instructions}, {"text": user_prompt}]}],
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "responseSchema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "architecture_summary": {"type": "STRING"},
+                        "components": {
+                            "type": "ARRAY",
+                            "items": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "component_type": {"type": "STRING"},
+                                    "generic_name": {"type": "STRING"},
+                                    "provider_sku_keyword": {"type": "STRING"},
+                                    "quantity": {"type": "INTEGER"},
+                                    "reasoning": {"type": "STRING"},
+                                },
+                                "required": [
+                                    "component_type",
+                                    "generic_name",
+                                    "provider_sku_keyword",
+                                    "quantity",
+                                    "reasoning",
+                                ],
+                            },
+                        },
+                        "security_warning": {"type": "STRING"},
+                    },
+                    "required": ["architecture_summary", "components"],
+                },
+            },
+        }
+        res = requests.post(
+            url, json=payload, headers={"Content-Type": "application/json"}, timeout=30
+        )
+        if res.status_code != 200:
+            raise ValueError(f"Gemini API returned error: {res.text}")
+
+        data = res.json()
+        try:
+            text_content = data["candidates"][0]["content"]["parts"][0]["text"]
+            blueprint_dict = json.loads(text_content)
+            return ArchitectureBlueprint(**blueprint_dict)
+        except Exception as e:
+            raise ValueError(
+                f"Failed to parse structured response from Gemini API: {e!s}"
+            ) from e
+
+    def _generate_claude_blueprint(self, user_prompt: str, provider: str, system_instructions: str) -> ArchitectureBlueprint:
+        """Generate blueprint using Anthropic Claude 3.5 Sonnet."""
+        if not self.claude_key or self.claude_key == "your_actual_anthropic_api_key_here":
+            raise ValueError("ANTHROPIC_API_KEY is not set in the environment variables.")
+
+        self.claude_client = Anthropic(api_key=self.claude_key)
+        
+        # Create JSON schema for Claude
+        schema = {
+            "type": "object",
+            "properties": {
+                "architecture_summary": {"type": "string"},
+                "components": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "component_type": {"type": "string"},
+                            "generic_name": {"type": "string"},
+                            "provider_sku_keyword": {"type": "string"},
+                            "quantity": {"type": "integer"},
+                            "reasoning": {"type": "string"},
+                        },
+                        "required": ["component_type", "generic_name", "provider_sku_keyword", "quantity", "reasoning"]
+                    }
+                },
+                "security_warning": {"type": "string"}
+            },
+            "required": ["architecture_summary", "components"]
+        }
+        
+        response = self.claude_client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=4096,
+            system=system_instructions,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"Generate a cloud architecture blueprint for: {user_prompt}\n\nRespond ONLY with valid JSON matching this schema:\n{json.dumps(schema, indent=2)}"
+                        }
+                    ]
+                }
+            ]
+        )
+        
+        # Extract JSON from response
+        content_text = response.content[0].text
+        # Clean up any markdown code blocks
+        if "```json" in content_text:
+            content_text = content_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in content_text:
+            content_text = content_text.split("```")[1].split("```")[0].strip()
+        
+        blueprint_dict = json.loads(content_text)
+        return ArchitectureBlueprint(**blueprint_dict)
+
+    def _generate_ensemble_blueprint(self, user_prompt: str, provider: str, system_instructions: str) -> ArchitectureBlueprint:
+        """Generate blueprint using ensemble of all available AI models."""
+        blueprints = []
+        errors = []
+        
+        # Try OpenAI
+        try:
+            if self.openai_key and self.openai_key != "your_actual_openai_api_key_here":
+                blueprints.append(("openai", self._generate_openai_blueprint(user_prompt, provider, system_instructions)))
+        except Exception as e:
+            errors.append(f"OpenAI: {e}")
+        
+        # Try Gemini
+        try:
+            if self.gemini_key and self.gemini_key != "your_actual_gemini_api_key_here":
+                blueprints.append(("gemini", self._generate_gemini_blueprint(user_prompt, provider, system_instructions)))
+        except Exception as e:
+            errors.append(f"Gemini: {e}")
+        
+        # Try Claude
+        try:
+            if self.claude_key and self.claude_key != "your_actual_anthropic_api_key_here":
+                blueprints.append(("claude", self._generate_claude_blueprint(user_prompt, provider, system_instructions)))
+        except Exception as e:
+            errors.append(f"Claude: {e}")
+        
+        if not blueprints:
+            print(f"[!] All AI models failed: {errors}")
+            return _generate_local_fallback(user_prompt, provider)
+        
+        # Merge blueprints: use the first successful one as base, combine components
+        base_blueprint = blueprints[0][1]
+        merged_components = list(base_blueprint.components)
+        
+        # Add unique components from other blueprints
+        for source_name, blueprint in blueprints[1:]:
+            for comp in blueprint.components:
+                # Check if component type already exists
+                if not any(c.component_type == comp.component_type for c in merged_components):
+                    merged_components.append(comp)
+        
+        # Create ensemble summary
+        sources = ", ".join([name for name, _ in blueprints])
+        ensemble_summary = f"Ensemble synthesis using {sources}. {base_blueprint.architecture_summary}"
+        
+        return ArchitectureBlueprint(
+            architecture_summary=ensemble_summary,
+            components=merged_components,
+            security_warning=base_blueprint.security_warning
+        )
 
 
 def _resolve_azure_price(sku: str, mapped_region: str, region: str) -> float | None:
@@ -553,6 +701,8 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
             "southeastasia": "southeastasia",
             "australiaeast": "australiaeast",
             "brazilsouth": "brazilsouth",
+            "japaneast": "japaneast",
+            "canadacentral": "canadacentral",
         },
         "aws": {
             "eastus": "us-east-1",
@@ -563,6 +713,8 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
             "southeastasia": "ap-southeast-1",
             "australiaeast": "ap-southeast-2",
             "brazilsouth": "sa-east-1",
+            "japaneast": "ap-northeast-1",
+            "canadacentral": "ca-central-1",
         },
         "gcp": {
             "eastus": "us-east1",
@@ -573,6 +725,8 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
             "southeastasia": "asia-southeast1",
             "australiaeast": "australia-southeast1",
             "brazilsouth": "southamerica-east1",
+            "japaneast": "asia-northeast1",
+            "canadacentral": "northamerica-northeast1",
         },
     }
 
