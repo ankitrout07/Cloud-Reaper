@@ -72,11 +72,7 @@ if "sqlite" in DATABASE_URL:
 if ASYNC_DATABASE_URL:
     async_engine = create_async_engine(ASYNC_DATABASE_URL, **async_engine_config)
     AsyncSessionLocal = async_sessionmaker(
-        async_engine, 
-        class_=AsyncSession, 
-        expire_on_commit=False,
-        autocommit=False,
-        autoflush=False
+        async_engine, class_=AsyncSession, expire_on_commit=False, autocommit=False, autoflush=False
     )
 else:
     async_engine = None
@@ -349,8 +345,10 @@ def get_db_session():
 async def get_async_db_session():
     """Async context manager for database sessions to ensure proper cleanup."""
     if AsyncSessionLocal is None:
-        raise RuntimeError("Async database not configured. Set DATABASE_URL with PostgreSQL or SQLite.")
-    
+        raise RuntimeError(
+            "Async database not configured. Set DATABASE_URL with PostgreSQL or SQLite."
+        )
+
     async with AsyncSessionLocal() as session:
         try:
             yield session

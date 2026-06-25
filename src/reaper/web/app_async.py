@@ -108,54 +108,52 @@ templates = Jinja2Templates(directory=str(_web_dir / "templates"))
 # Global HTTP client with connection pooling for external API calls
 # This improves performance by reusing connections instead of creating new ones for each request
 http_client = httpx.AsyncClient(
-    limits=httpx.Limits(
-        max_keepalive_connections=100,
-        max_connections=200,
-        keepalive_expiry=30.0
-    ),
+    limits=httpx.Limits(max_keepalive_connections=100, max_connections=200, keepalive_expiry=30.0),
     timeout=httpx.Timeout(30.0, connect=10.0),
-    http2=True  # Enable HTTP/2 for better performance
+    http2=True,  # Enable HTTP/2 for better performance
 )
+
 
 # Rate limiter for external API calls to avoid throttling
 class RateLimiter:
     """Token bucket rate limiter for API calls."""
+
     def __init__(self, rate: int, per: float = 1.0):
         self.rate = rate  # requests per second
         self.per = per  # time window in seconds
         self.allowance = rate
         self.last_check = time.time()
-    
+
     def can_proceed(self) -> bool:
         current = time.time()
         time_passed = current - self.last_check
         self.last_check = current
         self.allowance += time_passed * (self.rate / self.per)
-        
-        if self.allowance > self.rate:
-            self.allowance = self.rate
-        
+
+        self.allowance = min(self.allowance, self.rate)
+
         if self.allowance < 1.0:
             return False
         self.allowance -= 1.0
         return True
-    
+
     async def wait(self):
         """Wait until rate limit allows proceeding."""
         while not self.can_proceed():
             await asyncio.sleep(0.1)
 
+
 # Rate limiters for different API providers
 azure_rate_limiter = RateLimiter(rate=20, per=1.0)  # 20 requests per second for Azure
-aws_rate_limiter = RateLimiter(rate=20, per=1.0)    # 20 requests per second for AWS
-gcp_rate_limiter = RateLimiter(rate=20, per=1.0)    # 20 requests per second for GCP
-ai_rate_limiter = RateLimiter(rate=10, per=1.0)     # 10 requests per second for AI APIs
+aws_rate_limiter = RateLimiter(rate=20, per=1.0)  # 20 requests per second for AWS
+gcp_rate_limiter = RateLimiter(rate=20, per=1.0)  # 20 requests per second for GCP
+ai_rate_limiter = RateLimiter(rate=10, per=1.0)  # 10 requests per second for AI APIs
 
 
 # WebSocket Message Batching System
 class WebSocketBatcher:
     """Batches WebSocket messages to reduce network overhead and improve performance."""
-    
+
     def __init__(self, socketio_server, batch_interval_ms=100, max_batch_size=50):
         self.sio = socketio_server
         self.batch_interval = batch_interval_ms / 1000.0  # Convert to seconds
@@ -163,60 +161,55 @@ class WebSocketBatcher:
         self.batches = {}  # event_name -> list of messages
         self.timers = {}  # event_name -> timer handle
         self.lock = asyncio.Lock()
-    
+
     async def emit(self, event: str, data: dict, room: str = None):
         """Queue a message for batched emission."""
         async with self.lock:
             if event not in self.batches:
                 self.batches[event] = []
-            
+
             self.batches[event].append(data)
-            
+
             # Send immediately if batch size exceeded
             if len(self.batches[event]) >= self.max_batch_size:
                 await self._flush_batch(event, room)
-            else:
-                # Set timer to flush batch after interval
-                if event not in self.timers or self.timers[event].cancelled():
-                    self.timers[event] = asyncio.create_task(
-                        self._schedule_flush(event, room)
-                    )
-    
+            # Set timer to flush batch after interval
+            elif event not in self.timers or self.timers[event].cancelled():
+                self.timers[event] = asyncio.create_task(self._schedule_flush(event, room))
+
     async def _schedule_flush(self, event: str, room: str = None):
         """Schedule batch flush after interval."""
         await asyncio.sleep(self.batch_interval)
         await self._flush_batch(event, room)
-    
+
     async def _flush_batch(self, event: str, room: str = None):
         """Flush all pending messages for an event."""
         async with self.lock:
             if event not in self.batches or not self.batches[event]:
                 return
-            
+
             messages = self.batches[event]
             self.batches[event] = []
-            
+
             if event in self.timers:
                 self.timers[event].cancel()
                 del self.timers[event]
-        
+
         # Send batched messages
         if messages:
             try:
                 # Send as a single batch message
                 await self.sio.emit(
-                    f"{event}_batch",
-                    {"messages": messages, "count": len(messages)},
-                    room=room
+                    f"{event}_batch", {"messages": messages, "count": len(messages)}, room=room
                 )
             except Exception as e:
                 print(f"[!] WebSocket batch emit error for {event}: {e}")
-    
+
     async def flush_all(self):
         """Flush all pending batches immediately."""
         async with self.lock:
             events = list(self.batches.keys())
-        
+
         for event in events:
             await self._flush_batch(event)
 
@@ -224,9 +217,10 @@ class WebSocketBatcher:
 # Global WebSocket batcher instance
 ws_batcher = WebSocketBatcher(sio, batch_interval_ms=150, max_batch_size=30)
 
+import json as json_module
+
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from starlette.requests import Request as StarletteRequest
-import json as json_module
 
 
 def jsonify(*args, **kwargs):
@@ -445,9 +439,10 @@ async def startup_event():
     """Initialize background tasks and warm up caches."""
     # Start background metrics worker
     asyncio.create_task(background_metrics_worker())
-    
+
     # Start background task manager
     from reaper.engine.core.background_tasks import background_manager
+
     await background_manager.start()
 
 
@@ -455,9 +450,10 @@ async def startup_event():
 async def shutdown_event():
     """Clean up resources on shutdown."""
     await http_client.aclose()
-    
+
     # Stop background task manager
     from reaper.engine.core.background_tasks import background_manager
+
     await background_manager.stop()
 
 
@@ -2239,11 +2235,11 @@ async def get_resource_inventory(request: Request):
             # Parallel execution: fetch VM inventory and idle VMs concurrently
             vms_result = await asyncio.to_thread(az.get_vm_inventory)
             idle_vms_result = await asyncio.to_thread(az.get_idle_vms, cpu_threshold=5.0)
-            
+
             vms = vms_result
             idle_vms = idle_vms_result
             idle_vm_names = {vm["name"] for vm in idle_vms}
-            
+
             # Batch cost estimation for all VMs
             vm_cost_tasks = []
             for vm in vms:
@@ -2252,12 +2248,12 @@ async def get_resource_inventory(request: Request):
                         az.estimate_resource_cost,
                         "microsoft.compute/virtualmachines",
                         vm.get("size", ""),
-                        vm.get("location", "")
+                        vm.get("location", ""),
                     )
                 )
-            
+
             vm_costs = await asyncio.gather(*vm_cost_tasks)
-            
+
             for vm, cost in zip(vms, vm_costs):
                 is_idle = vm["name"] in idle_vm_names
                 _add(
@@ -2284,11 +2280,11 @@ async def get_resource_inventory(request: Request):
             # Parallel execution: fetch orphaned disks and all disks concurrently
             orphaned_disks_result = await asyncio.to_thread(az.get_orphaned_disks)
             all_disks_result = await asyncio.to_thread(lambda: list(az.compute.disks.list()))
-            
+
             orphaned_disks_data = orphaned_disks_result
             orphaned_disk_names = {d["name"] for d in orphaned_disks_data.get("disks", [])}
             all_disks = all_disks_result
-            
+
             # Batch cost estimation for all disks
             disk_cost_tasks = []
             for disk in all_disks:
@@ -2300,9 +2296,9 @@ async def get_resource_inventory(request: Request):
                         disk.location,
                     )
                 )
-            
+
             disk_costs = await asyncio.gather(*disk_cost_tasks)
-            
+
             for disk, cost in zip(all_disks, disk_costs):
                 is_orphaned = disk.name in orphaned_disk_names
                 _add(
@@ -2329,7 +2325,7 @@ async def get_resource_inventory(request: Request):
         # ---- Storage Accounts ----
         try:
             storage_accounts = await asyncio.to_thread(az.get_storage_accounts)
-            
+
             # Batch cost estimation for all storage accounts
             storage_cost_tasks = []
             for acc in storage_accounts:
@@ -2338,12 +2334,12 @@ async def get_resource_inventory(request: Request):
                         az.estimate_resource_cost,
                         "microsoft.storage/storageaccounts",
                         acc.get("sku", ""),
-                        acc.get("location", "")
+                        acc.get("location", ""),
                     )
                 )
-            
+
             storage_costs = await asyncio.gather(*storage_cost_tasks)
-            
+
             for acc, cost in zip(storage_accounts, storage_costs):
                 tier = acc.get("access_tier", "Hot")
                 _add(
@@ -2371,7 +2367,7 @@ async def get_resource_inventory(request: Request):
             # Parallel execution: fetch network resources concurrently
             ips_result = await asyncio.to_thread(az.get_unassociated_public_ips)
             lbs_result = await asyncio.to_thread(az.get_idle_load_balancers)
-            
+
             # Batch cost estimation for network resources
             network_cost_tasks = []
             for ip in ips_result:
@@ -2380,7 +2376,7 @@ async def get_resource_inventory(request: Request):
                         az.estimate_resource_cost,
                         "microsoft.network/publicipaddresses",
                         ip.get("sku", ""),
-                        ip.get("location", "")
+                        ip.get("location", ""),
                     )
                 )
             for lb in lbs_result:
@@ -2389,12 +2385,12 @@ async def get_resource_inventory(request: Request):
                         az.estimate_resource_cost,
                         "microsoft.network/loadbalancers",
                         lb.get("sku", ""),
-                        lb.get("location", "")
+                        lb.get("location", ""),
                     )
                 )
-            
+
             network_costs = await asyncio.gather(*network_cost_tasks)
-            
+
             # Process IPs (first half of costs)
             ip_count = len(ips_result)
             ip_costs = network_costs[:ip_count]
@@ -2414,7 +2410,7 @@ async def get_resource_inventory(request: Request):
                         "estimated_cost": cost,
                     },
                 )
-            
+
             # Process load balancers (second half of costs)
             lb_costs = network_costs[ip_count:]
             for lb, cost in zip(lbs_result, lb_costs):
@@ -2994,43 +2990,52 @@ async def get_resource_inventory(request: Request):
 
         # Return streaming response if requested
         if stream_response:
+
             async def generate_stream():
                 """Generator function for streaming JSON response."""
                 # Send initial metadata
-                yield json_module.dumps({
-                    "status": "success",
-                    "page": page,
-                    "page_size": page_size,
-                    "total": total,
-                    "total_pages": max(1, (total + page_size - 1) // page_size),
-                    "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
-                }) + "\n"
-                
+                yield (
+                    json_module.dumps(
+                        {
+                            "status": "success",
+                            "page": page,
+                            "page_size": page_size,
+                            "total": total,
+                            "total_pages": max(1, (total + page_size - 1) // page_size),
+                            "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
+                    + "\n"
+                )
+
                 # Stream resources in chunks
                 chunk_size = 50
                 for i in range(0, len(paginated_flat), chunk_size):
-                    chunk = paginated_flat[i:i + chunk_size]
-                    yield json_module.dumps({
-                        "type": "resources_chunk",
-                        "chunk_index": i // chunk_size,
-                        "total_chunks": (len(paginated_flat) + chunk_size - 1) // chunk_size,
-                        "resources": chunk
-                    }) + "\n"
+                    chunk = paginated_flat[i : i + chunk_size]
+                    yield (
+                        json_module.dumps(
+                            {
+                                "type": "resources_chunk",
+                                "chunk_index": i // chunk_size,
+                                "total_chunks": (len(paginated_flat) + chunk_size - 1)
+                                // chunk_size,
+                                "resources": chunk,
+                            }
+                        )
+                        + "\n"
+                    )
                     await asyncio.sleep(0.01)  # Small delay to prevent overwhelming the client
-                
+
                 # Send summary at the end
-                yield json_module.dumps({
-                    "type": "summary",
-                    "data": inventory
-                }) + "\n"
-            
+                yield json_module.dumps({"type": "summary", "data": inventory}) + "\n"
+
             return StreamingResponse(
                 generate_stream(),
                 media_type="application/json",
                 headers={
                     "Cache-Control": "no-cache",
-                    "X-Accel-Buffering": "no"  # Disable nginx buffering
-                }
+                    "X-Accel-Buffering": "no",  # Disable nginx buffering
+                },
             )
 
         return jsonify(
@@ -3614,12 +3619,14 @@ async def build_with_ai(request: Request):
 async def api_architect_status(request: Request):
     """Returns the validation state of the configured OpenAI, Gemini, and Claude API keys."""
     status = architect_manager.verify_api_status()
-    return jsonify({
-        "status": "success",
-        "openai": status["openai"],
-        "gemini": status["gemini"],
-        "claude": status["claude"]
-    })
+    return jsonify(
+        {
+            "status": "success",
+            "openai": status["openai"],
+            "gemini": status["gemini"],
+            "claude": status["claude"],
+        }
+    )
 
 
 @app.post("/api/v1/architect/estimate")
@@ -6080,15 +6087,12 @@ async def handle_start_log_stream(sid, data):
     from reaper.services.log_streamer import fetch_azure_logs
 
     # Use batched WebSocket emission for initial log messages
-    initial_logs = [
-        "🚀 Initializing Cloud-Reaper Log Stream...",
-        "📡 Connecting to log sources..."
-    ]
-    
+    initial_logs = ["🚀 Initializing Cloud-Reaper Log Stream...", "📡 Connecting to log sources..."]
+
     for log_msg in initial_logs:
         await ws_batcher.emit("new_log", {"data": log_msg})
         await asyncio.sleep(0.2)
-    
+
     await ws_batcher.flush_all()
 
     # Try to get actual Python application logs
@@ -6108,11 +6112,13 @@ async def handle_start_log_stream(sid, data):
 
             # Try to get recent log records if available
             # Note: This is a simplified approach - in production you'd want a proper log aggregation system
-            await ws_batcher.emit("new_log", {"data": "📊 Application logger connection established"})
+            await ws_batcher.emit(
+                "new_log", {"data": "📊 Application logger connection established"}
+            )
         else:
             await ws_batcher.emit("new_log", {"data": "⚠️  No application log handlers configured"})
             await asyncio.sleep(0.3)
-        
+
         await ws_batcher.flush_all()
     except Exception as e:
         await ws_batcher.emit("new_log", {"data": f"❌ Application logger error: {e!s}"})
@@ -6128,11 +6134,11 @@ async def handle_start_log_stream(sid, data):
                 {"data": f"✅ Connected to Azure Monitor - Found {len(azure_logs)} recent logs"},
             )
             await asyncio.sleep(0.3)
-            
+
             # Batch Azure log messages
             for i, log in enumerate(azure_logs):
                 await ws_batcher.emit("new_log", {"data": f"[Azure #{i + 1}] {log!s}"})
-            
+
             await ws_batcher.flush_all()
         else:
             await ws_batcher.emit(
@@ -6147,7 +6153,7 @@ async def handle_start_log_stream(sid, data):
 
     # Stream actual Cloud-Reaper system information
     system_messages = ["🔄 Streaming Cloud-Reaper system information..."]
-    
+
     try:
         # Get actual system information
         system_messages.append(f"💻 System: {platform.system()} {platform.release()}")
@@ -6167,17 +6173,17 @@ async def handle_start_log_stream(sid, data):
             system_messages.append("⚠️  Subscription ID not configured")
     except Exception as e:
         system_messages.append(f"❌ System info error: {e!s}")
-    
+
     # Batch system messages
     for msg in system_messages:
         await ws_batcher.emit("new_log", {"data": msg})
         await asyncio.sleep(0.1)
-    
+
     await ws_batcher.flush_all()
 
     # Stream actual collector information
     collector_messages = ["🔍 Checking Cloud-Reaper collectors..."]
-    
+
     try:
         from reaper.collectors.providers.azure_collector import AzureCollector
 
@@ -6202,17 +6208,17 @@ async def handle_start_log_stream(sid, data):
 
     except Exception as collector_error:
         collector_messages.append(f"❌ Collector error: {collector_error!s}")
-    
+
     # Batch collector messages
     for msg in collector_messages:
         await ws_batcher.emit("new_log", {"data": msg})
         await asyncio.sleep(0.2)
-    
+
     await ws_batcher.flush_all()
 
     # Stream engine information if available
     engine_messages = ["⚙️  Checking Cloud-Reaper engine status..."]
-    
+
     try:
         binary_path = _reaper_engine_binary()
         if binary_path and binary_path.exists():
@@ -6221,12 +6227,12 @@ async def handle_start_log_stream(sid, data):
             engine_messages.append("⚠️  Go engine binary not found - using Python engine")
     except Exception as engine_error:
         engine_messages.append(f"❌ Engine check error: {engine_error!s}")
-    
+
     # Batch engine messages
     for msg in engine_messages:
         await ws_batcher.emit("new_log", {"data": msg})
         await asyncio.sleep(0.2)
-    
+
     await ws_batcher.flush_all()
 
     await ws_batcher.emit(

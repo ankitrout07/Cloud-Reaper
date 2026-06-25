@@ -2094,7 +2094,9 @@ class AzureCollector:
         Fetch multiple resource types in a single Resource Graph query for better performance.
         Returns a dictionary mapping resource type to list of resources.
         """
-        cache_key = f"resource_graph_batched_{'_'.join(sorted(resource_types))}_{self.subscription_id}"
+        cache_key = (
+            f"resource_graph_batched_{'_'.join(sorted(resource_types))}_{self.subscription_id}"
+        )
 
         def fetch() -> dict[str, list[dict]]:
             try:
@@ -2147,7 +2149,6 @@ class AzureCollector:
                 return {}
 
         return get_cached_data(cache_key, fetch, ttl_seconds=120)
-
 
     # ========== COST ESTIMATION ==========
 
