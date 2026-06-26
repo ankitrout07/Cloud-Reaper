@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
@@ -203,29 +204,55 @@ func outputPrices(provider string) {
 	}
 	regions := []string{"eastus", "westus2", "westeurope"}
 
-	var prices []map[string]any
+	type priceResult struct {
+		sku    string
+		region string
+		price  float64
+		err    error
+	}
+
+	resultChan := make(chan priceResult, len(skus)*len(regions))
+	var wg sync.WaitGroup
+
+	// Fan out price fetches in parallel
 	for _, skuName := range skus {
 		for _, region := range regions {
-			var price float64
-			var err error
-			switch provider {
-			case "aws":
-				price, err = collectors.FetchAWSPrice(skuName, region)
-			case "gcp":
-				price, err = collectors.FetchGCPPrice(skuName, region)
-			default:
-				price, err = collectors.FetchAzurePrice(skuName, region)
-			}
-			entry := map[string]any{
-				"sku":    skuName,
-				"region": region,
-				"price":  price,
-			}
-			if err != nil {
-				entry["error"] = err.Error()
-			}
-			prices = append(prices, entry)
+			wg.Add(1)
+			go func(sku, region string) {
+				defer wg.Done()
+				var price float64
+				var err error
+				switch provider {
+				case "aws":
+					price, err = collectors.FetchAWSPrice(sku, region)
+				case "gcp":
+					price, err = collectors.FetchGCPPrice(sku, region)
+				default:
+					price, err = collectors.FetchAzurePrice(sku, region)
+				}
+				resultChan <- priceResult{sku: sku, region: region, price: price, err: err}
+			}(skuName, region)
 		}
+	}
+
+	// Wait for all goroutines to complete
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// Collect results
+	var prices []map[string]any
+	for result := range resultChan {
+		entry := map[string]any{
+			"sku":    result.sku,
+			"region": result.region,
+			"price":  result.price,
+		}
+		if result.err != nil {
+			entry["error"] = result.err.Error()
+		}
+		prices = append(prices, entry)
 	}
 	out, _ := json.Marshal(map[string]any{"prices": prices})
 	fmt.Println(string(out))

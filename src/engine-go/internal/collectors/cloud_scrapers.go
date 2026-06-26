@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -274,17 +275,46 @@ func (a *AzureScraper) scanVMs(ctx context.Context) ([]models.Resource, error) {
 		if err != nil {
 			break
 		}
+		
+		// Fan out CPU usage fetches in parallel using goroutines
+		type vmResult struct {
+			vm    *armcompute.VirtualMachine
+			usage float64
+		}
+		
+		resultChan := make(chan vmResult, len(page.Value))
+		var wg sync.WaitGroup
+		
 		for _, vm := range page.Value {
 			if vm == nil || vm.ID == nil || vm.Name == nil {
 				continue
 			}
+			
+			wg.Add(1)
+			go func(vm *armcompute.VirtualMachine) {
+				defer wg.Done()
+				usage := a.latestCPUPercent(ctx, monitorClient, *vm.ID)
+				resultChan <- vmResult{vm: vm, usage: usage}
+			}(vm)
+		}
+		
+		// Wait for all goroutines to complete
+		go func() {
+			wg.Wait()
+			close(resultChan)
+		}()
+		
+		// Collect results
+		for result := range resultChan {
+			vm := result.vm
+			usage := result.usage
+			
 			tags := azureTagsToMap(vm.Tags)
 			sku := "Unknown"
 			if vm.Properties != nil && vm.Properties.HardwareProfile != nil && vm.Properties.HardwareProfile.VMSize != nil {
 				sku = string(*vm.Properties.HardwareProfile.VMSize)
 			}
 			region := vmLocation(vm)
-			usage := a.latestCPUPercent(ctx, monitorClient, *vm.ID)
 
 			resources = append(resources, models.Resource{
 				ID:            *vm.ID,
