@@ -17,7 +17,6 @@ from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.consumption import ConsumptionManagementClient
 from azure.mgmt.monitor import MonitorManagementClient
 from azure.mgmt.network import NetworkManagementClient
-from azure.mgmt.recoveryservices import RecoveryServicesClient
 from azure.mgmt.sql import SqlManagementClient
 from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.subscription import SubscriptionClient
@@ -192,7 +191,6 @@ class AzureCollector:
         self.monitor = MonitorManagementClient(self.credentials, self.subscription_id)
         self.web = WebSiteManagementClient(self.credentials, self.subscription_id)
         self.sql = SqlManagementClient(self.credentials, self.subscription_id)
-        self.recovery = RecoveryServicesClient(self.credentials, self.subscription_id)
         self.storage = StorageManagementClient(self.credentials, self.subscription_id)
         self.consumption = ConsumptionManagementClient(self.credentials, self.subscription_id)
         try:
@@ -217,6 +215,7 @@ class AzureCollector:
         self._appinsights: Any | None = None
         self._cdn: Any | None = None
         self._apim: Any | None = None
+        self._recovery: Any | None = None  # lazy — only needed by get_recovery_vaults()
 
         # In-memory cost price cache: (resource_type, sku, region) -> (timestamp, monthly_cost)
         self._price_cache: dict[tuple[str, str, str], tuple[float, float]] = {}
@@ -811,8 +810,11 @@ class AzureCollector:
         return idle_gateways
 
     def get_recovery_vaults(self):
-        """Finds Recovery Service Vaults"""
-        vaults = self.recovery.vaults.list_by_subscription()
+        """Finds Recovery Service Vaults (lazy-initializes the RecoveryServicesClient)."""
+        if self._recovery is None:
+            from azure.mgmt.recoveryservices import RecoveryServicesClient
+            self._recovery = RecoveryServicesClient(self.credentials, self.subscription_id)
+        vaults = self._recovery.vaults.list_by_subscription()
         return [{"name": v.name, "location": v.location, "sku": v.sku.name} for v in vaults]
 
     def get_empty_app_service_plans(self):
