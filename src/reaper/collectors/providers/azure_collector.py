@@ -229,10 +229,13 @@ class AzureCollector:
         cache_key = f"vm_inventory_{self.subscription_id}"
 
         def fetch():
-            vms = self.compute.virtual_machines.list_all()
-            inventory = []
+            try:
+                vms = list(self.compute.virtual_machines.list_all())
+            except Exception as e:
+                print(f"[!] Error listing VMs: {e}")
+                return []
 
-            for vm in vms:
+            def process_vm(vm):
                 # Extract basic VM info
                 vm_size = vm.hardware_profile.vm_size if vm.hardware_profile else "Unknown"
                 location = vm.location or "Unknown"
@@ -277,20 +280,21 @@ class AzureCollector:
                 except Exception as e:
                     print(f"[!] Error fetching metrics for VM {vm.name}: {e}")
 
-                inventory.append(
-                    {
-                        "name": vm.name,
-                        "size": vm_size,
-                        "location": location,
-                        "status": "Managed",
-                        "id": vm.id,
-                        "tags": dict(vm.tags) if vm.tags else {},
-                        "cost": round(estimated_cost, 2),
-                        "cpu_utilization": round(cpu_utilization, 2),
-                        "memory_utilization": memory_utilization,
-                    }
-                )
-            return inventory
+                return {
+                    "name": vm.name,
+                    "size": vm_size,
+                    "location": location,
+                    "status": "Managed",
+                    "id": vm.id,
+                    "tags": dict(vm.tags) if vm.tags else {},
+                    "cost": round(estimated_cost, 2),
+                    "cpu_utilization": round(cpu_utilization, 2),
+                    "memory_utilization": memory_utilization,
+                }
+
+            # Map the processing logic across the shared thread pool
+            results = list(_SHARED_EXECUTOR.map(process_vm, vms))
+            return [res for res in results if res is not None]
 
         return get_cached_data(cache_key, fetch, ttl_seconds=60)
 
@@ -664,12 +668,12 @@ class AzureCollector:
             fam = _vm_series_family(size)
             by_fam[fam]["cpu"].append(float(row.get("usage", 0)))
 
-        for row in report[:8]:
+        def process_memory(row):
             name = row.get("name")
             size = inv.get(name)
             rg = row.get("rg")
             if not name or not rg or not size:
-                continue
+                return None
             fam = _vm_series_family(size)
             rid = (
                 f"/subscriptions/{self.subscription_id}/resourceGroups/{rg}/"
@@ -677,7 +681,14 @@ class AzureCollector:
             )
             avail = self.get_vm_metric_latest(rid, "Available Memory Bytes", "PT1H", "PT5M")
             if avail is not None and avail > 0:
-                by_fam[fam]["mem_gib"].append(avail / (1024.0**3))
+                return fam, avail / (1024.0**3)
+            return None
+
+        memory_results = list(_SHARED_EXECUTOR.map(process_memory, report[:8]))
+        for res in memory_results:
+            if res:
+                fam, val = res
+                by_fam[fam]["mem_gib"].append(val)
 
         labels = sorted(by_fam.keys())[:10]
         cpu_avgs: list[float] = []
