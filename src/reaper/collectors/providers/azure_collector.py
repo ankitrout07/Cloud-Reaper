@@ -813,6 +813,7 @@ class AzureCollector:
         """Finds Recovery Service Vaults (lazy-initializes the RecoveryServicesClient)."""
         if self._recovery is None:
             from azure.mgmt.recoveryservices import RecoveryServicesClient
+
             self._recovery = RecoveryServicesClient(self.credentials, self.subscription_id)
         vaults = self._recovery.vaults.list_by_subscription()
         return [{"name": v.name, "location": v.location, "sku": v.sku.name} for v in vaults]

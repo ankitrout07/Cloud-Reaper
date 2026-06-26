@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 try:
     from influxdb_client import InfluxDBClient, Point, WritePrecision
     from influxdb_client.client.write_api import SYNCHRONOUS
+
     _INFLUXDB_AVAILABLE = True
 except ImportError:
     _INFLUXDB_AVAILABLE = False
