@@ -68,6 +68,8 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 async_engine_config = engine_config.copy()
 if "sqlite" in DATABASE_URL:
     async_engine_config["connect_args"] = {"check_same_thread": False}
+    # Remove pool_size for aiosqlite which doesn't support connection pooling
+    async_engine_config.pop("pool_size", None)
 
 if ASYNC_DATABASE_URL:
     async_engine = create_async_engine(ASYNC_DATABASE_URL, **async_engine_config)

@@ -7,6 +7,11 @@ One of Cloud-Reaper's most innovative features is its AI-assisted cloud
 architecture planner, which approaches infrastructure provisioning through the lens of
 mathematical cost constraints.
 
+### Version Requirements
+- **Python**: 3.12+ for Pydantic v2 and modern type annotations
+- **Google GenAI SDK**: Latest version for Gemini 2.5 Flash integration
+- **OpenAI SDK**: 1.50.0+ for multi-provider AI support
+
 
 1. GEMINI 2.5 FLASH COST-BOUNDED PERFORMANCE COPILOT
 -----------------------------------------------------
@@ -37,6 +42,43 @@ mathematical cost constraints.
   - The LLM connection is configured with `temperature=0.1` to enforce strict mathematical
     rigor, limit structural hallucinations, and guarantee that total cost projections are
     strictly bounded.
+
+**Code Example:**
+```python
+from reaper.engine.copilot_engine import KnapsackCopilotEngine
+
+# Initialize the copilot engine
+copilot = KnapsackCopilotEngine()
+
+# Generate architecture blueprint
+blueprint = copilot.optimize(
+    provider="azure",
+    intent="high-availability API cluster handling 50k RPM with auto-scaling",
+    budget_cap=1200.00
+)
+
+print(f"Architecture Overview: {blueprint['system_architecture_overview']}")
+print(f"Total Cost: ${blueprint['calculated_total_cost']:.2f}")
+print(f"Efficiency Score: {blueprint['efficiency_index_score']}/100")
+print(f"\nComponents:")
+for component in blueprint['infrastructure_components']:
+    print(f"  - {component['name']}: {component['sku_size']} x{component['quantity']} (${component['monthly_cost']:.2f}/mo)")
+
+print(f"\nTerraform HCL:")
+print(blueprint['production_terraform_hcl'])
+
+# Output example:
+# Architecture Overview: High-availability API cluster with load balancer, auto-scaling VMs, and managed database
+# Total Cost: $1185.50
+# Efficiency Score: 87/100
+# 
+# Components:
+#   - Load Balancer: Standard_LB x1 ($25.00/mo)
+#   - API Servers: Standard_D2s_v3 x4 ($420.00/mo)
+#   - Database: Standard_D4s_v3 x2 ($350.00/mo)
+#   - Storage: Standard_LRS x3 ($100.00/mo)
+#   - CDN: Standard_Premium x1 ($290.50/mo)
+```
 
 
 2. STRUCTURED SCHEMA CONTRACT VALIDATION (Pydantic Integration)
@@ -132,3 +174,67 @@ mathematical cost constraints.
   - Unified Dashboard: Consolidates generative AI token expenses alongside standard
     virtual machines, networks, and storage costs. This gives engineers and finance teams a
     complete view of application operational costs, including direct AI model costs.
+
+
+7. TROUBLESHOOTING THE AI COPILOT
+---------------------------------
+
+### Common Issues and Solutions
+
+**Issue: API Key Not Configured**
+- **Symptom**: "API key not found" or "authentication failed" errors
+- **Cause**: `GEMINI_API_KEY` or `OPENAI_API_KEY` not set in `.env` file
+- **Solution**:
+  ```bash
+  # Add to .env file
+  GEMINI_API_KEY=your-gemini-api-key
+  OPENAI_API_KEY=your-openai-api-key
+  ```
+- **Alternative**: Use offline fallback mode which uses rule-based synthesis
+
+**Issue: Rate Limiting from AI Provider**
+- **Symptom**: "rate limit exceeded" or "quota exceeded" errors
+- **Cause**: Too many API requests within the provider's rate limit window
+- **Solution**: The system automatically falls back to offline rule-based synthesis
+- **Prevention**: Use the 128-entry LRU cache to avoid redundant API calls
+
+**Issue: Schema Validation Failures**
+- **Symptom**: "Pydantic validation error" or "invalid schema response"
+- **Cause**: LLM returned JSON that doesn't match the expected Pydantic schema
+- **Solution**: The system automatically retries with lower temperature (more deterministic)
+- **Prevention**: Ensure `temperature=0.1` is set for strict mathematical rigor
+
+**Issue: Budget Constraint Violations**
+- **Symptom**: Generated architecture exceeds the specified budget cap
+- **Cause**: LLM hallucination or pricing data mismatch
+- **Solution**: The system validates total cost against budget and regenerates if exceeded
+- **Prevention**: Use accurate regional pricing data in `region_price_cache` table
+
+**Issue: Terraform HCL Generation Errors**
+- **Symptom**: Invalid Terraform syntax or missing required fields
+- **Cause**: LLM generated syntactically incorrect HCL code
+- **Solution**: Use Terraform validation tools before deployment
+- **Prevention**: Review generated HCL in the dashboard before exporting
+
+**Issue: Cache Not Working**
+- **Symptom**: Repeated API calls for identical requests
+- **Cause**: Cache key mismatch or cache eviction policy too aggressive
+- **Solution**: Check cache key generation in `copilot_engine.py`
+- **Prevention**: Use consistent provider names, intents, and budget values for cache hits
+
+### Debug Mode
+Enable verbose AI copilot logging:
+```bash
+export COPILOT_DEBUG=true
+# Then make API calls via dashboard or curl
+```
+
+### Performance Optimization
+- **Cache Tuning**: Adjust LRU cache size (default: 128 entries) in `copilot_engine.py`
+- **Temperature Adjustment**: Lower temperature (0.0-0.1) for more deterministic outputs
+- **Offline Mode**: Force offline fallback by setting `FORCE_OFFLINE=true` in environment
+
+### Cost Management
+- **Token Tracking**: Monitor token usage in the unified dashboard
+- **Cost Estimation**: Review estimated token costs before generation
+- **Budget Alerts**: Set up alerts for AI API spending in the Settings section

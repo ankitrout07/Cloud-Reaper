@@ -49,6 +49,41 @@ reinforcement learning, and time-series forecasting.
   - Confidence Scoring: Automatically assigns confidence levels based on historical
     size: "low" (< 5 days), "medium" (5-14 days), and "high" (> 14 days of history).
 
+**Code Example:**
+```python
+from reaper.engine.logic import BudgetForecaster
+from datetime import datetime, timedelta
+
+# Initialize the forecaster
+forecaster = BudgetForecaster()
+
+# Historical daily costs (last 20 days)
+historical_costs = [
+    120.50, 135.20, 128.90, 142.30, 138.75,
+    145.60, 140.20, 152.40, 148.90, 155.30,
+    150.75, 162.40, 158.90, 165.30, 160.75,
+    172.40, 168.90, 175.30, 170.75, 182.40
+]
+
+# Get EoM forecast
+forecast = forecaster.forecast_eom(
+    historical_costs=historical_costs,
+    current_date=datetime.now(),
+    monthly_budget=5000.00
+)
+
+print(f"Projected EoM Spend: ${forecast['projected_spend']:.2f}")
+print(f"Confidence Level: {forecast['confidence']}")
+print(f"Budget Status: {forecast['budget_status']}")
+print(f"Days Remaining: {forecast['days_remaining']}")
+
+# Output example:
+# Projected EoM Spend: $4850.75
+# Confidence Level: high
+# Budget Status: within_budget
+# Days Remaining: 10
+```
+
 
 3. AUTONOMOUS REINFORCEMENT LEARNING RIGHT-SIZING AGENT (RightsizingAgent)
 --------------------------------------------------------------------------
@@ -82,6 +117,40 @@ reinforcement learning, and time-series forecasting.
     - Low Risk: Standard scaling under moderate or low load.
     The agent enforces that SLA compliance (`sla_maintained`) is marked as False
     whenever a "High Risk" classification is triggered, preventing dangerous de-provisioning.
+
+**Code Example:**
+```python
+from reaper.engine.calculator import RightsizingAgent
+
+# Initialize the RL agent
+agent = RightsizingAgent()
+
+# Current VM metrics
+current_cpu = 25.0  # 25% utilization
+current_memory = 45.0  # 45% utilization
+current_iops = 1500  # 1500 IOPS
+current_network = 200  # Mbps
+
+# Get recommendation
+recommendation = agent.recommend_sku(
+    cpu=current_cpu,
+    memory=current_memory,
+    iops=current_iops,
+    network=current_network,
+    current_sku="Standard_D4s_v3"
+)
+
+print(f"Action: {recommendation['action']}")
+print(f"Recommended SKU: {recommendation['sku']}")
+print(f"Risk Level: {recommendation['risk']}")
+print(f"SLA Maintained: {recommendation['sla_maintained']}")
+
+# Output example:
+# Action: downscale
+# Recommended SKU: Standard_D2s_v3
+# Risk Level: Low
+# SLA Maintained: True
+```
 
 
 4. TIME-SERIES ANOMALY DETECTOR (AnomalyDetector)
@@ -184,3 +253,68 @@ reinforcement learning, and time-series forecasting.
     reduces billing footprints without changing performance specs. Utilizes Go's
     concurrency engine to retrieve cross-regional spot/retail rates, computing
     exact monthly dollar savings and percentage cuts.
+
+
+9. TROUBLESHOOTING THE FINOPS INTELLIGENCE LAYER
+--------------------------------------------------
+
+### Common Issues and Solutions
+
+**Issue: ARIMA Model Fails to Converge**
+- **Symptom**: "ARIMA model failed to converge" or "non-stationary data" errors
+- **Cause**: Insufficient historical data or non-stationary time series
+- **Solution**: The system automatically falls back to linear rolling average for datasets < 5 points
+- **Prevention**: Ensure at least 14 days of historical spend data for accurate forecasting
+
+**Issue: Q-Learning Agent Returns Poor Recommendations**
+- **Symptom**: Rightsizing agent suggests inappropriate SKU sizes
+- **Cause**: Insufficient training data or incorrect state discretization
+- **Solution**: Retrain the agent with more historical telemetry data
+- **Prevention**: Ensure CPU/memory/IOPS metrics are collected consistently
+
+**Issue: Anomaly Detector False Positives**
+- **Symptom**: Regular weekly spikes flagged as anomalies
+- **Cause**: Seasonal decomposition not properly configured
+- **Solution**: The system uses seasonal decomposition with period=7 to eliminate weekday patterns
+- **Prevention**: Adjust Z-score threshold (default: 3.0) in `AnomalyDetector` class
+
+**Issue: Zombie Scorer Missing Idle Resources**
+- **Symptom**: Idle resources not flagged as zombies
+- **Cause**: IOPS thresholds too high or attachment status incorrect
+- **Solution**: Adjust scoring rules in `ZombieScorer` class (default: IOPS < 10 for 7 days)
+- **Prevention**: Ensure telemetry data is collected for the full 7-day window
+
+**Issue: Unit Economics Regression Fails**
+- **Symptom**: "insufficient data for regression" or "correlation too low"
+- **Cause**: Missing business metrics (ACTIVE_USERS, API_REQUESTS) or insufficient data points
+- **Solution**: Ensure business metrics are populated in `business_metrics` table
+- **Prevention**: Set up automated metric collection from application monitoring
+
+**Issue: Spot Eviction Predictor Inaccurate**
+- **Symptom**: Predicted evictions don't match actual instance terminations
+- **Cause**: Insufficient training data or outdated feature weights
+- **Solution**: Retrain the GradientBoostingClassifier with recent spot instance data
+- **Prevention**: Regularly update training data with actual eviction events
+
+**Issue: Workload Personality Classification Errors**
+- **Symptom**: Workloads misclassified (e.g., stable labeled as bursty)
+- **Cause**: Seasonal strength threshold inappropriate for the workload
+- **Solution**: Adjust seasonal strength threshold (default: 0.6) in `WorkloadPersonality` class
+- **Prevention**: Review classification results and adjust thresholds based on actual patterns
+
+### Debug Mode
+Enable verbose ML engine logging:
+```bash
+export ENGINE_DEBUG=true
+PYTHONPATH=src python -m reaper.cli --enhanced-pipeline
+```
+
+### Performance Optimization
+- **Model Caching**: Enable model caching to avoid retraining on every run
+- **Batch Processing**: Process resources in batches for large-scale analysis
+- **Parallel Execution**: Use multiprocessing for independent model runs
+
+### Data Quality Requirements
+- **Minimum Historical Data**: 14 days for ARIMA, 5 days for budget forecasting
+- **Telemetry Frequency**: Hourly metrics for accurate anomaly detection
+- **Business Metrics**: Daily aggregation for unit economics correlation

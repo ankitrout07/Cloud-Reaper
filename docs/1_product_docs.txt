@@ -1,17 +1,19 @@
-# Product Docs
+# Product Documentation
 
-Welcome to the Cloud Reaper intelligence suite. Cloud Reaper is a high-performance multi-cloud FinOps engine designed to bridge the gap between cloud engineering and financial accountability.
+Welcome to the Cloud-Reaper intelligence suite. Cloud-Reaper is a high-performance **Hybrid FinOps Intelligence Engine** designed to bridge the gap between cloud financial management and automated engineering action.
 
 ## 🚀 Quick Overview
 
-Cloud Reaper is an enterprise-grade platform that provides:
+Cloud-Reaper is an enterprise-grade platform that provides:
 
-- **Real-time Asset Tracking**: Monitor your entire cloud infrastructure across multiple providers
-- **Predictive AI Resource Sizing**: ML-powered recommendations for optimal resource allocation
-- **Dynamic Multi-cloud Architecture**: Support for AWS, Azure, GCP, and Kubernetes
-- **Automated Cost Optimization**: Intelligent waste detection and remediation
-- **Budget Guardrails**: Real-time spend monitoring and alerting
-- **AI-Powered Infrastructure Design**: Natural-language architecture generation
+- **Real-time Asset Tracking**: Monitor your entire cloud infrastructure across multiple providers with sub-second discovery
+- **Predictive AI Resource Sizing**: ML-powered recommendations using Q-learning reinforcement learning and ARIMA forecasting
+- **Dynamic Multi-cloud Architecture**: Support for AWS, Azure, GCP, and Kubernetes with unified API interfaces
+- **Automated Cost Optimization**: Intelligent waste detection, zombie resource hunting, and automated remediation
+- **Budget Guardrails**: Real-time spend monitoring with predictive forecasting and multi-channel alerting
+- **AI-Powered Infrastructure Design**: Natural-language architecture generation with cost-bounded optimization
+- **Cryptographic Audit Trails**: SHA-256 chained hash ledger for tamper-proof compliance logging
+- **Encrypted Vault**: PBKDF2-HMAC-SHA256 + Fernet encryption for secure credential management
 
 ## 🎯 Key Capabilities
 
@@ -43,26 +45,58 @@ Cloud Reaper is an enterprise-grade platform that provides:
 
 ### Prerequisites
 - Cloud provider credentials (AWS, Azure, GCP, or Kubernetes)
-- Python 3.8+ (for local development)
-- Go 1.18+ (for scanner components)
-- Database (SQLite for development, PostgreSQL for production)
+- Python 3.12+ (for local development and intelligence layer)
+- Go 1.26+ (for high-performance scanner components)
+- Docker (for PostgreSQL database container)
+- Azure CLI (`az login`) — for Azure scanning
 
 ### Installation
 
+#### Method 1: Universal Bootstrap (Recommended)
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/cloud-reaper.git
-cd cloud-reaper
+git clone https://github.com/ankitrout07/Cloud-Reaper.git
+cd Cloud-Reaper
+
+# Run the universal bootstrap script
+python bootstrap.py
+```
+
+The bootstrap script automatically:
+- Detects your OS (Windows, macOS, Linux)
+- Creates a Python virtual environment
+- Installs all dependencies
+- Builds the Go performance engine
+- Configures PostgreSQL
+- Launches the dashboard at http://localhost:5001
+
+#### Method 2: Manual Installation
+```bash
+# Clone the repository
+git clone https://github.com/ankitrout07/Cloud-Reaper.git
+cd Cloud-Reaper
+
+# Create Python virtual environment
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install Python dependencies
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-dev.txt
+
+# Build Go engine
+cd src/engine-go
+go build -o ../../bin/reaper-engine .
+cd ../..
+
+# Start PostgreSQL
+docker run --name cloud-reaper-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:15-alpine
 
 # Configure environment variables
 cp .env.example .env
 # Edit .env with your credentials
 
 # Run the application
-python main.py
+PYTHONPATH=src python -m reaper.web.app_async
 ```
 
 ### Initial Configuration
@@ -76,40 +110,64 @@ python main.py
 
 ### Components
 
-- **Go Scanner Engine**: High-performance resource discovery and telemetry collection
-- **Python ML Engine**: Q-learning rightsizing, ARIMA forecasting, and anomaly detection
-- **FastAPI Backend**: RESTful API with WebSocket support for real-time updates
-- **Web Dashboard**: Modern interface with real-time charts and metrics
-- **SQLite/PostgreSQL**: Flexible database backend with connection pooling
+- **Go Scanner Engine** (`src/engine-go/`): High-performance resource discovery using goroutines with token-bucket rate limiting (10 req/s)
+- **Python ML Engine** (`src/reaper/engine/`): Q-learning rightsizing, ARIMA forecasting, anomaly detection, and unit economics
+- **FastAPI + SocketIO Backend** (`src/reaper/web/`): RESTful API with WebSocket support for real-time updates
+- **Web Dashboard**: Modern glassmorphism UI with real-time charts, metrics, and dark/light theme
+- **PostgreSQL 15**: Production-grade database with SQLAlchemy 2.0 ORM and pgx/v5 driver
+- **InfluxDB Integration**: Time-series telemetry for long-term metrics retention
+- **Cryptographic Vault**: PBKDF2-HMAC-SHA256 (600K iterations) + Fernet AES-128-CBC encryption
+- **AI Copilot**: Google Gemini 2.5 Flash with structured Pydantic schema validation
 
 ### Data Flow
 
-1. **Telemetry Collection**: Go scrapers collect resource metrics from cloud APIs
-2. **Analysis Pipeline**: Python ML engines analyze usage patterns and generate recommendations
-3. **Storage**: Optimized data is stored in the database for historical analysis
-4. **Presentation**: Dashboard displays real-time insights and actionable recommendations
+1. **Telemetry Collection**: Go scrapers concurrently collect resource metrics from cloud APIs using goroutines
+2. **Database Ingestion**: Raw data is normalized and batch-upserted into PostgreSQL via pgx/v5
+3. **Analysis Pipeline**: Python ML engines analyze usage patterns using ARIMA, Q-learning, and statistical models
+4. **Storage**: Optimized data is stored in PostgreSQL with 5-minute auto-purge of stale entries
+5. **Presentation**: Dashboard displays real-time insights via WebSocket with in-memory cache acceleration
+6. **Audit Logging**: Every action is logged to a SHA-256 chained hash ledger for tamper detection
+7. **Telemetry Bridge**: Savings metrics are pushed to InfluxDB for long-term time-series retention
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
 ```bash
-# Database
-DATABASE_URL=sqlite:///data/reaper.db
+# Application
+APP_ENV=development
+FLASK_PORT=5001
+FLASK_DEBUG=True
 
-# Cloud Providers
+# Database
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/cloud_reaper
+
+# Azure (required for live scans)
 AZURE_SUBSCRIPTION_ID=your-subscription-id
+AZURE_TENANT_ID=your-tenant-id
+AZURE_CLIENT_ID=your-client-id
+AZURE_CLIENT_SECRET=your-client-secret
+
+# AWS (optional)
 AWS_ACCESS_KEY_ID=your-access-key
 AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_REGION=us-east-1
+
+# GCP (optional)
 GCP_PROJECT_ID=your-project-id
+GCP_SERVICE_ACCOUNT_JSON=your-service-account-json
 
 # AI Integration
 OPENAI_API_KEY=your-openai-key
 GEMINI_API_KEY=your-gemini-key
 
-# Notifications
+# Notifications (optional)
 DISCORD_WEBHOOK_URL=your-discord-webhook
 SLACK_WEBHOOK_URL=your-slack-webhook
+TEAMS_WEBHOOK_URL=your-teams-webhook
+
+# Vault Security
+VAULT_UNLOCK_TTL_SEC=3600
 ```
 
 ### Scanner Configuration
@@ -164,16 +222,32 @@ Cloud Reaper uses a secure vault for credential storage:
 
 ### Production Deployment
 
+#### Docker Compose (Recommended)
 ```bash
-# Using Docker
-docker-compose up -d
+# Full-stack deployment: app + PostgreSQL
+docker compose up -d
+```
 
-# Using Kubernetes
+This launches:
+- **cloud-reaper-db**: PostgreSQL 15 (Alpine) with persistent volume
+- **cloud-reaper-app**: Multi-stage build (Go builder → Python 3.12 runtime)
+
+#### Standalone Docker Build
+```bash
+docker build -t cloud-reaper:latest .
+docker run -p 5001:5001 \
+  -e DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/cloud_reaper \
+  -e AZURE_SUBSCRIPTION_ID=your-sub-id \
+  cloud-reaper:latest
+```
+
+#### Kubernetes Deployment
+```bash
+# Apply Kubernetes manifests
 kubectl apply -f k8s/
 
-# Using Systemd
-sudo systemctl enable cloud-reaper
-sudo systemctl start cloud-reaper
+# Check deployment status
+kubectl get pods -n cloud-reaper
 ```
 
 ### High Availability Setup
@@ -207,8 +281,8 @@ We welcome contributions! Please see our contributing guidelines for details.
 
 ```bash
 # Create virtual environment
-python -m venv venv
-source venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install development dependencies
 pip install -r requirements-dev.txt
@@ -216,32 +290,53 @@ pip install -r requirements-dev.txt
 # Run tests
 pytest
 
-# Run linter
-flake8
-black .
+# Run linters (Ruff + Mypy)
+ruff check src/reaper bootstrap.py main.py
+mypy src/reaper --ignore-missing-imports
+
+# Format code
+ruff format src/reaper bootstrap.py main.py
+
+# Build Go engine
+cd src/engine-go && go build -o ../../bin/reaper-engine . && cd ../..
+
+# Run Go tests
+cd src/engine-go && go test -v ./... && cd ../..
+
+# Run Go linter
+cd src/engine-go && golangci-lint run ./... && cd ../..
 ```
 
 ## 📞 Support
 
 ### Getting Help
 
-- **Documentation**: Check this documentation first
-- **Community**: Join our Discord community
-- **Issues**: Report bugs on GitHub
-- **Email**: Contact our support team
+- **Documentation**: Check this documentation and the `Docs/` directory for detailed guides
+- **RAG Search**: Use the built-in documentation search in the dashboard
+- **GitHub Issues**: Report bugs at https://github.com/ankitrout07/Cloud-Reaper/issues
+- **Setup Guide**: Refer to `HOW_TO_RUN.md` for detailed installation instructions
 
 ### Common Issues
 
 **Q: Scanner not finding resources?**
-A: Verify cloud provider credentials and check API permissions.
+A: Verify cloud provider credentials, check API permissions, and ensure `az login` has been run for Azure.
 
 **Q: Dashboard not updating?**
-A: Check WebSocket connection and refresh the page.
+A: Check WebSocket connection, verify the Go engine is running, and refresh the page.
 
 **Q: Alerts not firing?**
-A: Verify webhook URLs and check notification service status.
+A: Verify webhook URLs in `.env`, check notification service status, and ensure budget thresholds are configured.
+
+**Q: ModuleNotFoundError: reaper?**
+A: Set `PYTHONPATH=src` before running Python commands, or use `python -m reaper.web.app_async`.
+
+**Q: Database connection failed?**
+A: Ensure PostgreSQL Docker container is running: `docker start cloud-reaper-db`
+
+**Q: Go engine not found?**
+A: Build the Go engine: `cd src/engine-go && go build -o ../../bin/reaper-engine . && cd ../..`
 
 ---
 
 > [!NOTE]
-> We update these product docs along with every major release. Keep an eye on this section to understand how to fully utilize the Reaper engine.
+> We update these product docs along with every major release. Keep an eye on this section to understand how to fully utilize the Cloud-Reaper engine. For the latest updates, check the CHANGELOG.md file.

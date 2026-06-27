@@ -1,0 +1,433 @@
+================================================================================
+☁️ CLOUD-REAPER COMPREHENSIVE DOCUMENTATION
+PART 6: RAG DOCUMENTATION SEARCH ENGINE
+================================================================================
+
+Cloud-Reaper includes a built-in **Retrieval-Augmented Generation (RAG)** engine
+for searching the `Docs/` directory with hybrid retrieval combining BM25 sparse
+retrieval, Gemini Embedding dense retrieval, and Reciprocal Rank Fusion (RRF).
+
+### Version Requirements
+- **Python**: 3.12+ for modern type annotations and async support
+- **Google GenAI SDK**: Latest version for Gemini Embedding API
+- **NumPy**: For vector operations and similarity calculations
+
+
+1. ARCHITECTURAL OVERVIEW
+--------------------------
+* Location: `src/reaper/rag/engine.py` (Class: `RAGEngine`)
+* Purpose: Enable natural language search across all project documentation files
+* Philosophy: Traditional keyword search is insufficient for technical documentation.
+  Engineers need semantic understanding to find relevant information regardless of
+  exact terminology used.
+
+### 4-Stage Retrieval Pipeline
+
+1. **Dense Retrieval (Semantic Search)**
+   - Uses Google Gemini Embedding API to convert text chunks into vector embeddings
+   - Computes cosine similarity between query embedding and document chunk embeddings
+   - Captures semantic meaning (e.g., "cost optimization" ≈ "reduce spending")
+
+2. **Sparse Retrieval (Keyword Search)**
+   - Custom BM25 (Best Matching 25) algorithm implementation
+   - IDF (Inverse Document Frequency) smoothing for rare term weighting
+   - Exact keyword matching for technical terms (e.g., "ARIMA", "Q-learning")
+
+3. **Reciprocal Rank Fusion (RRF)**
+   - Combines dense and sparse rankings into a unified score
+   - Formula: RRF(d) = Σ (1 / (k + rank_i(d))) where k=60
+   - Balances semantic relevance with keyword precision
+
+4. **Cross-Encoder Re-Ranking**
+   - Optional final re-ranking using Gemini to score top candidates
+   - Provides contextual relevance assessment
+   - Falls back gracefully if Gemini API is unavailable
+
+
+2. DOCUMENT PROCESSING PIPELINE
+-------------------------------
+* Location: `src/reaper/rag/engine.py` (Methods: `_load_documents`, `_chunk_documents`)
+
+### Document Ingestion
+- **Supported Formats**: Markdown (.md), Text (.txt), and plain text files
+- **Auto-Indexing**: Automatically indexes new files dropped into `Docs/` directory
+- **Document-Level Summaries**: Each document is summarized to provide context for chunks
+- **Sliding Window Chunks**: Text is split into overlapping chunks with left/right context
+
+### Chunking Strategy
+- **Chunk Size**: 500 characters (configurable)
+- **Overlap**: 50 characters between chunks to maintain context
+- **Context Enrichment**: Each chunk is prefixed with document summary and section headers
+- **Metadata Preservation**: Chunk metadata includes source file, chunk index, and position
+
+### Example Chunk Structure
+```json
+{
+  "chunk_id": "doc_1_chunk_5",
+  "source_file": "6_finops_intelligence_layer_python.txt",
+  "chunk_index": 5,
+  "text": "ARIMA(1,1,1) time-series model for End-of-Month spend projection...",
+  "document_summary": "The heart of Cloud-Reaper's decision-making logic...",
+  "position": 2500,
+  "metadata": {
+    "section": "BUDGET FORECASTING WITH ARIMA",
+    "keywords": ["ARIMA", "forecasting", "budget"]
+  }
+}
+```
+
+
+3. SEARCH API ENDPOINTS
+-----------------------
+* Location: `src/reaper/web/search_router.py`
+
+### Primary Search Endpoint
+```bash
+POST /api/search
+Content-Type: application/json
+
+{
+  "query": "How does the zombie detection algorithm work?",
+  "top_k": 5,
+  "use_rerank": true
+}
+```
+
+**Response Schema:**
+```json
+{
+  "results": [
+    {
+      "chunk_id": "doc_1_chunk_5",
+      "source_file": "6_finops_intelligence_layer_python.txt",
+      "text": "ARIMA(1,1,1) time-series model...",
+      "score": 0.89,
+      "rank": 1,
+      "metadata": {
+        "section": "BUDGET FORECASTING WITH ARIMA",
+        "keywords": ["ARIMA", "forecasting"]
+      }
+    }
+  ],
+  "query": "How does the zombie detection algorithm work?",
+  "total_results": 5,
+  "search_time_ms": 125
+}
+```
+
+### Search Parameters
+- **query** (required): Natural language search query
+- **top_k** (optional): Number of results to return (default: 5, max: 20)
+- **use_rerank** (optional): Enable cross-encoder re-ranking (default: true)
+- **min_score** (optional): Minimum relevance threshold (default: 0.3)
+
+
+4. HYBRID RETRIEVAL ALGORITHMS
+------------------------------
+
+### BM25 Sparse Retrieval
+* Location: `src/reaper/rag/engine.py` (Method: `_bm25_search`)
+
+**Algorithm:**
+```
+BM25_score(D, Q) = Σ IDF(qi) * (f(qi, D) * (k1 + 1)) / (f(qi, D) + k1 * (1 - b + b * |D| / avgdl))
+
+Where:
+- qi: Query term
+- D: Document chunk
+- f(qi, D): Frequency of term in document
+- |D|: Document length
+- avgdl: Average document length in corpus
+- k1: Term saturation parameter (default: 1.2)
+- b: Length normalization parameter (default: 0.75)
+- IDF(qi): Inverse document frequency
+```
+
+**Advantages:**
+- Excellent for exact technical term matching
+- Fast computation with precomputed IDF values
+- Handles rare technical terms well (e.g., "pgx/v5", "PBKDF2-HMAC-SHA256")
+
+### Dense Retrieval with Gemini Embeddings
+* Location: `src/reaper/rag/engine.py` (Method: `_dense_search`)
+
+**Algorithm:**
+1. Convert query text to embedding vector using Gemini Embedding API
+2. Retrieve precomputed embeddings for all document chunks
+3. Compute cosine similarity: similarity(A, B) = (A · B) / (||A|| * ||B||)
+4. Return top-k chunks by similarity score
+
+**Advantages:**
+- Captures semantic meaning (synonyms, related concepts)
+- Handles natural language queries effectively
+- Robust to spelling variations and paraphrasing
+
+### Reciprocal Rank Fusion (RRF)
+* Location: `src/reaper/rag/engine.py` (Method: `_rrf_fusion`)
+
+**Algorithm:**
+```
+RRF_score(d) = Σ (1 / (k + rank_i(d)))
+
+Where:
+- d: Document chunk
+- rank_i(d): Rank of document in retrieval method i
+- k: Constant (default: 60) to dampen the impact of high ranks
+```
+
+**Example:**
+If a document ranks #1 in BM25 and #3 in dense retrieval:
+RRF_score = 1/(60+1) + 1/(60+3) = 0.0164 + 0.0159 = 0.0323
+
+**Advantages:**
+- Combines strengths of both retrieval methods
+- Robust to individual method failures
+- No need for score normalization
+
+
+5. GRACEFUL DEGRADATION
+-----------------------
+* Location: `src/reaper/rag/engine.py` (Method: `_fallback_search`)
+
+### Fallback Strategy
+When Gemini API is unavailable or rate-limited, the system automatically falls back:
+
+1. **Primary Fallback**: BM25-only search (keyword-based)
+2. **Secondary Fallback**: Jaccard similarity for text overlap
+3. **Tertiary Fallback**: Simple substring matching
+
+### Fallback Detection
+- API timeout (> 10 seconds)
+- HTTP 429 (rate limit)
+- HTTP 500+ (server errors)
+- Network connectivity issues
+
+### User Notification
+Fallback mode is indicated in the response:
+```json
+{
+  "results": [...],
+  "fallback_mode": "bm25_only",
+  "message": "Gemini API unavailable, using keyword search only"
+}
+```
+
+
+6. USAGE EXAMPLES
+-----------------
+
+### Example 1: Finding Algorithm Details
+**Query:** "How does the Q-learning agent work?"
+
+**Expected Results:**
+- Chunk from `6_finops_intelligence_layer_python.txt` describing Q-learning
+- Section on "AUTONOMOUS REINFORCEMENT LEARNING RIGHT-SIZING AGENT"
+- Details on state space, action space, and update rule
+
+### Example 2: Troubleshooting
+**Query:** "Why is my vault passcode not working?"
+
+**Expected Results:**
+- Chunk from `9_database_schema_and_api_endpoints.txt` troubleshooting section
+- Specific issue: "Vault Passcode Not Accepted"
+- Solutions and prevention steps
+
+### Example 3: API Reference
+**Query:** "What are the vault API endpoints?"
+
+**Expected Results:**
+- Chunk from `9_database_schema_and_api_endpoints.txt` API section
+- List of all vault endpoints (setup, unlock, lock, entries, etc.)
+- HTTP methods and request/response schemas
+
+### Example 4: Architecture Understanding
+**Query:** "Explain the dual-core architecture"
+
+**Expected Results:**
+- Chunk from `5_executive_summary_and_architecture.txt`
+- Diagram and explanation of Go + Python hybrid architecture
+- Data flow between components
+
+
+7. CONFIGURATION AND TUNING
+---------------------------
+* Location: `src/reaper/rag/engine.py` (Class constants)
+
+### Tunable Parameters
+
+```python
+class RAGEngine:
+    # Chunking
+    CHUNK_SIZE = 500  # Characters per chunk
+    CHUNK_OVERLAP = 50  # Overlap between chunks
+    
+    # BM25
+    BM25_K1 = 1.2  # Term saturation
+    BM25_B = 0.75  # Length normalization
+    
+    # RRF
+    RRF_K = 60  # Damping constant
+    
+    # Dense Retrieval
+    EMBEDDING_MODEL = "text-embedding-004"  # Gemini model
+    TOP_K_DENSE = 10  # Candidates for dense retrieval
+    
+    # Re-ranking
+    USE_RERANK = True  # Enable cross-encoder
+    TOP_K_RERANK = 5  # Final results after re-ranking
+```
+
+### Performance Tuning
+- **Increase CHUNK_SIZE** for more context per chunk (slower indexing)
+- **Decrease RRF_K** to give more weight to top-ranked results
+- **Disable RERANK** for faster search (less accurate)
+- **Cache embeddings** to avoid recomputation (increases memory usage)
+
+
+8. TROUBLESHOOTING RAG SEARCH
+------------------------------
+
+### Common Issues and Solutions
+
+**Issue: Search Returns No Results**
+- **Symptom**: Empty results array for valid queries
+- **Cause**: Documents not indexed or query too specific
+- **Solution**:
+  ```bash
+  # Force re-indexing
+  PYTHONPATH=src python -c "from reaper.rag.engine import RAGEngine; RAGEngine().reindex()"
+  ```
+- **Prevention**: Ensure `Docs/` directory contains .md and .txt files
+
+**Issue: Gemini API Rate Limiting**
+- **Symptom**: "rate limit exceeded" or search falls back to BM25
+- **Cause**: Too many embedding API calls within rate limit window
+- **Solution**: System automatically falls back to BM25-only search
+- **Prevention**: Enable embedding caching to reduce API calls
+
+**Issue: Poor Search Relevance**
+- **Symptom**: Results don't match query intent
+- **Cause**: Inappropriate chunking or insufficient document context
+- **Solution**: Adjust CHUNK_SIZE and CHUNK_OVERLAP parameters
+- **Prevention**: Use clear section headers in documentation files
+
+**Issue: Slow Search Performance**
+- **Symptom**: Search takes > 1 second to return results
+- **Cause**: Large document corpus or no embedding caching
+- **Solution**: Enable embedding caching and reduce TOP_K parameters
+- **Prevention**: Pre-compute embeddings during application startup
+
+**Issue: Encoding Errors with Special Characters**
+- **Symptom**: "UnicodeDecodeError" or character encoding issues
+- **Cause**: Documentation files with non-UTF-8 encoding
+- **Solution**: Ensure all documentation files are UTF-8 encoded
+- **Prevention**: Use text editors that default to UTF-8
+
+### Debug Mode
+Enable verbose RAG logging:
+```bash
+export RAG_DEBUG=true
+PYTHONPATH=src python -m reaper.web.app_async
+```
+
+### Performance Optimization
+- **Embedding Caching**: Pre-compute and cache embeddings for all chunks
+- **Index Caching**: Cache BM25 index to avoid recomputation
+- **Async Processing**: Use async/await for concurrent API calls
+- **Result Caching**: Cache frequent search queries with TTL
+
+
+9. INTEGRATION WITH DASHBOARD
+------------------------------
+* Location: `src/reaper/web/templates/` (Search UI components)
+
+### Dashboard Integration
+- **Search Bar**: Prominent search input in dashboard header
+- **Real-time Results**: Results appear as user types (debounced)
+- **Result Cards**: Display chunk text with source file reference
+- **Highlighting**: Query terms highlighted in results
+- **Source Links**: Click to open source file at relevant section
+
+### User Experience
+1. User types query in search bar
+2. System debounces input (300ms delay)
+3. Search API called via WebSocket
+4. Results rendered in dropdown or modal
+5. User clicks result to view full context
+6. Source file highlighted at relevant section
+
+
+10. EXTENDING THE RAG ENGINE
+----------------------------
+
+### Adding New Document Sources
+To index additional documentation sources:
+
+```python
+from reaper.rag.engine import RAGEngine
+
+rag = RAGEngine()
+
+# Add custom document source
+rag.add_document_source(
+    path="/path/to/custom/docs",
+    file_patterns=["*.md", "*.rst", "*.txt"],
+    metadata={"source": "external_docs"}
+)
+```
+
+### Custom Retrieval Methods
+Implement custom retrieval algorithms:
+
+```python
+class CustomRAGEngine(RAGEngine):
+    def _custom_search(self, query: str, top_k: int):
+        # Implement custom retrieval logic
+        results = self._my_custom_algorithm(query, top_k)
+        return results
+    
+    def search(self, query: str, top_k: int = 5):
+        # Combine custom with existing methods
+        dense_results = self._dense_search(query, top_k)
+        custom_results = self._custom_search(query, top_k)
+        return self._rrf_fusion([dense_results, custom_results])
+```
+
+### Custom Re-Ranking
+Implement domain-specific re-ranking:
+
+```python
+def custom_rerank(results: List[Dict], query: str) -> List[Dict]:
+    # Apply custom scoring based on domain knowledge
+    for result in results:
+        if "production" in query.lower() and "prod" in result["text"].lower():
+            result["score"] *= 1.5  # Boost production-related results
+    return sorted(results, key=lambda x: x["score"], reverse=True)
+```
+
+
+11. BEST PRACTICES
+-----------------
+
+### Documentation Structure
+- **Clear Headings**: Use consistent heading hierarchy (H1, H2, H3)
+- **Descriptive Filenames**: Use filenames that indicate content (e.g., `6_finops_intelligence_layer_python.txt`)
+- **Keyword Density**: Include technical terms naturally in text
+- **Code Examples**: Use code blocks for examples (indexed separately)
+
+### Query Formulation
+- **Natural Language**: Use questions rather than keywords (e.g., "How do I..." vs "setup")
+- **Specific Terms**: Include technical terms for precision (e.g., "PBKDF2-HMAC-SHA256")
+- **Context**: Provide context for ambiguous terms (e.g., "vault encryption" vs "encryption")
+
+### Performance
+- **Index During Startup**: Pre-compute indexes during application initialization
+- **Cache Frequently**: Cache embeddings and search results
+- **Batch Operations**: Batch document updates to minimize re-indexing
+
+---
+
+> [!NOTE]
+> The RAG engine is designed to be self-healing and gracefully degrades when external
+> services are unavailable. Always test search functionality after adding new documentation
+> files to ensure proper indexing.

@@ -1,5 +1,5 @@
 # === Core Web Framework ===
-# Flask stack removed — app runs on FastAPI + uvicorn (ASGI, async).
+# App runs on FastAPI + uvicorn (ASGI, async).
 weasyprint
 fastapi>=0.111.0
 uvicorn[standard]>=0.30.0

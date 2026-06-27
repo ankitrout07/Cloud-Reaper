@@ -6,6 +6,12 @@ PART 5: DATABASE SCHEMAS, CRYPTOGRAPHIC VAULT, APIS & DEV TOOLS
 This final section covers Cloud-Reaper's data persistence model, its high-security
 cryptographic credential vault, web API structures, and developer tool chains.
 
+### Version Requirements
+- **PostgreSQL**: 15+ for JSONB support, advanced indexing, and pgx/v5 driver
+- **Python**: 3.12+ for SQLAlchemy 2.0 and modern type annotations
+- **SQLAlchemy**: 2.0+ for declarative ORM and async support
+- **Cryptography**: Latest for Fernet AES-128-CBC encryption
+
 
 1. RELATIONAL DATABASE persistence DATA MODELS (models.py)
 -----------------------------------------------------------
@@ -150,3 +156,108 @@ developer toolchain:
   - Automatically compiles the Go performance core, building `reaper-engine`.
   - Sets up the `.env` configuration file, prompting the user for credential values.
   - Initializes database schemas and starts the local Flask server on port 5001.
+
+
+5. TROUBLESHOOTING DATABASE & VAULT ISSUES
+------------------------------------------
+
+### Common Database Issues
+
+**Issue: Database Connection Refused**
+- **Symptom**: "connection refused" or "could not connect to server"
+- **Cause**: PostgreSQL container not running or incorrect DATABASE_URL
+- **Solution**:
+  ```bash
+  # Check if container is running
+  docker ps | grep cloud-reaper-db
+  
+  # Start container if stopped
+  docker start cloud-reaper-db
+  
+  # Check container logs
+  docker logs cloud-reaper-db
+  ```
+- **Prevention**: Use Docker Compose for automatic container management
+
+**Issue: Database Schema Not Initialized**
+- **Symptom**: "relation does not exist" or "no such table"
+- **Cause**: Database tables not created after fresh installation
+- **Solution**:
+  ```bash
+  PYTHONPATH=src python -c "from reaper.engine.models import init_db; init_db()"
+  ```
+- **Prevention**: The bootstrap.py script automatically initializes the schema
+
+**Issue: Migration Conflicts**
+- **Symptom**: "alembic migration conflict" or schema version mismatch
+- **Cause**: Manual schema changes without migration tracking
+- **Solution**: Drop and recreate schema (WARNING: data loss):
+  ```bash
+  docker exec -it cloud-reaper-db psql -U postgres -c "DROP DATABASE cloud_reaper;"
+  docker exec -it cloud-reaper-db psql -U postgres -c "CREATE DATABASE cloud_reaper;"
+  PYTHONPATH=src python -c "from reaper.engine.models import init_db; init_db()"
+  ```
+
+**Issue: Connection Pool Exhaustion**
+- **Symptom**: "connection pool exhausted" or "too many connections"
+- **Cause**: Too many concurrent database connections
+- **Solution**: Increase pool size in SQLAlchemy configuration or use connection pooling
+- **Prevention**: Configure appropriate pool size based on expected load
+
+### Common Vault Issues
+
+**Issue: Vault Passcode Not Accepted**
+- **Symptom**: "Invalid passcode" or "passcode verification failed"
+- **Cause**: Incorrect passcode or vault not initialized
+- **Solution**:
+  - Ensure vault is initialized via `/api/vault/setup`
+  - Use the exact passcode set during initialization
+  - If forgotten, use `/api/vault/reset` to wipe and reinitialize (WARNING: data loss)
+
+**Issue: Vault Auto-Lock Too Frequent**
+- **Symptom**: Vault locks repeatedly during use
+- **Cause**: `VAULT_UNLOCK_TTL_SEC` set too low
+- **Solution**: Increase TTL in `.env` file:
+  ```bash
+  VAULT_UNLOCK_TTL_SEC=7200  # 2 hours instead of 1 hour
+  ```
+
+**Issue: Encrypted Payload Decryption Fails**
+- **Symptom**: "decryption failed" or "invalid token"
+- **Cause**: Vault key not in session or session expired
+- **Solution**: Unlock vault again via `/api/vault/unlock`
+- **Prevention**: Ensure session cookies are enabled in browser
+
+**Issue: Vault Entries Not Persisting**
+- **Symptom**: Added vault entries disappear after restart
+- **Cause**: Database not persisting vault_entries table
+- **Solution**: Check database connection and ensure vault_entries table exists
+- **Prevention**: Verify PostgreSQL container has persistent volume
+
+### API Endpoint Issues
+
+**Issue: 404 Not Found on API Endpoints**
+- **Symptom**: API endpoints return 404 errors
+- **Cause**: Incorrect URL paths or blueprints not registered
+- **Solution**: Verify correct API paths in documentation and check Flask app registration
+- **Prevention**: Use the API reference section for exact endpoint paths
+
+**Issue: CORS Errors in API Calls**
+- **Symptom**: Browser CORS policy errors when calling API
+- **Cause**: CORS not configured for Flask application
+- **Solution**: Ensure CORS middleware is properly configured in Flask app
+- **Prevention**: Use same-origin calls or configure allowed origins
+
+### Debug Mode
+Enable verbose database and vault logging:
+```bash
+export DB_DEBUG=true
+export VAULT_DEBUG=true
+PYTHONPATH=src python -m reaper.web.app_async
+```
+
+### Database Maintenance
+- **Regular Backups**: Use `pg_dump` for periodic database backups
+- **Vacuum**: Run `VACUUM ANALYZE` periodically to reclaim space
+- **Index Optimization**: Rebuild indexes if query performance degrades
+- **Log Rotation**: Configure PostgreSQL log rotation to prevent disk filling

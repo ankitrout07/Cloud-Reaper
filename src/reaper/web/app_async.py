@@ -214,6 +214,9 @@ class WebSocketBatcher:
             await self._flush_batch(event)
 
 
+import socketio
+sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+
 # Global WebSocket batcher instance
 ws_batcher = WebSocketBatcher(sio, batch_interval_ms=150, max_batch_size=30)
 
@@ -280,9 +283,7 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 
 secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 app.add_middleware(SessionMiddleware, secret_key=secret_key, max_age=31536000)
-import socketio
 
-sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
 
 from reaper.web.copilot_router import copilot_router

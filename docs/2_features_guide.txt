@@ -1,21 +1,265 @@
 # Features & How to Use
 
-Here is a guide to the key features in Cloud Reaper and how to utilize them effectively.
+Here is a comprehensive guide to the key features in Cloud-Reaper and how to utilize them effectively for maximum cost optimization and operational efficiency.
 
-## Dashboard
+---
+
+## 📊 Dashboard
+
 The central hub for all metrics. Access real-time FinOps charts, burn rate analysis, and a snapshot of your infrastructure's health and budget tracking.
 
-## Price Catalog
+### Key Dashboard Features
+- **Real-time Metrics**: WebSocket-powered updates with sub-millisecond latency
+- **Burn Rate Analysis**: Track current spend vs. budget with predictive forecasting
+- **Service Distribution**: Cost breakdown by service type (compute, storage, networking)
+- **Instance Family Analysis**: Resource usage patterns across VM families
+- **Usage Heatmaps**: Hourly resource utilization patterns with color-coded intensity
+- **Glassmorphism UI**: Modern dark theme with adaptive light/dark mode
+
+### How to Use
+1. Navigate to `http://localhost:5001` after setup
+2. View the main dashboard for overall infrastructure health
+3. Click on specific charts to drill down into detailed metrics
+4. Use the time-range selector to analyze historical patterns
+
+---
+
+## 💰 Price Catalog
+
 Browse up-to-date cloud SKUs and costs dynamically. You can build an arbitrary cart of resources to generate a Bill of Materials (BOM) export as a PDF.
 
-## Build with AI
+### Key Features
+- **Live Pricing**: Real-time SKU pricing from Azure, AWS, and GCP Retail APIs
+- **Multi-Region Support**: Compare costs across different geographic regions
+- **BOM Generation**: Create detailed Bill of Materials for infrastructure planning
+- **PDF Export**: Generate professional PDF reports with WeasyPrint
+- **Cost Calculator**: Calculate monthly costs for resource combinations
+
+### How to Use
+1. Navigate to the Price Catalog section
+2. Select your cloud provider and region
+3. Browse available SKUs or search for specific resource types
+4. Add resources to your cart by clicking the "Add" button
+5. Review your cart and click "Export BOM" to generate a PDF
+
+### Example Use Case
+```bash
+# Scenario: Planning a new microservices architecture
+# 1. Select Azure East US region
+# 2. Add 4x Standard_D2s_v3 (compute)
+# 3. Add 2x Standard_LRS (storage)
+# 4. Add 1x Standard_GRS (backup)
+# 5. Export BOM for stakeholder review
+```
+
+---
+
+## 🤖 Build with AI
+
 Use natural language to describe the application or infrastructure you want to deploy. Our Architect AI Engine will synthesize a cost-optimized, secure BOM across your preferred cloud vendor.
 
-## FinOps Intelligence
+### Key Features
+- **Natural Language Input**: Describe requirements in plain English
+- **Cost-Bounded Optimization**: Bounded Knapsack algorithm maximizes performance within budget
+- **Multi-Provider Support**: Azure, AWS, and GCP architectures
+- **Terraform HCL Output**: Ready-to-deploy infrastructure code
+- **Governance Tags**: Automatic inclusion of required FinOps tags
+- **Offline Fallback**: Rule-based synthesis when AI APIs are unavailable
+
+### How to Use
+1. Navigate to the "Build with AI" section
+2. Select your cloud provider (Azure, AWS, or GCP)
+3. Enter your infrastructure description in natural language
+4. Set your monthly budget cap
+5. Click "Generate Architecture"
+6. Review the generated blueprint and Terraform code
+7. Export or copy the Terraform HCL for deployment
+
+### Example Prompts
+```
+"High-availability API cluster handling 50k RPM with auto-scaling"
+"E-commerce platform with database, cache, and CDN"
+"Machine learning pipeline with GPU compute and object storage"
+"Microservices architecture with service mesh and observability"
+```
+
+### API Usage
+```bash
+curl -X POST http://localhost:5001/api/v1/copilot/optimize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "azure",
+    "intent": "high-availability API cluster handling 50k RPM",
+    "budget_cap": 1200.00
+  }'
+```
+
+---
+
+## 🧠 FinOps Intelligence
+
 Scan connected environments for idle resources, right-size VMs, enforce tagging compliance policies, and identify unattached storage arrays eating up costs.
 
-## Cloud Monitor
+### Key Features
+- **Zombie Resource Detection**: Heuristic scoring (0-100) for orphaned resources
+- **ARIMA Forecasting**: Seasonal-aware spend prediction with confidence intervals
+- **Q-Learning Right-Sizing**: RL agent for optimal VM SKU recommendations
+- **Tag Health Scoring**: Audit of critical tags (owner, project) for cost attribution
+- **Anomaly Detection**: Seasonal decomposition to eliminate false positives
+- **Commitment Optimization**: RI/SP recommendations based on usage patterns
+
+### How to Use
+1. Navigate to the FinOps Intelligence section
+2. Click "Run Scan" to analyze your connected cloud environment
+3. Review detected optimization opportunities
+4. Apply recommendations with one-click actions
+5. Set up automated scans on a schedule
+
+### Scan Results Categories
+- **Zombie Resources**: Unattached disks, idle VMs, unused snapshots
+- **Right-Sizing Opportunities**: Over-provisioned instances
+- **Tag Compliance**: Missing or inconsistent governance tags
+- **Budget Anomalies**: Unusual spend patterns
+- **Commitment Gaps**: Resources that could benefit from RIs/SPs
+
+---
+
+## 📡 Cloud Monitor
+
 Monitor real-time telemetry from your cloud. The real-time Go engine streams CPU and Memory usage down to the second, helping you visualize the heartbeat of your workloads.
 
-## Settings & Vault
+### Key Features
+- **Sub-Second Telemetry**: Go-powered concurrent scraping with 10 req/s rate limiting
+- **Multi-Cloud Support**: Azure, AWS, GCP, and Kubernetes metrics
+- **Historical Trends**: Time-series data with InfluxDB integration
+- **Alert Thresholds**: Configurable alerts for metric breaches
+- **WebSocket Streaming**: Real-time updates without page refresh
+
+### How to Use
+1. Navigate to the Cloud Monitor section
+2. Select your cloud provider and resource type
+3. View real-time CPU, memory, and network metrics
+4. Set alert thresholds for proactive monitoring
+5. Export telemetry data for external analysis
+
+### Supported Metrics
+- **Compute**: CPU utilization, memory usage, disk IOPS
+- **Network**: Ingress/egress bandwidth, latency
+- **Storage**: Read/write operations, capacity utilization
+- **Kubernetes**: Pod metrics, node utilization, cluster health
+
+---
+
+## ⚙️ Settings & Vault
+
 Securely connect your Azure, AWS, and GCP environments. Update AI strategy and FinOps governance policies. The Vault stores connection secrets safely using high-grade encryption.
+
+### Key Features
+- **Encrypted Vault**: PBKDF2-HMAC-SHA256 (600K iterations) + Fernet AES-128-CBC
+- **Multi-Provider Support**: Azure, AWS, GCP, and Kubernetes connections
+- **Auto-Lock**: Session-based security with configurable TTL
+- **Audit Logging**: SHA-256 chained hash ledger for tamper detection
+- **Policy Configuration**: Customizable FinOps governance rules
+- **AI Strategy**: Configure AI provider preferences and fallback behavior
+
+### How to Use
+1. Navigate to the Settings section
+2. **Vault Setup**:
+   - Click "Initialize Vault" if first time
+   - Set a strong passcode (minimum 12 characters recommended)
+   - Store the passcode securely - it cannot be recovered
+3. **Connect Cloud Providers**:
+   - Click "Add Connection"
+   - Select provider type (Azure, AWS, GCP, Kubernetes)
+   - Enter credentials (these are encrypted and stored in the vault)
+   - Test connection before saving
+4. **Configure Policies**:
+   - Set budget thresholds and alert rules
+   - Configure tagging requirements
+   - Define automated action permissions
+
+### Security Best Practices
+- Use a strong, unique vault passcode
+- Enable auto-lock (default: 1 hour)
+- Regularly rotate cloud credentials
+- Review audit logs for suspicious activity
+- Use service accounts with minimal permissions
+
+### Vault API Endpoints
+```bash
+# Check vault status
+GET /api/vault/status
+
+# Initialize vault
+POST /api/vault/setup
+{"passcode": "your-secure-passcode"}
+
+# Unlock vault
+POST /api/vault/unlock
+{"passcode": "your-secure-passcode"}
+
+# Add cloud connection
+POST /api/settings/connect-cloud
+{
+  "provider_type": "azure",
+  "connection_name": "production-subscription",
+  "credentials": {...}
+}
+```
+
+---
+
+## 🔍 RAG Documentation Search
+
+Built-in Retrieval-Augmented Generation engine for searching project documentation with hybrid retrieval (BM25 + Gemini Embeddings + RRF).
+
+### Key Features
+- **Hybrid Retrieval**: Combines keyword and semantic search
+- **Contextual Results**: Document-level summaries with chunk enrichment
+- **Natural Language Queries**: Ask questions in plain English
+- **Real-Time Indexing**: Automatically indexes new documentation files
+
+### How to Use
+1. Use the search bar in the dashboard header
+2. Enter natural language queries about Cloud-Reaper features
+3. Review contextualized results with source references
+
+### Example Queries
+```
+"How does the zombie detection algorithm work?"
+"What is the ARIMA forecasting model?"
+"How do I set up the encrypted vault?"
+"Explain the Q-learning right-sizing agent"
+```
+
+---
+
+## 🔐 Cryptographic Audit Trails
+
+Every action performed by Cloud-Reaper is logged with a cryptographically signed hash chain ensuring tamper-proof, mathematically verifiable audit trails.
+
+### Key Features
+- **SHA-256 Hash Chain**: Blockchain-inspired tamper detection
+- **Action Logging**: Complete record of all system actions
+- **Verification API**: Mathematical verification of log integrity
+- **Export Capability**: Generate signed audit reports
+
+### How to Use
+1. Navigate to the Audit Logs section
+2. View chronological action history
+3. Click "Verify" to check chain integrity
+4. Export audit reports for compliance
+
+---
+
+## 🚀 Quick Start Workflow
+
+For new users, follow this recommended workflow:
+
+1. **Setup**: Run `python bootstrap.py` for one-click installation
+2. **Vault**: Initialize the encrypted vault with a strong passcode
+3. **Connect**: Add your cloud provider credentials
+4. **Scan**: Run your first FinOps intelligence scan
+5. **Review**: Analyze optimization opportunities
+6. **Act**: Apply recommendations and set up automation
+7. **Monitor**: Configure real-time monitoring and alerts

@@ -9,6 +9,11 @@ ingestion to a custom-built Go performance core (`src/engine-go/`). This binary
 runs natively on the host system or inside containers, returning highly optimized
 JSON outputs or writing directly to the PostgreSQL database.
 
+### Version Requirements
+- **Go**: 1.26+ for goroutines, rate limiting, and concurrent API scraping
+- **PostgreSQL**: 15+ for JSONB support and advanced indexing
+- **Python**: 3.12+ for ML libraries and modern type annotations
+
 
 1. CONCURRENCY PIPELINE & TOKEN-BUCKET RATE LIMITING
 ------------------------------------------------------
@@ -134,3 +139,73 @@ JSON outputs or writing directly to the PostgreSQL database.
   - Metric Seeding: Automatically populates business baseline metrics (such as
     `ACTIVE_USERS`, `API_REQUESTS`, and `CICD_BUILDS`) to feed the Python unit economics
     regression models.
+
+
+8. TROUBLESHOOTING THE GO ENGINE
+--------------------------------
+
+### Common Issues and Solutions
+
+**Issue: Rate Limiting Errors (429 Too Many Requests)**
+- **Symptom**: Frequent HTTP 429 errors when scanning large subscriptions
+- **Cause**: Token-bucket rate limiter may be too aggressive or provider quotas exceeded
+- **Solution**: Adjust rate limiter in `main.go`: `rate.NewLimiter(rate.Every(time.Second/X), X)` where X is requests per second
+- **Prevention**: Use `--mode arbitrage` for regional price comparisons which uses concurrent workers with semaphore limits
+
+**Issue: Database Connection Timeouts**
+- **Symptom**: `connection timeout` or `database is locked` errors
+- **Cause**: PostgreSQL container not running or network connectivity issues
+- **Solution**: 
+  ```bash
+  docker start cloud-reaper-db
+  docker logs cloud-reaper-db
+  ```
+- **Prevention**: Ensure `DATABASE_URL` in `.env` points to correct host (`host.docker.internal` for Docker-in-Docker)
+
+**Issue: Binary Not Found or Permission Denied**
+- **Symptom**: `reaper-engine: command not found` or `permission denied`
+- **Cause**: Go binary not built or not executable
+- **Solution**:
+  ```bash
+  cd src/engine-go
+  go build -o ../../bin/reaper-engine .
+  chmod +x ../../bin/reaper-engine
+  ```
+
+**Issue: Azure Authentication Failures**
+- **Symptom**: `authentication failed` or `invalid credentials`
+- **Cause**: Expired Azure CLI token or incorrect service principal credentials
+- **Solution**:
+  ```bash
+  az login
+  az account set --subscription <subscription-id>
+  ```
+- **Alternative**: Use service principal credentials stored in the encrypted vault
+
+**Issue: Memory Usage Spikes During Large Scans**
+- **Symptom**: High memory consumption when scanning thousands of resources
+- **Cause**: In-memory resource accumulation before batch upsert
+- **Solution**: Reduce batch size in `pushToDB` function or implement streaming writes
+- **Prevention**: Use resource filtering to scan specific regions or resource types
+
+**Issue: Go Module Dependency Conflicts**
+- **Symptom**: `go: inconsistent vendoring` or version mismatch errors
+- **Cause**: Outdated `go.sum` or conflicting module versions
+- **Solution**:
+  ```bash
+  cd src/engine-go
+  go mod tidy
+  go mod download
+  ```
+
+### Debug Mode
+Enable verbose logging by setting environment variable:
+```bash
+export REAPER_DEBUG=true
+./bin/reaper-engine --subscription <sub-id>
+```
+
+### Performance Tuning
+- **Increase Concurrency**: Modify worker pool size in scraper files (default: 10 goroutines)
+- **Adjust Rate Limiting**: Balance between speed and API quota compliance
+- **Enable Caching**: Use `--cache-ttl` flag to control price cache duration

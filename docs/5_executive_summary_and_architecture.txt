@@ -56,7 +56,7 @@ capabilities of both developer ecosystems:
 └──────────────────────────────────────────────────────────────────────────────┘
 
 * Go Performance Core (engine-go):
-  - Written in Go 1.24+ for massive parallel scaling and memory efficiency.
+  - Written in Go 1.26+ for massive parallel scaling and memory efficiency.
   - Multi-threaded scrapers execute concurrent API queries using lightweight
     Goroutines and sync.WaitGroup worker pool models.
   - Leverages token-bucket rate limiters (`golang.org/x/time/rate`) to strictly
