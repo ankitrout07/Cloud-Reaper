@@ -510,7 +510,7 @@ async def _get_cached_user_info(request: Request) -> tuple[str, str]:
 
 @app.get("/")
 async def index(request: Request):
-    user_name, sub_name = _get_cached_user_info(request)
+    user_name, sub_name = await _get_cached_user_info(request)
     return templates.TemplateResponse(
         request,
         "pages/index.html",

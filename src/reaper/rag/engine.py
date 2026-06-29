@@ -7,6 +7,7 @@ import re
 import time
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 from google import genai
 
@@ -70,6 +71,27 @@ class DocSearchEngine:
     _EMBED_MAX_RETRIES: int = 3
     # Base backoff in seconds for exponential retry (jittered)
     _EMBED_BASE_BACKOFF: float = 1.5
+    
+    # Domain-specific synonyms for query expansion
+    _DOMAIN_SYNONYMS: dict[str, list[str]] = {
+        "cost": ["price", "expense", "spending", "budget", "billing", "financial"],
+        "optimize": ["improve", "reduce", "minimize", "cut", "save", "efficiency"],
+        "vm": ["virtual machine", "instance", "compute", "server", "workload"],
+        "azure": ["microsoft", "cloud", "subscription", "tenant"],
+        "storage": ["disk", "blob", "file", "data", "persistence"],
+        "network": ["vnet", "subnet", "connectivity", "routing", "firewall"],
+        "security": ["access", "permission", "auth", "authentication", "identity"],
+        "monitor": ["track", "observe", "metric", "telemetry", "log"],
+        "scale": ["autoscale", "elastic", "grow", "shrink", "capacity"],
+        "deploy": ["provision", "create", "setup", "install", "configure"],
+        "delete": ["remove", "cleanup", "terminate", "destroy", "decommission"],
+        "backup": ["snapshot", "recover", "restore", "disaster", "recovery"],
+        "database": ["db", "sql", "nosql", "data", "storage"],
+        "container": ["docker", "kubernetes", "k8s", "pod", "microservice"],
+        "function": ["serverless", "lambda", "trigger", "event"],
+        "api": ["endpoint", "service", "rest", "interface"],
+        "performance": ["speed", "latency", "throughput", "response"],
+    }
 
     def __init__(self):
         import os
@@ -168,6 +190,67 @@ class DocSearchEngine:
             if s_clean:
                 sentences.append(s_clean)
         return sentences
+
+    def _split_into_semantic_chunks(self, text: str, max_chunk_size: int = 300) -> list[str]:
+        """Splits text into semantically coherent chunks based on content boundaries.
+        
+        This is an improvement over simple sentence splitting as it:
+        1. Respects paragraph boundaries
+        2. Keeps related sentences together
+        3. Avoids breaking in the middle of logical concepts
+        4. Maintains reasonable chunk sizes for embedding
+        
+        Args:
+            text: The text to chunk
+            max_chunk_size: Maximum characters per chunk (soft limit)
+            
+        Returns:
+            List of semantically coherent text chunks
+        """
+        # First split by paragraphs (double newlines or significant line breaks)
+        paragraphs = re.split(r'\n\s*\n|\n(?=[A-Z])', text)
+        
+        chunks = []
+        current_chunk = ""
+        
+        for paragraph in paragraphs:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                continue
+                
+            # If paragraph is small enough, add to current chunk
+            if len(current_chunk) + len(paragraph) + 2 <= max_chunk_size:
+                if current_chunk:
+                    current_chunk += " " + paragraph
+                else:
+                    current_chunk = paragraph
+            else:
+                # Current chunk is full, save it
+                if current_chunk:
+                    chunks.append(current_chunk)
+                
+                # If paragraph itself is too large, split it by sentences
+                if len(paragraph) > max_chunk_size:
+                    sentences = self._split_into_sentences(paragraph)
+                    current_chunk = ""
+                    for sentence in sentences:
+                        if len(current_chunk) + len(sentence) + 1 <= max_chunk_size:
+                            if current_chunk:
+                                current_chunk += " " + sentence
+                            else:
+                                current_chunk = sentence
+                        else:
+                            if current_chunk:
+                                chunks.append(current_chunk)
+                            current_chunk = sentence
+                else:
+                    current_chunk = paragraph
+        
+        # Don't forget the last chunk
+        if current_chunk:
+            chunks.append(current_chunk)
+        
+        return chunks
 
     def _get_document_context(self, file_path: str, content: str) -> str:
         """Determines global context for Claude-style chunk situating."""
@@ -277,17 +360,18 @@ class DocSearchEngine:
                     continue
 
                 clean_section = section if idx == 0 else f"## {section}"
-                sentences = self._split_into_sentences(clean_section)
+                # Use semantic chunking instead of simple sentence splitting
+                chunks = self._split_into_semantic_chunks(clean_section)
 
-                # Store each sentence with contextual window enrichment
-                for s_idx, sentence in enumerate(sentences):
+                # Store each chunk with contextual window enrichment
+                for c_idx, chunk in enumerate(chunks):
                     if self._quota_exhausted:
                         file_quota_hit = True
                         break
 
-                    left_context = " ".join(sentences[max(0, s_idx - 2) : s_idx])
-                    right_context = " ".join(sentences[s_idx + 1 : min(len(sentences), s_idx + 3)])
-                    situated_content = f"{doc_context}\n\nSentence: {sentence}"
+                    left_context = " ".join(chunks[max(0, c_idx - 1) : c_idx])
+                    right_context = " ".join(chunks[c_idx + 1 : min(len(chunks), c_idx + 2)])
+                    situated_content = f"{doc_context}\n\nContent: {chunk}"
 
                     # Use backoff-aware helper — returns None on unrecoverable error
                     vector = self._embed_with_backoff(situated_content)
@@ -302,10 +386,16 @@ class DocSearchEngine:
                         {
                             "file_name": file_path.name,
                             "text": situated_content,
-                            "sentence": sentence,
+                            "sentence": chunk,  # Using chunk as the main sentence for compatibility
                             "left_context": left_context,
                             "right_context": right_context,
                             "vector": vector,
+                            "metadata": {
+                                "file_path": str(file_path),
+                                "section": clean_section[:50] if clean_section else "",
+                                "chunk_index": c_idx,
+                                "file_type": file_path.suffix,
+                            }
                         }
                     )
 
@@ -314,6 +404,33 @@ class DocSearchEngine:
 
     def get_document_context_safely(self, file_path: str, content: str) -> str:
         return self._get_document_context(file_path, content)
+
+    def _expand_query(self, query: str) -> list[str]:
+        """Expands query with domain-specific synonyms and related terms.
+        
+        Returns original query plus expanded variants for multi-query retrieval.
+        """
+        query_lower = query.lower()
+        expanded_queries = [query]
+        
+        # Domain-specific synonym expansion
+        for term, synonyms in self._DOMAIN_SYNONYMS.items():
+            if term in query_lower:
+                for synonym in synonyms:
+                    # Create expanded query by replacing term with synonym
+                    expanded_query = query_lower.replace(term, synonym)
+                    if expanded_query != query_lower:
+                        expanded_queries.append(expanded_query)
+        
+        # Also add queries with additional synonyms appended
+        for term, synonyms in self._DOMAIN_SYNONYMS.items():
+            if term in query_lower:
+                for synonym in synonyms[:2]:  # Limit to top 2 synonyms to avoid explosion
+                    expanded_query = f"{query} {synonym}"
+                    if expanded_query not in expanded_queries:
+                        expanded_queries.append(expanded_query)
+        
+        return expanded_queries
 
     def _get_bm25_index(self):
         """Lazily builds BM25 index on active documentation items."""
@@ -416,62 +533,220 @@ class DocSearchEngine:
     def _local_fallback_rerank(
         self, user_query: str, top_candidates: list, dense_scores: list
     ) -> list:
+        """Enhanced local reranking with multi-factor scoring."""
         scored_candidates = []
-        query_words = set(re.findall(r"\w+", user_query.lower()))
+        query_words = list(re.findall(r"\w+", user_query.lower()))
+        query_word_set = set(query_words)
+        
+        # Calculate term importance based on rarity (inverse document frequency approximation)
+        term_importance = {}
+        for word in query_word_set:
+            # Rare terms (longer, more specific) get higher importance
+            term_importance[word] = len(word) * 0.1
+        
         for idx, doc in top_candidates:
             sentence_text = doc.get("sentence", doc.get("text", ""))
-            sentence_words = set(re.findall(r"\w+", sentence_text.lower()))
-            overlap = len(query_words.intersection(sentence_words))
+            sentence_words = list(re.findall(r"\w+", sentence_text.lower()))
+            sentence_word_set = set(sentence_words)
+            
+            # 1. Jaccard similarity (baseline)
+            overlap = len(query_word_set.intersection(sentence_word_set))
             jaccard = (
-                (overlap / len(query_words.union(sentence_words)))
-                if query_words.union(sentence_words)
+                (overlap / len(query_word_set.union(sentence_word_set)))
+                if query_word_set.union(sentence_word_set)
                 else 0.0
             )
-            ce_score = jaccard * 100.0
-
+            
+            # 2. Weighted term overlap (gives more weight to important/rare terms)
+            weighted_score = 0.0
+            for word in query_word_set:
+                if word in sentence_word_set:
+                    weighted_score += term_importance.get(word, 1.0)
+            weighted_score = weighted_score / len(query_word_set) if query_word_set else 0.0
+            
+            # 3. Position-based scoring (earlier matches get higher scores)
+            position_score = 0.0
+            for i, word in enumerate(query_words):
+                if word in sentence_words:
+                    # Find the position of this word in the sentence
+                    for j, sent_word in enumerate(sentence_words):
+                        if word == sent_word:
+                            # Earlier position in query and earlier position in sentence = higher score
+                            position_score += (1.0 - i / len(query_words)) * (1.0 - j / len(sentence_words))
+                            break
+            position_score = position_score / len(query_words) if query_words else 0.0
+            
+            # 4. Exact phrase match bonus
+            phrase_bonus = 0.0
             if user_query.lower() in sentence_text.lower():
-                ce_score = max(ce_score, 100.0)
-
+                phrase_bonus = 1.0
+            elif " ".join(query_words[:2]) in " ".join(sentence_words):
+                phrase_bonus = 0.5  # Partial phrase match
+            
+            # 5. Dense retrieval similarity (if available)
             dense_cos = 0.0
             for d_idx, d_score in dense_scores:
                 if d_idx == idx:
                     dense_cos = d_score
                     break
-
-            ce_score = max(ce_score, dense_cos * 100.0)
+            
+            # Combine all factors with weights
+            combined_score = (
+                jaccard * 40.0 +          # Jaccard similarity (40% weight)
+                weighted_score * 30.0 +    # Weighted term overlap (30% weight)
+                position_score * 15.0 +    # Position-based scoring (15% weight)
+                phrase_bonus * 10.0 +      # Phrase match bonus (10% weight)
+                dense_cos * 5.0            # Dense similarity (5% weight)
+            )
+            
+            # Boost score if document contains domain-specific terms from our synonym dictionary
+            domain_bonus = 0.0
+            for term in self._DOMAIN_SYNONYMS:
+                if term in user_query.lower() and term in sentence_text.lower():
+                    domain_bonus += 0.1
+            combined_score += domain_bonus * 100.0
+            
+            # Cap at 100%
+            ce_score = min(combined_score, 100.0)
+            
             scored_candidates.append((ce_score, doc))
         return scored_candidates
 
-    def query_docs(self, user_query: str, top_k: int = 3) -> list:
-        """Executes advanced contextual search using sparse-dense RRF fusion and Cross-Encoder re-ranking."""
+    def _apply_maximal_marginal_relevance(self, results: list, lambda_param: float = 0.5, top_k: int = 10) -> list:
+        """Applies Maximal Marginal Relevance (MMR) to diversify results.
+        
+        Args:
+            results: List of (doc_idx, score) tuples sorted by score
+            lambda_param: Balance between relevance and diversity (0=diversity, 1=relevance)
+            top_k: Number of diverse results to return
+            
+        Returns:
+            Diversified list of (doc_idx, score) tuples
+        """
+        if not results:
+            return []
+            
+        selected = []
+        remaining = results.copy()
+        
+        # Select the highest scoring result first
+        if remaining:
+            selected.append(remaining.pop(0))
+        
+        while len(selected) < top_k and remaining:
+            best_idx = 0
+            best_mmr = -float('inf')
+            
+            for i, (idx, score) in enumerate(remaining):
+                # Calculate relevance component
+                relevance = score
+                
+                # Calculate diversity component (minimum similarity to already selected)
+                max_similarity = 0.0
+                for sel_idx, _ in selected:
+                    # Get document vectors for similarity calculation
+                    if idx < len(self.docs_index) and sel_idx < len(self.docs_index):
+                        vec1 = self.docs_index[idx].get("vector", [])
+                        vec2 = self.docs_index[sel_idx].get("vector", [])
+                        if vec1 and vec2 and len(vec1) == len(vec2) and len(vec1) > 0:
+                            # Cosine similarity
+                            dot = sum(v1 * v2 for v1, v2 in zip(vec1, vec2))
+                            norm1 = sum(v * v for v in vec1) ** 0.5
+                            norm2 = sum(v * v for v in vec2) ** 0.5
+                            if norm1 > 0 and norm2 > 0:
+                                similarity = dot / (norm1 * norm2)
+                                max_similarity = max(max_similarity, similarity)
+                
+                # MMR score: lambda * relevance - (1-lambda) * max_similarity
+                mmr_score = lambda_param * relevance - (1 - lambda_param) * max_similarity
+                
+                if mmr_score > best_mmr:
+                    best_mmr = mmr_score
+                    best_idx = i
+            
+            selected.append(remaining.pop(best_idx))
+        
+        return selected
+
+    def query_docs(self, user_query: str, top_k: int = 3, file_filter: str | None = None, file_type_filter: str | None = None) -> list:
+        """Executes advanced contextual search using multi-query retrieval, sparse-dense RRF fusion, and MMR diversification.
+        
+        Args:
+            user_query: The search query
+            top_k: Number of results to return
+            file_filter: Optional filter to only search in specific files (partial match)
+            file_type_filter: Optional filter to only search specific file types (e.g., ".md", ".txt")
+            
+        Returns:
+            List of search results with file, content, and confidence_score
+        """
         if not self.docs_index:
             return []
 
-        dense_scores = self._dense_search(user_query)
-        dense_ranks = {idx: rank + 1 for rank, (idx, _) in enumerate(dense_scores)}
+        # Apply metadata filters if provided
+        filtered_indices = set(range(len(self.docs_index)))
+        if file_filter:
+            filtered_indices = {
+                idx for idx in filtered_indices 
+                if file_filter.lower() in self.docs_index[idx]["file_name"].lower()
+            }
+        if file_type_filter:
+            filtered_indices = {
+                idx for idx in filtered_indices 
+                if self.docs_index[idx].get("metadata", {}).get("file_type", "") == file_type_filter
+            }
+        
+        # If no documents match the filter, return empty
+        if not filtered_indices:
+            return []
 
-        sparse_scores = self._sparse_search(user_query)
-        sparse_ranks = {idx: rank + 1 for rank, (idx, _) in enumerate(sparse_scores)}
-
+        # Multi-query retrieval with expansion
+        expanded_queries = self._expand_query(user_query)
+        
+        # Aggregate results from all query variants
+        all_rrf_scores = {}
         rrf_constant = 60
-        rrf_scores = []
-        for idx in range(len(self.docs_index)):
-            r_dense = dense_ranks.get(idx, len(self.docs_index) + 1)
-            r_sparse = sparse_ranks.get(idx, len(self.docs_index) + 1)
-            rrf_scores.append(
-                (idx, 1.0 / (rrf_constant + r_dense) + 1.0 / (rrf_constant + r_sparse))
-            )
+        
+        for query in expanded_queries:
+            dense_scores = self._dense_search(query)
+            dense_ranks = {idx: rank + 1 for rank, (idx, _) in enumerate(dense_scores)}
 
+            sparse_scores = self._sparse_search(query)
+            sparse_ranks = {idx: rank + 1 for rank, (idx, _) in enumerate(sparse_scores)}
+
+            # Aggregate RRF scores across all query variants (only for filtered indices)
+            for idx in filtered_indices:
+                r_dense = dense_ranks.get(idx, len(self.docs_index) + 1)
+                r_sparse = sparse_ranks.get(idx, len(self.docs_index) + 1)
+                rrf_score = 1.0 / (rrf_constant + r_dense) + 1.0 / (rrf_constant + r_sparse)
+                
+                if idx not in all_rrf_scores:
+                    all_rrf_scores[idx] = rrf_score
+                else:
+                    # Take maximum score across query variants
+                    all_rrf_scores[idx] = max(all_rrf_scores[idx], rrf_score)
+
+        # Convert to sorted list
+        rrf_scores = [(idx, score) for idx, score in all_rrf_scores.items()]
         rrf_scores.sort(key=lambda x: x[1], reverse=True)
-        candidate_pool_size = max(top_k * 4, 10)
+        
+        # Apply MMR for diversity
+        candidate_pool_size = max(top_k * 6, 20)  # Larger pool for better diversity
+        diverse_candidates = self._apply_maximal_marginal_relevance(
+            rrf_scores[:candidate_pool_size], 
+            lambda_param=0.6,  # Balance relevance and diversity
+            top_k=max(top_k * 3, 12)
+        )
+        
         top_candidates = [
-            (idx, self.docs_index[idx]) for idx, _ in rrf_scores[:candidate_pool_size]
+            (idx, self.docs_index[idx]) for idx, _ in diverse_candidates
         ]
 
+        # Re-rank with Gemini (using original query for relevance assessment)
         scored_candidates = self._rerank_candidates_gemini(user_query, top_candidates)
         if not scored_candidates:
             scored_candidates = self._local_fallback_rerank(
-                user_query, top_candidates, dense_scores
+                user_query, top_candidates, self._dense_search(user_query)
             )
 
         scored_candidates.sort(key=lambda x: x[0], reverse=True)
@@ -484,11 +759,22 @@ class DocSearchEngine:
             enriched_content = f"{left} {sentence}".strip() if left else sentence
             enriched_content = f"{enriched_content} {right}".strip() if right else enriched_content
 
+            # Generate title from filename for compatibility with frontend
+            title = doc["file_name"].replace(".md", "").replace(".txt", "").lstrip("0123456789_").replace("_", " ").title()
+
             final_results.append(
                 {
                     "file": doc["file_name"],
                     "content": enriched_content,
                     "confidence_score": f"{score:.2f}%",
+                    "metadata": doc.get("metadata", {}),
+                    # Frontend-compatible structure
+                    "text": enriched_content,
+                    "score": score / 100.0,  # Convert percentage to 0-1 scale
+                    "metadata_frontend": {
+                        "filename": doc["file_name"],
+                        "title": title,
+                    }
                 }
             )
 

@@ -198,6 +198,19 @@ function addCodeCopyButtons(container) {
 }
 
 function showDoc(filename) {
+    // If filename doesn't match expected format, try to find matching document
+    const docFilenames = [{% for doc in docs_data %}'{{ doc.filename }}'{% if not loop.last %},{% endif %}{% endfor %}];
+    
+    // Handle both full filenames and potential partial matches
+    let targetFilename = filename;
+    if (!docFilenames.includes(filename)) {
+        // Try to find a partial match
+        const matched = docFilenames.find(f => f.includes(filename) || filename.includes(f.replace('.txt', '').replace('.md', '')));
+        if (matched) {
+            targetFilename = matched;
+        }
+    }
+    
     // Hide all sections with fade out
     document.querySelectorAll('.doc-section').forEach(section => {
         section.style.opacity = '0';
@@ -215,7 +228,7 @@ function showDoc(filename) {
 
     // Show target section with fade in
     setTimeout(() => {
-        const targetSection = document.getElementById('section-' + filename);
+        const targetSection = document.getElementById('section-' + targetFilename);
         if (targetSection) {
             targetSection.classList.remove('hidden');
             targetSection.style.opacity = '0';
@@ -225,7 +238,7 @@ function showDoc(filename) {
         }
 
         // Highlight target button
-        const targetBtn = document.getElementById('nav-btn-' + filename);
+        const targetBtn = document.getElementById('nav-btn-' + targetFilename);
         if (targetBtn) {
             targetBtn.classList.add('active', 'bg-cyan-500/10', 'text-cyan-400', 'border-l-3', 'border-cyan-500');
             targetBtn.classList.remove('text-slate-400');
@@ -270,18 +283,24 @@ async function triggerDocSearch() {
             } else {
                 let html = '';
                 data.results.forEach((res, index) => {
-                    const scorePercent = (res.score * 100).toFixed(1);
+                    // Handle both old and new result formats
+                    const scorePercent = res.score ? (res.score * 100).toFixed(1) : parseFloat(res.confidence_score).toFixed(1);
                     const relevanceColor = scorePercent > 80 ? 'emerald' : (scorePercent > 50 ? 'cyan' : 'orange');
                     
+                    // Handle both metadata structures
+                    const metadata = res.metadata_frontend || res.metadata || {};
+                    const filename = metadata.filename || res.file;
+                    const title = metadata.title || res.title || filename;
+                    
                     html += `
-                        <div class="p-4 bg-slate-800/50 border border-slate-700 hover:border-cyan-500/50 rounded-xl cursor-pointer transition-all duration-200 hover:bg-slate-700/50" onclick="showDoc('${res.metadata.filename}')">
+                        <div class="p-4 bg-slate-800/50 border border-slate-700 hover:border-cyan-500/50 rounded-xl cursor-pointer transition-all duration-200 hover:bg-slate-700/50" onclick="showDoc('${filename}')">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider">${res.metadata.title}</span>
+                                <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider">${title}</span>
                                 <span class="text-[10px] bg-${relevanceColor}-500/20 text-${relevanceColor}-400 px-2 py-0.5 rounded-full font-medium">${scorePercent}% match</span>
                             </div>
-                            <div class="text-sm text-slate-300 leading-relaxed">"${res.text.substring(0, 120)}..."</div>
+                            <div class="text-sm text-slate-300 leading-relaxed">"${(res.text || res.content).substring(0, 120)}..."</div>
                             <div class="text-[10px] text-slate-500 mt-2">
-                                <i class="fas fa-file-alt mr-1"></i>${res.metadata.filename}
+                                <i class="fas fa-file-alt mr-1"></i>${filename}
                             </div>
                         </div>
                     `;
@@ -323,7 +342,9 @@ function filterSearchResults(category) {
     
     if (category !== 'all') {
         filteredResults = filteredResults.filter(result => {
-            const title = result.metadata.title.toLowerCase();
+            // Handle both metadata structures
+            const metadata = result.metadata_frontend || result.metadata || {};
+            const title = (metadata.title || result.title || '').toLowerCase();
             if (category === 'getting-started') {
                 return title.includes('getting') || title.includes('introduction') || title.includes('setup');
             } else if (category === 'technical') {
@@ -352,18 +373,24 @@ function renderSearchResults(results) {
     
     let html = '';
     results.forEach((res, index) => {
-        const scorePercent = (res.score * 100).toFixed(1);
+        // Handle both old and new result formats
+        const scorePercent = res.score ? (res.score * 100).toFixed(1) : parseFloat(res.confidence_score).toFixed(1);
         const relevanceColor = scorePercent > 80 ? 'emerald' : (scorePercent > 50 ? 'cyan' : 'orange');
         
+        // Handle both metadata structures
+        const metadata = res.metadata_frontend || res.metadata || {};
+        const filename = metadata.filename || res.file;
+        const title = metadata.title || res.title || filename;
+        
         html += `
-            <div class="p-4 bg-slate-800/50 border border-slate-700 hover:border-cyan-500/50 rounded-xl cursor-pointer transition-all duration-200 hover:bg-slate-700/50" onclick="showDoc('${res.metadata.filename}')">
+            <div class="p-4 bg-slate-800/50 border border-slate-700 hover:border-cyan-500/50 rounded-xl cursor-pointer transition-all duration-200 hover:bg-slate-700/50" onclick="showDoc('${filename}')">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider">${res.metadata.title}</span>
+                    <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider">${title}</span>
                     <span class="text-[10px] bg-${relevanceColor}-500/20 text-${relevanceColor}-400 px-2 py-0.5 rounded-full font-medium">${scorePercent}% match</span>
                 </div>
-                <div class="text-sm text-slate-300 leading-relaxed">"${res.text.substring(0, 120)}..."</div>
+                <div class="text-sm text-slate-300 leading-relaxed">"${(res.text || res.content).substring(0, 120)}..."</div>
                 <div class="text-[10px] text-slate-500 mt-2 flex items-center gap-3">
-                    <i class="fas fa-file-alt"></i>${res.metadata.filename}
+                    <i class="fas fa-file-alt"></i>${filename}
                     <i class="fas fa-clock"></i>Recently updated
                 </div>
             </div>
