@@ -25,7 +25,6 @@ aws_creds/
 # Logs & Data
 logs/
 *.log
-influxdb_data/
 *.sqlite
 *.db
 data/

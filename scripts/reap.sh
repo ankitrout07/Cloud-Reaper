@@ -87,12 +87,6 @@ AZURE_CLIENT_SECRET=your_client_secret
 
 # Database (PostgreSQL via Docker)
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
-
-# InfluxDB (Optional - for metrics storage)
-INFLUXDB_URL=http://localhost:8086
-INFLUXDB_TOKEN=your_token
-INFLUXDB_ORG=ReaperOps
-INFLUXDB_BUCKET=cloud_burn
 EOF
     echo "[+] .env file created. Please update Azure credentials!"
 else

@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # Main Python Application
   app:
     build: .
     container_name: cloud-reaper-app
@@ -10,9 +11,16 @@ services:
       - AZURE_TENANT_ID=${AZURE_TENANT_ID}
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
       - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+      # Go Services Configuration (for local development with separate Go servers)
+      - GO_TASK_MANAGER_HOST=${GO_TASK_MANAGER_HOST:-localhost}
+      - GO_TASK_MANAGER_PORT=${GO_TASK_MANAGER_PORT:-7071}
+      - GO_WEBSOCKET_HOST=${GO_WEBSOCKET_HOST:-localhost}
+      - GO_WEBSOCKET_PORT=${GO_WEBSOCKET_PORT:-7072}
+      - GO_RATELIMITER_HOST=${GO_RATELIMITER_HOST:-localhost}
+      - GO_RATELIMITER_PORT=${GO_RATELIMITER_PORT:-7073}
     ports:
       - "5001:5001"
     volumes:
       # Map a local folder to persist the SQLite database state inside the container
       - ./data:/app/data
-    restart: always
+    restart: unless-stopped

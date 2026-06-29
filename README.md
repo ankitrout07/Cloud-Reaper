@@ -51,7 +51,6 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 | **🏷️ Tag Health Score** | Automated audit of critical tags (`owner`, `project`) for 100% cost attribution |
 | **📈 ARIMA Anomaly Detection** | Seasonal-aware ARIMA(1,1,1) time-series forecasting with Z-score residual analysis (threshold Z=3.0) |
 | **🌍 Regional Price Intelligence** | Lazy-cached Azure/AWS/GCP SKU pricing per region via `RegionPriceCache` (PostgreSQL) |
-| **📡 InfluxDB Telemetry Bridge** | Pushes savings and unit economics metrics into InfluxDB for long-term time-series retention |
 
 ### 📉 Phase 2 — Optimize: Waste & Carbon Reduction
 
@@ -112,7 +111,7 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
                           │   ├── collectors/  Azure, AWS, GCP      │
                           │   ├── engine/      ARIMA, Q-RL, Econ    │
                           │   ├── rag/         BM25 + Gemini RRF    │
-                          │   ├── services/    InfluxDB, Pusher     │
+                          │   ├── services/    Pusher               │
                           │   └── web/         Flask + SocketIO     │
                           └────────────────────┬────────────────────┘
                                                │
@@ -132,7 +131,6 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 3. **Python Intelligence Layer** queries the DB, runs ARIMA anomaly detection, Q-learning right-sizing, and unit economics models
 4. **Flask Dashboard** renders real-time metrics via WebSocket (SocketIO) with in-memory cache acceleration
 5. Every vault access and resource action is logged into a **SHA-256 chained hash ledger** for tamper detection
-6. Savings telemetry is pushed to **InfluxDB** for long-term time-series retention
 
 ---
 
@@ -203,7 +201,7 @@ Cloud-Reaper/
 │   │   │   └── engine.py             # BM25 + Gemini Embedding hybrid search + RRF
 │   │   ├── services/           # Background services
 │   │   │   ├── log_streamer.py       # WebSocket log streaming service
-│   │   │   └── pusher.py             # InfluxDB push & notification service
+│   │   │   └── pusher.py             # Notification service (placeholder for future telemetry)
 │   │   └── web/                # Flask app, templates, static assets
 │   │       ├── app_async.py          # Main FastAPI/SocketIO application
 │   │       ├── copilot_router.py     # Blueprint: /api/v1/copilot/optimize
@@ -253,7 +251,6 @@ Cloud-Reaper/
 | **Language (Python)** | Python 3.12+ |
 | **Language (Go)** | Go 1.26+ |
 | **Database** | PostgreSQL 15 (SQLAlchemy 2.0 ORM + pgx/v5 driver) |
-| **Time-Series** | InfluxDB (savings & unit economics telemetry via `influxdb-client`) |
 | **Web Framework** | FastAPI + SocketIO (async WebSocket transport) |
 | **AI Copilot** | Google GenAI (`google-genai`) · Gemini 2.5 Flash · Bounded Knapsack Optimizer |
 | **AI Architect** | OpenAI (`openai>=1.50.0`) + Google Gemini (multi-provider BOM generation + offline fallback) |
@@ -869,11 +866,6 @@ cp .env.example .env
 - AI features require respective API keys but are optional for basic scanning
 - For GCP: `GOOGLE_CLOUD_PROJECT` and `GOOGLE_APPLICATION_CREDENTIALS`
 
-**Optional Configuration**:
-| `INFLUXDB_URL` | Optional | InfluxDB endpoint (default: `http://localhost:8086`) |
-| `INFLUXDB_TOKEN` | Optional | InfluxDB auth token |
-| `INFLUXDB_ORG` | Optional | InfluxDB organisation (default: `ReaperOps`) |
-| `INFLUXDB_BUCKET` | Optional | InfluxDB bucket (default: `cloud_burn`) |
 | `DISCORD_WEBHOOK_URL` | Optional | Discord alerting webhook |
 | `SLACK_WEBHOOK_URL` | Optional | Slack alerting webhook |
 | `TEAMS_WEBHOOK_URL` | Optional | Microsoft Teams alerting webhook |

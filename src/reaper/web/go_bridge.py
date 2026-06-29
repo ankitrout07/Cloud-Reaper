@@ -40,16 +40,36 @@ import os
 from pathlib import Path
 from typing import Any
 
+from reaper.web.go_bridge_base import (
+    BaseGoBridge,
+    GoBridgeConfig,
+    GoBridgeConnectionError,
+    GoBridgeTimeoutError,
+    create_bridge_client
+)
+
 _BRIDGE_PORT = int(os.getenv("REAPER_GO_BRIDGE_PORT", "7070"))
 _BRIDGE_BASE = f"http://127.0.0.1:{_BRIDGE_PORT}"
 _TIMEOUT = float(os.getenv("REAPER_GO_BRIDGE_TIMEOUT", "120"))
 
 
 def _repo_root() -> Path:
+    """
+    Get the repository root directory.
+    
+    Returns:
+        Path to the repository root
+    """
     return Path(__file__).resolve().parent.parent.parent.parent
 
 
 def _engine_binary() -> Path | None:
+    """
+    Find the Go engine binary.
+    
+    Returns:
+        Path to the binary if found, None otherwise
+    """
     root = _repo_root()
     name = "reaper-engine.exe" if os.name == "nt" else "reaper-engine"
     for candidate in (root / "bin" / name, root / "src" / "engine-go" / name):
@@ -59,7 +79,12 @@ def _engine_binary() -> Path | None:
 
 
 async def _is_bridge_alive() -> bool:
-    """Quick health check — returns True if the bridge HTTP server is up."""
+    """
+    Quick health check - returns True if the bridge HTTP server is up.
+    
+    Returns:
+        True if the bridge server is responding, False otherwise
+    """
     try:
         import httpx
 
@@ -77,7 +102,12 @@ async def scan(subscription_id: str, provider: str = "azure") -> dict[str, Any] 
     Tries the resident HTTP bridge first (zero fork overhead).
     Falls back to asyncio subprocess if the bridge is not running.
 
-    Returns the parsed JSON scan result, or None on failure.
+    Args:
+        subscription_id: Cloud subscription ID to scan
+        provider: Cloud provider (default: "azure")
+
+    Returns:
+        The parsed JSON scan result, or None on failure
     """
     if await _is_bridge_alive():
         return await _scan_via_bridge(subscription_id, provider)
@@ -85,7 +115,16 @@ async def scan(subscription_id: str, provider: str = "azure") -> dict[str, Any] 
 
 
 async def _scan_via_bridge(subscription_id: str, provider: str) -> dict[str, Any] | None:
-    """POST /scan to the resident Go bridge server — non-blocking."""
+    """
+    POST /scan to the resident Go bridge server - non-blocking.
+    
+    Args:
+        subscription_id: Cloud subscription ID to scan
+        provider: Cloud provider
+        
+    Returns:
+        The parsed JSON scan result, or None on failure
+    """
     try:
         import httpx
 
@@ -107,8 +146,14 @@ async def _scan_via_bridge(subscription_id: str, provider: str) -> dict[str, Any
 
 async def _scan_via_subprocess(subscription_id: str) -> dict[str, Any] | None:
     """
-    Fallback: run the Go binary as a subprocess — non-blocking via
+    Fallback: run the Go binary as a subprocess - non-blocking via
     asyncio.create_subprocess_exec (does NOT block the event loop).
+    
+    Args:
+        subscription_id: Cloud subscription ID to scan
+        
+    Returns:
+        The parsed JSON scan result, or None on failure
     """
     binary = _engine_binary()
     if not binary:
@@ -137,9 +182,13 @@ async def _scan_via_subprocess(subscription_id: str) -> dict[str, Any] | None:
 
 async def prices(provider: str = "azure") -> dict[str, Any] | None:
     """
-    Fetch price list via the Go engine bridge — non-blocking.
+    Fetch price list via the Go engine bridge - non-blocking.
 
-    Returns {"prices": [...]} or None on failure.
+    Args:
+        provider: Cloud provider (default: "azure")
+
+    Returns:
+        Dictionary with prices data, or None on failure
     """
     if await _is_bridge_alive():
         try:
@@ -156,6 +205,15 @@ async def prices(provider: str = "azure") -> dict[str, Any] | None:
 
 
 async def _prices_via_subprocess(provider: str) -> dict[str, Any] | None:
+    """
+    Fallback to subprocess for fetching prices.
+    
+    Args:
+        provider: Cloud provider
+        
+    Returns:
+        Dictionary with prices data, or None on failure
+    """
     binary = _engine_binary()
     if not binary:
         return None
@@ -178,6 +236,12 @@ async def _prices_via_subprocess(provider: str) -> dict[str, Any] | None:
 
 
 def _log_db_stats(stats: dict[str, Any] | None) -> None:
+    """
+    Log database statistics from Go bridge operations.
+    
+    Args:
+        stats: Dictionary containing database statistics
+    """
     if not stats:
         return
     print(

@@ -115,7 +115,6 @@ PYTHONPATH=src python -m reaper.web.app_async
 - **FastAPI + SocketIO Backend** (`src/reaper/web/`): RESTful API with WebSocket support for real-time updates
 - **Web Dashboard**: Modern glassmorphism UI with real-time charts, metrics, and dark/light theme
 - **PostgreSQL 15**: Production-grade database with SQLAlchemy 2.0 ORM and pgx/v5 driver
-- **InfluxDB Integration**: Time-series telemetry for long-term metrics retention
 - **Cryptographic Vault**: PBKDF2-HMAC-SHA256 (600K iterations) + Fernet AES-128-CBC encryption
 - **AI Copilot**: Google Gemini 2.5 Flash with structured Pydantic schema validation
 
@@ -127,7 +126,6 @@ PYTHONPATH=src python -m reaper.web.app_async
 4. **Storage**: Optimized data is stored in PostgreSQL with 5-minute auto-purge of stale entries
 5. **Presentation**: Dashboard displays real-time insights via WebSocket with in-memory cache acceleration
 6. **Audit Logging**: Every action is logged to a SHA-256 chained hash ledger for tamper detection
-7. **Telemetry Bridge**: Savings metrics are pushed to InfluxDB for long-term time-series retention
 
 ## 🔧 Configuration
 

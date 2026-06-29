@@ -364,9 +364,8 @@ def run_reaper():
     if total_monthly_saving > 0:
         try:
             pusher.push_savings("azure", total_monthly_saving)
-            print("\n[+] Telemetry pushed to InfluxDB.")
         except Exception as e:
-            print(f"[!] Error pushing telemetry: {e}")
+            print(f"[!] Error with telemetry: {e}")
 
     print("\n" + "=" * 50)
     print(f"TOTAL POTENTIAL AZURE SAVINGS: ${total_monthly_saving:.2f} / month")

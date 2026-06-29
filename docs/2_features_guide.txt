@@ -131,7 +131,7 @@ Monitor real-time telemetry from your cloud. The real-time Go engine streams CPU
 ### Key Features
 - **Sub-Second Telemetry**: Go-powered concurrent scraping with 10 req/s rate limiting
 - **Multi-Cloud Support**: Azure, AWS, GCP, and Kubernetes metrics
-- **Historical Trends**: Time-series data with InfluxDB integration
+- **Historical Trends**: Time-series data stored in PostgreSQL
 - **Alert Thresholds**: Configurable alerts for metric breaches
 - **WebSocket Streaming**: Real-time updates without page refresh
 
