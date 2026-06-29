@@ -283,10 +283,18 @@ The Cloud-Reaper project has been verified to be correctly wired and fully funct
 - ✅ **Database**: PostgreSQL running in Docker, models import correctly
 - ✅ **Configuration**: Environment structure properly configured
 - ✅ **Entry Points**: CLI and web interfaces responding correctly
+- ✅ **Metrics System**: Updated to require real cloud data only - no simulated/fallback data
 - ⚠️ **AI Features**: Require `GEMINI_API_KEY` and `OPENAI_API_KEY` configuration
 - ⚠️ **Database URL**: Should be uncommented in `.env` for full functionality
+- ⚠️ **Cloud Credentials**: Required for metrics and cost optimization features
 
 **Test Coverage**: 53/53 Python unit tests passing across all core modules including RAG search, copilot engine, financial routes, workload analysis, and webhook integrations.
+
+**Recent Updates**:
+- Removed all simulated/fallback data from metrics system
+- Metrics commands now require real cloud provider credentials
+- Enhanced error messaging for missing cloud credentials
+- Updated web API endpoints to return real data or appropriate error states
 
 ---
 
@@ -298,6 +306,10 @@ The Cloud-Reaper project has been verified to be correctly wired and fully funct
 - Go 1.26+
 - Docker (for PostgreSQL)
 - Azure CLI (`az login`) — for Azure scanning
+- Cloud Provider Credentials — Required for metrics and cost optimization features:
+  - **Azure**: `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`
+  - **AWS**: `AWS_DEFAULT_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+  - **GCP**: `GOOGLE_CLOUD_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS`
 - `GEMINI_API_KEY` — Google AI Studio API key (required for AI Copilot & RAG search)
 
 ### One-Command Setup
@@ -312,11 +324,38 @@ python bootstrap.py
 1. Detects OS (Windows, macOS, Linux) and creates a Python virtual environment
 2. Installs all dependencies from `requirements.txt` and `requirements-dev.txt`
 3. Builds the Go performance engine binary to `bin/reaper-engine`
-4. Scaffolds `.env` file (prompts for credentials including `GEMINI_API_KEY`)
+4. Scaffolds `.env` file (prompts for credentials including `GEMINI_API_KEY` and cloud provider credentials)
 5. Initializes PostgreSQL schema via `init_db()`
 6. Launches the dashboard at **http://localhost:5001**
 
 > Full setup guide → **[HOW_TO_RUN.md](HOW_TO_RUN.md)**
+
+### Metrics System
+
+Cloud-Reaper's metrics system provides real-time FinOps intelligence by fetching live data from your cloud providers:
+
+**Key Features**:
+- **Real Data Only**: No simulated or fallback data - all metrics are fetched directly from cloud providers
+- **Multi-Cloud Support**: Works with Azure, AWS, and GCP (auto-detects from environment)
+- **Compute Efficiency**: Right-Sizing Index (RSI), idle VM detection, utilization analysis
+- **Storage Optimization**: Orphaned disk detection, cold storage migration recommendations
+- **Network Analysis**: Orphaned network resources (IPs, load balancers) identification
+
+**Usage**:
+```bash
+# Display metrics (auto-detects provider from environment)
+python main.py --metrics
+
+# Specify provider explicitly
+python main.py --metrics --provider azure
+python main.py --metrics --provider aws
+python main.py --metrics --provider gcp
+```
+
+**Requirements**:
+- Cloud provider credentials must be configured in `.env` or environment variables
+- For Azure: Azure SDK must be installed (`pip install azure-identity azure-mgmt-compute azure-mgmt-network azure-mgmt-storage azure-mgmt-monitor azure-mgmt-costmanagement`)
+- Metrics will fail gracefully with clear error messages if credentials are missing
 
 ### Manual Setup
 
@@ -350,7 +389,7 @@ The main CLI provides several operation modes:
 # Standard FinOps scan (Azure mode)
 python main.py
 
-# Display live performance metrics
+# Display live performance metrics (requires cloud credentials)
 python main.py --metrics [--provider azure|aws|gcp]
 
 # Enhanced sequential FinOps pipeline with workload differentiation
@@ -359,6 +398,8 @@ python main.py --enhanced-pipeline [--provider azure] [--lookback 7]
 # PR cost simulation (generates Markdown table for GitHub comments)
 python main.py --pr-simulation [optional-plan-file.json]
 ```
+
+**Important**: The metrics command (`--metrics`) now requires real cloud provider credentials. It will no longer display simulated/fallback data. Ensure your cloud credentials are properly configured in `.env` before running metrics commands.
 
 **Enhanced Pipeline Features**:
 - Sequential execution: Telemetry → Rightsizing → Baseline → Commitments
@@ -809,17 +850,26 @@ cp .env.example .env
 | `FLASK_PORT` | No | Dashboard port (default: `5001`) |
 | `FLASK_HOST` | No | Dashboard bind host (default: `127.0.0.1`) |
 | `FLASK_DEBUG` | No | Enable Flask debug mode (`True` / `False`) |
-| `AZURE_SUBSCRIPTION_ID` | For Azure | Azure subscription to scan |
-| `AZURE_TENANT_ID` | For Azure | Azure AD tenant ID |
-| `AZURE_CLIENT_ID` | For Azure | Service Principal app ID |
-| `AZURE_CLIENT_SECRET` | For Azure | Service Principal secret |
-| `AWS_ACCESS_KEY_ID` | For AWS | AWS IAM access key |
-| `AWS_SECRET_ACCESS_KEY` | For AWS | AWS IAM secret key |
-| `AWS_REGION` | For AWS | Default AWS region |
-| `GCP_PROJECT_ID` | For GCP | Google Cloud project ID |
-| `GCP_SERVICE_ACCOUNT_JSON` | For GCP | Service account key JSON (inline or file path) |
-| `GEMINI_API_KEY` | For AI features | Google AI Studio key (Copilot, RAG, Triage) |
-| `OPENAI_API_KEY` | For AI Architect | OpenAI API key (multi-provider BOM generation) |
+| `AZURE_SUBSCRIPTION_ID` | **For Azure** | Azure subscription to scan (required for metrics) |
+| `AZURE_TENANT_ID` | **For Azure** | Azure AD tenant ID (required for metrics) |
+| `AZURE_CLIENT_ID` | **For Azure** | Service Principal app ID (required for metrics) |
+| `AZURE_CLIENT_SECRET` | **For Azure** | Service Principal secret (required for metrics) |
+| `AWS_ACCESS_KEY_ID` | **For AWS** | AWS IAM access key (required for metrics) |
+| `AWS_SECRET_ACCESS_KEY` | **For AWS** | AWS IAM secret key (required for metrics) |
+| `AWS_REGION` | **For AWS** | Default AWS region (required for metrics) |
+| `GEMINI_API_KEY` | For AI Features | Google AI Studio API key for Copilot & RAG |
+| `OPENAI_API_KEY` | For AI Features | OpenAI API key for AI Architect |
+| `REAPER_METRICS_EMIT_SEC` | No | WebSocket metrics emit interval (default: `8`) |
+| `VAULT_UNLOCK_TTL_SEC` | No | Vault session auto-lock TTL (default: `3600`) |
+
+**Important Notes**:
+- Cloud provider credentials are now **required** for metrics functionality
+- The system will not display simulated/fallback data - only real cloud data
+- Configure at least one cloud provider (Azure, AWS, or GCP) to use metrics features
+- AI features require respective API keys but are optional for basic scanning
+- For GCP: `GOOGLE_CLOUD_PROJECT` and `GOOGLE_APPLICATION_CREDENTIALS`
+
+**Optional Configuration**:
 | `INFLUXDB_URL` | Optional | InfluxDB endpoint (default: `http://localhost:8086`) |
 | `INFLUXDB_TOKEN` | Optional | InfluxDB auth token |
 | `INFLUXDB_ORG` | Optional | InfluxDB organisation (default: `ReaperOps`) |
@@ -835,6 +885,8 @@ cp .env.example .env
 Full history in **[CHANGELOG.md](CHANGELOG.md)**.
 
 **Recent Highlights:**
+- **Metrics System Overhaul**: Removed all simulated/fallback data from metrics system - now requires real cloud provider credentials only
+- **Enhanced Error Handling**: Improved error messaging for missing cloud credentials and SDK dependencies
 - **Performance**: Upgraded `ruff` for faster static analysis; stabilized hybrid Go/Python execution pipelines and reduced memory footprint across resource scrapers
 - **Fixes**: Iterative improvements to multi-cloud authentication (Azure/AWS/GCP) and enforced vault log retention policies to prevent unbounded DB growth
 - **UI/UX**: Shipped glassmorphism redesign for vault and cloud provider UIs; fine-tuned cyan/slate color palette across the dashboard; added About page, Kubernetes Agent card, and enriched Budget Alerts tab
