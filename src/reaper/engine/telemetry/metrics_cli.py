@@ -37,9 +37,11 @@ def display_finops_performance_metrics(cloud_provider: str | None = None):
     if not cloud_provider:
         print(f"{RED}✗ Error: No cloud provider configured.{RESET}")
         print(f"{YELLOW}Please set cloud credentials in your environment:{RESET}")
-        print(f"  - Azure: Set AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET")
-        print(f"  - AWS: Set AWS_DEFAULT_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY")
-        print(f"  - GCP: Set GOOGLE_CLOUD_PROJECT, GOOGLE_APPLICATION_CREDENTIALS")
+        print(
+            "  - Azure: Set AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET"
+        )
+        print("  - AWS: Set AWS_DEFAULT_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY")
+        print("  - GCP: Set GOOGLE_CLOUD_PROJECT, GOOGLE_APPLICATION_CREDENTIALS")
         return
 
     compute_metrics = {}
@@ -118,7 +120,9 @@ def display_finops_performance_metrics(cloud_provider: str | None = None):
 
         except ImportError as e:
             logger.error(f"Azure collector not available: {e}")
-            print(f"{RED}✗ Error: Azure SDK not installed. Run: pip install azure-identity azure-mgmt-compute azure-mgmt-network azure-mgmt-storage azure-mgmt-monitor azure-mgmt-costmanagement{RESET}")
+            print(
+                f"{RED}✗ Error: Azure SDK not installed. Run: pip install azure-identity azure-mgmt-compute azure-mgmt-network azure-mgmt-storage azure-mgmt-monitor azure-mgmt-costmanagement{RESET}"
+            )
             return
         except Exception as e:
             logger.error(f"Failed to initialize Azure collector: {e}")

@@ -287,7 +287,9 @@ class AzureCollector:
                     "id": vm.id,
                     "tags": dict(vm.tags) if vm.tags else {},
                     "cost": round(estimated_cost, 2),
-                    "cpu_utilization": round(cpu_utilization, 2) if cpu_utilization is not None else None,
+                    "cpu_utilization": round(cpu_utilization, 2)
+                    if cpu_utilization is not None
+                    else None,
                     "memory_utilization": memory_utilization,
                 }
 

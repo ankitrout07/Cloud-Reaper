@@ -35,6 +35,7 @@ def main():
 
     # Import run_reaper only when needed to avoid Azure dependency issues
     from reaper.cli import run_reaper
+
     run_reaper()
 
 

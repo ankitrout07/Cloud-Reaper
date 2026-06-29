@@ -2137,6 +2137,7 @@ async def get_dashboard_metrics(request: Request):
         )
 
     try:
+
         def _get_real_metrics():
             c = AzureCollector()
             # Fetch real metrics if available
