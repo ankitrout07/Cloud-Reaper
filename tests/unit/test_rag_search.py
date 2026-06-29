@@ -92,7 +92,7 @@ class TestDocSearchEngine(unittest.TestCase):
 
             # With semantic chunking and sufficient content, we should get multiple chunks
             self.assertGreater(len(engine.docs_index), 1)
-            
+
             # Verify that chunks have the expected structure
             for chunk in engine.docs_index:
                 self.assertIn("sentence", chunk)
@@ -175,13 +175,17 @@ class TestDocSearchEngine(unittest.TestCase):
 
         with patch.dict("os.environ", {"GEMINI_API_KEY": "fake_key"}):
             engine = DocSearchEngine()
-            
+
             # Test query expansion for domain terms
             expanded = engine._expand_query("optimize cost")
             self.assertIn("optimize cost", expanded)  # Original query
             # Should contain variations with synonyms
-            self.assertTrue(any("price" in q or "expense" in q or "spending" in q for q in expanded))
-            self.assertTrue(any("improve" in q or "reduce" in q or "minimize" in q for q in expanded))
+            self.assertTrue(
+                any("price" in q or "expense" in q or "spending" in q for q in expanded)
+            )
+            self.assertTrue(
+                any("improve" in q or "reduce" in q or "minimize" in q for q in expanded)
+            )
 
     @patch("google.genai.Client")
     def test_metadata_filtering(self, mock_client_class):
@@ -201,20 +205,20 @@ class TestDocSearchEngine(unittest.TestCase):
                     "file_name": "architecture.md",
                     "sentence": "System architecture details.",
                     "vector": [0.5, 0.5],
-                    "metadata": {"file_type": ".md", "section": "architecture"}
+                    "metadata": {"file_type": ".md", "section": "architecture"},
                 },
                 {
                     "file_name": "setup.txt",
                     "sentence": "Setup instructions for the system.",
                     "vector": [0.5, 0.5],
-                    "metadata": {"file_type": ".txt", "section": "setup"}
+                    "metadata": {"file_type": ".txt", "section": "setup"},
                 },
             ]
 
             # Test file type filtering
             results_md = engine.query_docs("system", top_k=10, file_type_filter=".md")
             self.assertTrue(all(r["file"].endswith(".md") for r in results_md))
-            
+
             # Test file name filtering
             results_arch = engine.query_docs("system", top_k=10, file_filter="architecture")
             self.assertTrue(all("architecture" in r["file"].lower() for r in results_arch))
@@ -232,11 +236,11 @@ class TestDocSearchEngine(unittest.TestCase):
 
         with patch.dict("os.environ", {"GEMINI_API_KEY": "fake_key"}):
             engine = DocSearchEngine()
-            
+
             # Test semantic chunking with paragraphs
             content = "First paragraph with some text.\n\nSecond paragraph with different content.\n\nThird paragraph."
             chunks = engine._split_into_semantic_chunks(content, max_chunk_size=50)
-            
+
             # Should respect paragraph boundaries
             self.assertTrue(len(chunks) >= 2)  # At least 2 chunks for 3 paragraphs
             # Each chunk should be reasonably sized
@@ -251,7 +255,7 @@ class TestDocSearchEngine(unittest.TestCase):
 
         with patch.dict("os.environ", {"GEMINI_API_KEY": "fake_key"}):
             engine = DocSearchEngine()
-            
+
             # Create similar documents (high similarity)
             engine.docs_index = [
                 {
@@ -260,7 +264,7 @@ class TestDocSearchEngine(unittest.TestCase):
                     "vector": [0.9, 0.1, 0.0],
                 },
                 {
-                    "file_name": "similar2.md", 
+                    "file_name": "similar2.md",
                     "sentence": "Cost optimization techniques for cloud infrastructure.",
                     "vector": [0.89, 0.11, 0.0],  # Very similar to first
                 },
@@ -270,11 +274,13 @@ class TestDocSearchEngine(unittest.TestCase):
                     "vector": [0.1, 0.1, 0.8],  # Different topic
                 },
             ]
-            
+
             # Test MMR with high diversity preference
             results = [(0, 0.9), (1, 0.89), (2, 0.8)]  # Initial rankings
-            diverse_results = engine._apply_maximal_marginal_relevance(results, lambda_param=0.3, top_k=2)
-            
+            diverse_results = engine._apply_maximal_marginal_relevance(
+                results, lambda_param=0.3, top_k=2
+            )
+
             # With lambda=0.3 (diversity preference), should pick different document
             selected_indices = [idx for idx, _ in diverse_results]
             self.assertIn(2, selected_indices)  # Different document should be selected
@@ -481,7 +487,7 @@ class TestSearchRoutes(unittest.TestCase):
                 "metadata": {"file_type": ".md", "section": "audit"},
                 "text": "To maintain operational integrity and strict regulatory compliance, Cloud-Reaper includes a high-fidelity, comprehensive Audit Logging system.",
                 "score": 0.955,
-                "metadata_frontend": {"filename": "4_audit_logs.md", "title": "Audit Logs"}
+                "metadata_frontend": {"filename": "4_audit_logs.md", "title": "Audit Logs"},
             }
         ]
 
