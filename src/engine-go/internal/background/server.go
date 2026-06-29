@@ -223,7 +223,7 @@ func getTaskFunction(taskType string) (TaskFunc, error) {
 func priceScanTask(ctx context.Context, args []interface{}) (interface{}, error) {
 	// Simulate price scanning work
 	log.Printf("Starting price scan task with args: %v", args)
-	
+
 	// Simulate progress updates
 	for i := 0; i <= 10; i++ {
 		select {
@@ -234,58 +234,58 @@ func priceScanTask(ctx context.Context, args []interface{}) (interface{}, error)
 			// In a real implementation, we'd update progress here
 		}
 	}
-	
+
 	result := map[string]interface{}{
 		"skus_scanned": 150,
 		"regions":      []string{"eastus", "westus2", "westeurope"},
 		"timestamp":    time.Now().Unix(),
 	}
-	
+
 	return result, nil
 }
 
 func resourceAuditTask(ctx context.Context, args []interface{}) (interface{}, error) {
 	log.Printf("Starting resource audit task with args: %v", args)
-	
+
 	// Simulate resource auditing
 	time.Sleep(500 * time.Millisecond)
-	
+
 	result := map[string]interface{}{
 		"resources_audited": 75,
 		"issues_found":      12,
 		"timestamp":         time.Now().Unix(),
 	}
-	
+
 	return result, nil
 }
 
 func costAnalysisTask(ctx context.Context, args []interface{}) (interface{}, error) {
 	log.Printf("Starting cost analysis task with args: %v", args)
-	
+
 	// Simulate cost analysis
 	time.Sleep(300 * time.Millisecond)
-	
+
 	result := map[string]interface{}{
 		"total_cost":    1250.50,
 		"savings_found": 342.75,
 		"timestamp":     time.Now().Unix(),
 	}
-	
+
 	return result, nil
 }
 
 func metricsFetchTask(ctx context.Context, args []interface{}) (interface{}, error) {
 	log.Printf("Starting metrics fetch task with args: %v", args)
-	
+
 	// Simulate metrics fetching
 	time.Sleep(200 * time.Millisecond)
-	
+
 	result := map[string]interface{}{
 		"cpu_utilization": 45.2,
 		"memory_usage":    68.5,
 		"timestamp":       time.Now().Unix(),
 	}
-	
+
 	return result, nil
 }
 

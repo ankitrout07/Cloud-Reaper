@@ -91,9 +91,9 @@ func RegisterCalculatorHandlers(mux *http.ServeMux) {
 		cost := calc.CalculateMonthlyCost(req.Provider, req.ResourceType, req.SKU, req.Quantity)
 
 		sendJSONResponse(w, map[string]interface{}{
-			"cost":         cost,
-			"currency":     calc.GetCurrency(),
-			"formatted":    calc.FormatPrice(cost),
+			"cost":      cost,
+			"currency":  calc.GetCurrency(),
+			"formatted": calc.FormatPrice(cost),
 		})
 	})
 
@@ -113,9 +113,9 @@ func RegisterCalculatorHandlers(mux *http.ServeMux) {
 		cost := calc.CalculateHourlyCost(req.Provider, req.ResourceType, req.SKU, req.Quantity)
 
 		sendJSONResponse(w, map[string]interface{}{
-			"cost":         cost,
-			"currency":     calc.GetCurrency(),
-			"formatted":    calc.FormatPrice(cost),
+			"cost":      cost,
+			"currency":  calc.GetCurrency(),
+			"formatted": calc.FormatPrice(cost),
 		})
 	})
 
@@ -158,9 +158,9 @@ func RegisterCalculatorHandlers(mux *http.ServeMux) {
 		results := calc.BatchCalculateMonthlyCost(req.Items)
 
 		sendJSONResponse(w, map[string]interface{}{
-			"results":     results,
-			"item_count":  len(req.Items),
-			"currency":    calc.GetCurrency(),
+			"results":    results,
+			"item_count": len(req.Items),
+			"currency":   calc.GetCurrency(),
 		})
 	})
 
@@ -180,9 +180,9 @@ func RegisterCalculatorHandlers(mux *http.ServeMux) {
 		results := calc.BatchCalculateHourlyCost(req.Items)
 
 		sendJSONResponse(w, map[string]interface{}{
-			"results":     results,
-			"item_count":  len(req.Items),
-			"currency":    calc.GetCurrency(),
+			"results":    results,
+			"item_count": len(req.Items),
+			"currency":   calc.GetCurrency(),
 		})
 	})
 
@@ -269,7 +269,7 @@ func RegisterCalculatorHandlers(mux *http.ServeMux) {
 
 		book := calc.GetPriceBook()
 		providerCount := len(book.Providers)
-		
+
 		totalResourceTypes := 0
 		totalSKUs := 0
 		for _, provider := range book.Providers {
@@ -280,10 +280,10 @@ func RegisterCalculatorHandlers(mux *http.ServeMux) {
 		}
 
 		sendJSONResponse(w, map[string]interface{}{
-			"providers":          providerCount,
-			"resource_types":     totalResourceTypes,
-			"total_skus":         totalSKUs,
-			"currency":           calc.GetCurrency(),
+			"providers":      providerCount,
+			"resource_types": totalResourceTypes,
+			"total_skus":     totalSKUs,
+			"currency":       calc.GetCurrency(),
 		})
 	})
 }

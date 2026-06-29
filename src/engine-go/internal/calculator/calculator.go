@@ -31,9 +31,9 @@ type BurnItem struct {
 
 // CostCalculator handles cost calculations with batch operations
 type CostCalculator struct {
-	priceBook  *PriceBook
+	priceBook   *PriceBook
 	priceBookMu sync.RWMutex
-	currency   string
+	currency    string
 }
 
 // NewCostCalculator creates a new cost calculator
@@ -190,7 +190,7 @@ func (cc *CostCalculator) calculateItemHourlyCost(item BurnItem) float64 {
 // BatchCalculateMonthlyCost performs batch monthly cost calculations
 func (cc *CostCalculator) BatchCalculateMonthlyCost(items []BurnItem) []float64 {
 	results := make([]float64, len(items))
-	
+
 	var wg sync.WaitGroup
 	for i, item := range items {
 		wg.Add(1)
@@ -199,7 +199,7 @@ func (cc *CostCalculator) BatchCalculateMonthlyCost(items []BurnItem) []float64 
 			results[idx] = cc.CalculateMonthlyCost(burnItem.Provider, burnItem.ResourceType, burnItem.SKU, burnItem.Quantity)
 		}(i, item)
 	}
-	
+
 	wg.Wait()
 	return results
 }
@@ -207,7 +207,7 @@ func (cc *CostCalculator) BatchCalculateMonthlyCost(items []BurnItem) []float64 
 // BatchCalculateHourlyCost performs batch hourly cost calculations
 func (cc *CostCalculator) BatchCalculateHourlyCost(items []BurnItem) []float64 {
 	results := make([]float64, len(items))
-	
+
 	var wg sync.WaitGroup
 	for i, item := range items {
 		wg.Add(1)
@@ -216,7 +216,7 @@ func (cc *CostCalculator) BatchCalculateHourlyCost(items []BurnItem) []float64 {
 			results[idx] = cc.CalculateHourlyCost(burnItem.Provider, burnItem.ResourceType, burnItem.SKU, burnItem.Quantity)
 		}(i, item)
 	}
-	
+
 	wg.Wait()
 	return results
 }

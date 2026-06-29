@@ -21,16 +21,16 @@ func InitRateLimiters() {
 	limiterInit.Do(func() {
 		// Default token bucket limiter (20 req/s, burst 20)
 		globalTokenLimiter = NewTokenBucketRateLimiter(20.0, 20)
-		
+
 		// Multi-limiter for different contexts
 		globalMultiLimiter = NewMultiLimiter()
-		
+
 		// Initialize common rate limiters
 		globalMultiLimiter.GetOrCreate("azure", 20.0, 20)
 		globalMultiLimiter.GetOrCreate("aws", 20.0, 20)
 		globalMultiLimiter.GetOrCreate("gcp", 20.0, 20)
 		globalMultiLimiter.GetOrCreate("ai", 10.0, 10)
-		
+
 		log.Println("[Rate Limiter] Initialized global rate limiters")
 	})
 }
@@ -56,9 +56,9 @@ type HTTPResponse struct {
 
 // RateLimitRequest represents a request to check/update rate limits
 type RateLimitRequest struct {
-	Key              string  `json:"key,omitempty"`
+	Key               string  `json:"key,omitempty"`
 	RequestsPerSecond float64 `json:"requests_per_second,omitempty"`
-	BurstSize        int     `json:"burst_size,omitempty"`
+	BurstSize         int     `json:"burst_size,omitempty"`
 }
 
 // RegisterRateLimiterHandlers registers HTTP handlers for rate limiting
@@ -83,7 +83,7 @@ func RegisterRateLimiterHandlers(mux *http.ServeMux) {
 
 		allowed := globalTokenLimiter.Allow()
 		stats := globalTokenLimiter.GetStatistics()
-		
+
 		sendJSONResponse(w, map[string]interface{}{
 			"allowed": allowed,
 			"stats":   stats,
@@ -99,10 +99,10 @@ func RegisterRateLimiterHandlers(mux *http.ServeMux) {
 
 		waitDuration := globalTokenLimiter.WaitDuration()
 		stats := globalTokenLimiter.GetStatistics()
-		
+
 		sendJSONResponse(w, map[string]interface{}{
 			"wait_duration_ms": waitDuration.Milliseconds(),
-			"stats":           stats,
+			"stats":            stats,
 		})
 	})
 
@@ -122,7 +122,7 @@ func RegisterRateLimiterHandlers(mux *http.ServeMux) {
 		limiter := globalMultiLimiter.GetOrCreate(key, 20.0, 20)
 		allowed := limiter.Allow()
 		stats := limiter.GetStatistics()
-		
+
 		sendJSONResponse(w, map[string]interface{}{
 			"allowed": allowed,
 			"stats":   stats,
@@ -175,7 +175,7 @@ func RegisterRateLimiterHandlers(mux *http.ServeMux) {
 			"default": globalTokenLimiter.GetStatistics(),
 			"all":     globalMultiLimiter.GetStatistics(),
 		}
-		
+
 		sendJSONResponse(w, stats)
 	})
 
@@ -195,7 +195,7 @@ func RegisterRateLimiterHandlers(mux *http.ServeMux) {
 		// Remove and recreate the limiter
 		globalMultiLimiter.Remove(key)
 		newLimiter := globalMultiLimiter.GetOrCreate(key, 20.0, 20)
-		
+
 		sendJSONResponse(w, map[string]interface{}{
 			"status": "reset",
 			"stats":  newLimiter.GetStatistics(),

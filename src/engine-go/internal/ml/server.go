@@ -39,25 +39,25 @@ type EvaluateRequest struct {
 
 // BatchEvaluateRequest represents a batch evaluation request
 type BatchEvaluateRequest struct {
-	MetricsList  []map[string]float64 `json:"metrics_list"`
-	CurrentSKUs  []string             `json:"current_skus"`
-	EnvironmentType string             `json:"environment_type,omitempty"`
+	MetricsList     []map[string]float64 `json:"metrics_list"`
+	CurrentSKUs     []string             `json:"current_skus"`
+	EnvironmentType string               `json:"environment_type,omitempty"`
 }
 
 // TrainingRequest represents a training request
 type TrainingRequest struct {
-	State        map[string]float64 `json:"state"`
-	Action       int                `json:"action"`
-	Reward       float64            `json:"reward"`
-	NextState    map[string]float64 `json:"next_state"`
+	State     map[string]float64 `json:"state"`
+	Action    int                `json:"action"`
+	Reward    float64            `json:"reward"`
+	NextState map[string]float64 `json:"next_state"`
 }
 
 // ConfigRequest represents a configuration request
 type ConfigRequest struct {
-	LearningRate     float64 `json:"learning_rate"`
-	DiscountFactor   float64 `json:"discount_factor"`
-	ExplorationRate  float64 `json:"exploration_rate"`
-	EnvironmentType  string  `json:"environment_type"`
+	LearningRate    float64 `json:"learning_rate"`
+	DiscountFactor  float64 `json:"discount_factor"`
+	ExplorationRate float64 `json:"exploration_rate"`
+	EnvironmentType string  `json:"environment_type"`
 }
 
 // RegisterMLHandlers registers HTTP handlers for ML operations
@@ -184,13 +184,13 @@ func RegisterMLHandlers(mux *http.ServeMux, environmentType string) {
 		}
 
 		sendJSONResponse(w, map[string]interface{}{
-			"q_table_size":      agent.GetQTableSize(),
-			"learning_rate":     agent.learningRate,
-			"discount_factor":   agent.discountFactor,
-			"exploration_rate":  agent.explorationRate,
-			"environment_type":  agent.environmentType,
-			"risk_thresholds":   agent.riskThresholds,
-			"actions":           agent.actions,
+			"q_table_size":     agent.GetQTableSize(),
+			"learning_rate":    agent.learningRate,
+			"discount_factor":  agent.discountFactor,
+			"exploration_rate": agent.explorationRate,
+			"environment_type": agent.environmentType,
+			"risk_thresholds":  agent.riskThresholds,
+			"actions":          agent.actions,
 		})
 	})
 

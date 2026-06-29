@@ -11,7 +11,7 @@ import (
 // Global RAG engine instance
 var (
 	globalRAGEngine *RAGEngine
-	ragInit        sync.Once
+	ragInit         sync.Once
 )
 
 // GetRAGEngine returns the singleton RAG engine instance
@@ -37,16 +37,16 @@ type IndexRequest struct {
 
 // SearchRequest represents a search request
 type SearchRequest struct {
-	Query          string   `json:"query"`
+	Query          string    `json:"query"`
 	QueryVector    []float64 `json:"query_vector,omitempty"`
-	TopK           int      `json:"top_k"`
-	FileFilter     string   `json:"file_filter,omitempty"`
-	FileTypeFilter string   `json:"file_type_filter,omitempty"`
-	LambdaParam    float64  `json:"lambda_param"`
-	RRFConstant    int      `json:"rrf_constant"`
-	EnableBM25     bool     `json:"enable_bm25"`
-	EnableDense    bool     `json:"enable_dense"`
-	EnableMMR      bool     `json:"enable_mmr"`
+	TopK           int       `json:"top_k"`
+	FileFilter     string    `json:"file_filter,omitempty"`
+	FileTypeFilter string    `json:"file_type_filter,omitempty"`
+	LambdaParam    float64   `json:"lambda_param"`
+	RRFConstant    int       `json:"rrf_constant"`
+	EnableBM25     bool      `json:"enable_bm25"`
+	EnableDense    bool      `json:"enable_dense"`
+	EnableMMR      bool      `json:"enable_mmr"`
 }
 
 // RegisterRAGHandlers registers HTTP handlers for RAG search
@@ -124,11 +124,11 @@ func RegisterRAGHandlers(mux *http.ServeMux) {
 			TopK:           req.TopK,
 			FileFilter:     req.FileFilter,
 			FileTypeFilter: req.FileTypeFilter,
-			LambdaParam:     req.LambdaParam,
-			RRFConstant:     req.RRFConstant,
-			EnableBM25:      req.EnableBM25,
-			EnableDense:     req.EnableDense,
-			EnableMMR:       req.EnableMMR,
+			LambdaParam:    req.LambdaParam,
+			RRFConstant:    req.RRFConstant,
+			EnableBM25:     req.EnableBM25,
+			EnableDense:    req.EnableDense,
+			EnableMMR:      req.EnableMMR,
 		}
 
 		results := rag.HybridSearch(query)
@@ -149,7 +149,7 @@ func RegisterRAGHandlers(mux *http.ServeMux) {
 
 		var req struct {
 			QueryVector []float64 `json:"query_vector"`
-			TopK        int      `json:"top_k"`
+			TopK        int       `json:"top_k"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			sendJSONError(w, "Invalid request body", http.StatusBadRequest)
@@ -239,9 +239,9 @@ func RegisterRAGHandlers(mux *http.ServeMux) {
 		expanded := rag.expandQuery(req.Query)
 
 		sendJSONResponse(w, map[string]interface{}{
-			"original":  req.Query,
-			"expanded":  expanded,
-			"count":     len(expanded),
+			"original": req.Query,
+			"expanded": expanded,
+			"count":    len(expanded),
 		})
 	})
 }

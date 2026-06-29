@@ -23,24 +23,24 @@ type Document struct {
 
 // SearchQuery represents a search request
 type SearchQuery struct {
-	Query           string   `json:"query"`
-	QueryVector     []float64 `json:"query_vector,omitempty"`
-	TopK            int      `json:"top_k"`
-	FileFilter      string   `json:"file_filter,omitempty"`
-	FileTypeFilter  string   `json:"file_type_filter,omitempty"`
-	LambdaParam     float64  `json:"lambda_param"` // For MMR diversity
-	RRFConstant     int      `json:"rrf_constant"`
-	EnableBM25      bool     `json:"enable_bm25"`
-	EnableDense     bool     `json:"enable_dense"`
-	EnableMMR       bool     `json:"enable_mmr"`
+	Query          string    `json:"query"`
+	QueryVector    []float64 `json:"query_vector,omitempty"`
+	TopK           int       `json:"top_k"`
+	FileFilter     string    `json:"file_filter,omitempty"`
+	FileTypeFilter string    `json:"file_type_filter,omitempty"`
+	LambdaParam    float64   `json:"lambda_param"` // For MMR diversity
+	RRFConstant    int       `json:"rrf_constant"`
+	EnableBM25     bool      `json:"enable_bm25"`
+	EnableDense    bool      `json:"enable_dense"`
+	EnableMMR      bool      `json:"enable_mmr"`
 }
 
 // SearchResult represents a search result
 type SearchResult struct {
-	Document       Document `json:"document"`
-	Score          float64  `json:"score"`
-	Confidence     float64  `json:"confidence"`
-	RankingMethod  string   `json:"ranking_method"`
+	Document      Document `json:"document"`
+	Score         float64  `json:"score"`
+	Confidence    float64  `json:"confidence"`
+	RankingMethod string   `json:"ranking_method"`
 }
 
 // BM25Index represents the BM25 sparse search index
@@ -187,7 +187,7 @@ func (re *RAGEngine) DenseSearch(queryVector []float64, topK int) []SearchResult
 
 		docNorm := normalize(doc.Vector)
 		dotProduct := dotProduct(queryVector, doc.Vector)
-		
+
 		if queryNorm > 0 && docNorm > 0 {
 			scores[i] = dotProduct / (queryNorm * docNorm)
 		} else {
@@ -214,7 +214,7 @@ func (re *RAGEngine) DenseSearch(queryVector []float64, topK int) []SearchResult
 			doc.Metadata = make(map[string]interface{})
 		}
 		doc.Metadata["original_index"] = idx
-		
+
 		results = append(results, SearchResult{
 			Document:      doc,
 			Score:         scores[idx],
@@ -259,7 +259,7 @@ func (re *RAGEngine) SparseSearch(query string, topK int) []SearchResult {
 			tf := termFreqs[term]
 			numerator := float64(tf * (re.bm25Index.k1 + 1))
 			denominator := float64(tf) + re.bm25Index.k1*(1-re.bm25Index.b+re.bm25Index.b*(float64(docLen)/re.bm25Index.avgDocLength))
-			
+
 			score += idf * (numerator / denominator)
 		}
 
@@ -285,7 +285,7 @@ func (re *RAGEngine) SparseSearch(query string, topK int) []SearchResult {
 			doc.Metadata = make(map[string]interface{})
 		}
 		doc.Metadata["original_index"] = idx
-		
+
 		results = append(results, SearchResult{
 			Document:      doc,
 			Score:         scores[idx],
@@ -364,7 +364,7 @@ func (re *RAGEngine) HybridSearch(query SearchQuery) []SearchResult {
 			}
 
 			rrfScore := 1.0/float64(rrfConstant+rDense) + 1.0/float64(rrfConstant+rSparse)
-			
+
 			if existingScore, exists := rrfScores[idx]; exists {
 				rrfScores[idx] = math.Max(existingScore, rrfScore)
 			} else {
@@ -409,7 +409,7 @@ func (re *RAGEngine) HybridSearch(query SearchQuery) []SearchResult {
 // applyFilters applies metadata filters to document indices
 func (re *RAGEngine) applyFilters(query SearchQuery) map[int]bool {
 	filteredIndices := make(map[int]bool)
-	
+
 	for idx := range re.documents {
 		filteredIndices[idx] = true
 	}
@@ -559,11 +559,11 @@ func (re *RAGEngine) GetStatistics() map[string]interface{} {
 	defer re.mu.RUnlock()
 
 	return map[string]interface{}{
-		"total_documents":    len(re.documents),
-		"bm25_indexed":       re.bm25Index.N,
-		"vector_indexed":     len(re.vectorIndex.documents),
-		"avg_doc_length":     re.bm25Index.avgDocLength,
-		"unique_terms":       len(re.bm25Index.docFreqs),
-		"domain_synonyms":    len(re.domainSynonyms),
+		"total_documents": len(re.documents),
+		"bm25_indexed":    re.bm25Index.N,
+		"vector_indexed":  len(re.vectorIndex.documents),
+		"avg_doc_length":  re.bm25Index.avgDocLength,
+		"unique_terms":    len(re.bm25Index.docFreqs),
+		"domain_synonyms": len(re.domainSynonyms),
 	}
 }

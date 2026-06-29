@@ -14,7 +14,7 @@ import threading
 import time
 from functools import wraps
 from pathlib import Path
-from typing import Any, cast, Optional
+from typing import Any, cast
 
 import httpx
 from azure.identity import DefaultAzureCredential
@@ -34,11 +34,12 @@ from starlette.middleware.sessions import SessionMiddleware
 try:
     from reaper.web.go_websocket import (
         GoWebSocketBatcher,
-        get_websocket_batcher,
-        emit_metric_update,
         emit_cost_alert,
-        emit_resource_update
+        emit_metric_update,
+        emit_resource_update,
+        get_websocket_batcher,
     )
+
     GO_WEBSOCKET_AVAILABLE = True
 except ImportError:
     GO_WEBSOCKET_AVAILABLE = False
@@ -47,13 +48,14 @@ except ImportError:
 try:
     from reaper.web.go_ratelimiter import (
         GoRateLimiter,
-        get_rate_limiter,
-        allow_azure_request,
-        allow_aws_request,
-        allow_gcp_request,
         allow_ai_request,
-        wait_for_rate_limit
+        allow_aws_request,
+        allow_azure_request,
+        allow_gcp_request,
+        get_rate_limiter,
+        wait_for_rate_limit,
     )
+
     GO_RATELIMITER_AVAILABLE = True
 except ImportError:
     GO_RATELIMITER_AVAILABLE = False
@@ -149,21 +151,29 @@ class RateLimiter:
     Now supports both Python implementation and Go backend for enhanced performance.
     """
 
-    def __init__(self, rate: int, per: float = 1.0, use_go_backend: bool = True, limiter_key: Optional[str] = None):
+    def __init__(
+        self,
+        rate: int,
+        per: float = 1.0,
+        use_go_backend: bool = True,
+        limiter_key: str | None = None,
+    ):
         self.rate = rate  # requests per second
         self.per = per  # time window in seconds
         self.allowance = rate
         self.last_check = time.time()
         self.limiter_key = limiter_key
-        
+
         # Try to use Go backend if available and enabled
         self.use_go_backend = use_go_backend and GO_RATELIMITER_AVAILABLE
-        self.go_limiter: Optional[GoRateLimiter] = None
-        
+        self.go_limiter: GoRateLimiter | None = None
+
         if self.use_go_backend:
             try:
                 # Don't initialize immediately, will be done lazily
-                print(f"[Go Rate Limiter] Using Go backend for enhanced performance (key: {limiter_key})")
+                print(
+                    f"[Go Rate Limiter] Using Go backend for enhanced performance (key: {limiter_key})"
+                )
             except Exception as e:
                 print(f"[Go Rate Limiter] Failed to initialize Go backend: {e}")
                 self.use_go_backend = False
@@ -190,16 +200,17 @@ class RateLimiter:
             try:
                 if self.go_limiter is None:
                     self.go_limiter = await get_rate_limiter()
-                
+
                 allowed = await self.go_limiter.allow(self.limiter_key)
                 if allowed:
                     return True
-                else:
-                    print(f"[Go Rate Limiter] Request blocked by rate limiter (key: {self.limiter_key})")
-                    return False
+                print(
+                    f"[Go Rate Limiter] Request blocked by rate limiter (key: {self.limiter_key})"
+                )
+                return False
             except Exception as e:
                 print(f"[Go Rate Limiter] Error checking rate limit: {e}, falling back to Python")
-        
+
         # Fall back to Python implementation
         return self.can_proceed()
 
@@ -210,24 +221,34 @@ class RateLimiter:
             try:
                 if self.go_limiter is None:
                     self.go_limiter = await get_rate_limiter()
-                
+
                 wait_duration = await self.go_limiter.wait(self.limiter_key)
                 if wait_duration > 0:
                     await asyncio.sleep(wait_duration / 1000.0)  # Convert ms to seconds
                 return
             except Exception as e:
-                print(f"[Go Rate Limiter] Error waiting for rate limit: {e}, falling back to Python")
-        
+                print(
+                    f"[Go Rate Limiter] Error waiting for rate limit: {e}, falling back to Python"
+                )
+
         # Fall back to Python implementation
         while not self.can_proceed():
             await asyncio.sleep(0.1)
 
 
 # Rate limiters for different API providers
-azure_rate_limiter = RateLimiter(rate=20, per=1.0, use_go_backend=True, limiter_key="azure")  # 20 requests per second for Azure
-aws_rate_limiter = RateLimiter(rate=20, per=1.0, use_go_backend=True, limiter_key="aws")  # 20 requests per second for AWS
-gcp_rate_limiter = RateLimiter(rate=20, per=1.0, use_go_backend=True, limiter_key="gcp")  # 20 requests per second for GCP
-ai_rate_limiter = RateLimiter(rate=10, per=1.0, use_go_backend=True, limiter_key="ai")  # 10 requests per second for AI APIs
+azure_rate_limiter = RateLimiter(
+    rate=20, per=1.0, use_go_backend=True, limiter_key="azure"
+)  # 20 requests per second for Azure
+aws_rate_limiter = RateLimiter(
+    rate=20, per=1.0, use_go_backend=True, limiter_key="aws"
+)  # 20 requests per second for AWS
+gcp_rate_limiter = RateLimiter(
+    rate=20, per=1.0, use_go_backend=True, limiter_key="gcp"
+)  # 20 requests per second for GCP
+ai_rate_limiter = RateLimiter(
+    rate=10, per=1.0, use_go_backend=True, limiter_key="ai"
+)  # 10 requests per second for AI APIs
 
 
 # WebSocket Message Batching System
@@ -237,18 +258,20 @@ class WebSocketBatcher:
     Now supports both Python asyncio and Go-based batching for enhanced performance.
     """
 
-    def __init__(self, socketio_server, batch_interval_ms=100, max_batch_size=50, use_go_backend=True):
+    def __init__(
+        self, socketio_server, batch_interval_ms=100, max_batch_size=50, use_go_backend=True
+    ):
         self.sio = socketio_server
         self.batch_interval = batch_interval_ms / 1000.0  # Convert to seconds
         self.max_batch_size = max_batch_size
         self.batches = {}  # event_name -> list of messages
         self.timers = {}  # event_name -> timer handle
         self.lock = asyncio.Lock()
-        
+
         # Try to use Go backend if available and enabled
         self.use_go_backend = use_go_backend and GO_WEBSOCKET_AVAILABLE
         self.go_batcher: GoWebSocketBatcher | None = None
-        
+
         if self.use_go_backend:
             try:
                 # Get Go WebSocket batcher host/port from environment or use defaults
@@ -268,15 +291,16 @@ class WebSocketBatcher:
             try:
                 if self.go_batcher is None:
                     self.go_batcher = await get_websocket_batcher()
-                
+
                 success = await self.go_batcher.emit(event, data, room)
                 if success:
                     return  # Successfully sent to Go backend
-                else:
-                    print(f"[Go WebSocket Batcher] Failed to emit via Go backend, falling back to Python")
+                print(
+                    "[Go WebSocket Batcher] Failed to emit via Go backend, falling back to Python"
+                )
             except Exception as e:
                 print(f"[Go WebSocket Batcher] Error using Go backend: {e}, falling back to Python")
-        
+
         # Fall back to Python implementation
         async with self.lock:
             if event not in self.batches:

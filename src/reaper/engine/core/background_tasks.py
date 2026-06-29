@@ -16,11 +16,9 @@ from uuid import uuid4
 
 # Try to import Go task manager bridge for enhanced performance
 try:
-    from reaper.engine.core.go_task_manager import (
-        GoTaskManagerBridge,
-        get_task_manager_bridge,
-        TaskStatus as GoTaskStatus
-    )
+    from reaper.engine.core.go_task_manager import GoTaskManagerBridge, get_task_manager_bridge
+    from reaper.engine.core.go_task_manager import TaskStatus as GoTaskStatus
+
     GO_TASK_MANAGER_AVAILABLE = True
 except ImportError:
     GO_TASK_MANAGER_AVAILABLE = False
@@ -60,11 +58,11 @@ class BackgroundTaskManager:
         self.semaphore = asyncio.Semaphore(max_concurrent_tasks)
         self._running = False
         self._worker_task: asyncio.Task | None = None
-        
+
         # Try to use Go backend if available and enabled
         self.use_go_backend = use_go_backend and GO_TASK_MANAGER_AVAILABLE
         self.go_bridge: GoTaskManagerBridge | None = None
-        
+
         if self.use_go_backend:
             try:
                 # Get Go task manager host/port from environment or use defaults
@@ -92,7 +90,7 @@ class BackgroundTaskManager:
                 await self._worker_task
             except asyncio.CancelledError:
                 pass
-        
+
         # Close Go bridge connection if used
         if self.go_bridge:
             try:
@@ -163,16 +161,13 @@ class BackgroundTaskManager:
                 task_type = self._get_go_task_type(func)
                 if task_type:
                     go_task_id = await self.go_bridge.submit_task(
-                        task_type=task_type,
-                        args=list(args),
-                        task_id=task_id,
-                        metadata=kwargs
+                        task_type=task_type, args=list(args), task_id=task_id, metadata=kwargs
                     )
                     # Create task record with Go backend reference
                     self.tasks[task_id] = TaskResult(
-                        task_id=task_id, 
+                        task_id=task_id,
                         status=TaskStatus.PENDING,
-                        metadata={"backend": "go", "go_task_id": go_task_id}
+                        metadata={"backend": "go", "go_task_id": go_task_id},
                     )
                     return task_id
             except Exception as e:
@@ -186,26 +181,26 @@ class BackgroundTaskManager:
         self.task_queue.append((task_id, func, args, kwargs))
 
         return task_id
-    
+
     def _get_go_task_type(self, func: Callable) -> str | None:
         """Map Python functions to Go task types"""
         # This could be enhanced with decorators or function metadata
         func_name = getattr(func, "__name__", "")
-        
+
         # Map known functions to Go task types
         task_mappings = {
             "price_scan_task": "price_scan",
-            "resource_audit_task": "resource_audit", 
+            "resource_audit_task": "resource_audit",
             "cost_analysis_task": "cost_analysis",
             "metrics_fetch_task": "metrics_fetch",
         }
-        
+
         return task_mappings.get(func_name)
 
     async def get_task_status(self, task_id: str) -> TaskResult | None:
         """Get the current status of a task (async version with Go backend support)."""
         local_task = self.tasks.get(task_id)
-        
+
         # If task is managed by Go backend, fetch latest status
         if local_task and local_task.metadata and local_task.metadata.get("backend") == "go":
             if self.use_go_backend and self.go_bridge:
@@ -221,7 +216,7 @@ class BackgroundTaskManager:
                     return local_task
                 except Exception as e:
                     print(f"[Go Task Manager] Failed to get task status from Go: {e}")
-        
+
         return local_task
 
     async def get_all_tasks(self) -> list[TaskResult]:
@@ -242,7 +237,7 @@ class BackgroundTaskManager:
                             created_at=go_task.created_at,
                             started_at=go_task.started_at,
                             completed_at=go_task.completed_at,
-                            metadata={"backend": "go"}
+                            metadata={"backend": "go"},
                         )
                     else:
                         # Update existing task
@@ -255,7 +250,7 @@ class BackgroundTaskManager:
                         local_task.completed_at = go_task.completed_at
             except Exception as e:
                 print(f"[Go Task Manager] Failed to get all tasks from Go: {e}")
-        
+
         return list(self.tasks.values())
 
     async def cancel_task(self, task_id: str) -> bool:
@@ -328,8 +323,8 @@ class BackgroundTaskManager:
 
 # Global background task manager instance
 background_manager = BackgroundTaskManager(
-    max_concurrent_tasks=10, 
-    use_go_backend=True  # Enable Go backend by default for enhanced performance
+    max_concurrent_tasks=10,
+    use_go_backend=True,  # Enable Go backend by default for enhanced performance
 )
 
 

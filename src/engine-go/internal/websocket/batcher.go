@@ -9,27 +9,27 @@ import (
 
 // Message represents a WebSocket message to be batched
 type Message struct {
-	Event   string                 `json:"event"`
-	Data    map[string]interface{} `json:"data"`
-	Room    string                 `json:"room,omitempty"`
-	SentAt  time.Time              `json:"sent_at"`
+	Event  string                 `json:"event"`
+	Data   map[string]interface{} `json:"data"`
+	Room   string                 `json:"room,omitempty"`
+	SentAt time.Time              `json:"sent_at"`
 }
 
 // Batch represents a collection of messages to be sent together
 type Batch struct {
-	Event    string                 `json:"event"`
-	Messages []Message             `json:"messages"`
-	Count    int                   `json:"count"`
-	SentAt   time.Time             `json:"sent_at"`
-	Room     string                 `json:"room,omitempty"`
+	Event    string    `json:"event"`
+	Messages []Message `json:"messages"`
+	Count    int       `json:"count"`
+	SentAt   time.Time `json:"sent_at"`
+	Room     string    `json:"room,omitempty"`
 }
 
 // BatcherConfig holds configuration for the WebSocket batcher
 type BatcherConfig struct {
-	BatchInterval    time.Duration // Time to wait before flushing a batch
-	MaxBatchSize     int           // Maximum messages per batch
-	MaxQueueSize     int           // Maximum messages in queue before dropping
-	FlushOnShutdown  bool          // Whether to flush all batches on shutdown
+	BatchInterval   time.Duration // Time to wait before flushing a batch
+	MaxBatchSize    int           // Maximum messages per batch
+	MaxQueueSize    int           // Maximum messages in queue before dropping
+	FlushOnShutdown bool          // Whether to flush all batches on shutdown
 }
 
 // DefaultBatcherConfig returns sensible defaults
@@ -44,14 +44,14 @@ func DefaultBatcherConfig() BatcherConfig {
 
 // WebSocketBatcher batches WebSocket messages to reduce network overhead
 type WebSocketBatcher struct {
-	config      BatcherConfig
-	batches     map[string][]Message // event -> messages
-	timers      map[string]*time.Timer
-	mu          sync.RWMutex
-	emitter     MessageEmitter
-	running     bool
-	stopChan    chan struct{}
-	wg          sync.WaitGroup
+	config       BatcherConfig
+	batches      map[string][]Message // event -> messages
+	timers       map[string]*time.Timer
+	mu           sync.RWMutex
+	emitter      MessageEmitter
+	running      bool
+	stopChan     chan struct{}
+	wg           sync.WaitGroup
 	droppedCount int64
 	sentCount    int64
 }
@@ -69,11 +69,11 @@ func NewWebSocketBatcher(emitter MessageEmitter, config BatcherConfig) *WebSocke
 	}
 
 	return &WebSocketBatcher{
-		config:  config,
-		batches: make(map[string][]Message),
-		timers:  make(map[string]*time.Timer),
-		emitter: emitter,
-		running: true,
+		config:   config,
+		batches:  make(map[string][]Message),
+		timers:   make(map[string]*time.Timer),
+		emitter:  emitter,
+		running:  true,
 		stopChan: make(chan struct{}),
 	}
 }
@@ -259,7 +259,7 @@ func NewMockEmitter() *MockEmitter {
 func (me *MockEmitter) Emit(event string, data interface{}) error {
 	me.mu.Lock()
 	defer me.mu.Unlock()
-	
+
 	msg := map[string]interface{}{
 		"event": event,
 		"data":  data,
@@ -271,7 +271,7 @@ func (me *MockEmitter) Emit(event string, data interface{}) error {
 func (me *MockEmitter) EmitToRoom(event string, room string, data interface{}) error {
 	me.mu.Lock()
 	defer me.mu.Unlock()
-	
+
 	msg := map[string]interface{}{
 		"event": event,
 		"room":  room,
@@ -284,7 +284,7 @@ func (me *MockEmitter) EmitToRoom(event string, room string, data interface{}) e
 func (me *MockEmitter) GetMessages() []map[string]interface{} {
 	me.mu.Lock()
 	defer me.mu.Unlock()
-	
+
 	result := make([]map[string]interface{}, len(me.messages))
 	copy(result, me.messages)
 	return result

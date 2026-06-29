@@ -4,15 +4,11 @@ Provides async interface to the Go RAG search HTTP server
 """
 
 import asyncio
-import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from reaper.web.go_bridge_base import (
     BaseGoBridge,
-    GoBridgeConfig,
-    GoBridgeConnectionError,
-    GoBridgeTimeoutError,
-    create_bridge_client
+    create_bridge_client,
 )
 
 
@@ -21,17 +17,13 @@ class RAGBridge(BaseGoBridge):
     Async client for Go RAG search engine.
     Provides high-performance vector and hybrid search capabilities.
     """
-    
+
     def __init__(
-        self,
-        host: str = "localhost",
-        port: int = 7074,
-        timeout: float = 30.0,
-        enabled: bool = True
+        self, host: str = "localhost", port: int = 7074, timeout: float = 30.0, enabled: bool = True
     ):
         """
         Initialize RAG bridge client.
-        
+
         Args:
             host: Go RAG server host
             port: Go RAG server port (default 7074)
@@ -39,39 +31,37 @@ class RAGBridge(BaseGoBridge):
             enabled: Whether the bridge is enabled
         """
         super().__init__(host, port, timeout, enabled)
-    
-    async def index_documents(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+    async def index_documents(self, documents: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Index documents in the Go RAG engine.
-        
+
         Args:
             documents: List of document dictionaries with text, vectors, and metadata
-            
+
         Returns:
             Indexing result with document counts
         """
         return await self._make_request(
-            "POST",
-            "/api/rag/index",
-            json_data={"documents": documents}
+            "POST", "/api/rag/index", json_data={"documents": documents}
         )
-    
+
     async def search(
         self,
         query: str,
-        query_vector: Optional[List[float]] = None,
+        query_vector: list[float] | None = None,
         top_k: int = 10,
-        file_filter: Optional[str] = None,
-        file_type_filter: Optional[str] = None,
+        file_filter: str | None = None,
+        file_type_filter: str | None = None,
         lambda_param: float = 0.6,
         rrf_constant: int = 60,
         enable_bm25: bool = True,
         enable_dense: bool = True,
-        enable_mmr: bool = False
-    ) -> Dict[str, Any]:
+        enable_mmr: bool = False,
+    ) -> dict[str, Any]:
         """
         Perform hybrid search in the Go RAG engine.
-        
+
         Args:
             query: Search query text
             query_vector: Optional pre-computed query vector
@@ -83,7 +73,7 @@ class RAGBridge(BaseGoBridge):
             enable_bm25: Enable BM25 sparse search
             enable_dense: Enable dense vector search
             enable_mmr: Enable MMR diversification
-            
+
         Returns:
             Search results with documents and scores
         """
@@ -100,124 +90,98 @@ class RAGBridge(BaseGoBridge):
                 "rrf_constant": rrf_constant,
                 "enable_bm25": enable_bm25,
                 "enable_dense": enable_dense,
-                "enable_mmr": enable_mmr
-            }
+                "enable_mmr": enable_mmr,
+            },
         )
-    
-    async def dense_search(
-        self,
-        query_vector: List[float],
-        top_k: int = 10
-    ) -> Dict[str, Any]:
+
+    async def dense_search(self, query_vector: list[float], top_k: int = 10) -> dict[str, Any]:
         """
         Perform dense vector search only.
-        
+
         Args:
             query_vector: Query vector
             top_k: Number of results to return
-            
+
         Returns:
             Dense search results
         """
         return await self._make_request(
-            "POST",
-            "/api/rag/dense",
-            json_data={
-                "query_vector": query_vector,
-                "top_k": top_k
-            }
+            "POST", "/api/rag/dense", json_data={"query_vector": query_vector, "top_k": top_k}
         )
-    
-    async def sparse_search(
-        self,
-        query: str,
-        top_k: int = 10
-    ) -> Dict[str, Any]:
+
+    async def sparse_search(self, query: str, top_k: int = 10) -> dict[str, Any]:
         """
         Perform BM25 sparse search only.
-        
+
         Args:
             query: Search query text
             top_k: Number of results to return
-            
+
         Returns:
             Sparse search results
         """
         return await self._make_request(
-            "POST",
-            "/api/rag/sparse",
-            json_data={
-                "query": query,
-                "top_k": top_k
-            }
+            "POST", "/api/rag/sparse", json_data={"query": query, "top_k": top_k}
         )
-    
-    async def clear_index(self) -> Dict[str, Any]:
+
+    async def clear_index(self) -> dict[str, Any]:
         """
         Clear all indexed documents.
-        
+
         Returns:
             Clear operation result
         """
         return await self._make_request("POST", "/api/rag/clear")
-    
-    async def get_statistics(self) -> Dict[str, Any]:
+
+    async def get_statistics(self) -> dict[str, Any]:
         """
         Get RAG engine statistics.
-        
+
         Returns:
             Engine statistics including document counts and index info
         """
         return await self._make_request("GET", "/api/rag/stats")
-    
-    async def expand_query(self, query: str) -> Dict[str, Any]:
+
+    async def expand_query(self, query: str) -> dict[str, Any]:
         """
         Expand query with domain-specific synonyms.
-        
+
         Args:
             query: Original query
-            
+
         Returns:
             Expanded query variants
         """
-        return await self._make_request(
-            "POST",
-            "/api/rag/expand",
-            json_data={"query": query}
-        )
+        return await self._make_request("POST", "/api/rag/expand", json_data={"query": query})
 
 
 def create_rag_bridge(**kwargs) -> RAGBridge:
     """
     Factory function to create RAG bridge with standardized configuration.
-    
+
     Args:
         **kwargs: Additional constructor arguments
-        
+
     Returns:
         Configured RAG bridge instance
     """
-    return create_bridge_client(
-        RAGBridge,
-        "rag",
-        **kwargs
-    )
+    return create_bridge_client(RAGBridge, "rag", **kwargs)
 
 
 # Global singleton instance
-_global_rag_bridge: Optional[RAGBridge] = None
+_global_rag_bridge: RAGBridge | None = None
 _rag_bridge_lock = asyncio.Lock()
 
 
 async def get_rag_bridge() -> RAGBridge:
     """
     Get or create the global RAG bridge instance.
-    
+
     Returns:
         Global RAG bridge instance
     """
     global _global_rag_bridge
-    
+
     async with _rag_bridge_lock:
         if _global_rag_bridge is None:
             _global_rag_bridge = create_rag_bridge()
@@ -227,7 +191,7 @@ async def get_rag_bridge() -> RAGBridge:
 async def close_rag_bridge():
     """Close the global RAG bridge instance."""
     global _global_rag_bridge
-    
+
     async with _rag_bridge_lock:
         if _global_rag_bridge is not None:
             await _global_rag_bridge.close()

@@ -10,22 +10,22 @@ import (
 // RightsizingAgent implements Q-learning for workload rightsizing decisions
 type RightsizingAgent struct {
 	// Q-learning parameters
-	learningRate     float64
-	discountFactor   float64
-	explorationRate  float64
-	
+	learningRate    float64
+	discountFactor  float64
+	explorationRate float64
+
 	// Environment type
-	environmentType  string
-	
+	environmentType string
+
 	// Q-table: state -> action values
-	qTable           map[string][]float64
-	qTableMu         sync.RWMutex
-	
+	qTable   map[string][]float64
+	qTableMu sync.RWMutex
+
 	// Action space
-	actions          []string
-	
+	actions []string
+
 	// Risk thresholds based on environment
-	riskThresholds   map[string]float64
+	riskThresholds map[string]float64
 }
 
 // State represents the discretized state space
@@ -38,9 +38,9 @@ type State struct {
 
 // Action represents the possible actions
 const (
-	ActionStay = "stay"
-	ActionDownscale = "downscale"
-	ActionUpscale = "upscale"
+	ActionStay          = "stay"
+	ActionDownscale     = "downscale"
+	ActionUpscale       = "upscale"
 	ActionMigrateFamily = "migrate_family"
 )
 
@@ -55,7 +55,7 @@ func NewRightsizingAgent(environmentType string) *RightsizingAgent {
 		actions:         []string{ActionStay, ActionDownscale, ActionUpscale, ActionMigrateFamily},
 		riskThresholds:  make(map[string]float64),
 	}
-	
+
 	ra.setRiskThresholds()
 	return ra
 }
@@ -89,7 +89,7 @@ func (ra *RightsizingAgent) GetState(cpu, mem, iops, net float64) State {
 		}
 		return 2
 	}
-	
+
 	return State{
 		CPU:  discretize(cpu),
 		Mem:  discretize(mem),
@@ -100,26 +100,26 @@ func (ra *RightsizingAgent) GetState(cpu, mem, iops, net float64) State {
 
 // stateKey converts state to string key for Q-table lookup
 func (ra *RightsizingAgent) stateKey(state State) string {
-	return string(rune(state.CPU)) + "," + string(rune(state.Mem)) + "," + 
-	       string(rune(state.IOPS)) + "," + string(rune(state.Net))
+	return string(rune(state.CPU)) + "," + string(rune(state.Mem)) + "," +
+		string(rune(state.IOPS)) + "," + string(rune(state.Net))
 }
 
 // ChooseAction selects an action using epsilon-greedy policy
 func (ra *RightsizingAgent) ChooseAction(state State) int {
 	key := ra.stateKey(state)
-	
+
 	ra.qTableMu.Lock()
 	if _, exists := ra.qTable[key]; !exists {
 		ra.qTable[key] = make([]float64, len(ra.actions))
 	}
 	qValues := ra.qTable[key]
 	ra.qTableMu.Unlock()
-	
+
 	// Epsilon-greedy exploration
 	if rand.Float64() < ra.explorationRate {
 		return rand.Intn(len(ra.actions))
 	}
-	
+
 	// Choose best action
 	bestAction := 0
 	bestValue := qValues[0]
@@ -129,7 +129,7 @@ func (ra *RightsizingAgent) ChooseAction(state State) int {
 			bestAction = i
 		}
 	}
-	
+
 	return bestAction
 }
 
@@ -137,10 +137,10 @@ func (ra *RightsizingAgent) ChooseAction(state State) int {
 func (ra *RightsizingAgent) Learn(state State, action int, reward float64, nextState State) {
 	stateKey := ra.stateKey(state)
 	nextStateKey := ra.stateKey(nextState)
-	
+
 	ra.qTableMu.Lock()
 	defer ra.qTableMu.Unlock()
-	
+
 	// Initialize Q-values if needed
 	if _, exists := ra.qTable[stateKey]; !exists {
 		ra.qTable[stateKey] = make([]float64, len(ra.actions))
@@ -148,7 +148,7 @@ func (ra *RightsizingAgent) Learn(state State, action int, reward float64, nextS
 	if _, exists := ra.qTable[nextStateKey]; !exists {
 		ra.qTable[nextStateKey] = make([]float64, len(ra.actions))
 	}
-	
+
 	currentQ := ra.qTable[stateKey][action]
 	maxNextQ := 0.0
 	for _, value := range ra.qTable[nextStateKey] {
@@ -156,9 +156,9 @@ func (ra *RightsizingAgent) Learn(state State, action int, reward float64, nextS
 			maxNextQ = value
 		}
 	}
-	
+
 	// Q-learning update: Q(s,a) = Q(s,a) + α * (reward + γ * max(Q(s',a')) - Q(s,a))
-	newQ := currentQ + ra.learningRate * (reward + ra.discountFactor * maxNextQ - currentQ)
+	newQ := currentQ + ra.learningRate*(reward+ra.discountFactor*maxNextQ-currentQ)
 	ra.qTable[stateKey][action] = newQ
 }
 
@@ -169,7 +169,7 @@ func (ra *RightsizingAgent) EvaluateMigration(metrics map[string]float64, curren
 	if env == "" {
 		env = ra.environmentType
 	}
-	
+
 	// Set appropriate thresholds
 	thresholds := ra.riskThresholds
 	if env == "production" {
@@ -185,18 +185,18 @@ func (ra *RightsizingAgent) EvaluateMigration(metrics map[string]float64, curren
 			"low_utilization":    20.0,
 		}
 	}
-	
+
 	cpuUtil := metrics["cpu"]
 	memUtil := metrics["mem"]
 	iops := metrics["iops"]
 	net := metrics["net"]
-	
+
 	// Inference mode (exploit)
 	ra.explorationRate = 0.0
 	state := ra.GetState(cpuUtil, memUtil, iops, net)
 	actionIdx := ra.ChooseAction(state)
 	action := ra.actions[actionIdx]
-	
+
 	// Environment-aware risk assessment
 	riskProfile := "Low"
 	if action == ActionMigrateFamily {
@@ -214,13 +214,13 @@ func (ra *RightsizingAgent) EvaluateMigration(metrics map[string]float64, curren
 			riskProfile = "High"
 		}
 	}
-	
+
 	// Production safety override
 	if env == "production" && riskProfile == "High" {
 		action = ActionStay
 		riskProfile = "Low" // Override since we're staying
 	}
-	
+
 	return map[string]interface{}{
 		"recommended_action": action,
 		"risk_profile":       riskProfile,
@@ -234,7 +234,7 @@ func (ra *RightsizingAgent) EvaluateMigration(metrics map[string]float64, curren
 // BatchEvaluateMigration performs batch evaluation for multiple instances
 func (ra *RightsizingAgent) BatchEvaluateMigration(metricsList []map[string]float64, currentSKUs []string) []map[string]interface{} {
 	results := make([]map[string]interface{}, len(metricsList))
-	
+
 	var wg sync.WaitGroup
 	for i, metrics := range metricsList {
 		wg.Add(1)
@@ -243,7 +243,7 @@ func (ra *RightsizingAgent) BatchEvaluateMigration(metricsList []map[string]floa
 			results[idx] = ra.EvaluateMigration(m, sku, "")
 		}(i, metrics, currentSKUs[i])
 	}
-	
+
 	wg.Wait()
 	return results
 }

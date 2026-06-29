@@ -33,10 +33,10 @@ type HTTPResponse struct {
 
 // DetectRequest represents a single metric detection request
 type DetectRequest struct {
-	Timestamp  int64              `json:"timestamp"`
-	Value      float64            `json:"value"`
-	Labels     map[string]string  `json:"labels"`
-	MetricName string             `json:"metric_name"`
+	Timestamp  int64             `json:"timestamp"`
+	Value      float64           `json:"value"`
+	Labels     map[string]string `json:"labels"`
+	MetricName string            `json:"metric_name"`
 }
 
 // BatchDetectRequest represents a batch detection request
@@ -127,8 +127,8 @@ func RegisterAnomalyHandlers(mux *http.ServeMux) {
 		results := detector.DetectAnomaliesBatch(metrics)
 
 		sendJSONResponse(w, map[string]interface{}{
-			"results":     results,
-			"total_count": len(results),
+			"results":       results,
+			"total_count":   len(results),
 			"anomaly_count": countAnomalies(results),
 		})
 	})
@@ -200,7 +200,7 @@ func RegisterAnomalyHandlers(mux *http.ServeMux) {
 		}
 
 		sendJSONResponse(w, map[string]interface{}{
-			"threshold":  detector.threshold,
+			"threshold":   detector.threshold,
 			"window_size": detector.windowSize,
 		})
 	})
@@ -213,7 +213,7 @@ func RegisterAnomalyHandlers(mux *http.ServeMux) {
 		}
 
 		stats := detector.statisticalDetector.GetStatistics()
-		
+
 		// Add buffer statistics
 		detector.bufferMu.RLock()
 		totalMetrics := len(detector.metricBuffer)

@@ -61,11 +61,11 @@ func NewTaskManager(maxConcurrent int) *TaskManager {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &TaskManager{
 		maxConcurrent: maxConcurrent,
-		tasks:        make(map[string]*TaskResult),
-		taskQueue:    make(chan *Task, 1000),
-		runningTasks: make(map[string]context.CancelFunc),
-		ctx:          ctx,
-		cancel:       cancel,
+		tasks:         make(map[string]*TaskResult),
+		taskQueue:     make(chan *Task, 1000),
+		runningTasks:  make(map[string]context.CancelFunc),
+		ctx:           ctx,
+		cancel:        cancel,
 	}
 }
 
@@ -301,14 +301,14 @@ func (tm *TaskManager) GetStatistics() map[string]interface{} {
 	defer tm.mu.RUnlock()
 
 	stats := map[string]interface{}{
-		"total_tasks":     len(tm.tasks),
-		"pending":         0,
-		"running":         0,
-		"completed":       0,
-		"failed":          0,
-		"cancelled":       0,
-		"queue_size":      len(tm.taskQueue),
-		"max_concurrent":  tm.maxConcurrent,
+		"total_tasks":    len(tm.tasks),
+		"pending":        0,
+		"running":        0,
+		"completed":      0,
+		"failed":         0,
+		"cancelled":      0,
+		"queue_size":     len(tm.taskQueue),
+		"max_concurrent": tm.maxConcurrent,
 	}
 
 	for _, result := range tm.tasks {
