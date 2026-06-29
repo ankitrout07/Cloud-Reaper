@@ -12,11 +12,11 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from reaper.engine.core.calculator import RightsizingAgent
+from reaper.engine.core.logic import analyze_compute_telemetry
 from reaper.engine.core.scheduler import (
     FinOpsPipeline,
     WorkloadClassifier,
 )
-from reaper.engine.core.logic import analyze_compute_telemetry
 
 
 def test_workload_classification():

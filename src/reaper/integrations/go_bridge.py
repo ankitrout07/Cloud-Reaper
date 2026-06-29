@@ -40,14 +40,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-from reaper.integrations.go_bridge_base import (
-    BaseGoBridge,
-    GoBridgeConfig,
-    GoBridgeConnectionError,
-    GoBridgeTimeoutError,
-    create_bridge_client
-)
-
 _BRIDGE_PORT = int(os.getenv("REAPER_GO_BRIDGE_PORT", "7070"))
 _BRIDGE_BASE = f"http://127.0.0.1:{_BRIDGE_PORT}"
 _TIMEOUT = float(os.getenv("REAPER_GO_BRIDGE_TIMEOUT", "120"))
