@@ -2124,15 +2124,64 @@ async def update_spend_config(request: Request):
 
 @app.get("/api/metrics")
 async def get_dashboard_metrics(request: Request):
-    """Provides valid default metrics to satisfy the real-time telemetry canvases"""
-    return jsonify(
-        {
-            "status": "healthy",
-            "burn_rate_velocity": 0.00,
-            "efficiency_score": 94.2,
-            "telemetry_stream": [],
-        }
-    )
+    """Provides real metrics from cloud providers or returns empty structure if not configured"""
+    if is_first_run():
+        return jsonify(
+            {
+                "status": "unconfigured",
+                "message": "Cloud credentials not configured",
+                "burn_rate_velocity": 0.00,
+                "efficiency_score": 0.0,
+                "telemetry_stream": [],
+            }
+        )
+
+    try:
+        def _get_real_metrics():
+            c = AzureCollector()
+            # Fetch real metrics if available
+            try:
+                idle_vms = c.get_idle_vms(cpu_threshold=5.0)
+                vm_inventory = c.get_vm_inventory()
+                total_vms = len(vm_inventory) if vm_inventory else 0
+                idle_count = len(idle_vms) if idle_vms else 0
+
+                if total_vms > 0:
+                    efficiency_score = ((total_vms - idle_count) / total_vms) * 100
+                else:
+                    efficiency_score = 100.0
+
+                burn_data = c.get_burn_rate_forecast()
+                burn_rate = burn_data.get("burn_rate", 0.0)
+
+                return {
+                    "status": "healthy",
+                    "burn_rate_velocity": burn_rate,
+                    "efficiency_score": efficiency_score,
+                    "telemetry_stream": [],
+                }
+            except Exception as e:
+                print(f"[!] Error fetching real metrics: {e}")
+                return {
+                    "status": "error",
+                    "message": str(e),
+                    "burn_rate_velocity": 0.00,
+                    "efficiency_score": 0.0,
+                    "telemetry_stream": [],
+                }
+
+        metrics = await asyncio.to_thread(_get_real_metrics)
+        return jsonify(metrics)
+    except Exception as e:
+        return jsonify(
+            {
+                "status": "error",
+                "message": str(e),
+                "burn_rate_velocity": 0.00,
+                "efficiency_score": 0.0,
+                "telemetry_stream": [],
+            }
+        )
 
 
 # ========== FINANCIAL INTELLIGENCE API ENDPOINTS ==========

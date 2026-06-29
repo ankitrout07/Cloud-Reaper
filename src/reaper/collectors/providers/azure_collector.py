@@ -245,8 +245,8 @@ class AzureCollector:
                 )
 
                 # Get CPU utilization metrics for cost optimization insights
-                cpu_utilization = 50  # Default fallback
-                memory_utilization = 50  # Default fallback
+                cpu_utilization = None
+                memory_utilization = None
 
                 try:
                     resource_group = vm.id.split("/")[4] if len(vm.id.split("/")) > 4 else "unknown"
@@ -287,7 +287,7 @@ class AzureCollector:
                     "id": vm.id,
                     "tags": dict(vm.tags) if vm.tags else {},
                     "cost": round(estimated_cost, 2),
-                    "cpu_utilization": round(cpu_utilization, 2),
+                    "cpu_utilization": round(cpu_utilization, 2) if cpu_utilization is not None else None,
                     "memory_utilization": memory_utilization,
                 }
 
@@ -1150,20 +1150,6 @@ class AzureCollector:
         except Exception as e:
             print(f"[!] Error fetching cold storage candidates: {e}")
 
-        if not candidates:
-            # Authentic fallback examples representing real hot->cool tier optimization deltas
-            candidates = [
-                {
-                    "bucket": "reaperstatelogs",
-                    "size_gb": 2400,
-                    "monthly_savings": 24.00,
-                },
-                {
-                    "bucket": "auditbackupsprod",
-                    "size_gb": 5800,
-                    "monthly_savings": 58.00,
-                },
-            ]
         return candidates[:5]
 
     def get_modernization_candidates(self):
@@ -1647,14 +1633,12 @@ class AzureCollector:
             }
         except Exception as e:
             print(f"[!] Error in get_cost_vs_budget: {e}")
-            # Fallback to simulated data
-            fallback_spend = 3420.50
             return {
-                "cumulative_spend": fallback_spend,
-                "budget_pace": 114.02,
+                "cumulative_spend": [],
+                "budget_pace": [],
                 "daily_spend": [],
-                "burn_rate": fallback_spend / 30,
-                "forecast": fallback_spend,
+                "burn_rate": 0.0,
+                "forecast": 0.0,
             }
 
     def get_cost_vs_budget_chart(self) -> dict:

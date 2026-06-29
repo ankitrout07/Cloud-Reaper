@@ -5,7 +5,6 @@ from pathlib import Path
 # Set PYTHONPATH to include src directory
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from reaper.cli import run_reaper
 from reaper.engine.telemetry.metrics_cli import display_finops_performance_metrics
 
 
@@ -34,6 +33,8 @@ def main():
     if args.enhanced_pipeline:
         sys.argv.append("--enhanced-pipeline")  # Pass through to CLI
 
+    # Import run_reaper only when needed to avoid Azure dependency issues
+    from reaper.cli import run_reaper
     run_reaper()
 
 
