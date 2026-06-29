@@ -6,7 +6,7 @@ Provides async interface to the Go cost calculator HTTP server
 import asyncio
 from typing import Any
 
-from reaper.web.go_bridge_base import (
+from reaper.integrations.go_bridge_base import (
     BaseGoBridge,
     create_bridge_client,
 )

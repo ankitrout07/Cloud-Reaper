@@ -1,4 +1,4 @@
-# src/reaper/web/go_bridge.py
+# src/reaper/integrations/go_bridge.py
 #
 # Async Go Engine Bridge Client
 # ==============================
@@ -39,6 +39,14 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+
+from reaper.integrations.go_bridge_base import (
+    BaseGoBridge,
+    GoBridgeConfig,
+    GoBridgeConnectionError,
+    GoBridgeTimeoutError,
+    create_bridge_client
+)
 
 _BRIDGE_PORT = int(os.getenv("REAPER_GO_BRIDGE_PORT", "7070"))
 _BRIDGE_BASE = f"http://127.0.0.1:{_BRIDGE_PORT}"

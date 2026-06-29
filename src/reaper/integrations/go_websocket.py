@@ -6,7 +6,7 @@ Provides Python interface to the Go-based WebSocket batching system
 import asyncio
 from typing import Any
 
-from reaper.web.go_bridge_base import (
+from reaper.integrations.go_bridge_base import (
     BaseGoBridge,
     GoBridgeError,
     create_bridge_client,

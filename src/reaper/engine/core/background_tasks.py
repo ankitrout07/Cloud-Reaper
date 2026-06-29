@@ -16,9 +16,11 @@ from uuid import uuid4
 
 # Try to import Go task manager bridge for enhanced performance
 try:
-    from reaper.engine.core.go_task_manager import GoTaskManagerBridge, get_task_manager_bridge
-    from reaper.engine.core.go_task_manager import TaskStatus as GoTaskStatus
-
+    from reaper.integrations.go_task_manager import (
+        GoTaskManagerBridge,
+        get_task_manager_bridge,
+        TaskStatus as GoTaskStatus
+    )
     GO_TASK_MANAGER_AVAILABLE = True
 except ImportError:
     GO_TASK_MANAGER_AVAILABLE = False

@@ -15,8 +15,8 @@ from reaper.engine.core.calculator import RightsizingAgent
 from reaper.engine.core.scheduler import (
     FinOpsPipeline,
     WorkloadClassifier,
-    analyze_compute_telemetry,
 )
+from reaper.engine.core.logic import analyze_compute_telemetry
 
 
 def test_workload_classification():

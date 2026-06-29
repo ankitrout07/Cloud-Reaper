@@ -3,7 +3,9 @@ version: '3.8'
 services:
   # Main Python Application
   app:
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: cloud-reaper-app
     environment:
       # Database is now embedded SQLite (no Postgres connection string needed)

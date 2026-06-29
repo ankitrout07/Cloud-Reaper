@@ -142,8 +142,9 @@ Cloud-Reaper/
 ├── bootstrap.py                # Universal cross-platform one-click setup script
 ├── main.py                     # CLI entry point
 ├── Makefile                    # Developer shortcuts (install, build, test, lint, fmt)
-├── Dockerfile                  # Multi-stage Docker build (Go builder → Python runtime)
-├── docker-compose.yml          # Full-stack deployment (app + PostgreSQL)
+├── docker/
+│   ├── Dockerfile              # Multi-stage Docker build (Go builder → Python runtime)
+│   └── docker-compose.yml      # Full-stack deployment (app + PostgreSQL)
 ├── pyproject.toml              # Ruff, Mypy, Pytest configuration
 ├── requirements.txt            # Runtime dependencies (grouped by category)
 ├── requirements-dev.txt        # Dev/CI dependencies (Ruff, Mypy, Pytest, Bandit)
@@ -413,7 +414,7 @@ python main.py --pr-simulation [optional-plan-file.json]
 
 ```bash
 # Full-stack deployment: app + PostgreSQL
-docker compose up -d
+docker compose -f docker/docker-compose.yml up -d
 ```
 
 This launches:
@@ -425,7 +426,7 @@ Dashboard available at **http://localhost:5001**
 ### Standalone Docker Build
 
 ```bash
-docker build -t cloud-reaper:latest .
+docker build -t cloud-reaper:latest -f docker/Dockerfile .
 docker run -p 5001:5001 \
   -e DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/cloud_reaper \
   -e AZURE_SUBSCRIPTION_ID=your-sub-id \

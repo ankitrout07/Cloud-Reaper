@@ -32,7 +32,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 # Try to import Go WebSocket batcher for enhanced performance
 try:
-    from reaper.web.go_websocket import (
+    from reaper.integrations.go_websocket import (
         GoWebSocketBatcher,
         emit_cost_alert,
         emit_metric_update,
@@ -46,7 +46,7 @@ except ImportError:
 
 # Try to import Go rate limiter for enhanced performance
 try:
-    from reaper.web.go_ratelimiter import (
+    from reaper.integrations.go_ratelimiter import (
         GoRateLimiter,
         allow_ai_request,
         allow_aws_request,
@@ -97,7 +97,7 @@ from reaper.engine.models.resources import (
     VaultSettings,
     init_db,
 )
-from reaper.web.vault_crypto import (
+from reaper.security.vault_crypto import (
     derive_fernet_key,
     generate_salt,
     hash_passcode,
@@ -434,7 +434,7 @@ app.include_router(search_router)
 from reaper.web.metrics_router import telemetry_router
 
 app.include_router(telemetry_router)
-from reaper.web import go_bridge  # async Go engine bridge (non-blocking)
+from reaper.integrations import go_bridge  # async Go engine bridge (non-blocking)
 
 VAULT_UNLOCK_TTL_SEC = int(os.getenv("VAULT_UNLOCK_TTL_SEC", "3600"))
 thread = None
