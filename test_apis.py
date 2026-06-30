@@ -1,5 +1,6 @@
-import sys
 import logging
+import sys
+
 logging.basicConfig(level=logging.ERROR)
 
 # Setup path so it finds reaper
@@ -8,6 +9,7 @@ sys.path.insert(0, "./src")
 from reaper.collectors.prices.aws import AWSPriceClient
 from reaper.collectors.prices.azure import AzurePriceClient
 from reaper.collectors.prices.gcp import GCPPriceClient
+
 
 def test():
     print("Testing AWS...")
@@ -33,6 +35,7 @@ def test():
         print(f"GCP returned {len(prices)} prices. First: {prices[0] if prices else 'None'}")
     except Exception as e:
         print(f"GCP Failed: {e}")
+
 
 if __name__ == "__main__":
     test()

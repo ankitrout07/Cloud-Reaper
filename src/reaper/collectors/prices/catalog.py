@@ -25,6 +25,7 @@ _WARM_META: dict[str, dict[str, Any]] = {}
 @dataclass
 class CatalogQueryParams:
     """Parameters for querying the price catalog."""
+
     provider: str
     page: int = 1
     per_page: int = 50

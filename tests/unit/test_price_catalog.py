@@ -1,5 +1,9 @@
 from reaper.collectors.prices.azure import AZURE_RETAIL_SERVICE_NAMES
-from reaper.collectors.prices.catalog import CatalogQueryParams, normalize_price_record, query_catalog_prices
+from reaper.collectors.prices.catalog import (
+    CatalogQueryParams,
+    normalize_price_record,
+    query_catalog_prices,
+)
 
 
 def test_normalize_azure_api_record():

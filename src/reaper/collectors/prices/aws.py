@@ -47,7 +47,7 @@ class AWSPriceClient:
         for item in ec2_data:
             inst_type = item.get("instance_type", "")
             pricing = item.get("pricing", {})
-            
+
             # Extract specifications
             specs = {
                 "vcpu": item.get("vCPU"),
@@ -59,7 +59,7 @@ class AWSPriceClient:
                 "architecture": item.get("architecture"),
                 "instance_family": item.get("instance_family"),
             }
-            
+
             for region, reg_pricing in pricing.items():
                 ondemand = reg_pricing.get("linux", {}).get("ondemand")
                 if ondemand is not None:
@@ -74,7 +74,7 @@ class AWSPriceClient:
         for item in rds_data:
             inst_type = item.get("instance_type", "")
             pricing = item.get("pricing", {})
-            
+
             # Extract specifications
             specs = {
                 "vcpu": item.get("vCPU"),
@@ -83,13 +83,15 @@ class AWSPriceClient:
                 "storage_type": item.get("storage_type"),
                 "engine": item.get("engine"),
             }
-            
+
             for region, reg_pricing in pricing.items():
                 ondemand = reg_pricing.get("PostgreSQL", {}).get("ondemand") or reg_pricing.get(
                     "MySQL", {}
                 ).get("ondemand")
                 if ondemand is not None:
-                    prices.append(self._build_price(inst_type, "SQL Database", region, ondemand, specs))
+                    prices.append(
+                        self._build_price(inst_type, "SQL Database", region, ondemand, specs)
+                    )
         return prices
 
     def _fetch_elasticache_prices(self):
@@ -98,7 +100,7 @@ class AWSPriceClient:
         for item in cache_data:
             inst_type = item.get("instance_type", "")
             pricing = item.get("pricing", {})
-            
+
             # Extract specifications
             specs = {
                 "vcpu": item.get("vCPU"),
@@ -106,14 +108,16 @@ class AWSPriceClient:
                 "network_performance": item.get("network_performance"),
                 "cache_engine": item.get("cache_engine"),
             }
-            
+
             for region, reg_pricing in pricing.items():
                 ondemand = reg_pricing.get("Redis", {}).get("ondemand") or reg_pricing.get(
                     "Memcached", {}
                 ).get("ondemand")
                 if ondemand is not None:
                     prices.append(
-                        self._build_price(inst_type, "Azure Cache for Redis", region, ondemand, specs)
+                        self._build_price(
+                            inst_type, "Azure Cache for Redis", region, ondemand, specs
+                        )
                     )
         return prices
 
