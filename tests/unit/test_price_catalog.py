@@ -1,5 +1,5 @@
 from reaper.collectors.prices.azure import AZURE_RETAIL_SERVICE_NAMES
-from reaper.collectors.prices.catalog import normalize_price_record, query_catalog_prices
+from reaper.collectors.prices.catalog import CatalogQueryParams, normalize_price_record, query_catalog_prices
 
 
 def test_normalize_azure_api_record():
@@ -17,6 +17,7 @@ def test_normalize_azure_api_record():
     assert result["region"] == "eastus"
     assert result["service"] == "Virtual Machines"
     assert result["hourly_price"] == 0.367
+    assert "specifications" in result
 
 
 def test_normalize_aws_api_record():
@@ -26,11 +27,16 @@ def test_normalize_aws_api_record():
         "armRegionName": "us-east-1",
         "retailPrice": 0.0104,
         "unitOfMeasure": "1 Hour",
+        "vcpu": 2,
+        "memory": "8 GiB",
     }
     result = normalize_price_record(raw, "aws")
     assert result is not None
     assert result["sku"] == "t3.micro"
     assert result["price"] == 0.0104
+    assert "specifications" in result
+    assert result["specifications"]["vcpu"] == 2
+    assert result["specifications"]["memory"] == "8 GiB"
 
 
 def test_normalize_skips_error_entries():
@@ -50,6 +56,7 @@ def test_query_catalog_prices_pagination_shape():
             "monthly_price": 36.5,
             "description": "",
             "provider": "azure",
+            "specifications": {"vcpu": 2, "memory": "4 GB"},
         },
         {
             "sku": "Standard_D4s_v5",
@@ -62,6 +69,7 @@ def test_query_catalog_prices_pagination_shape():
             "monthly_price": 262.8,
             "description": "",
             "provider": "azure",
+            "specifications": {"vcpu": 4, "memory": "16 GB"},
         },
     ]
 
@@ -71,11 +79,14 @@ def test_query_catalog_prices_pagination_shape():
     catalog_module._WARM_STATUS["azure"] = "ready"
     catalog_module._WARM_META["azure"] = {"count": len(sample), "source": "test"}
 
-    result = query_catalog_prices("azure", page=1, per_page=1, search="", sort_by="sku-asc")
+    params = CatalogQueryParams(provider="azure", page=1, per_page=1, search="", sort_by="sku-asc")
+    result = query_catalog_prices(params)
     assert result["total"] == 2
     assert len(result["prices"]) == 1
     assert result["page"] == 1
     assert result["total_pages"] == 2
+    # Verify specifications are preserved in pagination
+    assert "specifications" in result["prices"][0]
 
 
 def test_azure_catalog_filters_use_exact_service_list(monkeypatch):
@@ -98,3 +109,25 @@ def test_azure_catalog_filters_use_exact_service_list(monkeypatch):
     filters = get_catalog_filters("azure")
     assert filters["services"] == AZURE_RETAIL_SERVICE_NAMES
     assert filters["regions"] == ["eastus"]
+
+
+def test_specifications_extraction():
+    """Test that specifications are properly extracted and included in normalized records."""
+    raw = {
+        "armSkuName": "Standard_D2s_v3",
+        "serviceName": "Virtual Machines",
+        "armRegionName": "eastus",
+        "retailPrice": 0.096,
+        "unitOfMeasure": "1 Hour",
+        "vcpu": 2,
+        "memory": "8 GB",
+        "series": "D",
+        "network_performance": "5 Gbps",
+    }
+    result = normalize_price_record(raw, "azure")
+    assert result is not None
+    assert "specifications" in result
+    assert result["specifications"]["vcpu"] == 2
+    assert result["specifications"]["memory"] == "8 GB"
+    assert result["specifications"]["series"] == "D"
+    assert result["specifications"]["network_performance"] == "5 Gbps"

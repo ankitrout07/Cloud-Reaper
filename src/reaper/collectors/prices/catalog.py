@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from dataclasses import dataclass
 from typing import Any
 
 from reaper.collectors.prices.aws import AWSPriceClient
@@ -19,6 +20,18 @@ _CACHE_LOCK = threading.Lock()
 _FETCH_LOCKS: dict[str, threading.Lock] = {}
 _WARM_STATUS: dict[str, str] = dict.fromkeys(PROVIDERS, "idle")
 _WARM_META: dict[str, dict[str, Any]] = {}
+
+
+@dataclass
+class CatalogQueryParams:
+    """Parameters for querying the price catalog."""
+    provider: str
+    page: int = 1
+    per_page: int = 50
+    search: str = ""
+    service: str = ""
+    region: str = ""
+    sort_by: str = "sku-asc"
 
 
 def normalize_price_record(raw: dict[str, Any], provider: str) -> dict[str, Any] | None:
@@ -57,6 +70,30 @@ def normalize_price_record(raw: dict[str, Any], provider: str) -> dict[str, Any]
 
     description = raw.get("description") or raw.get("productName") or raw.get("meterName") or ""
 
+    # Extract specifications if available
+    specifications = {
+        "vcpu": raw.get("vcpu"),
+        "memory": raw.get("memory"),
+        "gpu": raw.get("gpu"),
+        "network_performance": raw.get("network_performance"),
+        "physical_processor": raw.get("physical_processor"),
+        "clock_speed_ghz": raw.get("clock_speed_ghz"),
+        "architecture": raw.get("architecture"),
+        "instance_family": raw.get("instance_family"),
+        "series": raw.get("series"),
+        "guestAccelerators": raw.get("guestAccelerators"),
+        "machineType": raw.get("machineType"),
+        "cpuPlatform": raw.get("cpuPlatform"),
+        "storage_type": raw.get("storage_type"),
+        "engine": raw.get("engine"),
+        "cache_engine": raw.get("cache_engine"),
+        "accelerator_type": raw.get("accelerator_type"),
+        "tier": raw.get("tier"),
+        "type": raw.get("type"),
+        "productName": raw.get("productName"),
+        "meterName": raw.get("meterName"),
+    }
+
     return {
         "sku": sku,
         "name": sku,
@@ -68,6 +105,7 @@ def normalize_price_record(raw: dict[str, Any], provider: str) -> dict[str, Any]
         "monthly_price": hourly * 730,
         "description": description,
         "provider": provider,
+        "specifications": specifications,
     }
 
 
@@ -248,18 +286,9 @@ def lookup_price(provider: str, sku: str, region: str) -> float | None:
     return None
 
 
-def query_catalog_prices(
-    provider: str,
-    *,
-    page: int = 1,
-    per_page: int = 50,
-    search: str = "",
-    service: str = "",
-    region: str = "",
-    sort_by: str = "sku-asc",
-) -> dict[str, Any]:
+def query_catalog_prices(params: CatalogQueryParams) -> dict[str, Any]:
     """Return a paginated, optionally filtered slice of the cached catalog."""
-    provider = provider.lower()
+    provider = params.provider.lower()
     status = get_catalog_status(provider)
 
     if status["status"] == "warming" and status.get("count", 0) == 0:
@@ -268,8 +297,8 @@ def query_catalog_prices(
             return {
                 "prices": [],
                 "total": 0,
-                "page": page,
-                "per_page": per_page,
+                "page": params.page,
+                "per_page": params.per_page,
                 "total_pages": 0,
                 "catalog_status": "warming",
                 "source": status.get("source"),
@@ -277,8 +306,8 @@ def query_catalog_prices(
 
     prices = get_catalog_prices(provider)
 
-    if search:
-        term = search.lower()
+    if params.search:
+        term = params.search.lower()
         prices = [
             p
             for p in prices
@@ -288,30 +317,30 @@ def query_catalog_prices(
             or term in p.get("description", "").lower()
         ]
 
-    if service:
-        service_term = service.lower()
+    if params.service:
+        service_term = params.service.lower()
         prices = [p for p in prices if p["service"].lower() == service_term]
 
-    if region:
-        region_term = region.lower()
+    if params.region:
+        region_term = params.region.lower()
         prices = [p for p in prices if p["region"].lower() == region_term]
 
-    if sort_by == "price-asc":
+    if params.sort_by == "price-asc":
         prices.sort(key=lambda p: p["price"])
-    elif sort_by == "price-desc":
+    elif params.sort_by == "price-desc":
         prices.sort(key=lambda p: p["price"], reverse=True)
-    elif sort_by == "sku-desc":
+    elif params.sort_by == "sku-desc":
         prices.sort(key=lambda p: p["sku"].lower(), reverse=True)
-    elif sort_by == "region-asc":
+    elif params.sort_by == "region-asc":
         prices.sort(key=lambda p: p["region"].lower())
-    elif sort_by == "region-desc":
+    elif params.sort_by == "region-desc":
         prices.sort(key=lambda p: p["region"].lower(), reverse=True)
     else:
         prices.sort(key=lambda p: p["sku"].lower())
 
     total = len(prices)
-    page = max(1, page)
-    per_page = max(1, min(per_page, 100))
+    page = max(1, params.page)
+    per_page = max(1, min(params.per_page, 100))
     start = (page - 1) * per_page
     end = start + per_page
 

@@ -67,6 +67,7 @@ except Exception as e:
     print(f"[*] WeasyPrint could not be loaded: {e}")
 
 from reaper.collectors.prices.catalog import (
+    CatalogQueryParams,
     get_catalog_filters,
     get_catalog_status,
     query_catalog_prices,
@@ -4373,8 +4374,8 @@ async def get_prices(request: Request):
     sort_by = request.query_params.get("sort", "sku-asc")
 
     try:
-        result = query_catalog_prices(
-            provider,
+        params = CatalogQueryParams(
+            provider=provider,
             page=page,
             per_page=per_page,
             search=search,
@@ -4382,6 +4383,7 @@ async def get_prices(request: Request):
             region=region,
             sort_by=sort_by,
         )
+        result = query_catalog_prices(params)
         if result.get("catalog_status") == "warming":
             return JSONResponse(status_code=202, content={"status": "warming", **result})
         if not result["prices"] and result.get("catalog_status") == "error":

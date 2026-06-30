@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import requests
 
@@ -11,6 +12,7 @@ class GCPPriceClient:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self._compute_index: dict[tuple[str, str], float] | None = None
+        self._instance_specs: dict[str, dict[str, Any]] | None = None
 
     def get_live_prices(self):
         """
@@ -53,8 +55,28 @@ class GCPPriceClient:
             self._compute_index = index
         return self._compute_index
 
+    def _get_instance_specs(self) -> dict[str, dict[str, Any]]:
+        """Fetch and cache instance specifications from GCP pricing data."""
+        if self._instance_specs is None:
+            response = requests.get(self.URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            specs: dict[str, dict[str, Any]] = {}
+            for inst in data.get("instances", []):
+                name = inst.get("name", "")
+                specs[name] = {
+                    "vcpu": inst.get("vcpu"),
+                    "memory": inst.get("memory"),
+                    "guestAccelerators": inst.get("guestAccelerators"),
+                    "machineType": inst.get("machineType"),
+                    "cpuPlatform": inst.get("cpuPlatform"),
+                }
+            self._instance_specs = specs
+        return self._instance_specs
+
     def _fetch_compute_prices(self):
         index = self._get_compute_index()
+        specs = self._get_instance_specs()
         return [
             {
                 "armResourceName": sku,
@@ -63,6 +85,7 @@ class GCPPriceClient:
                 "armRegionName": region,
                 "retailPrice": price_val,
                 "unitOfMeasure": "1 Hour",
+                **specs.get(sku, {}),
             }
             for (sku, region), price_val in index.items()
         ]

@@ -1418,6 +1418,23 @@ function renderPrices() {
             ? (price.hourly_price || price.price || price.rate || 0)
             : (price.monthly_price || (price.price || price.rate || 0) * 730);
 
+        // Render specifications
+        const specs = price.specifications || {};
+        const specParts = [];
+        
+        if (specs.vcpu) specParts.push(`${specs.vcpu} vCPU`);
+        if (specs.memory) specParts.push(specs.memory);
+        if (specs.gpu) specParts.push(specs.gpu);
+        if (specs.network_performance) specParts.push(specs.network_performance);
+        if (specs.series) specParts.push(specs.series);
+        if (specs.architecture) specParts.push(specs.architecture);
+        if (specs.instance_family) specParts.push(specs.instance_family);
+        if (specs.machineType) specParts.push(specs.machineType);
+        if (specs.cpuPlatform) specParts.push(specs.cpuPlatform);
+        if (specs.tier) specParts.push(specs.tier);
+        
+        const specDisplay = specParts.length > 0 ? specParts.join(' • ') : 'N/A';
+
         return `
             <tr class="border-b border-white/5 hover:bg-white/5 transition">
                 <td class="p-4">
@@ -1427,6 +1444,9 @@ function renderPrices() {
                 <td class="p-4 text-slate-300 text-sm">${price.service || 'Compute'}</td>
                 <td class="p-4">
                     <span class="px-2 py-1 bg-cyan-500/10 text-cyan-400 text-xs rounded border border-cyan-500/20">${price.region || 'Unknown'}</span>
+                </td>
+                <td class="p-4">
+                    <div class="text-slate-300 text-xs">${specDisplay}</div>
                 </td>
                 <td class="p-4">
                     <span class="text-white font-mono text-sm metric-value">$${Number(priceValue).toFixed(4)}</span>
@@ -1450,7 +1470,7 @@ function renderNoPrices() {
     if (tbody) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" class="p-12 text-center">
+                <td colspan="6" class="p-12 text-center">
                     <div class="flex flex-col items-center gap-4">
                         <i class="fas fa-search text-4xl text-slate-600"></i>
                         <p class="text-slate-500 font-bold">No matching SKUs found</p>
@@ -1468,7 +1488,7 @@ function renderWarming() {
     if (tbody) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" class="p-12 text-center">
+                <td colspan="6" class="p-12 text-center">
                     <div class="flex flex-col items-center gap-4">
                         <div class="w-8 h-8 border-4 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin"></div>
                         <p class="text-[var(--text-muted)] font-bold">Syncing live catalog from cloud API...</p>
@@ -1486,7 +1506,7 @@ function renderError(message = 'Failed to load live price catalog') {
     if (tbody) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" class="p-12 text-center">
+                <td colspan="6" class="p-12 text-center">
                     <div class="flex flex-col items-center gap-4">
                         <i class="fas fa-exclamation-triangle text-4xl text-rose-400"></i>
                         <p class="text-rose-400 font-bold">${message}</p>
