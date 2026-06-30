@@ -177,7 +177,7 @@ class AzurePriceClient:
                 try:
                     series_letter = match.group(1)
                     vcpu_num = int(match.group(2))
-                    
+
                     # Only use this pattern if it doesn't incorrectly match version numbers
                     # Patterns with "_v" are safe (has_version=True)
                     # Patterns without "_v" need to check they're not matching version suffixes
@@ -256,22 +256,23 @@ class AzurePriceClient:
 
         # Extract series from SKU name
         import re
+
         series_match = re.search(r"Standard_([A-Za-z]+)", sku_name)
         if not series_match:
             return None
 
         series = series_match.group(1)
-        
+
         # Find matching series ratio
         ratio = None
         for series_prefix, series_ratio in series_ratios.items():
             if series.startswith(series_prefix):
                 ratio = series_ratio
                 break
-        
+
         if ratio:
             return vcpu * ratio
-        
+
         return None
 
     def get_prices_by_service(self, service_name, max_pages=None):
