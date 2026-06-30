@@ -12,12 +12,28 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    position: relative;
+    overflow-x: hidden;
+}
+
+.welcome-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 400px;
+    background: radial-gradient(ellipse at top, rgba(6, 182, 212, 0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
 }
 
 .hero-section {
     background: linear-gradient(180deg, rgba(31, 41, 55, 0.3) 0%, transparent 100%);
     border-bottom: 1px solid rgba(55, 65, 81, 0.3);
     padding: 40px 32px;
+    position: relative;
+    z-index: 1;
 }
 
 .action-card {
@@ -29,6 +45,22 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.2) inset;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
+}
+
+.action-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.03), transparent);
+    transition: left 0.6s ease;
+    pointer-events: none;
+}
+
+.action-card:hover::before {
+    left: 100%;
 }
 
 .action-card:hover {
@@ -50,7 +82,7 @@
     letter-spacing: 0.1em;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05) inset, 0 0 20px rgba(6, 182, 212, 0.1);
     overflow: hidden;
 }
 
@@ -71,7 +103,7 @@
 
 .scan-button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08) inset, 0 0 30px rgba(6, 182, 212, 0.2);
     background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
 }
 
@@ -105,12 +137,31 @@
     background: rgba(23, 29, 36, 0.6);
     border: 1px solid rgba(55, 65, 81, 0.3);
     transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #6b7280, #9ca3af, #6b7280);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.stat-card:hover::before {
+    opacity: 1;
 }
 
 .stat-card:hover {
     border-color: rgba(107, 114, 128, 0.4);
     transform: translateY(-2px);
     background: rgba(31, 41, 55, 0.6);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .stat-value {
@@ -122,6 +173,8 @@
     background-clip: text;
     letter-spacing: -0.02em;
     line-height: 1;
+    position: relative;
+    z-index: 1;
 }
 
 .stat-label {
@@ -138,6 +191,7 @@
     background: rgba(23, 29, 36, 0.6);
     border: 1px solid rgba(55, 65, 81, 0.3);
     overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .module-table thead {
@@ -152,12 +206,24 @@
     color: #9ca3af;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    position: relative;
+}
+
+.module-table th::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.3), transparent);
 }
 
 .module-table td {
     padding: 18px 24px;
     border-bottom: 1px solid rgba(55, 65, 81, 0.2);
     color: #e5e7eb;
+    transition: all 0.2s ease;
 }
 
 .module-table tr:hover td {
@@ -171,6 +237,7 @@
     background: rgba(31, 41, 55, 0.5);
     border-radius: 12px;
     border: 1px solid rgba(55, 65, 81, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .filter-tab {
@@ -185,6 +252,24 @@
     letter-spacing: 0.05em;
     cursor: pointer;
     transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.filter-tab::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(59, 130, 246, 0.1));
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.filter-tab:hover::before {
+    opacity: 1;
 }
 
 .filter-tab:hover {
@@ -195,6 +280,7 @@
 .filter-tab.active {
     background: rgba(75, 85, 99, 0.4);
     color: #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .search-input {
@@ -207,12 +293,13 @@
     color: #e5e7eb;
     font-size: 14px;
     transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .search-input:focus {
     outline: none;
-    border-color: rgba(107, 114, 128, 0.5);
-    box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.1);
+    border-color: rgba(6, 182, 212, 0.5);
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1), 0 4px 16px rgba(0, 0, 0, 0.2);
     background: rgba(31, 41, 55, 0.8);
 }
 
@@ -257,9 +344,272 @@
     color: #fca5a5;
     border: 1px solid rgba(239, 68, 68, 0.3);
 }
+
+/* Enhanced Animations */
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes glow {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(6, 182, 212, 0.1);
+    }
+    50% {
+        box-shadow: 0 0 30px rgba(6, 182, 212, 0.2);
+    }
+}
+
+@keyframes shimmer-slow {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
+.floating-element {
+    animation: float 6s ease-in-out infinite;
+}
+
+.glowing-element {
+    animation: glow 3s ease-in-out infinite;
+}
+
+/* Particle effect for background */
+.particle-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+}
+
+.particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: rgba(6, 182, 212, 0.3);
+    border-radius: 50%;
+    animation: float 8s ease-in-out infinite;
+}
+
+.particle:nth-child(1) { top: 20%; left: 10%; animation-delay: 0s; }
+.particle:nth-child(2) { top: 60%; left: 20%; animation-delay: 1s; }
+.particle:nth-child(3) { top: 40%; left: 70%; animation-delay: 2s; }
+.particle:nth-child(4) { top: 80%; left: 80%; animation-delay: 3s; }
+.particle:nth-child(5) { top: 30%; left: 50%; animation-delay: 4s; }
+
+/* Enhanced avatar */
+.avatar-glow {
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.3), 0 0 40px rgba(6, 182, 212, 0.1);
+    animation: glow 4s ease-in-out infinite;
+}
+
+/* Improved button hover effects */
+.btn-shine {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-shine::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+        to right,
+        transparent,
+        rgba(255, 255, 255, 0.1),
+        transparent
+    );
+    transform: rotate(45deg);
+    transition: all 0.5s ease;
+    opacity: 0;
+}
+
+.btn-shine:hover::after {
+    animation: shine 0.75s ease;
+    opacity: 1;
+}
+
+@keyframes shine {
+    0% {
+        left: -50%;
+        top: -50%;
+    }
+    100% {
+        left: 150%;
+        top: 150%;
+    }
+}
+
+/* Enhanced table row animation */
+.table-row-animate {
+    animation: slideIn 0.3s ease forwards;
+    opacity: 0;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Improved status indicators */
+.status-indicator {
+    position: relative;
+}
+
+.status-indicator::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    animation: pulse-ring 2s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+}
+
+/* Enhanced card hover effect */
+.card-3d {
+    transform-style: preserve-3d;
+    perspective: 1000px;
+}
+
+.card-3d:hover {
+    transform: rotateX(2deg) rotateY(2deg);
+}
+
+/* Responsive Improvements */
+@media (max-width: 1024px) {
+    .particle-container {
+        display: none;
+    }
+
+    .stat-card {
+        padding: 20px;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+    }
+
+    .action-card {
+        padding: 24px;
+    }
+
+    .scan-button {
+        padding: 14px 32px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 768px) {
+    .hero-section {
+        padding: 24px 16px;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .filter-tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+        padding: 4px;
+    }
+
+    .filter-tab {
+        padding: 10px 16px;
+        font-size: 11px;
+    }
+
+    .module-table {
+        border-radius: 12px;
+    }
+
+    .module-table th,
+    .module-table td {
+        padding: 12px 16px;
+        font-size: 13px;
+    }
+
+    .search-input {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-card {
+        padding: 16px;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+    }
+
+    .action-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .scan-button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .module-table {
+        font-size: 12px;
+    }
+
+    .module-table th,
+    .module-table td {
+        padding: 10px 12px;
+    }
+}
 </style>
 
 <main class="welcome-container flex-1">
+    <!-- Particle Background -->
+    <div class="particle-container">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+
     <!-- Professional Hero Section -->
     <div class="hero-section">
         <div class="max-w-7xl mx-auto">
@@ -290,7 +640,7 @@
 
             <!-- Welcome Message -->
             <div class="flex items-center gap-6 mb-12">
-                <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-gray-600 to-gray-700 flex items-center justify-center text-2xl font-black text-white shadow-xl shadow-gray-500/30">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-gray-600 to-gray-700 flex items-center justify-center text-2xl font-black text-white shadow-xl shadow-gray-500/30 avatar-glow">
                     {{ user_name[0] if user_name else 'A' }}
                 </div>
                 <div>
@@ -307,19 +657,19 @@
 
             <!-- Stats Overview -->
             <div class="stats-grid mb-12">
-                <div class="stat-card">
+                <div class="stat-card floating-element" style="animation-delay: 0s;">
                     <div class="stat-value" id="savings-val">$0.00</div>
                     <div class="stat-label">Monthly Savings</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card floating-element" style="animation-delay: 0.5s;">
                     <div class="stat-value" id="vm-count">0</div>
                     <div class="stat-label">Active Resources</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card floating-element" style="animation-delay: 1s;">
                     <div class="stat-value" id="disk-count">0</div>
                     <div class="stat-label">Zombie Resources</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card floating-element" style="animation-delay: 1.5s;">
                     <div class="stat-value">94.2%</div>
                     <div class="stat-label">Efficiency Score</div>
                 </div>
@@ -352,7 +702,7 @@
                         <button onclick="runScan()" id="refreshBtn" class="w-14 h-14 rounded-xl bg-gray-700/50 border border-gray-600 hover:border-gray-500 flex items-center justify-center transition group">
                             <i id="refreshIcon" class="fas fa-sync-alt w-6 h-6 text-gray-400 group-hover:text-gray-300 transition-transform duration-500"></i>
                         </button>
-                        <button onclick="runScan()" id="scanBtn" class="scan-button flex items-center gap-3">
+                        <button onclick="runScan()" id="scanBtn" class="scan-button btn-shine flex items-center gap-3">
                             <i class="fas fa-radar text-xl"></i>
                             <span>Initiate Global Scan</span>
                         </button>
@@ -482,10 +832,10 @@ document.addEventListener('DOMContentLoaded', function() {
         scanBtn.addEventListener('click', function() {
             const btn = this;
             if (btn.classList.contains('scanning')) return;
-            
+
             btn.classList.add('scanning');
-            btn.innerHTML = '<i class="fas fa-spinner"></i> <span>Scanning...</span>';
-            
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Scanning...</span>';
+
             setTimeout(() => {
                 btn.classList.remove('scanning');
                 btn.innerHTML = '<i class="fas fa-radar text-xl"></i> <span>Initiate Global Scan</span>';
@@ -493,12 +843,68 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Tab functionality
+    // Tab functionality with enhanced animation
     document.querySelectorAll('.filter-tab').forEach(tab => {
         tab.addEventListener('click', function() {
-            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.filter-tab').forEach(t => {
+                t.classList.remove('active');
+                t.style.transform = 'scale(1)';
+            });
             this.classList.add('active');
+            this.style.transform = 'scale(1.05)';
+            setTimeout(() => {
+                this.style.transform = 'scale(1)';
+            }, 150);
         });
+    });
+
+    // Enhanced particle animation
+    const particles = document.querySelectorAll('.particle');
+    particles.forEach((particle, index) => {
+        particle.style.animationDelay = `${index * 0.5}s`;
+    });
+
+    // Check if device is touch-enabled
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+    // Mouse parallax effect on stat cards (only on non-touch devices)
+    if (!isTouchDevice) {
+        document.querySelectorAll('.stat-card').forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const rotateX = (y - centerY) / 20;
+                const rotateY = (centerX - x) / 20;
+
+                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-2px)`;
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateY(0)';
+            });
+        });
+    }
+
+    // Enhanced table row animations
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('table-row-animate');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll('#target-list tr, #zombie-list tr').forEach(row => {
+        observer.observe(row);
     });
 });
 </script>

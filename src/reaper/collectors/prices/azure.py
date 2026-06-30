@@ -142,29 +142,137 @@ class AzurePriceClient:
         if not sku_name:
             return specs
 
+        import re
+
         # Try to extract series/family from SKU name
         # Examples: Standard_D2s_v3, Standard_E4-2ds_v4, Basic_A0
         parts = sku_name.split("_")
         if len(parts) >= 2:
             series = parts[1] if len(parts) > 1 else None
             if series:
-                specs["series"] = series
+                # Extract just the series letter(s) without numbers
+                # D2s -> D, NC6s -> NC, E8-4ds -> E
+                series_match = re.match(r"([A-Za-z]+)", series)
+                if series_match:
+                    specs["series"] = series_match.group(1)
 
-        # Try to extract CPU/memory from meter name (often contains vCPU count)
-        if meter_name:
+        # Extract vCPU and series from SKU name patterns
+        # Standard_D2s_v3 -> series=D, vcpu=2
+        # Standard_E8-4ds_v4 -> series=E, vcpu=8
+        # Standard_B2s -> series=B, vcpu=2
+        # Standard_NC6s_v3 -> series=NC, vcpu=6
+        # Standard_NP96s -> series=NP, vcpu=96
+        # Standard_D14 -> series=D, vcpu=14
+        vcpu_patterns = [
+            (r"_([A-Za-z]*)(\d+)[A-Za-z]*_v\d+", True),  # Standard_D2s_v3 -> D, 2
+            (r"_([A-Za-z]*)(\d+)-\d+[A-Za-z]*_v\d+", True),  # Standard_E8-4ds_v4 -> E, 8
+            (r"_([A-Za-z]*)(\d+)[A-Za-z]*$", False),  # Standard_B2s -> B, 2 (no version)
+            (r"_([A-Za-z]*)(\d+)-\d+[A-Za-z]*$", False),  # Standard_E4-2as -> E, 4 (no version)
+            (r"_([A-Za-z]*)(\d+)$", False),  # Standard_D14 -> D, 14 (no version)
+        ]
+
+        for pattern, has_version in vcpu_patterns:
+            match = re.search(pattern, sku_name)
+            if match and match.lastindex >= 2:
+                try:
+                    series_letter = match.group(1)
+                    vcpu_num = int(match.group(2))
+                    
+                    # Only use this pattern if it doesn't incorrectly match version numbers
+                    # Patterns with "_v" are safe (has_version=True)
+                    # Patterns without "_v" need to check they're not matching version suffixes
+                    if has_version or not series_letter.startswith("v"):
+                        specs["vcpu"] = vcpu_num
+                        # Don't override series if already set
+                        if series_letter and not specs["series"]:
+                            specs["series"] = series_letter
+                        break
+                except (ValueError, IndexError):
+                    continue
+
+        # Extract memory based on vCPU count and series
+        # Azure VM series have typical memory-to-vCPU ratios
+        if specs["vcpu"]:
+            memory_gb = self._estimate_memory_from_sku(sku_name, specs["vcpu"])
+            if memory_gb:
+                specs["memory"] = f"{memory_gb} GB"
+
+        # Try to extract CPU/memory from meter name as fallback
+        if meter_name and (not specs["vcpu"] or not specs["memory"]):
             # Look for patterns like "2 vCPU", "4 vCPU", "8 vCPU"
-            import re
-
             vcpu_match = re.search(r"(\d+)\s*vCPU", meter_name, re.IGNORECASE)
-            if vcpu_match:
+            if vcpu_match and not specs["vcpu"]:
                 specs["vcpu"] = int(vcpu_match.group(1))
 
             # Look for memory patterns like "8 GB", "16 GB", "32 GB"
             memory_match = re.search(r"(\d+)\s*GB", meter_name, re.IGNORECASE)
-            if memory_match:
+            if memory_match and not specs["memory"]:
                 specs["memory"] = f"{memory_match.group(1)} GB"
 
         return specs
+
+    def _estimate_memory_from_sku(self, sku_name: str, vcpu: int) -> int | None:
+        """Estimate memory in GB based on SKU series and vCPU count."""
+        # Memory ratios for common Azure VM series (GB per vCPU)
+        series_ratios = {
+            # A series
+            "A": 2,
+            "B": 2,
+            # D series (general purpose)
+            "D": 4,
+            "Ds": 4,
+            "Dv": 4,
+            "Dsv": 4,
+            # E series (memory optimized)
+            "E": 8,
+            "Es": 8,
+            "Ev": 8,
+            "Esv": 8,
+            # F series (compute optimized)
+            "F": 2,
+            "Fs": 2,
+            # G series (memory optimized)
+            "G": 8,
+            "Gs": 8,
+            # H series (high performance compute)
+            "H": 8,
+            "Hs": 8,
+            # L series (storage optimized)
+            "L": 8,
+            "Ls": 8,
+            # M series (memory optimized)
+            "M": 16,
+            "Ms": 16,
+            # N series (GPU)
+            "N": 8,
+            "Ns": 8,
+            # P series (GPU)
+            "P": 8,
+            "Ps": 8,
+            # V series (memory optimized)
+            "V": 8,
+            "Vs": 8,
+        }
+
+        # Extract series from SKU name
+        import re
+        series_match = re.search(r"Standard_([A-Za-z]+)", sku_name)
+        if not series_match:
+            return None
+
+        series = series_match.group(1)
+        
+        # Find matching series ratio
+        ratio = None
+        for series_prefix, series_ratio in series_ratios.items():
+            if series.startswith(series_prefix):
+                ratio = series_ratio
+                break
+        
+        if ratio:
+            return vcpu * ratio
+        
+        return None
 
     def get_prices_by_service(self, service_name, max_pages=None):
         filter_query = f"serviceName eq '{service_name}' and priceType eq 'Consumption'"

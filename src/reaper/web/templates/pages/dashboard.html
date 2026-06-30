@@ -20,6 +20,20 @@ body {
 .dashboard-container {
     background: linear-gradient(180deg, #0a0e17 0%, #111827 50%, #0a0e17 100%);
     min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+}
+
+.dashboard-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 500px;
+    background: radial-gradient(ellipse at top, rgba(6, 182, 212, 0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
 }
 
 .dashboard-header {
@@ -27,6 +41,9 @@ body {
     backdrop-filter: blur(24px);
     border-bottom: 1px solid rgba(55, 65, 81, 0.3);
     padding: 24px 32px;
+    position: relative;
+    z-index: 10;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .dashboard-module {
@@ -38,11 +55,29 @@ body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.2) inset;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
+    z-index: 1;
+}
+
+.dashboard-module::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.02), transparent);
+    transition: left 0.6s ease;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.dashboard-module:hover::before {
+    left: 100%;
 }
 
 .dashboard-module:hover {
     border-color: rgba(107, 114, 128, 0.4);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(107, 114, 128, 0.1) inset;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(107, 114, 128, 0.1) inset, 0 0 30px rgba(6, 182, 212, 0.05);
     transform: translateY(-2px);
 }
 
@@ -70,6 +105,36 @@ body {
     justify-content: center;
     font-size: 20px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.module-icon::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transform: rotate(45deg);
+    transition: all 0.5s ease;
+    opacity: 0;
+}
+
+.dashboard-module:hover .module-icon::after {
+    opacity: 1;
+    animation: iconShine 1s ease;
+}
+
+@keyframes iconShine {
+    0% {
+        transform: translateX(-100%) translateY(-100%) rotate(45deg);
+    }
+    100% {
+        transform: translateX(100%) translateY(100%) rotate(45deg);
+    }
 }
 
 .module-title h3 {
@@ -256,10 +321,20 @@ body {
     color: #9ca3af;
 }
 
+.module-cyan.stat-module {
+    --stat-color: #6b7280;
+    --stat-color-light: #9ca3af;
+}
+
 .module-purple .module-icon {
     background: linear-gradient(135deg, rgba(107, 114, 128, 0.3) 0%, rgba(75, 85, 99, 0.25) 100%);
     border: 1px solid rgba(156, 163, 175, 0.3);
     color: #d1d5db;
+}
+
+.module-purple.stat-module {
+    --stat-color: #8b5cf6;
+    --stat-color-light: #a78bfa;
 }
 
 .module-green .module-icon {
@@ -268,10 +343,20 @@ body {
     color: #34d399;
 }
 
+.module-green.stat-module {
+    --stat-color: #10b981;
+    --stat-color-light: #34d399;
+}
+
 .module-orange .module-icon {
     background: linear-gradient(135deg, rgba(251, 146, 60, 0.15) 0%, rgba(234, 88, 12, 0.1) 100%);
     border: 1px solid rgba(251, 146, 60, 0.25);
     color: #fb923c;
+}
+
+.module-orange.stat-module {
+    --stat-color: #f59e0b;
+    --stat-color-light: #fbbf24;
 }
 
 .module-blue .module-icon {
@@ -280,15 +365,43 @@ body {
     color: #60a5fa;
 }
 
+.module-blue.stat-module {
+    --stat-color: #3b82f6;
+    --stat-color-light: #60a5fa;
+}
+
 .module-rose .module-icon {
     background: linear-gradient(135deg, rgba(244, 63, 94, 0.15) 0%, rgba(225, 29, 72, 0.1) 100%);
     border: 1px solid rgba(244, 63, 94, 0.25);
     color: #fb7185;
 }
 
+.module-rose.stat-module {
+    --stat-color: #f43f5e;
+    --stat-color-light: #fb7185;
+}
+
 /* Stats Module Styles */
 .stat-module {
     padding: 32px 28px;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-module::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--stat-color, #6b7280), var(--stat-color-light, #9ca3af), var(--stat-color, #6b7280));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.stat-module:hover::before {
+    opacity: 1;
 }
 
 .stat-module .module-header {
@@ -306,6 +419,8 @@ body {
     -webkit-text-fill-color: transparent;
     background-clip: text;
     letter-spacing: -0.02em;
+    position: relative;
+    z-index: 1;
 }
 
 .stat-label {
@@ -351,20 +466,264 @@ body {
     .stat-value {
         font-size: 2.5rem;
     }
+
+    .dashboard-container::before {
+        height: 300px;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-header {
+        padding: 16px 20px;
+    }
+
+    .module-header {
+        padding: 16px 20px;
+    }
+
+    .module-content {
+        padding: 20px;
+    }
+
+    .stat-module {
+        padding: 24px 20px;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+    }
+
+    .module-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+
+    .module-title h3 {
+        font-size: 12px;
+    }
+
+    .module-title p {
+        font-size: 11px;
+    }
+
+    .module-control-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 13px;
+    }
 }
 
 @media (max-width: 640px) {
     .dashboard-header {
-        padding: 20px;
+        padding: 12px 16px;
     }
-    
+
     .module-header {
-        padding: 20px;
+        padding: 12px 16px;
     }
-    
+
     .module-content {
-        padding: 24px;
+        padding: 16px;
     }
+
+    .stat-module {
+        padding: 20px 16px;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+    }
+
+    .module-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+
+    .module-title h3 {
+        font-size: 11px;
+    }
+
+    .module-title p {
+        font-size: 10px;
+    }
+
+    .module-controls {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    .module-control-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 12px;
+    }
+
+    .chart-container {
+        min-height: 200px;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-header {
+        padding: 12px;
+    }
+
+    .module-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .module-controls {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+    }
+
+    .module-badge {
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
+    }
+}
+
+/* Enhanced Animations */
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(6, 182, 212, 0.1);
+    }
+    50% {
+        box-shadow: 0 0 30px rgba(6, 182, 212, 0.2);
+    }
+}
+
+@keyframes shimmer-dashboard {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
+.floating-module {
+    animation: float 6s ease-in-out infinite;
+}
+
+.glowing-module {
+    animation: pulse-glow 4s ease-in-out infinite;
+}
+
+/* Enhanced module content area */
+.module-content {
+    position: relative;
+    z-index: 1;
+}
+
+/* Enhanced chart container */
+.chart-container {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.chart-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(ellipse at center, rgba(6, 182, 212, 0.03) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+/* Enhanced status indicators */
+.status-indicator-enhanced {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-indicator-enhanced::before {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse-ring 2s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+
+/* Enhanced button interactions */
+.module-control-btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.module-control-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease, height 0.3s ease;
+}
+
+.module-control-btn:active::after {
+    width: 100px;
+    height: 100px;
+}
+
+/* Enhanced skeleton loading */
+.skeleton-enhanced {
+    background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-enhanced::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.1), transparent);
+    animation: shimmer-dashboard 2s infinite;
 }
 </style>
 
@@ -401,7 +760,7 @@ body {
         <!-- Professional Stats Grid -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
             <!-- Stat Module 1 -->
-            <div class="dashboard-module module-cyan stat-module">
+            <div class="dashboard-module module-cyan stat-module floating-module" style="animation-delay: 0s;">
                 <div class="module-header border-b-0 pb-0">
                     <div class="module-title">
                         <div class="module-icon">
@@ -420,7 +779,7 @@ body {
             </div>
 
             <!-- Stat Module 2 -->
-            <div class="dashboard-module module-green stat-module">
+            <div class="dashboard-module module-green stat-module floating-module" style="animation-delay: 0.5s;">
                 <div class="module-header border-b-0 pb-0">
                     <div class="module-title">
                         <div class="module-icon">
@@ -439,7 +798,7 @@ body {
             </div>
 
             <!-- Stat Module 3 -->
-            <div class="dashboard-module module-purple stat-module">
+            <div class="dashboard-module module-purple stat-module floating-module" style="animation-delay: 1s;">
                 <div class="module-header border-b-0 pb-0">
                     <div class="module-title">
                         <div class="module-icon">
@@ -458,7 +817,7 @@ body {
             </div>
 
             <!-- Stat Module 4 -->
-            <div class="dashboard-module module-orange stat-module relative">
+            <div class="dashboard-module module-orange stat-module relative floating-module" style="animation-delay: 1.5s;">
                 <div class="module-header border-b-0 pb-0">
                     <div class="module-title">
                         <div class="module-icon">
@@ -479,7 +838,7 @@ body {
         </div>
 
         <!-- Main Chart Module -->
-        <div class="dashboard-module module-cyan mb-10">
+        <div class="dashboard-module module-cyan mb-10 glowing-module">
             <div class="module-header">
                 <div class="module-title">
                     <div class="module-icon">
@@ -509,9 +868,9 @@ body {
                 </div>
             </div>
             <div class="module-content">
-                <div class="h-[360px] relative">
+                <div class="h-[360px] relative chart-container">
                     <div class="chart-loading absolute inset-0 flex items-center justify-center" id="computeChart-loading">
-                        <div class="skeleton"></div>
+                        <div class="skeleton-enhanced"></div>
                     </div>
                     <canvas id="computeChart" class="relative z-10"></canvas>
                 </div>
@@ -543,9 +902,9 @@ body {
                     </div>
                 </div>
                 <div class="module-content">
-                    <div class="h-[280px] relative">
+                    <div class="h-[280px] relative chart-container">
                         <div class="chart-loading absolute inset-0 flex items-center justify-center" id="burnAreaChart-loading">
-                            <div class="skeleton"></div>
+                            <div class="skeleton-enhanced"></div>
                         </div>
                         <canvas id="burnAreaChart" class="relative z-10"></canvas>
                     </div>
@@ -575,9 +934,9 @@ body {
                     </div>
                 </div>
                 <div class="module-content">
-                    <div class="h-[280px] relative">
+                    <div class="h-[280px] relative chart-container">
                         <div class="chart-loading absolute inset-0 flex items-center justify-center" id="serviceBarChart-loading">
-                            <div class="skeleton"></div>
+                            <div class="skeleton-enhanced"></div>
                         </div>
                         <canvas id="serviceBarChart" class="relative z-10"></canvas>
                     </div>
@@ -610,9 +969,9 @@ body {
                     </div>
                 </div>
                 <div class="module-content">
-                    <div class="h-[280px] relative">
+                    <div class="h-[280px] relative chart-container">
                         <div class="chart-loading absolute inset-0 flex items-center justify-center" id="familyStackChart-loading">
-                            <div class="skeleton"></div>
+                            <div class="skeleton-enhanced"></div>
                         </div>
                         <canvas id="familyStackChart" class="relative z-10"></canvas>
                     </div>
@@ -642,9 +1001,9 @@ body {
                     </div>
                 </div>
                 <div class="module-content">
-                    <div class="h-[280px] relative">
+                    <div class="h-[280px] relative chart-container">
                         <div class="chart-loading absolute inset-0 flex items-center justify-center" id="usageHeatmapChart-loading">
-                            <div class="skeleton"></div>
+                            <div class="skeleton-enhanced"></div>
                         </div>
                         <canvas id="usageHeatmapChart" class="relative z-10"></canvas>
                     </div>
@@ -660,7 +1019,10 @@ body {
     function hideChartLoading(chartId) {
         const loadingElement = document.getElementById(chartId + '-loading');
         if (loadingElement) {
-            loadingElement.style.display = 'none';
+            loadingElement.style.opacity = '0';
+            setTimeout(() => {
+                loadingElement.style.display = 'none';
+            }, 300);
         }
     }
 
@@ -685,7 +1047,7 @@ body {
                 e.preventDefault();
                 const module = this.closest('.dashboard-module');
                 const icon = this.querySelector('i');
-                
+
                 if (icon.classList.contains('fa-sync-alt')) {
                     // Professional refresh animation
                     this.style.transform = 'rotate(180deg)';
@@ -698,7 +1060,7 @@ body {
                     // Expand/collapse with smooth transition
                     const content = module.querySelector('.module-content');
                     const isExpanded = content.style.display === 'none';
-                    
+
                     if (isExpanded) {
                         content.style.display = 'block';
                         content.style.opacity = '0';
@@ -711,10 +1073,10 @@ body {
                             content.style.display = 'none';
                         }, 300);
                     }
-                    
+
                     icon.classList.toggle('fa-expand');
                     icon.classList.toggle('fa-compress');
-                    
+
                     // Update button title
                     this.title = isExpanded ? 'Fullscreen' : 'Collapse';
                 }
@@ -738,14 +1100,79 @@ body {
             });
         }, 15000);
 
-        // Add subtle hover effect to stat modules
-        document.querySelectorAll('.stat-module').forEach(module => {
-            module.addEventListener('mouseenter', function() {
-                this.style.transform = 'translateY(-4px)';
+        // Check if device is touch-enabled
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+        // Enhanced 3D hover effect on stat modules (only on non-touch devices)
+        if (!isTouchDevice) {
+            document.querySelectorAll('.stat-module').forEach(module => {
+                module.addEventListener('mousemove', (e) => {
+                    const rect = module.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    const rotateX = (y - centerY) / 25;
+                    const rotateY = (centerX - x) / 25;
+
+                    module.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-4px)`;
+                });
+
+                module.addEventListener('mouseleave', () => {
+                    module.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateY(0)';
+                });
             });
-            module.addEventListener('mouseleave', function() {
-                this.style.transform = 'translateY(0)';
+
+            // Enhanced 3D hover effect on dashboard modules
+            document.querySelectorAll('.dashboard-module:not(.stat-module)').forEach(module => {
+                module.addEventListener('mousemove', (e) => {
+                    const rect = module.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    const rotateX = (y - centerY) / 30;
+                    const rotateY = (centerX - x) / 30;
+
+                    module.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-2px)`;
+                });
+
+                module.addEventListener('mouseleave', () => {
+                    module.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateY(0)';
+                });
             });
+        }
+
+        // Intersection Observer for scroll animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -100px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '0';
+                    entry.target.style.transform = 'translateY(20px)';
+                    setTimeout(() => {
+                        entry.target.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }, 100);
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.dashboard-module').forEach(module => {
+            observer.observe(module);
+        });
+
+        // Enhanced badge animation
+        document.querySelectorAll('.module-badge').forEach(badge => {
+            badge.style.animation = 'none';
+            badge.offsetHeight; // Trigger reflow
+            badge.style.animation = 'badge-pulse 2s infinite';
         });
     });
 </script>
