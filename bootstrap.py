@@ -140,7 +140,7 @@ def cmd_check(args: argparse.Namespace) -> int:  # noqa: ARG001
     ok = True
     checks = {
         "python3": ("Python 3.12+", True),
-        "go": ("Go 1.24+", True),
+        "go": ("Go 1.26+", True),
         "docker": ("Docker", False),
         "az": ("Azure CLI", False),
         "git": ("Git", False),
@@ -250,7 +250,7 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
 
     go_bin = shutil.which("go")
     if not go_bin:
-        print(c("[!] Go not found. Install Go 1.24+ first.", RED))
+        print(c("[!] Go not found. Install Go 1.26+ first.", RED))
         print("    sudo apt-get install -y golang-go")
         print("    # or follow https://golang.org/dl/")
         return 1

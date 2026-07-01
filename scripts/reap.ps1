@@ -103,12 +103,6 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
 # Flask Web Dashboard
 FLASK_PORT=5001
 FLASK_DEBUG=True
-
-# InfluxDB (Optional - for metrics storage)
-INFLUXDB_URL=http://localhost:8086
-INFLUXDB_TOKEN=your_token
-INFLUXDB_ORG=ReaperOps
-INFLUXDB_BUCKET=cloud_burn
 "@
     Set-Content -Path ".env" -Value $envContent
     Write-Host "[+] .env file created. Please update Azure credentials!"
