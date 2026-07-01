@@ -3389,13 +3389,12 @@ async def get_budget_data(request: Request):
             budget_pace = cost_data.get("budget_pace", 0)
             daily_spend = cost_data.get("daily_spend", [])
         except Exception as e:
-            logger.error("Failed to fetch cost data from Azure", 
-                         context={"error": str(e)})
+            logger.error("Failed to fetch cost data from Azure", context={"error": str(e)})
             error_response = handle_exception(
                 e,
                 ErrorCategory.CLOUD_PROVIDER,
                 context={"endpoint": "/api/finops/budget/data"},
-                user_message="Unable to fetch budget data from Azure. Please check your Azure credentials and connection."
+                user_message="Unable to fetch budget data from Azure. Please check your Azure credentials and connection.",
             )
             return JSONResponse(status_code=503, content=error_response)
 
@@ -3464,13 +3463,12 @@ async def get_budget_chart_data(request: Request):
         try:
             chart_data = await asyncio.to_thread(_fetch_chart_data)
         except Exception as e:
-            logger.error("Failed to fetch chart data from Azure",
-                         context={"error": str(e)})
+            logger.error("Failed to fetch chart data from Azure", context={"error": str(e)})
             error_response = handle_exception(
                 e,
                 ErrorCategory.CLOUD_PROVIDER,
                 context={"endpoint": "/api/finops/budget/chart"},
-                user_message="Unable to fetch budget chart data from Azure. Please check your Azure credentials and connection."
+                user_message="Unable to fetch budget chart data from Azure. Please check your Azure credentials and connection.",
             )
             return JSONResponse(status_code=503, content=error_response)
 
@@ -3480,7 +3478,7 @@ async def get_budget_chart_data(request: Request):
             e,
             ErrorCategory.INTERNAL,
             context={"endpoint": "/api/finops/budget/chart"},
-            user_message="Failed to retrieve budget chart data. Please try again."
+            user_message="Failed to retrieve budget chart data. Please try again.",
         )
         return JSONResponse(status_code=500, content=error_response)
 
@@ -3497,13 +3495,12 @@ async def get_commitments_data(request: Request):
         try:
             commitments, coverage, recommendations = await asyncio.to_thread(_fetch_commitments)
         except Exception as e:
-            logger.error("Failed to fetch commitments data from Azure",
-                         context={"error": str(e)})
+            logger.error("Failed to fetch commitments data from Azure", context={"error": str(e)})
             error_response = handle_exception(
                 e,
                 ErrorCategory.CLOUD_PROVIDER,
                 context={"endpoint": "/api/finops/commitments/data"},
-                user_message="Unable to fetch commitments data from Azure. Please check your Azure credentials and connection."
+                user_message="Unable to fetch commitments data from Azure. Please check your Azure credentials and connection.",
             )
             return JSONResponse(status_code=503, content=error_response)
 
@@ -3522,7 +3519,7 @@ async def get_commitments_data(request: Request):
             e,
             ErrorCategory.INTERNAL,
             context={"endpoint": "/api/finops/commitments/data"},
-            user_message="Failed to retrieve commitments data. Please try again."
+            user_message="Failed to retrieve commitments data. Please try again.",
         )
         return JSONResponse(status_code=500, content=error_response)
 
@@ -3539,13 +3536,12 @@ async def get_issues_data(request: Request):
         try:
             issues = await asyncio.to_thread(_fetch_issues)
         except Exception as e:
-            logger.error("Failed to fetch issues data from Azure",
-                         context={"error": str(e)})
+            logger.error("Failed to fetch issues data from Azure", context={"error": str(e)})
             error_response = handle_exception(
                 e,
                 ErrorCategory.CLOUD_PROVIDER,
                 context={"endpoint": "/api/finops/issues/data"},
-                user_message="Unable to fetch issues data from Azure. Please check your Azure credentials and connection."
+                user_message="Unable to fetch issues data from Azure. Please check your Azure credentials and connection.",
             )
             return JSONResponse(status_code=503, content=error_response)
 
