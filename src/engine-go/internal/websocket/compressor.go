@@ -13,24 +13,24 @@ import (
 type CompressionType string
 
 const (
-	CompressionNone CompressionType = "none"
-	CompressionGzip CompressionType = "gzip"
+	CompressionNone   CompressionType = "none"
+	CompressionGzip   CompressionType = "gzip"
 	CompressionSnappy CompressionType = "snappy"
 )
 
 // MessageCompressor handles WebSocket message compression
 type MessageCompressor struct {
-	compressionType CompressionType
+	compressionType  CompressionType
 	compressionLevel int
-	bufferPool      *sync.Pool
-	stats           CompressionStats
-	mu              sync.RWMutex
+	bufferPool       *sync.Pool
+	stats            CompressionStats
+	mu               sync.RWMutex
 }
 
 // CompressionStats tracks compression statistics
 type CompressionStats struct {
-	TotalMessages     int64
-	CompressedSize    int64
+	TotalMessages    int64
+	CompressedSize   int64
 	OriginalSize     int64
 	CompressionRatio float64
 	TotalSavings     int64
@@ -38,17 +38,17 @@ type CompressionStats struct {
 
 // CompressorConfig holds configuration for the compressor
 type CompressorConfig struct {
-	Type           CompressionType
+	Type             CompressionType
 	CompressionLevel int // For gzip: 1-9, default 6
-	BufferSize     int
+	BufferSize       int
 }
 
 // DefaultCompressorConfig returns sensible defaults
 func DefaultCompressorConfig() CompressorConfig {
 	return CompressorConfig{
-		Type:           CompressionGzip,
+		Type:             CompressionGzip,
 		CompressionLevel: 6,
-		BufferSize:     4096,
+		BufferSize:       4096,
 	}
 }
 
@@ -59,7 +59,7 @@ func NewMessageCompressor(config CompressorConfig) *MessageCompressor {
 	}
 
 	return &MessageCompressor{
-		compressionType: config.Type,
+		compressionType:  config.Type,
 		compressionLevel: config.CompressionLevel,
 		bufferPool: &sync.Pool{
 			New: func() interface{} {
@@ -142,7 +142,7 @@ func (mc *MessageCompressor) compressGzip(data []byte) ([]byte, error) {
 func (mc *MessageCompressor) compressSnappy(data []byte) ([]byte, error) {
 	// Simplified snappy-like compression
 	// For production, use the actual snappy-go library
-	
+
 	if len(data) < 100 {
 		return data, nil
 	}
@@ -237,11 +237,11 @@ func (mc *MessageCompressor) CompressBatch(batch Batch) (*CompressedBatch, error
 	}
 
 	return &CompressedBatch{
-		Event:          batch.Event,
-		CompressedData: compressed,
-		OriginalSize:   len(jsonData),
-		CompressedSize: len(compressed),
-		Count:          batch.Count,
+		Event:           batch.Event,
+		CompressedData:  compressed,
+		OriginalSize:    len(jsonData),
+		CompressedSize:  len(compressed),
+		Count:           batch.Count,
 		CompressionType: mc.compressionType,
 	}, nil
 }
@@ -265,11 +265,11 @@ func (mc *MessageCompressor) DecompressBatch(compressedBatch *CompressedBatch) (
 
 // CompressedBatch represents a compressed batch
 type CompressedBatch struct {
-	Event           string        `json:"event"`
-	CompressedData  []byte        `json:"compressed_data"`
-	OriginalSize    int           `json:"original_size"`
-	CompressedSize  int           `json:"compressed_size"`
-	Count           int           `json:"count"`
+	Event           string          `json:"event"`
+	CompressedData  []byte          `json:"compressed_data"`
+	OriginalSize    int             `json:"original_size"`
+	CompressedSize  int             `json:"compressed_size"`
+	Count           int             `json:"count"`
 	CompressionType CompressionType `json:"compression_type"`
 }
 
@@ -305,7 +305,7 @@ func (mc *MessageCompressor) GetCompressionType() CompressionType {
 type AdaptiveCompressor struct {
 	smallCompressor *MessageCompressor
 	largeCompressor *MessageCompressor
-	threshold      int
+	threshold       int
 }
 
 // NewAdaptiveCompressor creates a new adaptive compressor
@@ -316,11 +316,11 @@ func NewAdaptiveCompressor(threshold int) *AdaptiveCompressor {
 
 	return &AdaptiveCompressor{
 		smallCompressor: NewMessageCompressor(CompressorConfig{
-			Type:           CompressionNone, // No compression for small messages
+			Type:             CompressionNone, // No compression for small messages
 			CompressionLevel: 6,
 		}),
 		largeCompressor: NewMessageCompressor(CompressorConfig{
-			Type:           CompressionGzip,
+			Type:             CompressionGzip,
 			CompressionLevel: 6,
 		}),
 		threshold: threshold,

@@ -8,21 +8,21 @@ import (
 
 // ResourceScorer performs vectorized resource scoring operations
 type ResourceScorer struct {
-	cpuMatrix    [][]float64
-	memoryMatrix [][]float64
-	iopsMatrix   [][]float64
+	cpuMatrix     [][]float64
+	memoryMatrix  [][]float64
+	iopsMatrix    [][]float64
 	networkMatrix [][]float64
-	mu           sync.RWMutex
-	envType      string // "production" or "dev-test"
+	mu            sync.RWMutex
+	envType       string // "production" or "dev-test"
 }
 
 // ScoreResult represents the scoring result for a resource
 type ScoreResult struct {
 	ResourceIndex int
-	Action       string
-	Impact       string
-	Reason       string
-	Metrics      ResourceMetrics
+	Action        string
+	Impact        string
+	Reason        string
+	Metrics       ResourceMetrics
 }
 
 // ResourceMetrics holds resource performance metrics
@@ -39,44 +39,44 @@ type ResourceMetrics struct {
 
 // ScoringConfig holds configuration for resource scoring
 type ScoringConfig struct {
-	EnvType string
-	CPUShutdownThreshold     float64
-	CPUHighThreshold         float64
-	CPUMediumThreshold       float64
-	MemoryHighThreshold      float64
-	IOPSLowThreshold         float64
+	EnvType              string
+	CPUShutdownThreshold float64
+	CPUHighThreshold     float64
+	CPUMediumThreshold   float64
+	MemoryHighThreshold  float64
+	IOPSLowThreshold     float64
 }
 
 // DefaultScoringConfig returns sensible defaults
 func DefaultScoringConfig(envType string) ScoringConfig {
 	if envType == "production" {
 		return ScoringConfig{
-			EnvType:               "production",
-			CPUShutdownThreshold:  5.0,
-			CPUHighThreshold:      80.0,
-			CPUMediumThreshold:    60.0,
-			MemoryHighThreshold:   80.0,
-			IOPSLowThreshold:      10.0,
+			EnvType:              "production",
+			CPUShutdownThreshold: 5.0,
+			CPUHighThreshold:     80.0,
+			CPUMediumThreshold:   60.0,
+			MemoryHighThreshold:  80.0,
+			IOPSLowThreshold:     10.0,
 		}
 	}
 	return ScoringConfig{
-		EnvType:               "dev-test",
-		CPUShutdownThreshold:  15.0,
-		CPUHighThreshold:      70.0,
-		CPUMediumThreshold:    50.0,
-		MemoryHighThreshold:   70.0,
-		IOPSLowThreshold:      10.0,
+		EnvType:              "dev-test",
+		CPUShutdownThreshold: 15.0,
+		CPUHighThreshold:     70.0,
+		CPUMediumThreshold:   50.0,
+		MemoryHighThreshold:  70.0,
+		IOPSLowThreshold:     10.0,
 	}
 }
 
 // NewResourceScorer creates a new resource scorer
 func NewResourceScorer(cpuMatrix, memoryMatrix [][]float64, envType string) *ResourceScorer {
 	return &ResourceScorer{
-		cpuMatrix:    cpuMatrix,
-		memoryMatrix: memoryMatrix,
-		iopsMatrix:   nil,
+		cpuMatrix:     cpuMatrix,
+		memoryMatrix:  memoryMatrix,
+		iopsMatrix:    nil,
 		networkMatrix: nil,
-		envType:      envType,
+		envType:       envType,
 	}
 }
 
@@ -125,9 +125,9 @@ func (rs *ResourceScorer) scoreResource(index int, config ScoringConfig) ScoreRe
 	if index >= len(rs.cpuMatrix) {
 		return ScoreResult{
 			ResourceIndex: index,
-			Action:       "ERROR",
-			Impact:       "LOW",
-			Reason:       "Invalid resource index",
+			Action:        "ERROR",
+			Impact:        "LOW",
+			Reason:        "Invalid resource index",
 		}
 	}
 
@@ -144,10 +144,10 @@ func (rs *ResourceScorer) scoreResource(index int, config ScoringConfig) ScoreRe
 
 	return ScoreResult{
 		ResourceIndex: index,
-		Action:       action,
-		Impact:       impact,
-		Reason:       reason,
-		Metrics:      metrics,
+		Action:        action,
+		Impact:        impact,
+		Reason:        reason,
+		Metrics:       metrics,
 	}
 }
 

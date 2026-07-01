@@ -256,7 +256,7 @@ func (mma *MultiMetricAggregator) GetAggregateStats(metricNames []string) map[st
 // RateCalculator calculates rates (per second) from metrics
 type RateCalculator struct {
 	previousValues map[string]DataPoint
-	mu            sync.RWMutex
+	mu             sync.RWMutex
 }
 
 // NewRateCalculator creates a new rate calculator
@@ -327,14 +327,14 @@ func stdDev(values []float64) float64 {
 	if len(values) < 2 {
 		return 0
 	}
-	
+
 	mean := sum(values) / float64(len(values))
 	sumSqDiff := 0.0
 	for _, v := range values {
 		diff := v - mean
 		sumSqDiff += diff * diff
 	}
-	
+
 	variance := sumSqDiff / float64(len(values)-1)
 	return sqrt(variance)
 }

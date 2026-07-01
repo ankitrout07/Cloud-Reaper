@@ -4,8 +4,7 @@ Supports local database storage and extensible telemetry backends.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +14,7 @@ class DataPusher:
 
     def __init__(self, backend: str = "local"):
         """Initialize the data pusher.
-        
+
         Args:
             backend: Storage backend - 'local' for database, 'prometheus' for remote telemetry
         """
@@ -27,19 +26,19 @@ class DataPusher:
         self,
         provider: str,
         amount: float,
-        resource_id: Optional[str] = None,
-        action_type: Optional[str] = None,
-        metadata: Optional[dict] = None,
+        resource_id: str | None = None,
+        action_type: str | None = None,
+        metadata: dict | None = None,
     ) -> bool:
         """Push savings data to the configured backend.
-        
+
         Args:
             provider: Cloud provider (azure, aws, gcp)
             amount: Savings amount in USD
             resource_id: Optional resource identifier
             action_type: Type of action that generated savings (deallocate, resize, etc.)
             metadata: Optional additional metadata
-            
+
         Returns:
             True if push was successful, False otherwise
         """
@@ -50,11 +49,12 @@ class DataPusher:
         try:
             if self.backend == "local":
                 return self._push_to_local_db(provider, amount, resource_id, action_type, metadata)
-            elif self.backend == "prometheus":
-                return self._push_to_prometheus(provider, amount, resource_id, action_type, metadata)
-            else:
-                logger.warning(f"Unknown backend: {self.backend}")
-                return False
+            if self.backend == "prometheus":
+                return self._push_to_prometheus(
+                    provider, amount, resource_id, action_type, metadata
+                )
+            logger.warning(f"Unknown backend: {self.backend}")
+            return False
         except Exception as e:
             logger.error(f"Failed to push savings data: {e}")
             return False
@@ -63,17 +63,17 @@ class DataPusher:
         self,
         provider: str,
         amount: float,
-        resource_id: Optional[str],
-        action_type: Optional[str],
-        metadata: Optional[dict],
+        resource_id: str | None,
+        action_type: str | None,
+        metadata: dict | None,
     ) -> bool:
         """Push savings data to local SQLite database.
-        
+
         This stores savings records in the cost_history table for tracking.
         """
         try:
-            from reaper.engine.models.resources import SessionLocal, CostHistory
-            
+            from reaper.engine.models.resources import CostHistory, SessionLocal
+
             session = SessionLocal()
             try:
                 # Create a cost history entry for the savings
@@ -84,12 +84,12 @@ class DataPusher:
                     actual_cost=-amount,  # Negative cost represents savings
                     amortized_cost=-amount,
                     currency="USD",
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                 )
-                
+
                 session.add(savings_record)
                 session.commit()
-                
+
                 logger.info(f"Saved ${amount:.2f} from {provider} to local database")
                 return True
             except Exception as e:
@@ -101,25 +101,29 @@ class DataPusher:
         except ImportError:
             logger.warning("Database models not available, using fallback logging")
             # Fallback to logging if database is not available
-            logger.info(f"[SAVINGS] Provider: {provider}, Amount: ${amount:.2f}, "
-                       f"Resource: {resource_id}, Action: {action_type}")
+            logger.info(
+                f"[SAVINGS] Provider: {provider}, Amount: ${amount:.2f}, "
+                f"Resource: {resource_id}, Action: {action_type}"
+            )
             return True
 
     def _push_to_prometheus(
         self,
         provider: str,
         amount: float,
-        resource_id: Optional[str],
-        action_type: Optional[str],
-        metadata: Optional[dict],
+        resource_id: str | None,
+        action_type: str | None,
+        metadata: dict | None,
     ) -> bool:
         """Push savings data to Prometheus (placeholder for future implementation).
-        
+
         This method is a placeholder for future Prometheus integration.
         """
-        logger.info(f"Prometheus backend not yet implemented. "
-                   f"Would push: provider={provider}, amount={amount}, "
-                   f"resource_id={resource_id}, action_type={action_type}")
+        logger.info(
+            f"Prometheus backend not yet implemented. "
+            f"Would push: provider={provider}, amount={amount}, "
+            f"resource_id={resource_id}, action_type={action_type}"
+        )
         # TODO: Implement Prometheus client integration
         return True
 
@@ -127,15 +131,15 @@ class DataPusher:
         self,
         metric_name: str,
         value: float,
-        labels: Optional[dict] = None,
+        labels: dict | None = None,
     ) -> bool:
         """Push a generic metric to the configured backend.
-        
+
         Args:
             metric_name: Name of the metric
             value: Metric value
             labels: Optional metric labels
-            
+
         Returns:
             True if push was successful, False otherwise
         """

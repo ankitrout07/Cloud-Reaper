@@ -17,19 +17,19 @@ type LRUCache struct {
 
 // cacheItem represents an item in the cache
 type cacheItem struct {
-	key        string
-	value      interface{}
-	prev       *cacheItem
-	next       *cacheItem
-	expiresAt  time.Time
+	key       string
+	value     interface{}
+	prev      *cacheItem
+	next      *cacheItem
+	expiresAt time.Time
 }
 
 // PriceCache provides LRU caching for price lookups with TTL
 type PriceCache struct {
-	lru      *LRUCache
-	misses   int64
-	hits     int64
-	mu       sync.RWMutex
+	lru    *LRUCache
+	misses int64
+	hits   int64
+	mu     sync.RWMutex
 }
 
 // PriceCacheConfig holds configuration for the price cache
@@ -79,16 +79,16 @@ func NewPriceCache(config PriceCacheConfig) *PriceCache {
 // Get retrieves a value from the cache
 func (pc *PriceCache) Get(key string) (interface{}, bool) {
 	value, found := pc.lru.Get(key)
-	
+
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
-	
+
 	if found {
 		pc.hits++
 	} else {
 		pc.misses++
 	}
-	
+
 	return value, found
 }
 
@@ -343,10 +343,10 @@ func (mlc *MultiLevelCache) Put(key string, value interface{}) {
 func (mlc *MultiLevelCache) GetCombinedStats() map[string]CacheStats {
 	stats := make(map[string]CacheStats)
 	stats["l1"] = mlc.l1.GetStats()
-	
+
 	if mlc.l2 != nil {
 		stats["l2"] = mlc.l2.GetStats()
 	}
-	
+
 	return stats
 }

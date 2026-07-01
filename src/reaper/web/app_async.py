@@ -12,7 +12,6 @@ import subprocess
 import tempfile
 import threading
 import time
-from datetime import timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any, cast
@@ -31,7 +30,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from starlette.middleware.sessions import SessionMiddleware
 
-from reaper.utils.error_handler import ErrorCategory, handle_exception, get_logger
+from reaper.utils.error_handler import ErrorCategory, get_logger, handle_exception
 
 # Try to import Go WebSocket batcher for enhanced performance
 try:
@@ -3192,7 +3191,7 @@ async def get_resource_inventory(request: Request):
                             "page_size": page_size,
                             "total": total,
                             "total_pages": max(1, (total + page_size - 1) // page_size),
-                            "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
+                            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
                         }
                     )
                     + "\n"
@@ -3237,7 +3236,7 @@ async def get_resource_inventory(request: Request):
                 "page_size": page_size,
                 "total": total,
                 "total_pages": max(1, (total + page_size - 1) // page_size),
-                "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
         )
     except Exception as e:
@@ -3418,8 +3417,9 @@ async def get_budget_data(request: Request):
             budget_pace = cost_data.get("budget_pace", 0)
             daily_spend = cost_data.get("daily_spend", [])
         except Exception as e:
-            logger.warning("Failed to fetch cost data from Azure, using fallback", 
-                         context={"error": str(e)})
+            logger.warning(
+                "Failed to fetch cost data from Azure, using fallback", context={"error": str(e)}
+            )
             # Fallback to simulated data
             cumulative_spend = 3420.50
             budget_pace = 114.02
@@ -3450,7 +3450,7 @@ async def get_budget_data(request: Request):
             e,
             ErrorCategory.INTERNAL,
             context={"endpoint": "/api/finops/budget/data"},
-            user_message="Failed to retrieve budget data. Please try again."
+            user_message="Failed to retrieve budget data. Please try again.",
         )
         return JSONResponse(status_code=500, content=error_response)
 
@@ -6156,7 +6156,7 @@ async def generate_cost_report(request: Request):
                 "status": "success",
                 "format": format_type,
                 "report": report_content,
-                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "generated_at": datetime.now(datetime.UTC).isoformat(),
             }
         )
     except Exception as e:

@@ -18,10 +18,10 @@ type BatchDB struct {
 
 // QueryResult represents the result of a database query
 type QueryResult struct {
-	Query  string
-	Rows   *sql.Rows
-	Error  error
-	Done   chan struct{}
+	Query string
+	Rows  *sql.Rows
+	Error error
+	Done  chan struct{}
 }
 
 // BatchInsertResult represents the result of a batch insert operation

@@ -10,10 +10,10 @@ import (
 
 // ScrapingJob represents a single scraping task
 type ScrapingJob struct {
-	Provider   string            // azure, aws, gcp
-	ResourceType string           // compute, storage, network
-	Region     string            // region to scrape
-	Params     map[string]string // additional parameters
+	Provider     string            // azure, aws, gcp
+	ResourceType string            // compute, storage, network
+	Region       string            // region to scrape
+	Params       map[string]string // additional parameters
 }
 
 // ScrapingResult represents the result of a scraping job
@@ -27,17 +27,17 @@ type ScrapingResult struct {
 
 // ScrapingPool manages concurrent scraping operations
 type ScrapingPool struct {
-	workers      int
-	jobQueue     chan ScrapingJob
-	results      chan ScrapingResult
-	rateLimiter  *TokenBucket
-	workerWg     sync.WaitGroup
-	ctx          context.Context
-	cancel       context.CancelFunc
-	scrapers     map[string]Scraper
-	scrapersMu   sync.RWMutex
-	stats        PoolStats
-	statsMu      sync.RWMutex
+	workers     int
+	jobQueue    chan ScrapingJob
+	results     chan ScrapingResult
+	rateLimiter *TokenBucket
+	workerWg    sync.WaitGroup
+	ctx         context.Context
+	cancel      context.CancelFunc
+	scrapers    map[string]Scraper
+	scrapersMu  sync.RWMutex
+	stats       PoolStats
+	statsMu     sync.RWMutex
 }
 
 // Scraper interface for cloud provider scrapers
