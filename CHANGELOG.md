@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] / Recent Updates
 
-### 🚀 Performance Improvements
+### � Security & Data Integrity
+- **Eliminated All Simulated Data**: Removed all simulated/fake data fallbacks from the entire codebase. All API endpoints now fetch real data from cloud providers or return proper error responses.
+- **Enhanced Error Handling**: Updated all API endpoints (`/api/finops/budget/data`, `/api/finops/budget/chart`, `/api/finops/commitments/data`, `/api/finops/issues/data`) to return 503 status codes with user-friendly error messages when cloud provider data fetch fails.
+- **UI Error Guidance**: Updated frontend error handling to guide users to connect cloud providers in Settings when data fetch fails, preventing confusion about missing data.
+- **Removed Placeholder Endpoints**: Deleted `/api/v1/finops/simulate/commitment` and `/api/v1/finops/simulate/policy` endpoints that returned fake simulation data.
+
+### 🧹 Code Cleanup
+- **Removed Unused Classes**: Deleted `ProportionalAllocator` class from `economics.py` (placeholder with no implementation).
+- **Removed Test-Only Code**: Deleted `PredictiveScalingEngine` class from `workload.py` (only used in test block).
+- **Cleaned Up Imports**: Removed unused ARIMA import from `workload.py` after PredictiveScalingEngine removal.
+- **Azure Collector Cleanup**: Removed simulated data fallbacks from `get_cost_governance_issues` and `get_active_commitments` methods.
+- **Code Reduction**: Removed ~120 lines of unused/simulated code across the codebase.
+
+### �🚀 Performance Improvements
 - **Dependency Upgrades**: Upgraded `ruff` linting tool to the latest version to ensure faster and more reliable code linting, formatting, and static analysis across the Python codebase.
 - **Project Stabilization**: Extensive stabilization efforts applied across the hybrid Python/Go core, optimizing execution paths, reducing memory footprints, and addressing performance bottlenecks in resource scraping and telemetry ingestion.
 
@@ -25,3 +38,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Comprehensive Rewrite**: Full rewrite of the project `README.md`, introducing clear architectural diagrams, technology stack breakdowns, Docker deployment guides, and a complete API reference.
 - **Feature Documentation**: Added detailed explanations for the Cost-Bounded Performance Copilot, RAG Documentation Search, Cryptographic Audit Trails, and Vault Secret Management.
 - **Changelog Tracking**: Introduced a dedicated `CHANGELOG.md` to thoroughly track and explain all project updates, performance optimizations, and bug fixes.
+- **Code Cleanup Analysis**: Created `CODE_CLEANUP_ANALYSIS.md` documenting Python to Go migration progress and cleanup plan.

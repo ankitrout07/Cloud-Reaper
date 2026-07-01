@@ -1390,7 +1390,7 @@ class AzureCollector:
             except Exception as e:
                 print(f"Cost Management API Error: {e}")
 
-        # Fallback to DB or mocked if API fails
+        # Fallback to DB if API fails
         if not spend_data:
             db = SessionLocal()
             try:
@@ -1680,43 +1680,9 @@ class AzureCollector:
                     }
                 )
 
-            # Add placeholder AWS commitment if no Azure data
-            if not commitments:
-                commitments = [
-                    {
-                        "provider": "AWS",
-                        "type": "Savings Plan",
-                        "commit": "$2.50/hr",
-                        "savings": 32,
-                        "status": "active",
-                    },
-                    {
-                        "provider": "Azure",
-                        "type": "D4s_v5 RI",
-                        "quantity": 6,
-                        "savings": 41,
-                        "status": "active",
-                    },
-                ]
-
             return commitments
         except Exception:
-            return [
-                {
-                    "provider": "AWS",
-                    "type": "Savings Plan",
-                    "commit": "$2.50/hr",
-                    "savings": 32,
-                    "status": "active",
-                },
-                {
-                    "provider": "Azure",
-                    "type": "D4s_v5 RI",
-                    "quantity": 6,
-                    "savings": 41,
-                    "status": "active",
-                },
-            ]
+            return []
 
     def get_ri_coverage(self) -> dict:
         """
@@ -1860,38 +1826,6 @@ class AzureCollector:
                     )
         except Exception as e:
             print(f"[!] Error processing orphaned disks: {e}")
-
-        # Fallback to simulated data if no issues found
-        if not issues:
-            issues = [
-                {
-                    "id": "issue-1",
-                    "severity": "Critical",
-                    "type": "Compliance Tag Violation",
-                    "title": "Untagged Dev-Instance in EastUS",
-                    "resource_id": "vm-az-dev-1052",
-                    "daily_waste": 22.40,
-                    "actions": ["DISMISS", "KILL"],
-                },
-                {
-                    "id": "issue-2",
-                    "severity": "Warning",
-                    "type": "Idle Machine Alert",
-                    "title": "Underutilized compute core instances",
-                    "resource_id": "vm-test-db-replica",
-                    "monthly_savings": 180.00,
-                    "actions": ["DISMISS", "RIGHTSIZE"],
-                },
-                {
-                    "id": "issue-3",
-                    "severity": "Info",
-                    "type": "Storage Optimization",
-                    "title": "Orphaned Snapshot Volumes",
-                    "resource_id": "5 snapshots",
-                    "monthly_savings": 45.00,
-                    "actions": ["DISMISS", "KILL"],
-                },
-            ]
 
         return issues
 

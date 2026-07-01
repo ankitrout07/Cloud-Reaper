@@ -1616,34 +1616,6 @@ async def financial(request: Request):
     )
 
 
-@app.post("/api/v1/finops/simulate/commitment")
-async def simulate_commitment(request: Request):
-    # Placeholder simulator logic.
-    (await request.json() if await request.body() else {}) or {}
-    return jsonify(
-        {
-            "status": "success",
-            "message": "Commitment simulated successfully",
-            "savings_estimate": 150.00,
-            "roi_months": 3.5,
-        }
-    )
-
-
-@app.post("/api/v1/finops/simulate/policy")
-async def simulate_policy(request: Request):
-    # Placeholder logic for what-if policy application.
-    (await request.json() if await request.body() else {}) or {}
-    return jsonify(
-        {
-            "status": "success",
-            "message": "Policy simulated successfully",
-            "projected_savings": 820.00,
-            "carbon_offset": 184.2,
-        }
-    )
-
-
 @app.post("/api/financial/target-margin/calculate")
 async def calculate_target_margin(request: Request):
     """Calculate optimal resource modifications to close the gap between current and target spend using actual Azure resource costs."""
@@ -3417,13 +3389,15 @@ async def get_budget_data(request: Request):
             budget_pace = cost_data.get("budget_pace", 0)
             daily_spend = cost_data.get("daily_spend", [])
         except Exception as e:
-            logger.warning(
-                "Failed to fetch cost data from Azure, using fallback", context={"error": str(e)}
+            logger.error("Failed to fetch cost data from Azure", 
+                         context={"error": str(e)})
+            error_response = handle_exception(
+                e,
+                ErrorCategory.CLOUD_PROVIDER,
+                context={"endpoint": "/api/finops/budget/data"},
+                user_message="Unable to fetch budget data from Azure. Please check your Azure credentials and connection."
             )
-            # Fallback to simulated data
-            cumulative_spend = 3420.50
-            budget_pace = 114.02
-            daily_spend = []
+            return JSONResponse(status_code=503, content=error_response)
 
         # Calculate burn rate and forecast
         burn_rate = cumulative_spend / 30  # Simplified calculation
@@ -3489,19 +3463,26 @@ async def get_budget_chart_data(request: Request):
 
         try:
             chart_data = await asyncio.to_thread(_fetch_chart_data)
-        except Exception:
-            # Fallback simulated data
-            import random
-
-            chart_data = {
-                "labels": [f"Day {i}" for i in range(1, 31)],
-                "cumulative_spend": [random.uniform(100, 150) * i for i in range(1, 31)],
-                "budget_pace": [random.uniform(100, 150) * i * 0.95 for i in range(1, 31)],
-            }
+        except Exception as e:
+            logger.error("Failed to fetch chart data from Azure",
+                         context={"error": str(e)})
+            error_response = handle_exception(
+                e,
+                ErrorCategory.CLOUD_PROVIDER,
+                context={"endpoint": "/api/finops/budget/chart"},
+                user_message="Unable to fetch budget chart data from Azure. Please check your Azure credentials and connection."
+            )
+            return JSONResponse(status_code=503, content=error_response)
 
         return {"status": "success", "chart": chart_data}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        error_response = handle_exception(
+            e,
+            ErrorCategory.INTERNAL,
+            context={"endpoint": "/api/finops/budget/chart"},
+            user_message="Failed to retrieve budget chart data. Please try again."
+        )
+        return JSONResponse(status_code=500, content=error_response)
 
 
 @app.get("/api/finops/commitments/data")
@@ -3515,34 +3496,16 @@ async def get_commitments_data(request: Request):
 
         try:
             commitments, coverage, recommendations = await asyncio.to_thread(_fetch_commitments)
-        except Exception:
-            # Fallback simulated data
-            commitments = [
-                {
-                    "provider": "AWS",
-                    "type": "Savings Plan",
-                    "commit": "$2.50/hr",
-                    "savings": 32,
-                    "status": "active",
-                },
-                {
-                    "provider": "Azure",
-                    "type": "D4s_v5 RI",
-                    "quantity": 6,
-                    "savings": 41,
-                    "status": "active",
-                },
-            ]
-            coverage = {"overall_coverage": 62.4, "waste_amount": 1185.00, "target_coverage": 90.0}
-            recommendations = [
-                {
-                    "sku": "Standard_D4s_v5",
-                    "region": "eastus",
-                    "annual_savings": 420.50,
-                    "term": "3 years",
-                    "action": "Purchase RI",
-                }
-            ]
+        except Exception as e:
+            logger.error("Failed to fetch commitments data from Azure",
+                         context={"error": str(e)})
+            error_response = handle_exception(
+                e,
+                ErrorCategory.CLOUD_PROVIDER,
+                context={"endpoint": "/api/finops/commitments/data"},
+                user_message="Unable to fetch commitments data from Azure. Please check your Azure credentials and connection."
+            )
+            return JSONResponse(status_code=503, content=error_response)
 
         return jsonify(
             {
@@ -3555,7 +3518,13 @@ async def get_commitments_data(request: Request):
             }
         )
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        error_response = handle_exception(
+            e,
+            ErrorCategory.INTERNAL,
+            context={"endpoint": "/api/finops/commitments/data"},
+            user_message="Failed to retrieve commitments data. Please try again."
+        )
+        return JSONResponse(status_code=500, content=error_response)
 
 
 @app.get("/api/finops/issues/data")
@@ -3569,37 +3538,16 @@ async def get_issues_data(request: Request):
 
         try:
             issues = await asyncio.to_thread(_fetch_issues)
-        except Exception:
-            # Fallback simulated data
-            issues = [
-                {
-                    "id": "issue-1",
-                    "severity": "Critical",
-                    "type": "Compliance Tag Violation",
-                    "title": "Untagged Dev-Instance in EastUS",
-                    "resource_id": "vm-az-dev-1052",
-                    "daily_waste": 22.40,
-                    "actions": ["DISMISS", "KILL"],
-                },
-                {
-                    "id": "issue-2",
-                    "severity": "Warning",
-                    "type": "Idle Machine Alert",
-                    "title": "Underutilized compute core instances",
-                    "resource_id": "vm-test-db-replica",
-                    "monthly_savings": 180.00,
-                    "actions": ["DISMISS", "RIGHTSIZE"],
-                },
-                {
-                    "id": "issue-3",
-                    "severity": "Info",
-                    "type": "Storage Optimization",
-                    "title": "Orphaned Snapshot Volumes",
-                    "resource_id": "5 snapshots",
-                    "monthly_savings": 45.00,
-                    "actions": ["DISMISS", "KILL"],
-                },
-            ]
+        except Exception as e:
+            logger.error("Failed to fetch issues data from Azure",
+                         context={"error": str(e)})
+            error_response = handle_exception(
+                e,
+                ErrorCategory.CLOUD_PROVIDER,
+                context={"endpoint": "/api/finops/issues/data"},
+                user_message="Unable to fetch issues data from Azure. Please check your Azure credentials and connection."
+            )
+            return JSONResponse(status_code=503, content=error_response)
 
         return jsonify(
             {

@@ -131,6 +131,18 @@ window.loadBudgetData = async () => {
     try {
         const response = await fetch('/api/finops/budget/data');
         const data = await response.json();
+        
+        if (!response.ok || data.status === 'error') {
+            // Show error message to user
+            const errorMessage = data.message || data.user_message || 'Unable to fetch budget data';
+            if (typeof notify === 'function') {
+                notify(errorMessage + '. Please connect your cloud provider in Settings.', 'error');
+            } else {
+                alert(errorMessage + '. Please connect your cloud provider in Settings.');
+            }
+            return;
+        }
+        
         if (data.status === 'success') {
             const budget = data.data;
             // Update UI elements
@@ -151,6 +163,11 @@ window.loadBudgetData = async () => {
         }
     } catch (e) {
         console.error('Failed to load budget data:', e);
+        if (typeof notify === 'function') {
+            notify('Network error: Unable to fetch budget data. Please check your connection and ensure cloud provider is configured.', 'error');
+        } else {
+            alert('Network error: Unable to fetch budget data. Please check your connection and ensure cloud provider is configured.');
+        }
     }
 };
 
@@ -159,6 +176,18 @@ window.loadBudgetChart = async () => {
     try {
         const response = await fetch('/api/finops/budget/chart');
         const data = await response.json();
+        
+        if (!response.ok || data.status === 'error') {
+            // Show error message to user
+            const errorMessage = data.message || data.user_message || 'Unable to fetch budget chart data';
+            if (typeof notify === 'function') {
+                notify(errorMessage + '. Please connect your cloud provider in Settings.', 'error');
+            } else {
+                alert(errorMessage + '. Please connect your cloud provider in Settings.');
+            }
+            return;
+        }
+        
         if (data.status === 'success' && typeof Chart !== 'undefined') {
             // Update or create budget chart
             const ctx = document.getElementById('budgetChart');
@@ -169,6 +198,11 @@ window.loadBudgetChart = async () => {
         }
     } catch (e) {
         console.error('Failed to load budget chart:', e);
+        if (typeof notify === 'function') {
+            notify('Network error: Unable to fetch budget chart data. Please check your connection and ensure cloud provider is configured.', 'error');
+        } else {
+            alert('Network error: Unable to fetch budget chart data. Please check your connection and ensure cloud provider is configured.');
+        }
     }
 };
 
@@ -177,6 +211,18 @@ window.loadIssuesData = async () => {
     try {
         const response = await fetch('/api/finops/issues/data');
         const data = await response.json();
+        
+        if (!response.ok || data.status === 'error') {
+            // Show error message to user
+            const errorMessage = data.message || data.user_message || 'Unable to fetch issues data';
+            if (typeof notify === 'function') {
+                notify(errorMessage + '. Please connect your cloud provider in Settings.', 'error');
+            } else {
+                alert(errorMessage + '. Please connect your cloud provider in Settings.');
+            }
+            return;
+        }
+        
         if (data.status === 'success') {
             // Update issues list
             const issuesList = document.getElementById('issues-list-container');
@@ -187,6 +233,11 @@ window.loadIssuesData = async () => {
         }
     } catch (e) {
         console.error('Failed to load issues data:', e);
+        if (typeof notify === 'function') {
+            notify('Network error: Unable to fetch issues data. Please check your connection and ensure cloud provider is configured.', 'error');
+        } else {
+            alert('Network error: Unable to fetch issues data. Please check your connection and ensure cloud provider is configured.');
+        }
     }
 };
 
@@ -195,6 +246,18 @@ window.loadCommitmentsData = async () => {
     try {
         const response = await fetch('/api/finops/commitments/data');
         const data = await response.json();
+        
+        if (!response.ok || data.status === 'error') {
+            // Show error message to user
+            const errorMessage = data.message || data.user_message || 'Unable to fetch commitments data';
+            if (typeof notify === 'function') {
+                notify(errorMessage + '. Please connect your cloud provider in Settings.', 'error');
+            } else {
+                alert(errorMessage + '. Please connect your cloud provider in Settings.');
+            }
+            return;
+        }
+        
         if (data.status === 'success') {
             const commitments = data.data.active_commitments;
             const portfolio = document.getElementById('commitments-portfolio-container');
@@ -211,6 +274,11 @@ window.loadCommitmentsData = async () => {
         }
     } catch (e) {
         console.error('Failed to load commitments data:', e);
+        if (typeof notify === 'function') {
+            notify('Network error: Unable to fetch commitments data. Please check your connection and ensure cloud provider is configured.', 'error');
+        } else {
+            alert('Network error: Unable to fetch commitments data. Please check your connection and ensure cloud provider is configured.');
+        }
     }
 };
 
