@@ -3,7 +3,7 @@
 [![CI](https://github.com/ankitrout07/Cloud-Reaper/actions/workflows/ci.yml/badge.svg)](https://github.com/ankitrout07/Cloud-Reaper/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.12%2B-blue?logo=python)
 ![Go](https://img.shields.io/badge/Go-1.26%2B-00ADD8?logo=go)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Tests](https://img.shields.io/badge/Tests-53%20Passing-success)
@@ -50,7 +50,7 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 | **🧠 Unified AI/LLM Token Tracking** | Connects to AI providers (OpenAI, Google Gemini) to track generative AI billing alongside infrastructure costs |
 | **🏷️ Tag Health Score** | Automated audit of critical tags (`owner`, `project`) for 100% cost attribution |
 | **📈 ARIMA Anomaly Detection** | Seasonal-aware ARIMA(1,1,1) time-series forecasting with Z-score residual analysis (threshold Z=3.0) |
-| **🌍 Regional Price Intelligence** | Lazy-cached Azure/AWS/GCP SKU pricing per region via `RegionPriceCache` (PostgreSQL) |
+| **🌍 Regional Price Intelligence** | Lazy-cached Azure/AWS/GCP SKU pricing per region via `RegionPriceCache` (SQLite) |
 
 ### 📉 Phase 2 — Optimize: Waste & Carbon Reduction
 
@@ -105,7 +105,7 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
                           │   ├── auth           (Graph API)        │
                           │   └── db bridge      (pgx/v5 + upsert)  │
                           └────────────────────┬────────────────────┘
-                                               │  PostgreSQL 15
+                                               │  SQLite
                           ┌────────────────────▼────────────────────┐
                           │   Python Intelligence Layer             │
                           │   ├── collectors/  Azure, AWS, GCP      │
@@ -127,7 +127,7 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 ### Data Flow
 
 1. **Go Scanner** concurrently scrapes multi-cloud APIs using goroutines with a token-bucket rate limiter (10 req/s)
-2. Resource data is normalized and batch-upserted into PostgreSQL via `pgx/v5`; stale entries auto-purged after 5 min
+2. Resource data is normalized and stored in SQLite; stale entries auto-purged after 5 min
 3. **Python Intelligence Layer** queries the DB, runs ARIMA anomaly detection, Q-learning right-sizing, and unit economics models
 4. **Flask Dashboard** renders real-time metrics via WebSocket (SocketIO) with in-memory cache acceleration
 5. Every vault access and resource action is logged into a **SHA-256 chained hash ledger** for tamper detection
@@ -144,7 +144,7 @@ Cloud-Reaper/
 ├── Makefile                    # Developer shortcuts (install, build, test, lint, fmt)
 ├── docker/
 │   ├── Dockerfile              # Multi-stage Docker build (Go builder → Python runtime)
-│   └── docker-compose.yml      # Full-stack deployment (app + PostgreSQL)
+│   └── docker-compose.yml      # Full-stack deployment (app)
 ├── pyproject.toml              # Ruff, Mypy, Pytest configuration
 ├── requirements.txt            # Runtime dependencies (grouped by category)
 ├── requirements-dev.txt        # Dev/CI dependencies (Ruff, Mypy, Pytest, Bandit)
@@ -231,7 +231,7 @@ Cloud-Reaper/
 │       │   │   ├── consts.go             # Shared constants
 │       │   │   ├── auth.go               # Microsoft Graph user identity
 │       │   │   └── provider.go           # CloudProvider interface (Authenticate / ScanResources)
-│       │   ├── db/                   # PostgreSQL bridge (pgx/v5) + crypto audit
+│       │   ├── db/                   # Database bridge + crypto audit
 │       │   ├── desktop/              # Desktop GUI application
 │       │   └── models/               # Shared Go resource model
 ├── tests/
@@ -251,7 +251,7 @@ Cloud-Reaper/
 |---|---|
 | **Language (Python)** | Python 3.12+ |
 | **Language (Go)** | Go 1.26+ |
-| **Database** | PostgreSQL 15 (SQLAlchemy 2.0 ORM + pgx/v5 driver) |
+| **Database** | SQLite 3 (SQLAlchemy 2.0 ORM + aiosqlite driver) |
 | **Web Framework** | FastAPI + SocketIO (async WebSocket transport) |
 | **AI Copilot** | Google GenAI (`google-genai`) · Gemini 2.5 Flash · Bounded Knapsack Optimizer |
 | **AI Architect** | OpenAI (`openai>=1.50.0`) + Google Gemini (multi-provider BOM generation + offline fallback) |
@@ -278,7 +278,7 @@ The Cloud-Reaper project has been verified to be correctly wired and fully funct
 - ✅ **Hybrid Architecture**: Python intelligence layer + Go performance core properly integrated
 - ✅ **Python Dependencies**: All 53 unit tests passing, core imports functional
 - ✅ **Go Engine**: Compiled successfully (Go 1.26.4), CLI operational with multiple modes
-- ✅ **Database**: PostgreSQL running in Docker, models import correctly
+- ✅ **Database**: SQLite configured, models import correctly
 - ✅ **Configuration**: Environment structure properly configured
 - ✅ **Entry Points**: CLI and web interfaces responding correctly
 - ✅ **Metrics System**: Updated to require real cloud data only - no simulated/fallback data
@@ -302,7 +302,6 @@ The Cloud-Reaper project has been verified to be correctly wired and fully funct
 
 - Python 3.12+
 - Go 1.26+
-- Docker (for PostgreSQL)
 - Azure CLI (`az login`) — for Azure scanning
 - Cloud Provider Credentials — Required for metrics and cost optimization features:
   - **Azure**: `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`
@@ -323,7 +322,7 @@ python bootstrap.py
 2. Installs all dependencies from `requirements.txt` and `requirements-dev.txt`
 3. Builds the Go performance engine binary to `bin/reaper-engine`
 4. Scaffolds `.env` file (prompts for credentials including `GEMINI_API_KEY` and cloud provider credentials)
-5. Initializes PostgreSQL schema via `init_db()`
+5. Initializes SQLite database via `init_db()`
 6. Launches the dashboard at **http://localhost:5001**
 
 > Full setup guide → **[HOW_TO_RUN.md](HOW_TO_RUN.md)**
@@ -358,24 +357,18 @@ python main.py --metrics --provider gcp
 ### Manual Setup
 
 ```bash
-# 1. Start PostgreSQL
-docker run --name cloud-reaper-db \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=cloud_reaper \
-  -p 5432:5432 -d postgres:15-alpine
-
-# 2. Python environment
+# 1. Python environment
 python -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt -r requirements-dev.txt
 
-# 3. Environment variables
+# 2. Environment variables
 cp .env.example .env              # Edit with your credentials
 
-# 4. Build Go engine
+# 3. Build Go engine
 cd src/engine-go && go build -tags cli -o ../../bin/reaper-engine main_cli.go && cd ../..
 
-# 5. Launch dashboard
+# 4. Launch dashboard
 PYTHONPATH=src python -m reaper.web.app_async
 ```
 
@@ -413,12 +406,11 @@ python main.py --pr-simulation [optional-plan-file.json]
 ### Docker Compose (Recommended)
 
 ```bash
-# Full-stack deployment: app + PostgreSQL
+# Full-stack deployment: app
 docker compose -f docker/docker-compose.yml up -d
 ```
 
 This launches:
-- **`cloud-reaper-db`** — PostgreSQL 15 (Alpine) with persistent volume
 - **`cloud-reaper-app`** — Multi-stage build (Go builder → Python 3.12 runtime)
 
 Dashboard available at **http://localhost:5001**
@@ -428,7 +420,7 @@ Dashboard available at **http://localhost:5001**
 ```bash
 docker build -t cloud-reaper:latest -f docker/Dockerfile .
 docker run -p 5001:5001 \
-  -e DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/cloud_reaper \
+  -e DATABASE_URL=sqlite:///./data/reaper.db \
   -e AZURE_SUBSCRIPTION_ID=your-sub-id \
   cloud-reaper:latest
 ```
@@ -698,7 +690,7 @@ Outputs a Markdown table of infrastructure changes (CREATE/DESTROY), their cost 
 
 ## 🗄️ Database Schema
 
-Cloud-Reaper uses PostgreSQL 15 with **13 managed tables** (auto-initialized via `init_db()`):
+Cloud-Reaper uses SQLite with **13 managed tables** (auto-initialized via `init_db()`):
 
 | Table | Purpose |
 |---|---|
@@ -716,15 +708,7 @@ Cloud-Reaper uses PostgreSQL 15 with **13 managed tables** (auto-initialized via
 | `budget_alerts` | Notification thresholds + channel configs per budget |
 | `cloud_commitments` | Reserved Instance and Savings Plan contracts (AWS + Azure) |
 
-```bash
-# Spin up PostgreSQL
-docker run --name cloud-reaper-db \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=cloud_reaper \
-  -p 5432:5432 -d postgres:15-alpine
-
-# Schema auto-initializes via bootstrap.py
-```
+Schema auto-initializes via `bootstrap.py` or `init_db()`.
 
 ---
 
@@ -809,7 +793,7 @@ The GitHub Actions pipeline runs **7 parallel quality gates** on every push/PR t
 | `test-python` | `auto-lint-format` | Pytest + coverage → Codecov upload |
 | `test-go` | `auto-lint-format` | Go tests + binary build → artifact upload |
 | `security` | — | Bandit SAST + Safety dependency scan |
-| `integration` | `test-python` + `test-go` | PostgreSQL service container + wiring smoke test |
+| `integration` | `test-python` + `test-go` | Integration smoke test |
 | `docker-build` | `integration` | Full multi-stage Docker image build & verify |
 | `summary` | `integration` + `docker-build` | Final CI status report |
 
@@ -844,7 +828,7 @@ cp .env.example .env
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | **Yes** | PostgreSQL connection string |
+| `DATABASE_URL` | ❌ | Database connection string (SQLite by default) | `sqlite:///./data/reaper.db` |
 | `FLASK_PORT` | No | Dashboard port (default: `5001`) |
 | `FLASK_HOST` | No | Dashboard bind host (default: `127.0.0.1`) |
 | `FLASK_DEBUG` | No | Enable Flask debug mode (`True` / `False`) |

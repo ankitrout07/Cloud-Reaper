@@ -400,7 +400,7 @@ class RightsizingAgent:
         net_d = _disc(df["net"])
 
         # Build state tuples and resolve Q-values --------------------------------
-        states = list(zip(cpu_d, mem_d, iops_d, net_d))
+        states = list(zip(cpu_d, mem_d, iops_d, net_d, strict=False))
         q_vals = np.array(
             [self.q_table.get(s, np.zeros(len(self.actions))) for s in states],
             dtype=np.float64,

@@ -2,7 +2,6 @@ import json
 
 import numpy as np
 import pandas as pd
-from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 
@@ -68,49 +67,6 @@ class WorkloadPersonality:
             }
         except Exception as e:
             return {"personality": "Unknown", "error": str(e)}
-
-
-class PredictiveScalingEngine:
-    """
-    Forecasts future demand to allow for pre-emptive scaling (pre-warming).
-    """
-
-    def __init__(self, forecast_steps=15):
-        self.forecast_steps = forecast_steps
-
-    def predict_load(self, metric_history):
-        """
-        Predicts future load and recommends actions.
-        """
-        if len(metric_history) < 10:
-            return {"action": "NONE", "reason": "Insufficient history"}
-
-        try:
-            # Use ARIMA for short-term forecasting
-            model = ARIMA(metric_history, order=(1, 1, 0))
-            model_fit = model.fit()
-            forecast = model_fit.forecast(steps=self.forecast_steps)
-
-            latest_val = metric_history[-1]
-            peak_forecast = max(forecast)
-
-            action = "STAY"
-            if peak_forecast > 85:
-                action = "PRE_WARM"
-            elif peak_forecast < 20 and latest_val < 30:
-                action = "SCALE_DOWN"
-
-            return {
-                "current_load": round(float(latest_val), 1),
-                "predicted_peak": round(float(peak_forecast), 1),
-                "forecast_window_min": self.forecast_steps,
-                "action": action,
-                "reason": f"Forecasted peak of {peak_forecast:.1f}% exceeds threshold."
-                if action == "PRE_WARM"
-                else "Load within safe bounds.",
-            }
-        except Exception:
-            return {"action": "ERROR", "reason": "Forecasting failed"}
 
 
 class SpotAdvisor:
@@ -322,15 +278,8 @@ if __name__ == "__main__":
     personality = analyzer.analyze(history)
     print(json.dumps(personality, indent=2))
 
-    # 2. Predictive Scaling Demo
-    print("\n[2] Testing Predictive Scaling...")
-    linear_trend = [20, 22, 25, 30, 38, 45, 55, 68, 75, 82]  # Rapidly increasing load
-    scaler = PredictiveScalingEngine(forecast_steps=10)
-    prediction = scaler.predict_load(linear_trend)
-    print(json.dumps(prediction, indent=2))
-
-    # 3. Spot Advisor Demo
-    print("\n[3] Testing Spot Advisor...")
+    # 2. Spot Advisor Demo
+    print("\n[2] Testing Spot Advisor...")
     advisor = SpotAdvisor()
     risk = advisor.get_interruption_risk("Standard_F4s_v2", "southindia")
     print(json.dumps(risk, indent=2))

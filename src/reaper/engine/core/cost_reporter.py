@@ -310,7 +310,7 @@ class AutomatedCostReporter:
             ] += 1
 
         # Calculate averages
-        for cat, analysis in category_analysis.items():
+        for _cat, analysis in category_analysis.items():
             if analysis["recommendation_count"] > 0:
                 analysis["average_savings_per_recommendation"] = (
                     analysis["total_potential_savings"] / analysis["recommendation_count"]

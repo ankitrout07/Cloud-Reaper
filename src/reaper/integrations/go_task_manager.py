@@ -145,7 +145,7 @@ class GoTaskManagerBridge(BaseGoBridge):
             True if cancellation was successful
         """
         try:
-            data = await self._make_request("POST", f"/api/tasks/cancel/{task_id}")
+            await self._make_request("POST", f"/api/tasks/cancel/{task_id}")
             return True
         except GoBridgeError as e:
             raise Exception(f"Failed to cancel task: {e}")
@@ -162,7 +162,7 @@ class GoTaskManagerBridge(BaseGoBridge):
             True if update was successful
         """
         try:
-            data = await self._make_request(
+            await self._make_request(
                 "POST", f"/api/tasks/progress/{task_id}", json_data={"progress": progress}
             )
             return True

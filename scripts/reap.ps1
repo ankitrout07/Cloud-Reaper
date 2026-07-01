@@ -41,26 +41,8 @@ if ($pythonVersion -lt [version]"3.12") {
     exit 1
 }
 
-# Check if Docker is available for PostgreSQL
-if (Get-Command "docker" -ErrorAction SilentlyContinue) {
-    Write-Host "[*] Docker found - checking PostgreSQL container..."
-    $dockerPs = & docker ps -a | Select-String "cloud-reaper-db"
-    if (-not $dockerPs) {
-        Write-Host "[*] Starting PostgreSQL container..."
-        & docker run --name cloud-reaper-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres
-        Write-Host "[*] Waiting for PostgreSQL to be ready..."
-        Start-Sleep -Seconds 3
-    } else {
-        $dockerPsRunning = & docker ps | Select-String "cloud-reaper-db"
-        if (-not $dockerPsRunning) {
-            Write-Host "[*] Starting existing PostgreSQL container..."
-            & docker start cloud-reaper-db
-            Start-Sleep -Seconds 3
-        }
-    }
-} else {
-    Write-Host "[!] Docker not found. Please install Docker or start PostgreSQL manually." -ForegroundColor Yellow
-}
+# SQLite is used by default - no Docker container needed
+Write-Host "[*] Using SQLite database (no external database required)"
 
 # 1. Build Go Core (Performance Engine)
 if (Test-Path "src\engine-go") {
@@ -97,8 +79,8 @@ AZURE_TENANT_ID=your_tenant_id
 AZURE_CLIENT_ID=your_client_id
 AZURE_CLIENT_SECRET=your_client_secret
 
-# Database (PostgreSQL via Docker)
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+# Database (SQLite - no setup required)
+DATABASE_URL=sqlite:///./data/reaper.db
 
 # Flask Web Dashboard
 FLASK_PORT=5001
@@ -112,8 +94,8 @@ FLASK_DEBUG=True
     if (-not ($envFileContent -match "^DATABASE_URL=")) {
         Write-Host "[*] Adding DATABASE_URL to existing .env file..."
         Add-Content -Path ".env" -Value ""
-        Add-Content -Path ".env" -Value "# Database (PostgreSQL via Docker)"
-        Add-Content -Path ".env" -Value "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres"
+        Add-Content -Path ".env" -Value "# Database (SQLite - no setup required)"
+        Add-Content -Path ".env" -Value "DATABASE_URL=sqlite:///./data/reaper.db"
     }
 }
 

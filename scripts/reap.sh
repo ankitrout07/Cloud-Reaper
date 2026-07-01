@@ -38,18 +38,8 @@ if [[ "$(printf '%s\n' "$PYTHON_VERSION" "3.12" | sort -V | head -n1)" != "3.12"
     exit 1
 fi
 
-# Check if Docker is available for PostgreSQL
-if command -v docker &> /dev/null; then
-    echo "[*] Docker found - checking PostgreSQL container..."
-    if ! docker ps | grep -q cloud-reaper-db; then
-        echo "[*] Starting PostgreSQL container..."
-        docker run --name cloud-reaper-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres >/dev/null 2>&1 || true
-        echo "[*] Waiting for PostgreSQL to be ready..."
-        sleep 3
-    fi
-else
-    echo "[!] Docker not found. Please install Docker or start PostgreSQL manually."
-fi
+# SQLite is used by default - no Docker container needed
+echo "[*] Using SQLite database (no external database required)"
 
 # 1. Build Go Core (Performance Engine)
 if [ -d "src/engine-go" ]; then
@@ -85,8 +75,8 @@ AZURE_TENANT_ID=your_tenant_id
 AZURE_CLIENT_ID=your_client_id
 AZURE_CLIENT_SECRET=your_client_secret
 
-# Database (PostgreSQL via Docker)
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+# Database (SQLite - no setup required)
+DATABASE_URL=sqlite:///./data/reaper.db
 EOF
     echo "[+] .env file created. Please update Azure credentials!"
 else
@@ -94,8 +84,8 @@ else
     if ! grep -q "^DATABASE_URL=" .env; then
         echo "[*] Adding DATABASE_URL to existing .env file..."
         echo "" >> .env
-        echo "# Database (PostgreSQL via Docker)" >> .env
-        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres" >> .env
+        echo "# Database (SQLite - no setup required)" >> .env
+        echo "DATABASE_URL=sqlite:///./data/reaper.db" >> .env
     fi
 fi
 

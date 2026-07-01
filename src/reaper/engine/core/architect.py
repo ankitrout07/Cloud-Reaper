@@ -448,7 +448,7 @@ class AIArchitectManager:
         merged_components = list(base_blueprint.components)
 
         # Add unique components from other blueprints
-        for source_name, blueprint in blueprints[1:]:
+        for _source_name, blueprint in blueprints[1:]:
             for comp in blueprint.components:
                 # Check if component type already exists
                 if not any(c.component_type == comp.component_type for c in merged_components):

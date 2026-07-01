@@ -41,30 +41,6 @@ class BusinessCorrelation:
         }
 
 
-class ProportionalAllocator:
-    def __init__(self):
-        pass
-
-    def attribute_shared_costs(self, shared_cost, usage_map):
-        """
-        Formula: Cost_Team = (Usage_Team / Usage_Total) * Cost_Shared
-        usage_map: { 'team_a': 500, 'team_b': 300, ... } (Network Out in GB)
-        """
-        total_usage = sum(usage_map.values())
-        if total_usage == 0:
-            return dict.fromkeys(usage_map, 0)
-
-        allocations = {}
-        for team, usage in usage_map.items():
-            percentage = usage / total_usage
-            allocations[team] = {
-                "allocated_cost": round(percentage * shared_cost, 2),
-                "usage_percentage": round(percentage * 100, 2),
-            }
-
-        return allocations
-
-
 class RegionalArbitrage:
     def __init__(self):
         # Top regions to compare against

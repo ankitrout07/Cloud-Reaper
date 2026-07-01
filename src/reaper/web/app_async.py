@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from datetime import timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any, cast
@@ -29,6 +30,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from starlette.middleware.sessions import SessionMiddleware
+
+from reaper.utils.error_handler import ErrorCategory, handle_exception, get_logger
 
 # Try to import Go WebSocket batcher for enhanced performance
 try:
@@ -276,8 +279,8 @@ class WebSocketBatcher:
         if self.use_go_backend:
             try:
                 # Get Go WebSocket batcher host/port from environment or use defaults
-                go_host = os.getenv("GO_WEBSOCKET_HOST", "localhost")
-                go_port = int(os.getenv("GO_WEBSOCKET_PORT", "7072"))
+                os.getenv("GO_WEBSOCKET_HOST", "localhost")
+                int(os.getenv("GO_WEBSOCKET_PORT", "7072"))
                 # Don't initialize immediately, will be done lazily
                 print("[Go WebSocket Batcher] Using Go backend for enhanced performance")
             except Exception as e:
@@ -285,7 +288,7 @@ class WebSocketBatcher:
                 self.use_go_backend = False
                 self.go_batcher = None
 
-    async def emit(self, event: str, data: dict, room: str = None):
+    async def emit(self, event: str, data: dict, room: str | None = None):
         """Queue a message for batched emission."""
         # Try to use Go backend if available
         if self.use_go_backend:
@@ -316,12 +319,12 @@ class WebSocketBatcher:
             elif event not in self.timers or self.timers[event].cancelled():
                 self.timers[event] = asyncio.create_task(self._schedule_flush(event, room))
 
-    async def _schedule_flush(self, event: str, room: str = None):
+    async def _schedule_flush(self, event: str, room: str | None = None):
         """Schedule batch flush after interval."""
         await asyncio.sleep(self.batch_interval)
         await self._flush_batch(event, room)
 
-    async def _flush_batch(self, event: str, room: str = None):
+    async def _flush_batch(self, event: str, room: str | None = None):
         """Flush all pending messages for an event."""
         async with self.lock:
             if event not in self.batches or not self.batches[event]:
@@ -367,10 +370,7 @@ from starlette.requests import Request as StarletteRequest
 
 
 def jsonify(*args, **kwargs):
-    if args and isinstance(args[0], dict):
-        content = args[0]
-    else:
-        content = kwargs
+    content = args[0] if args and isinstance(args[0], dict) else kwargs
     status_code = kwargs.pop("status_code", 200)
     return JSONResponse(content=content, status_code=status_code)
 
@@ -623,9 +623,8 @@ async def _get_cached_user_info(request: Request) -> tuple[str, str]:
     timestamp = request.session.get(f"{cache_key_prefix}_timestamp")
 
     # Return cached data if valid
-    if user_name and sub_name and timestamp:
-        if time.time() - float(timestamp) < cache_ttl:
-            return user_name, sub_name
+    if user_name and sub_name and timestamp and time.time() - float(timestamp) < cache_ttl:
+        return user_name, sub_name
 
     # Fetch fresh data and cache it
     try:
@@ -1031,7 +1030,7 @@ def _validate_cloud_credentials(provider: str, credentials: dict[str, Any]) -> d
 
                 if credentials.get("service_account_json"):
                     try:
-                        service_account_info = json.loads(credentials["service_account_json"])
+                        json.loads(credentials["service_account_json"])
                         return {
                             "valid": True,
                             "message": "GCP credentials validated successfully",
@@ -1621,7 +1620,7 @@ async def financial(request: Request):
 @app.post("/api/v1/finops/simulate/commitment")
 async def simulate_commitment(request: Request):
     # Placeholder simulator logic.
-    data = (await request.json() if await request.body() else {}) or {}
+    (await request.json() if await request.body() else {}) or {}
     return jsonify(
         {
             "status": "success",
@@ -1635,7 +1634,7 @@ async def simulate_commitment(request: Request):
 @app.post("/api/v1/finops/simulate/policy")
 async def simulate_policy(request: Request):
     # Placeholder logic for what-if policy application.
-    data = (await request.json() if await request.body() else {}) or {}
+    (await request.json() if await request.body() else {}) or {}
     return jsonify(
         {
             "status": "success",
@@ -2445,7 +2444,7 @@ async def get_resource_inventory(request: Request):
 
             vm_costs = await asyncio.gather(*vm_cost_tasks)
 
-            for vm, cost in zip(vms, vm_costs):
+            for vm, cost in zip(vms, vm_costs, strict=False):
                 is_idle = vm["name"] in idle_vm_names
                 _add(
                     "virtual_machines",
@@ -2490,7 +2489,7 @@ async def get_resource_inventory(request: Request):
 
             disk_costs = await asyncio.gather(*disk_cost_tasks)
 
-            for disk, cost in zip(all_disks, disk_costs):
+            for disk, cost in zip(all_disks, disk_costs, strict=False):
                 is_orphaned = disk.name in orphaned_disk_names
                 _add(
                     "disks",
@@ -2531,7 +2530,7 @@ async def get_resource_inventory(request: Request):
 
             storage_costs = await asyncio.gather(*storage_cost_tasks)
 
-            for acc, cost in zip(storage_accounts, storage_costs):
+            for acc, cost in zip(storage_accounts, storage_costs, strict=False):
                 tier = acc.get("access_tier", "Hot")
                 _add(
                     "storage_accounts",
@@ -2585,7 +2584,7 @@ async def get_resource_inventory(request: Request):
             # Process IPs (first half of costs)
             ip_count = len(ips_result)
             ip_costs = network_costs[:ip_count]
-            for ip, cost in zip(ips_result, ip_costs):
+            for ip, cost in zip(ips_result, ip_costs, strict=False):
                 _add(
                     "network_resources",
                     {
@@ -2604,7 +2603,7 @@ async def get_resource_inventory(request: Request):
 
             # Process load balancers (second half of costs)
             lb_costs = network_costs[ip_count:]
-            for lb, cost in zip(lbs_result, lb_costs):
+            for lb, cost in zip(lbs_result, lb_costs, strict=False):
                 _add(
                     "network_resources",
                     {
@@ -3404,8 +3403,9 @@ async def dismiss_resource(request: Request, resource_id: str):
 @app.get("/api/finops/budget/data")
 async def get_budget_data(request: Request):
     """Get comprehensive budget pacing data for the financial dashboard."""
+    logger = get_logger("budget_api")
     try:
-        budget_threshold = float(settings_state.get("budget_threshold", 1000.0))
+        budget_threshold = float(settings_state.get("budget_threshold", 1000.0) or 1000.0)
 
         # Get actual spend data from Azure Collector if available
         def _fetch_cost_data():
@@ -3417,7 +3417,9 @@ async def get_budget_data(request: Request):
             cumulative_spend = cost_data.get("cumulative_spend", 0)
             budget_pace = cost_data.get("budget_pace", 0)
             daily_spend = cost_data.get("daily_spend", [])
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to fetch cost data from Azure, using fallback", 
+                         context={"error": str(e)})
             # Fallback to simulated data
             cumulative_spend = 3420.50
             budget_pace = 114.02
@@ -3444,7 +3446,13 @@ async def get_budget_data(request: Request):
             }
         )
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        error_response = handle_exception(
+            e,
+            ErrorCategory.INTERNAL,
+            context={"endpoint": "/api/finops/budget/data"},
+            user_message="Failed to retrieve budget data. Please try again."
+        )
+        return JSONResponse(status_code=500, content=error_response)
 
 
 @app.post("/api/finops/budget/update")
@@ -3753,7 +3761,7 @@ async def apply_policy_api(request: Request):
     """Apply a governance policy."""
     try:
         data = (await request.json() if await request.body() else {}) or {}
-        policy_config = data.get("policy")
+        data.get("policy")
 
         # In a real implementation, this would save policy configuration
         return jsonify(
@@ -3927,9 +3935,8 @@ async def api_dashboard_finops_charts(request: Request):
     cached_timestamp = request.session.get(f"{cache_key}_timestamp")
 
     # Return cached data if valid
-    if cached_charts and cached_timestamp:
-        if time.time() - float(cached_timestamp) < cache_ttl:
-            return {"status": "ok", "charts": cached_charts, "cached": True}
+    if cached_charts and cached_timestamp and time.time() - float(cached_timestamp) < cache_ttl:
+        return {"status": "ok", "charts": cached_charts, "cached": True}
 
     try:
 
@@ -4423,7 +4430,7 @@ async def get_prices_filters(request: Request):
 async def refresh_prices(request: Request):
     provider = (
         ((await request.json() if await request.body() else {}) or {}).get("provider")
-        if request.is_json
+        if request.headers.get("content-type", "").startswith("application/json")
         else None
     )
     providers = [provider] if provider else ["azure", "aws", "gcp"]
@@ -5946,7 +5953,7 @@ async def get_optimization_summary(request: Request):
 async def get_optimization_categories(request: Request):
     """Get recommendations grouped by optimization category"""
     try:
-        by_category = {}
+        by_category: dict[str, int] = {}
         for rec in cost_optimizer.recommendations:
             cat = rec.category.value
             if cat not in by_category:
@@ -6149,7 +6156,7 @@ async def generate_cost_report(request: Request):
                 "status": "success",
                 "format": format_type,
                 "report": report_content,
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
             }
         )
     except Exception as e:

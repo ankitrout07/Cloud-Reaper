@@ -61,10 +61,7 @@ def display_finops_performance_metrics(cloud_provider: str | None = None):
                 total_vms = len(vm_inventory) if vm_inventory else 0
                 idle_count = len(idle_vms) if idle_vms else 0
 
-                if total_vms > 0:
-                    rsi = ((total_vms - idle_count) / total_vms) * 100
-                else:
-                    rsi = 100.0
+                rsi = (total_vms - idle_count) / total_vms * 100 if total_vms > 0 else 100.0
 
                 compute_metrics = {
                     "rsi": rsi,

@@ -11,8 +11,8 @@ Install the following before starting:
 | Tool | Version | Install |
 |---|---|---|
 | Python | 3.12+ | [python.org](https://www.python.org/downloads/) |
-| Go | 1.24+ | [golang.org/dl](https://golang.org/dl/) |
-| Docker | Latest | [docs.docker.com](https://docs.docker.com/get-docker/) |
+| Go | 1.26+ | [golang.org/dl](https://golang.org/dl/) |
+| Docker | Optional | [docs.docker.com](https://docs.docker.com/get-docker/) |
 | Azure CLI | Latest | `brew install azure-cli` / `winget install Microsoft.AzureCLI` |
 | Git | Latest | [git-scm.com](https://git-scm.com/) |
 
@@ -37,12 +37,12 @@ python bootstrap.py
 ```
 
 ### What `bootstrap.py` does automatically:
-1. ✅ Verifies Go and Docker are installed
-2. ✅ Starts a PostgreSQL Docker container (`cloud-reaper-db`)
-3. ✅ Builds the Go performance engine (`src/engine-go/reaper-engine`)
-4. ✅ Creates a Python virtual environment (`./venv`)
-5. ✅ Installs all Python dependencies (`requirements.txt` + `requirements-dev.txt`)
-6. ✅ Generates a default `.env` file if one doesn't exist
+1. ✅ Verifies Go is installed
+2. ✅ Builds the Go performance engine (`src/engine-go/reaper-engine`)
+3. ✅ Creates a Python virtual environment (`./venv`)
+4. ✅ Installs all Python dependencies (`requirements.txt` + `requirements-dev.txt`)
+5. ✅ Generates a default `.env` file if one doesn't exist
+6. ✅ Initializes SQLite database
 7. ✅ Launches the dashboard at **http://localhost:5001**
 
 > **macOS note:** Port 5001 is used by default to avoid AirPlay Receiver conflicts on port 5000.
@@ -104,14 +104,7 @@ go build -o reaper-engine .
 cd ../..
 ```
 
-### Step 4 — Start PostgreSQL
-```bash
-docker run --name cloud-reaper-db \
-  -e POSTGRES_PASSWORD=postgres \
-  -p 5432:5432 -d postgres
-```
-
-### Step 5 — Configure Environment
+### Step 4 — Configure Environment
 
 Create a `.env` file at the project root:
 
@@ -127,8 +120,8 @@ AZURE_TENANT_ID=your-tenant-id
 AZURE_CLIENT_ID=your-client-id
 AZURE_CLIENT_SECRET=your-client-secret
 
-# Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+# Database (SQLite - no setup required)
+DATABASE_URL=sqlite:///./data/reaper.db
 
 # Notifications (optional)
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
@@ -197,7 +190,7 @@ safety check --file requirements.txt
 | `AZURE_TENANT_ID` | ✅ | Azure AD Tenant | — |
 | `AZURE_CLIENT_ID` | ✅ | Service Principal App ID | — |
 | `AZURE_CLIENT_SECRET` | ✅ | Service Principal Secret | — |
-| `DATABASE_URL` | ✅ | PostgreSQL connection string | — |
+| `DATABASE_URL` | ❌ | Database connection string (SQLite by default) | `sqlite:///./data/reaper.db` |
 | `FLASK_PORT` | ❌ | Dashboard port | `5001` |
 | `FLASK_HOST` | ❌ | Dashboard bind address | `127.0.0.1` |
 | `FLASK_DEBUG` | ❌ | Enable debug mode | `True` |
@@ -211,7 +204,6 @@ safety check --file requirements.txt
 |---|---|---|
 | `ModuleNotFoundError: reaper` | `PYTHONPATH` not set | Run with `python -m reaper.web.app` or set `export PYTHONPATH=$(pwd)/src` |
 | `Address already in use :5001` | Another process on 5001 | `lsof -i :5001` and kill the process, or set `FLASK_PORT=5002` in `.env` |
-| `FATAL: role "postgres" does not exist` | DB container not running | `docker start cloud-reaper-db` or re-run `bootstrap.py` |
 | `go: command not found` | Go not in PATH | Add Go to PATH: `export PATH=$PATH:/usr/local/go/bin` |
 | `reaper-engine: permission denied` | Binary not executable | `chmod +x src/engine-go/reaper-engine` |
 | `az: command not found` | Azure CLI not installed | Follow [Azure CLI install guide](https://learn.microsoft.com/cli/azure/install-azure-cli) |

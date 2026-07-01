@@ -282,7 +282,7 @@ class ComprehensiveCostOptimizer:
 
         provider = resource_data.get("provider", "").lower()
         resource_type = resource_data.get("type", "").lower()
-        current_sku = resource_data.get("sku", "")
+        resource_data.get("sku", "")
         region = resource_data.get("region", "")
 
         # Generate recommendations based on resource type
@@ -319,9 +319,9 @@ class ComprehensiveCostOptimizer:
     ) -> list[CostRecommendation]:
         """Analyze compute resources for optimization opportunities"""
         recommendations = []
-        resource_id = resource_data.get("id", "")
-        resource_name = resource_data.get("name", "")
-        current_sku = resource_data.get("sku", "")
+        resource_data.get("id", "")
+        resource_data.get("name", "")
+        resource_data.get("sku", "")
 
         # 1. Right-sizing recommendations
         right_size_rec = self._generate_right_sizing_recommendation(

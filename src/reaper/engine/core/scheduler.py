@@ -51,7 +51,7 @@ class WorkloadClassifier:
         resource_name = resource.get("name", "").lower()
 
         # Check tags first (most reliable)
-        for tag_key, variations in self.tag_key_mapping.items():
+        for _tag_key, variations in self.tag_key_mapping.items():
             for variation in variations:
                 if variation in tags:
                     env_value = str(tags[variation]).lower()

@@ -653,7 +653,7 @@ class DocSearchEngine:
                         vec2 = self.docs_index[sel_idx].get("vector", [])
                         if vec1 and vec2 and len(vec1) == len(vec2) and len(vec1) > 0:
                             # Cosine similarity
-                            dot = sum(v1 * v2 for v1, v2 in zip(vec1, vec2))
+                            dot = sum(v1 * v2 for v1, v2 in zip(vec1, vec2, strict=False))
                             norm1 = sum(v * v for v in vec1) ** 0.5
                             norm2 = sum(v * v for v in vec2) ** 0.5
                             if norm1 > 0 and norm2 > 0:
@@ -738,7 +738,7 @@ class DocSearchEngine:
                     all_rrf_scores[idx] = max(all_rrf_scores[idx], rrf_score)
 
         # Convert to sorted list
-        rrf_scores = [(idx, score) for idx, score in all_rrf_scores.items()]
+        rrf_scores = list(all_rrf_scores.items())
         rrf_scores.sort(key=lambda x: x[1], reverse=True)
 
         # Apply MMR for diversity

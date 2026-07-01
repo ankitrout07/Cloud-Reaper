@@ -1669,7 +1669,7 @@ class AzureCollector:
             ri_candidates = self.get_ri_sp_candidates()
 
             commitments = []
-            for i, candidate in enumerate(ri_candidates[:2]):
+            for _i, candidate in enumerate(ri_candidates[:2]):
                 commitments.append(
                     {
                         "provider": "Azure",
@@ -2309,8 +2309,8 @@ class AzureCollector:
                         # Try to get actual storage metrics instead of assuming 100GB
                         try:
                             # Get actual storage usage if possible
-                            account_name = account.get("name")
-                            resource_group = (
+                            account.get("name")
+                            (
                                 account.get("id", "").split("resourceGroups/")[1].split("/")[0]
                                 if "resourceGroups/" in account.get("id", "")
                                 else "unknown"
