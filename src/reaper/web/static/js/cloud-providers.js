@@ -1,11 +1,17 @@
-const CLOUD_PROVIDERS = ["aws", "azure", "gcp", "k8s"];
+const CLOUD_PROVIDERS = ["aws", "azure", "gcp"];
 
 async function readSettingsFileContent(inputId) {
     const input = document.getElementById(inputId);
     if (!input || !input.files || !input.files[0]) {
         return null;
     }
-    return input.files[0].text();
+    
+    try {
+        return await input.files[0].text();
+    } catch (error) {
+        console.error('[cloud-providers] Failed to read file content:', error);
+        return null;
+    }
 }
 
 function collectProviderCredentials(provider) {
@@ -30,13 +36,6 @@ function collectProviderCredentials(provider) {
             service_account_json: null,
         };
     }
-    if (provider === "k8s") {
-        return {
-            kubeconfig: document.getElementById("settings-k8s-kubeconfig")?.value.trim(),
-            service_account_token: document.getElementById("settings-k8s-service-account-token")?.value.trim(),
-            context: document.getElementById("settings-k8s-context")?.value.trim(),
-        };
-    }
     return {};
 }
 
@@ -44,19 +43,13 @@ async function connectSettingsProvider(provider) {
     const btn = document.getElementById(`settings-connect-${provider}`);
     if (btn) {
         btn.disabled = true;
-        btn.textContent = "Connecting...";
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Connecting...';
     }
 
     let credentials = collectProviderCredentials(provider);
     if (provider === "gcp") {
         const serviceAccount = await readSettingsFileContent("settings-gcp-key-file");
         credentials.service_account_json = serviceAccount;
-    }
-    if (provider === "k8s") {
-        const kubeconfigFile = await readSettingsFileContent("settings-k8s-kubeconfig-file");
-        if (!credentials.kubeconfig && kubeconfigFile) {
-            credentials.kubeconfig = kubeconfigFile;
-        }
     }
 
     try {
@@ -69,6 +62,11 @@ async function connectSettingsProvider(provider) {
                 credentials,
             }),
         });
+        
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
         const data = await res.json();
         if (data.status !== "success") {
             throw new Error(data.message || "Failed to connect provider");
@@ -77,14 +75,22 @@ async function connectSettingsProvider(provider) {
             showToast(data.message, "success");
         }
         await refreshCloudConnections();
+        
+        // Auto-close panel on success
+        if (btn) {
+            setTimeout(() => {
+                toggleCloudPanel(provider);
+            }, 1000);
+        }
     } catch (error) {
+        console.error('[cloud-providers] Connection failed:', error);
         if (typeof showToast === "function") {
-            showToast(error.message, "error");
+            showToast(error.message || "Connection failed", "error");
         }
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.textContent = "Connect & Activate";
+            btn.innerHTML = 'Connect & Activate';
         }
     }
 }
@@ -92,6 +98,11 @@ async function connectSettingsProvider(provider) {
 async function switchSettingsProvider(provider) {
     try {
         const res = await fetch(`/api/context/switch?provider=${encodeURIComponent(provider)}`);
+        
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
         const data = await res.json();
         if (data.status === "redirect" && data.url) {
             window.location.href = data.url;
@@ -106,8 +117,9 @@ async function switchSettingsProvider(provider) {
         }
         throw new Error(data.message || "Failed to switch provider");
     } catch (error) {
+        console.error('[cloud-providers] Switch provider failed:', error);
         if (typeof showToast === "function") {
-            showToast(error.message, "error");
+            showToast(error.message || "Failed to switch provider", "error");
         }
     }
 }
@@ -116,6 +128,8 @@ function updateCloudProviderCards(connections, activeProvider) {
     CLOUD_PROVIDERS.forEach((provider) => {
         const statusEl = document.getElementById(`cloud-status-${provider}`);
         const switchBtn = document.getElementById(`cloud-switch-${provider}`);
+        const card = document.getElementById(`cloud-status-${provider}`)?.closest('.group') || 
+                     document.getElementById(`cloud-status-${provider}`)?.closest('[class*="p-8"]');
         const info = connections[provider];
         const isActive = activeProvider === provider || (info && info.is_active);
 
@@ -136,18 +150,33 @@ function updateCloudProviderCards(connections, activeProvider) {
             switchBtn.disabled = !info || isActive;
             switchBtn.classList.toggle("opacity-40", !info || isActive);
         }
+        
+        // Add visual indicator to card for active provider
+        if (card && isActive) {
+            card.classList.add('border-cyan-400', 'bg-cyan-500/10');
+            card.classList.remove('border-gray-700', 'border-white/[0.06]');
+        } else if (card) {
+            card.classList.remove('border-cyan-400', 'bg-cyan-500/10');
+            card.classList.add('border-gray-700', 'border-white/[0.06]');
+        }
     });
 }
 
 async function refreshCloudConnections() {
     try {
         const res = await fetch("/api/settings/cloud-connections");
+        
+        if (!res.ok) {
+            console.warn('[cloud-providers] Cloud connections endpoint returned non-OK status:', res.status);
+            return;
+        }
+        
         const data = await res.json();
         if (data.status === "success") {
             updateCloudProviderCards(data.connections || {}, data.active_provider || "");
         }
-    } catch {
-        /* ignore refresh errors */
+    } catch (error) {
+        console.warn('[cloud-providers] Failed to refresh cloud connections:', error);
     }
 }
 
@@ -249,7 +278,7 @@ window.connectWizardProvider = async () => {
     }
     
     const btn = document.getElementById('connect-provider-btn');
-    const originalBtnText = btn.innerHTML;
+    const originalBtnText = btn?.innerHTML;
     if (btn) {
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Validating credentials...';
@@ -280,19 +309,12 @@ window.connectWizardProvider = async () => {
             // Handle file upload for GCP
             const keyFile = document.getElementById('gcp-key-file');
             if (keyFile && keyFile.files[0]) {
-                credentials.service_account_json = await keyFile.files[0].text();
-            }
-        } else if (selectedWizardProvider === 'k8s') {
-            credentials = {
-                kubeconfig: document.getElementById('k8s-kubeconfig')?.value.trim(),
-                service_account_token: document.getElementById('k8s-service-account-token')?.value.trim(),
-                context: document.getElementById('k8s-context')?.value.trim(),
-            };
-            
-            // Handle file upload for k8s
-            const kubeconfigFile = document.getElementById('k8s-kubeconfig-file');
-            if (kubeconfigFile && kubeconfigFile.files[0]) {
-                credentials.kubeconfig = await kubeconfigFile.files[0].text();
+                try {
+                    credentials.service_account_json = await keyFile.files[0].text();
+                } catch (error) {
+                    console.error('[cloud-providers] Failed to read GCP key file:', error);
+                    throw new Error('Failed to read GCP key file');
+                }
             }
         }
         
@@ -312,6 +334,10 @@ window.connectWizardProvider = async () => {
                 credentials: credentials,
             }),
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         
         const data = await response.json();
         
@@ -343,8 +369,9 @@ window.connectWizardProvider = async () => {
             throw new Error(data.message || 'Connection failed');
         }
     } catch (error) {
+        console.error('[cloud-providers] Wizard connection failed:', error);
         if (typeof showToast === "function") {
-            showToast(error.message, "error");
+            showToast(error.message || "Connection failed", "error");
         }
     } finally {
         if (btn) {

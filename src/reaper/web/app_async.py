@@ -919,20 +919,6 @@ def _set_cloud_env(provider: str, credentials: dict[str, Any]) -> None:
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _write_gcp_service_account_file(
                 str(credentials["service_account_json"])
             )
-    elif provider == "k8s":
-        kubeconfig = credentials.get("kubeconfig")
-        if kubeconfig:
-            kubeconfig_path = Path(str(kubeconfig))
-            if kubeconfig_path.exists():
-                os.environ["KUBECONFIG"] = str(kubeconfig_path)
-            else:
-                os.environ["KUBECONFIG"] = _write_kubeconfig_file(str(kubeconfig))
-        if credentials.get("service_account_token"):
-            os.environ["K8S_SERVICE_ACCOUNT_TOKEN"] = str(
-                credentials.get("service_account_token", "")
-            )
-        if credentials.get("context"):
-            os.environ["K8S_CONTEXT"] = str(credentials.get("context", ""))
     os.environ["REAPER_ACTIVE_PROVIDER"] = provider.upper()
 
 
@@ -1055,39 +1041,11 @@ def _validate_cloud_credentials(provider: str, credentials: dict[str, Any]) -> d
                     "details": "Credentials stored but validation skipped",
                 }
 
-        elif provider == "k8s":
-            # Test Kubernetes credentials
-            try:
-                kubeconfig = credentials.get("kubeconfig")
-                if kubeconfig:
-                    return {
-                        "valid": True,
-                        "message": "Kubernetes kubeconfig saved",
-                        "details": "Kubeconfig stored successfully",
-                    }
-                if credentials.get("service_account_token"):
-                    return {
-                        "valid": True,
-                        "message": "Kubernetes service account token saved",
-                        "details": "Service account token stored successfully",
-                    }
-                return {
-                    "valid": False,
-                    "message": "No kubeconfig or service account token provided",
-                    "details": "",
-                }
-            except Exception as e:
-                return {
-                    "valid": False,
-                    "message": f"Kubernetes validation failed: {e!s}",
-                    "details": "",
-                }
-
         else:
             return {
-                "valid": True,
-                "message": f"{provider.upper()} credentials saved",
-                "details": "No validation available for this provider",
+                "valid": False,
+                "message": f"Unsupported provider: {provider}",
+                "details": "",
             }
 
     except Exception as e:
@@ -1149,7 +1107,6 @@ async def connect_cloud(request: Request):
         "aws": ["access_key_id", "secret_access_key", "region"],
         "azure": ["subscription_id", "tenant_id", "client_id", "client_secret"],
         "gcp": ["project_id"],
-        "k8s": [],
     }
 
     if provider not in required_fields:
@@ -1160,10 +1117,6 @@ async def connect_cloud(request: Request):
     missing = [f for f in required_fields[provider] if not credentials.get(f)]
     if provider == "gcp" and not credentials.get("service_account_json"):
         missing.append("service_account_json")
-    if provider == "k8s" and not (
-        credentials.get("kubeconfig") or credentials.get("service_account_token")
-    ):
-        missing.append("kubeconfig or service_account_token")
 
     if missing:
         return jsonify(
@@ -3852,7 +3805,7 @@ async def monitor(request: Request):
 
 @app.get("/dashboard")
 async def dashboard(request: Request):
-    user_name, sub_name = _get_cached_user_info(request)
+    user_name, sub_name = await _get_cached_user_info(request)
     return templates.TemplateResponse(
         request,
         "pages/dashboard.html",

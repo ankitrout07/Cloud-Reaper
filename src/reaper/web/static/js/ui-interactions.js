@@ -113,6 +113,11 @@ async function postApiUpdate(action, payload = {}) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         if (data.status === 'success') {
             notify(data.msg || "Operation successful.", "success");
@@ -121,7 +126,7 @@ async function postApiUpdate(action, payload = {}) {
         }
         return data;
     } catch (e) {
-        console.error(e);
+        console.error('[ui-interactions] API update failed:', e);
         notify("Network error occurred.", "error");
     }
 }
@@ -130,6 +135,12 @@ async function postApiUpdate(action, payload = {}) {
 window.loadBudgetData = async () => {
     try {
         const response = await fetch('/api/finops/budget/data');
+        
+        if (!response.ok) {
+            console.warn('[ui-interactions] Budget data endpoint returned non-OK status:', response.status);
+            return;
+        }
+        
         const data = await response.json();
         
         if (!response.ok || data.status === 'error') {
@@ -162,7 +173,7 @@ window.loadBudgetData = async () => {
             if (progressBar) progressBar.style.width = `${Math.min(budget.utilization_percent, 100)}%`;
         }
     } catch (e) {
-        console.error('Failed to load budget data:', e);
+        console.error('[ui-interactions] Failed to load budget data:', e);
         if (typeof notify === 'function') {
             notify('Network error: Unable to fetch budget data. Please check your connection and ensure cloud provider is configured.', 'error');
         } else {
@@ -175,6 +186,12 @@ window.loadBudgetData = async () => {
 window.loadBudgetChart = async () => {
     try {
         const response = await fetch('/api/finops/budget/chart');
+        
+        if (!response.ok) {
+            console.warn('[ui-interactions] Budget chart endpoint returned non-OK status:', response.status);
+            return;
+        }
+        
         const data = await response.json();
         
         if (!response.ok || data.status === 'error') {
@@ -197,7 +214,7 @@ window.loadBudgetChart = async () => {
             }
         }
     } catch (e) {
-        console.error('Failed to load budget chart:', e);
+        console.error('[ui-interactions] Failed to load budget chart:', e);
         if (typeof notify === 'function') {
             notify('Network error: Unable to fetch budget chart data. Please check your connection and ensure cloud provider is configured.', 'error');
         } else {
@@ -210,6 +227,12 @@ window.loadBudgetChart = async () => {
 window.loadIssuesData = async () => {
     try {
         const response = await fetch('/api/finops/issues/data');
+        
+        if (!response.ok) {
+            console.warn('[ui-interactions] Issues data endpoint returned non-OK status:', response.status);
+            return;
+        }
+        
         const data = await response.json();
         
         if (!response.ok || data.status === 'error') {
@@ -232,7 +255,7 @@ window.loadIssuesData = async () => {
             }
         }
     } catch (e) {
-        console.error('Failed to load issues data:', e);
+        console.error('[ui-interactions] Failed to load issues data:', e);
         if (typeof notify === 'function') {
             notify('Network error: Unable to fetch issues data. Please check your connection and ensure cloud provider is configured.', 'error');
         } else {
@@ -245,6 +268,12 @@ window.loadIssuesData = async () => {
 window.loadCommitmentsData = async () => {
     try {
         const response = await fetch('/api/finops/commitments/data');
+        
+        if (!response.ok) {
+            console.warn('[ui-interactions] Commitments data endpoint returned non-OK status:', response.status);
+            return;
+        }
+        
         const data = await response.json();
         
         if (!response.ok || data.status === 'error') {
@@ -273,7 +302,7 @@ window.loadCommitmentsData = async () => {
             }
         }
     } catch (e) {
-        console.error('Failed to load commitments data:', e);
+        console.error('[ui-interactions] Failed to load commitments data:', e);
         if (typeof notify === 'function') {
             notify('Network error: Unable to fetch commitments data. Please check your connection and ensure cloud provider is configured.', 'error');
         } else {
@@ -302,14 +331,22 @@ window.updateSimSavings = async () => {
                     hourly_spend: hourly
                 })
             });
+            
+            if (!response.ok) {
+                console.warn('[ui-interactions] Commitment simulation endpoint returned non-OK status:', response.status);
+                return;
+            }
+            
             const data = await response.json();
             if (data.status === 'success') {
                 const sim = data.simulation;
-                document.getElementById('sim-est-annually').textContent = `$${sim.annual_savings}`;
-                document.getElementById('sim-est-rate').textContent = `${sim.discount_rate} discount`;
+                const estAnnually = document.getElementById('sim-est-annually');
+                const estRate = document.getElementById('sim-est-rate');
+                if (estAnnually) estAnnually.textContent = `$${sim.annual_savings}`;
+                if (estRate) estRate.textContent = `${sim.discount_rate} discount`;
             }
         } catch (e) {
-            console.error('Simulation failed:', e);
+            console.error('[ui-interactions] Simulation failed:', e);
         }
     }
 };
@@ -328,17 +365,29 @@ window.updateWhatIfModel = async () => {
                 spot_adoption: spotLevel
             })
         });
+        
+        if (!response.ok) {
+            console.warn('[ui-interactions] Policy simulation endpoint returned non-OK status:', response.status);
+            return;
+        }
+        
         const data = await response.json();
         if (data.status === 'success') {
             const sim = data.simulation;
-            document.getElementById('val-policy-level').textContent = `${sim.policy_aggressiveness}%`;
-            document.getElementById('val-spot-level').textContent = `${sim.spot_adoption}%`;
-            document.getElementById('display-model-savings').textContent = `$${sim.monthly_savings}`;
-            document.getElementById('display-model-co2').textContent = `${sim.carbon_offset_kg} kg CO2e`;
-            document.getElementById('display-model-trees').textContent = `${sim.trees_equivalent} Trees / mo`;
+            const valPolicyLevel = document.getElementById('val-policy-level');
+            const valSpotLevel = document.getElementById('val-spot-level');
+            const displayModelSavings = document.getElementById('display-model-savings');
+            const displayModelCo2 = document.getElementById('display-model-co2');
+            const displayModelTrees = document.getElementById('display-model-trees');
+            
+            if (valPolicyLevel) valPolicyLevel.textContent = `${sim.policy_aggressiveness}%`;
+            if (valSpotLevel) valSpotLevel.textContent = `${sim.spot_adoption}%`;
+            if (displayModelSavings) displayModelSavings.textContent = `$${sim.monthly_savings}`;
+            if (displayModelCo2) displayModelCo2.textContent = `${sim.carbon_offset_kg} kg CO2e`;
+            if (displayModelTrees) displayModelTrees.textContent = `${sim.trees_equivalent} Trees / mo`;
         }
     } catch (e) {
-        console.error('Policy simulation failed:', e);
+        console.error('[ui-interactions] Policy simulation failed:', e);
     }
 };
 
@@ -371,6 +420,11 @@ window.saveBudgetCap = async () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ threshold: parseFloat(threshold) })
             });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const data = await response.json();
             if (data.status === 'success') {
                 notify(data.message, "success");
@@ -380,6 +434,7 @@ window.saveBudgetCap = async () => {
                 notify(data.message || "Failed to update budget", "error");
             }
         } catch (e) {
+            console.error('[ui-interactions] Error updating budget cap:', e);
             notify("Error updating budget cap.", "error");
         }
     }
@@ -394,10 +449,16 @@ window.saveWebhooks = () => {
 window.triggerTestAlert = async () => {
     try {
         const response = await fetch('/api/v1/finops/test-webhook', { method: 'POST' });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         if (data.status === 'success') notify("Test alert sent successfully.", "success");
         else notify("Failed to send test alert.", "error");
     } catch (e) {
+        console.error('[ui-interactions] Error triggering test alert:', e);
         notify("Error triggering test alert.", "error");
     }
 };
@@ -426,6 +487,11 @@ window.submitNewMetric = async () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: name, target_value: parseFloat(target) })
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         if (data.status === 'success') {
             closeAddMetricModal();
@@ -436,6 +502,7 @@ window.submitNewMetric = async () => {
             notify(data.message || "Failed to add metric", "error");
         }
     } catch (e) {
+        console.error('[ui-interactions] Error adding metric:', e);
         notify("Error adding metric.", "error");
     }
 };
@@ -447,6 +514,11 @@ window.remediateIssue = async (id, action) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ issue_id: id, action: action })
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         if (data.status === 'success') {
             const el = document.getElementById(id);
@@ -461,6 +533,7 @@ window.remediateIssue = async (id, action) => {
             notify("Failed to remediate issue.", "error");
         }
     } catch (e) {
+        console.error('[ui-interactions] Error triaging issue:', e);
         notify("Error triaging issue.", "error");
     }
 };
@@ -484,6 +557,11 @@ window.purchaseSimCommitment = async () => {
                 hourly_spend: parseFloat(hourly_spend)
             })
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         
         // Purchase the commitment
@@ -492,6 +570,11 @@ window.purchaseSimCommitment = async () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ simulation: data.simulation })
         });
+        
+        if (!purchaseResponse.ok) {
+            throw new Error(`HTTP error! status: ${purchaseResponse.status}`);
+        }
+        
         const purchaseData = await purchaseResponse.json();
         
         if (purchaseData.status === 'success') {
@@ -500,6 +583,7 @@ window.purchaseSimCommitment = async () => {
             loadCommitmentsData();
         }
     } catch (e) {
+        console.error('[ui-interactions] Error simulating commitment:', e);
         notify("Error simulating commitment.", "error");
     }
 };
@@ -520,6 +604,11 @@ window.applyWhatIfPolicy = async () => {
                 }
             })
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         if (data.status === 'success') {
             const simResponse = await fetch('/api/finops/policy/simulate', {
@@ -530,12 +619,18 @@ window.applyWhatIfPolicy = async () => {
                     spot_adoption: spotLevel
                 })
             });
+            
+            if (!simResponse.ok) {
+                throw new Error(`HTTP error! status: ${simResponse.status}`);
+            }
+            
             const simData = await simResponse.json();
             if (simData.status === 'success') {
                 notify(`Governance policy applied. Cost Impact: -$${simData.simulation.monthly_savings}/mo`, "success");
             }
         }
     } catch (e) {
+        console.error('[ui-interactions] Error applying policy:', e);
         notify("Error applying policy.", "error");
     }
 };
@@ -684,6 +779,11 @@ window.runScan = async () => {
     }
     try {
         const response = await fetch('/api/scan');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         if (data.status === 'success') {
             populateScanResults(data);
@@ -692,6 +792,7 @@ window.runScan = async () => {
             notify(data.message || "Scan failed.", "error");
         }
     } catch (e) {
+        console.error('[ui-interactions] Error running scan:', e);
         notify("Error running scan.", "error");
     } finally {
         if (scanBtn) {

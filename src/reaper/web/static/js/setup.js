@@ -23,6 +23,11 @@ function toggleFieldVisibility(inputId, iconId) {
 async function switchGlobalProvider(provider) {
     try {
         const response = await fetch(`/api/context/switch?provider=${encodeURIComponent(provider)}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
 
         if (data.status === "redirect" && data.url) {
@@ -47,6 +52,7 @@ async function switchGlobalProvider(provider) {
             notify(message, "danger");
         }
     } catch (error) {
+        console.error('[setup] Error switching provider context:', error);
         if (typeof showToast === "function") {
             showToast("Unable to switch provider context.", "error");
         } else {
@@ -57,10 +63,10 @@ async function switchGlobalProvider(provider) {
 
 async function connectInfrastructure() {
     const payload = {
-        subscriptionId: document.getElementById("subId").value,
-        tenantId: document.getElementById("tenantId").value,
-        clientId: document.getElementById("clientId").value,
-        clientSecret: document.getElementById("clientSecret").value,
+        subscriptionId: document.getElementById("subId")?.value,
+        tenantId: document.getElementById("tenantId")?.value,
+        clientId: document.getElementById("clientId")?.value,
+        clientSecret: document.getElementById("clientSecret")?.value,
     };
 
     const response = await fetch("/api/settings/sync", {
@@ -136,6 +142,11 @@ document.addEventListener('DOMContentLoaded', initializeSidebarHighlighting);
 window.refreshSubs = async () => {
     try {
         const response = await fetch('/api/settings/subscriptions');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         if (data.status === 'success') {
             if (typeof showToast === "function") {
@@ -153,6 +164,7 @@ window.refreshSubs = async () => {
             }
         }
     } catch (error) {
+        console.error('[setup] Error refreshing subscriptions:', error);
         if (typeof showToast === "function") {
             showToast("Failed to refresh subscriptions.", "error");
         }
@@ -162,6 +174,12 @@ window.refreshSubs = async () => {
 window.checkAuth = async () => {
     try {
         const response = await fetch('/api/settings/auth');
+        
+        if (!response.ok) {
+            console.warn('[setup] Auth check endpoint returned non-OK status:', response.status);
+            return;
+        }
+        
         const data = await response.json();
         if (data.status === 'success') {
             const pulse = document.getElementById("auth-pulse");
@@ -174,6 +192,6 @@ window.checkAuth = async () => {
             }
         }
     } catch (error) {
-        console.error("Auth check failed:", error);
+        console.error('[setup] Auth check failed:', error);
     }
 };

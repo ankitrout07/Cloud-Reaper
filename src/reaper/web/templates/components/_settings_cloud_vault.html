@@ -7,71 +7,55 @@
                         </span>
                         <h4 class="text-xs font-black text-white/90 uppercase tracking-widest">Cloud Providers</h4>
                     </div>
-                    <p class="text-[10px] text-slate-500 mb-8 ml-12 font-medium">Connect AWS, Azure, GCP, or Kubernetes and switch the active scanning context.</p>
+                    <p class="text-[10px] text-slate-500 mb-8 ml-12 font-medium">Connect AWS, Azure, or GCP and switch the active scanning context.</p>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                         <!-- AWS -->
-                        <div class="group p-5 rounded-2xl border border-white/[0.06] bg-white/[0.015] hover:bg-white/[0.03] hover:border-white/[0.1] transition-all duration-300">
-                            <div class="flex justify-between items-center mb-4">
-                                <span class="font-bold text-white/90 flex items-center gap-3 text-sm">
+                        <div class="group p-4 rounded-xl border border-white/[0.06] bg-white/[0.015] hover:bg-white/[0.03] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold text-white/90 flex items-center gap-2 text-sm">
                                     <span class="w-8 h-8 rounded-lg bg-[#FF9900]/10 flex items-center justify-center border border-[#FF9900]/20">
                                         <i class="fab fa-aws text-[#FF9900] text-sm"></i>
                                     </span>
                                     AWS
                                 </span>
-                                <span id="cloud-status-aws" class="text-[9px] font-bold uppercase tracking-wider text-slate-600 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]">Disconnected</span>
+                                <span id="cloud-status-aws" class="text-[9px] font-bold uppercase tracking-wider text-slate-600 bg-white/[0.03] px-2 py-1 rounded-full border border-white/[0.05]">Disconnected</span>
                             </div>
                             <div class="flex gap-2">
-                                <button type="button" onclick="toggleCloudPanel('aws')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.06] rounded-xl border border-white/[0.06] text-slate-400 hover:text-white transition-all">Configure</button>
-                                <button type="button" id="cloud-switch-aws" onclick="switchSettingsProvider('aws')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-blue-500/[0.08] text-blue-400 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition-all">Activate</button>
+                                <button type="button" onclick="toggleCloudPanel('aws')" class="flex-1 py-2 text-[9px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.06] rounded-lg border border-white/[0.06] text-slate-400 hover:text-white transition-all">Configure</button>
+                                <button type="button" id="cloud-switch-aws" onclick="switchSettingsProvider('aws')" class="flex-1 py-2 text-[9px] font-bold uppercase tracking-wider bg-blue-500/[0.08] text-blue-400 rounded-lg border border-blue-500/20 hover:bg-blue-500/20 transition-all">Activate</button>
                             </div>
                         </div>
                         <!-- Azure -->
-                        <div class="group p-5 rounded-2xl border border-white/[0.06] bg-white/[0.015] hover:bg-white/[0.03] hover:border-white/[0.1] transition-all duration-300">
-                            <div class="flex justify-between items-center mb-4">
-                                <span class="font-bold text-white/90 flex items-center gap-3 text-sm">
+                        <div class="group p-4 rounded-xl border border-white/[0.06] bg-white/[0.015] hover:bg-white/[0.03] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold text-white/90 flex items-center gap-2 text-sm">
                                     <span class="w-8 h-8 rounded-lg bg-[#0078D4]/10 flex items-center justify-center border border-[#0078D4]/20">
                                         <i class="fab fa-microsoft text-[#0078D4] text-sm"></i>
                                     </span>
                                     Azure
                                 </span>
-                                <span id="cloud-status-azure" class="text-[9px] font-bold uppercase tracking-wider text-slate-600 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]">Disconnected</span>
+                                <span id="cloud-status-azure" class="text-[9px] font-bold uppercase tracking-wider text-slate-600 bg-white/[0.03] px-2 py-1 rounded-full border border-white/[0.05]">Disconnected</span>
                             </div>
                             <div class="flex gap-2">
-                                <button type="button" onclick="toggleCloudPanel('azure')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.06] rounded-xl border border-white/[0.06] text-slate-400 hover:text-white transition-all">Configure</button>
-                                <button type="button" id="cloud-switch-azure" onclick="switchSettingsProvider('azure')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-blue-500/[0.08] text-blue-400 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition-all">Activate</button>
+                                <button type="button" onclick="toggleCloudPanel('azure')" class="flex-1 py-2 text-[9px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.06] rounded-lg border border-white/[0.06] text-slate-400 hover:text-white transition-all">Configure</button>
+                                <button type="button" id="cloud-switch-azure" onclick="switchSettingsProvider('azure')" class="flex-1 py-2 text-[9px] font-bold uppercase tracking-wider bg-blue-500/[0.08] text-blue-400 rounded-lg border border-blue-500/20 hover:bg-blue-500/20 transition-all">Activate</button>
                             </div>
                         </div>
                         <!-- GCP -->
-                        <div class="group p-5 rounded-2xl border border-white/[0.06] bg-white/[0.015] hover:bg-white/[0.03] hover:border-white/[0.1] transition-all duration-300">
-                            <div class="flex justify-between items-center mb-4">
-                                <span class="font-bold text-white/90 flex items-center gap-3 text-sm">
+                        <div class="group p-4 rounded-xl border border-white/[0.06] bg-white/[0.015] hover:bg-white/[0.03] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-bold text-white/90 flex items-center gap-2 text-sm">
                                     <span class="w-8 h-8 rounded-lg bg-[#4285F4]/10 flex items-center justify-center border border-[#4285F4]/20">
                                         <i class="fab fa-google text-[#4285F4] text-sm"></i>
                                     </span>
                                     GCP
                                 </span>
-                                <span id="cloud-status-gcp" class="text-[9px] font-bold uppercase tracking-wider text-slate-600 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]">Disconnected</span>
+                                <span id="cloud-status-gcp" class="text-[9px] font-bold uppercase tracking-wider text-slate-600 bg-white/[0.03] px-2 py-1 rounded-full border border-white/[0.05]">Disconnected</span>
                             </div>
                             <div class="flex gap-2">
-                                <button type="button" onclick="toggleCloudPanel('gcp')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.06] rounded-xl border border-white/[0.06] text-slate-400 hover:text-white transition-all">Configure</button>
-                                <button type="button" id="cloud-switch-gcp" onclick="switchSettingsProvider('gcp')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-blue-500/[0.08] text-blue-400 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition-all">Activate</button>
-                            </div>
-                        </div>
-                        <!-- Kubernetes -->
-                        <div class="group p-5 rounded-2xl border border-white/[0.06] bg-white/[0.015] hover:bg-white/[0.03] hover:border-white/[0.1] transition-all duration-300">
-                            <div class="flex justify-between items-center mb-4">
-                                <span class="font-bold text-white/90 flex items-center gap-3 text-sm">
-                                    <span class="w-8 h-8 rounded-lg bg-[#326CE5]/10 flex items-center justify-center border border-[#326CE5]/20">
-                                        <i class="fas fa-network-wired text-[#326CE5] text-sm"></i>
-                                    </span>
-                                    Kubernetes
-                                </span>
-                                <span id="cloud-status-k8s" class="text-[9px] font-bold uppercase tracking-wider text-slate-600 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]">Disconnected</span>
-                            </div>
-                            <div class="flex gap-2">
-                                <button type="button" onclick="toggleCloudPanel('k8s')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.06] rounded-xl border border-white/[0.06] text-slate-400 hover:text-white transition-all">Configure</button>
-                                <button type="button" id="cloud-switch-k8s" onclick="switchSettingsProvider('k8s')" class="flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider bg-blue-500/[0.08] text-blue-400 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition-all">Activate</button>
+                                <button type="button" onclick="toggleCloudPanel('gcp')" class="flex-1 py-2 text-[9px] font-bold uppercase tracking-wider bg-white/[0.03] hover:bg-white/[0.06] rounded-lg border border-white/[0.06] text-slate-400 hover:text-white transition-all">Configure</button>
+                                <button type="button" id="cloud-switch-gcp" onclick="switchSettingsProvider('gcp')" class="flex-1 py-2 text-[9px] font-bold uppercase tracking-wider bg-blue-500/[0.08] text-blue-400 rounded-lg border border-blue-500/20 hover:bg-blue-500/20 transition-all">Activate</button>
                             </div>
                         </div>
                     </div>
@@ -100,15 +84,6 @@
                         <label class="text-[9px] uppercase tracking-widest text-slate-500 font-medium block mt-1">Service Account JSON</label>
                         <input id="settings-gcp-key-file" type="file" accept=".json" class="w-full text-[11px] text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-white/[0.05] file:text-slate-400 hover:file:bg-white/[0.08] file:transition file:cursor-pointer">
                         <button type="button" id="settings-connect-gcp" onclick="connectSettingsProvider('gcp')" class="w-full py-3 mt-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold uppercase tracking-widest rounded-xl text-[10px] transition-all shadow-lg shadow-blue-500/10">Connect & Activate</button>
-                    </div>
-
-                    <div id="cloud-panel-k8s" class="cloud-provider-panel hidden p-6 bg-[#080d18] border border-white/[0.06] rounded-2xl space-y-3 animate-fade-in">
-                        <div class="flex items-center gap-2 mb-2"><span class="w-1.5 h-1.5 rounded-full bg-[#326CE5]"></span><span class="text-[9px] font-bold uppercase tracking-widest text-slate-500">Kubernetes Cluster</span></div>
-                        <input id="settings-k8s-kubeconfig-file" type="file" accept=".yaml,.yml" class="w-full text-[11px] text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-[9px] file:font-bold file:uppercase file:bg-white/[0.05] file:text-slate-400 hover:file:bg-white/[0.08] file:transition file:cursor-pointer">
-                        <textarea id="settings-k8s-kubeconfig" rows="4" placeholder="Paste kubeconfig" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600 resize-none"></textarea>
-                        <input id="settings-k8s-service-account-token" type="password" placeholder="Service Account Token" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600">
-                        <input id="settings-k8s-context" placeholder="Optional context" class="w-full bg-white/[0.02] border border-white/[0.06] p-3.5 rounded-xl text-xs font-mono text-slate-300 outline-none focus:border-blue-500/30 transition placeholder:text-slate-600">
-                        <button type="button" id="settings-connect-k8s" onclick="connectSettingsProvider('k8s')" class="w-full py-3 mt-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold uppercase tracking-widest rounded-xl text-[10px] transition-all shadow-lg shadow-blue-500/10">Connect & Activate</button>
                     </div>
                 </div>
             </div>

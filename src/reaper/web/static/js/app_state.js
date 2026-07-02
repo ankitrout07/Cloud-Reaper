@@ -47,6 +47,12 @@
     async function fetchAuthStatus() {
         try {
             const response = await fetch(AUTH_STATUS_ENDPOINT);
+            
+            if (!response.ok) {
+                console.warn('[app_state] Auth status endpoint returned non-OK status:', response.status);
+                return currentAuthState;
+            }
+            
             const data = await response.json();
 
             if (data.provider !== undefined) {
