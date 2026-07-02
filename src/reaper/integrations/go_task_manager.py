@@ -48,7 +48,9 @@ class GoTaskManagerBridge(BaseGoBridge):
     Communicates with the Go HTTP server for task management.
     """
 
-    def __init__(self, host: str = "localhost", port: int = 7071, timeout: float = 30.0, enabled: bool = True):
+    def __init__(
+        self, host: str = "localhost", port: int = 7071, timeout: float = 30.0, enabled: bool = True
+    ):
         super().__init__(host=host, port=port, timeout=timeout, enabled=enabled)
         self._loop: asyncio.AbstractEventLoop | None = None
         self._running = False
