@@ -115,7 +115,7 @@ func (wb *WebSocketBatcher) Emit(event string, data map[string]interface{}, room
 		return nil
 	}
 
-	// Set/reset timer for this event
+	// Set/reset timer for this event (mutex already held)
 	if timer, exists := wb.timers[event]; exists {
 		timer.Stop()
 	}

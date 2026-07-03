@@ -133,6 +133,19 @@ func handleScan(w http.ResponseWriter, r *http.Request) {
 		req.Provider = "azure"
 	}
 
+	// Validate provider
+	validProviders := map[string]bool{"azure": true, "aws": true, "gcp": true}
+	if !validProviders[strings.ToLower(req.Provider)] {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid provider: %s (must be azure, aws, or gcp)", req.Provider))
+		return
+	}
+
+	// Validate subscription ID format (basic check)
+	if req.SubscriptionID == "" || len(req.SubscriptionID) < 5 {
+		writeError(w, http.StatusBadRequest, "subscription_id is required and must be at least 5 characters")
+		return
+	}
+
 	scraper := &collectors.AzureScraper{}
 	if err := scraper.Authenticate(map[string]string{
 		"subscription_id": req.SubscriptionID,
@@ -199,6 +212,13 @@ func handlePrices(w http.ResponseWriter, r *http.Request) {
 	provider := strings.ToLower(r.URL.Query().Get("provider"))
 	if provider == "" {
 		provider = "azure"
+	}
+
+	// Validate provider
+	validProviders := map[string]bool{"azure": true, "aws": true, "gcp": true}
+	if !validProviders[provider] {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid provider: %s (must be azure, aws, or gcp)", provider))
+		return
 	}
 
 	skus := []string{

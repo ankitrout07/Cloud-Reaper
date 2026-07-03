@@ -67,6 +67,12 @@ func RegisterTaskHandlers(mux *http.ServeMux) {
 			return
 		}
 
+		// Validate task type
+		if req.TaskType == "" {
+			sendJSONError(w, "task_type is required", http.StatusBadRequest)
+			return
+		}
+
 		// Map task type to actual function
 		taskFunc, err := getTaskFunction(req.TaskType)
 		if err != nil {
@@ -78,6 +84,12 @@ func RegisterTaskHandlers(mux *http.ServeMux) {
 		taskID := req.TaskID
 		if taskID == "" {
 			taskID = fmt.Sprintf("task_%d", time.Now().UnixNano())
+		}
+
+		// Validate task ID format (basic check)
+		if len(taskID) > 100 {
+			sendJSONError(w, "task_id must be less than 100 characters", http.StatusBadRequest)
+			return
 		}
 
 		if err := tm.SubmitTask(taskID, taskFunc, req.Args, req.Metadata); err != nil {
@@ -161,6 +173,12 @@ func RegisterTaskHandlers(mux *http.ServeMux) {
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			sendJSONError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		// Validate progress value
+		if req.Progress < 0 || req.Progress > 1 {
+			sendJSONError(w, "progress must be between 0 and 1", http.StatusBadRequest)
 			return
 		}
 

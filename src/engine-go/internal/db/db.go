@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -52,9 +53,30 @@ func Connect() (*sql.DB, error) {
 		}
 		if err == nil {
 			// Configure connection pool for better stability
-			pool.SetMaxOpenConns(25)
-			pool.SetMaxIdleConns(5)
-			pool.SetConnMaxLifetime(5 * time.Minute)
+			// Use environment variables or sensible defaults
+			maxOpenConns := 25
+			maxIdleConns := 5
+			connMaxLifetime := 5 * time.Minute
+
+			if val := os.Getenv("DB_MAX_OPEN_CONNS"); val != "" {
+				if intVal, err := strconv.Atoi(val); err == nil && intVal > 0 {
+					maxOpenConns = intVal
+				}
+			}
+			if val := os.Getenv("DB_MAX_IDLE_CONNS"); val != "" {
+				if intVal, err := strconv.Atoi(val); err == nil && intVal >= 0 {
+					maxIdleConns = intVal
+				}
+			}
+			if val := os.Getenv("DB_CONN_MAX_LIFETIME_MINUTES"); val != "" {
+				if intVal, err := strconv.Atoi(val); err == nil && intVal > 0 {
+					connMaxLifetime = time.Duration(intVal) * time.Minute
+				}
+			}
+
+			pool.SetMaxOpenConns(maxOpenConns)
+			pool.SetMaxIdleConns(maxIdleConns)
+			pool.SetConnMaxLifetime(connMaxLifetime)
 		}
 	})
 	return pool, err

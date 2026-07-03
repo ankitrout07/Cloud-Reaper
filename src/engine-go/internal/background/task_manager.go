@@ -236,12 +236,20 @@ func (tm *TaskManager) CancelTask(taskID string) error {
 	result.Status = StatusCancelled
 	result.CompletedAt = &now
 
-	// Remove from tasks map after a delay
+	// Remove from tasks map after a delay, checking if still running
 	go func() {
-		time.Sleep(5 * time.Minute)
-		tm.mu.Lock()
-		delete(tm.tasks, taskID)
-		tm.mu.Unlock()
+		select {
+		case <-time.After(5 * time.Minute):
+			tm.mu.Lock()
+			// Only delete if task manager is still running and task exists
+			if tm.ctx.Err() == nil {
+				delete(tm.tasks, taskID)
+			}
+			tm.mu.Unlock()
+		case <-tm.ctx.Done():
+			// Task manager stopped, abort cleanup
+			return
+		}
 	}()
 
 	return nil

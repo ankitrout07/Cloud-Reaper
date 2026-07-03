@@ -212,8 +212,12 @@ class RateLimiter:
                     f"[Go Rate Limiter] Request blocked by rate limiter (key: {self.limiter_key})"
                 )
                 return False
+            except (ConnectionError, TimeoutError) as e:
+                print(f"[Go Rate Limiter] Connection error checking rate limit: {e}, falling back to Python")
+            except (ImportError, AttributeError) as e:
+                print(f"[Go Rate Limiter] Go backend not available: {e}, falling back to Python")
             except Exception as e:
-                print(f"[Go Rate Limiter] Error checking rate limit: {e}, falling back to Python")
+                print(f"[Go Rate Limiter] Unexpected error checking rate limit: {e}, falling back to Python")
 
         # Fall back to Python implementation
         return self.can_proceed()
@@ -230,10 +234,12 @@ class RateLimiter:
                 if wait_duration > 0:
                     await asyncio.sleep(wait_duration / 1000.0)  # Convert ms to seconds
                 return
+            except (ConnectionError, TimeoutError) as e:
+                print(f"[Go Rate Limiter] Connection error waiting for rate limit: {e}, falling back to Python")
+            except (ImportError, AttributeError) as e:
+                print(f"[Go Rate Limiter] Go backend not available: {e}, falling back to Python")
             except Exception as e:
-                print(
-                    f"[Go Rate Limiter] Error waiting for rate limit: {e}, falling back to Python"
-                )
+                print(f"[Go Rate Limiter] Unexpected error waiting for rate limit: {e}, falling back to Python")
 
         # Fall back to Python implementation
         while not self.can_proceed():
@@ -283,8 +289,12 @@ class WebSocketBatcher:
                 int(os.getenv("GO_WEBSOCKET_PORT", "7072"))
                 # Don't initialize immediately, will be done lazily
                 print("[Go WebSocket Batcher] Using Go backend for enhanced performance")
+            except (ValueError, TypeError) as e:
+                print(f"[Go WebSocket Batcher] Invalid configuration: {e}, falling back to Python")
+                self.use_go_backend = False
+                self.go_batcher = None
             except Exception as e:
-                print(f"[Go WebSocket Batcher] Failed to initialize Go backend: {e}")
+                print(f"[Go WebSocket Batcher] Unexpected error initializing: {e}, falling back to Python")
                 self.use_go_backend = False
                 self.go_batcher = None
 
@@ -302,8 +312,12 @@ class WebSocketBatcher:
                 print(
                     "[Go WebSocket Batcher] Failed to emit via Go backend, falling back to Python"
                 )
+            except (ConnectionError, TimeoutError) as e:
+                print(f"[Go WebSocket Batcher] Connection error: {e}, falling back to Python")
+            except (ImportError, AttributeError) as e:
+                print(f"[Go WebSocket Batcher] Go backend not available: {e}, falling back to Python")
             except Exception as e:
-                print(f"[Go WebSocket Batcher] Error using Go backend: {e}, falling back to Python")
+                print(f"[Go WebSocket Batcher] Unexpected error: {e}, falling back to Python")
 
         # Fall back to Python implementation
         async with self.lock:
@@ -480,10 +494,23 @@ async def background_metrics_worker():
                     cpu_usage = await asyncio.to_thread(_get_cpu)
                     error_count = 0  # Reset error count on success
                     backoff_time = SOCKET_METRICS_INTERVAL_SEC  # Reset backoff on success
+            except (ConnectionError, TimeoutError) as e:
+                error_count += 1
+                print(f"[!] Metrics Worker Connection Error ({error_count}/{max_errors}): {e}")
+                # Exponential backoff for consecutive errors
+                if error_count >= max_errors:
+                    backoff_time = min(backoff_time * 2, max_backoff)
+                    print(
+                        f"[!] Too many consecutive connection errors, backing off for {backoff_time} seconds"
+                    )
+                    error_count = 0
+            except (ValueError, TypeError) as e:
+                error_count += 1
+                print(f"[!] Metrics Worker Data Error ({error_count}/{max_errors}): {e}")
+                # Data errors don't need backoff, just skip this iteration
             except Exception as e:
                 error_count += 1
-                print(f"[!] Metrics Worker Error ({error_count}/{max_errors}): {e}")
-
+                print(f"[!] Metrics Worker Unexpected Error ({error_count}/{max_errors}): {e}")
                 # Exponential backoff for consecutive errors
                 if error_count >= max_errors:
                     backoff_time = min(backoff_time * 2, max_backoff)
@@ -497,9 +524,14 @@ async def background_metrics_worker():
                 try:
                     # Use batched WebSocket emission for better performance
                     await ws_batcher.emit("metric_update", {"time": now, "value": cpu_usage})
+                except (ConnectionError, TimeoutError) as e:
+                    print(f"[!] Metrics emit connection error: {e}")
                 except Exception as e:
                     print(f"[!] Metrics emit error: {e}")
 
+        except asyncio.CancelledError:
+            print("[!] Metrics worker cancelled")
+            raise  # Re-raise to allow proper cleanup
         except Exception as e:
             print(f"[!] Critical error in metrics worker: {e}")
             # Prevent rapid crash loops by sleeping longer on critical errors

@@ -55,8 +55,14 @@ class DataPusher:
                 )
             logger.warning(f"Unknown backend: {self.backend}")
             return False
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid data format for savings push: {e}")
+            return False
+        except (IOError, OSError) as e:
+            logger.error(f"I/O error pushing savings data: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Failed to push savings data: {e}")
+            logger.error(f"Unexpected error pushing savings data: {e}")
             return False
 
     def _push_to_local_db(
