@@ -511,13 +511,30 @@ class FinOpsPipeline:
                     },
                 }
 
-            # In a real implementation, this would:
-            # 1. Query the optimized baseline from SQLite
-            # 2. Calculate commitment coverage based on optimized usage
-            # 3. Recommend RI/SP purchases based on newly optimized baseline
-            # 4. Avoid the capital waste of evaluating commitments before rightsizing
+            # Commitment Analysis Implementation Guide:
+            # 
+            # This section should analyze the optimized baseline to recommend
+            # Reserved Instances (RIs) and Savings Plans (SPs) to maximize savings.
+            # 
+            # Implementation Steps:
+            # 1. Query the optimized baseline from SQLite to get rightsized resource recommendations
+            # 2. Calculate commitment coverage based on optimized usage patterns:
+            #    - Identify resources with consistent 24/7 usage patterns (good for RIs)
+            #    - Identify resources with flexible usage patterns (good for SPs)
+            # 3. Analyze historical utilization data to predict future needs
+            # 4. Generate RI/SP purchase recommendations with ROI calculations
+            # 5. Calculate potential savings vs. upfront commitment costs
+            # 6. Avoid recommending commitments for resources that will be deallocated/scaled
+            #
+            # Key metrics to track:
+            # - Compute coverage percentage (how much of the baseline can be covered by commitments)
+            # - Break-even point analysis (when savings exceed commitment cost)
+            # - Risk assessment (what if usage drops below commitment threshold)
+            # - Utilization thresholds (minimum 75% utilization for RI recommendations)
+            #
+            # For now, we return a simplified response with the optimized baseline savings
+            # as a placeholder until full commitment analysis is implemented.
 
-            # Placeholder for commitment analysis logic
             total_savings = optimized_baseline.get("total_estimated_savings", 0)
 
             return {

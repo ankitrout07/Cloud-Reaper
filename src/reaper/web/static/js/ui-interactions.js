@@ -1,5 +1,52 @@
 // Shared UI functions for tab switching and basic interactions
 
+// Global credential check function
+async function checkCredentialsStatus() {
+    try {
+        const response = await fetch('/api/credentials/status');
+        
+        if (response.status === 503) {
+            const data = await response.json();
+            return {
+                valid: false,
+                message: data.user_message || data.message,
+                code: data.code,
+                provider: data.provider
+            };
+        }
+        
+        const data = await response.json();
+        return {
+            valid: data.status === 'success',
+            message: data.message,
+            provider: data.provider
+        };
+    } catch (e) {
+        console.error('[ui-interactions] Credential check failed:', e);
+        return {
+            valid: false,
+            message: 'Unable to verify credentials. Please check your connection.',
+            code: 'NETWORK_ERROR'
+        };
+    }
+}
+
+// Enhanced data loading with credential checks
+async function loadDataWithCredentialCheck(loadFunction, errorMessage) {
+    const credentials = await checkCredentialsStatus();
+    
+    if (!credentials.valid) {
+        if (typeof notify === 'function') {
+            notify(credentials.message, 'error');
+        } else {
+            alert(credentials.message);
+        }
+        return null;
+    }
+    
+    return await loadFunction();
+}
+
 function showTab(tabId) {
     const tabs = ['general', 'cloud', 'vault', 'advanced'];
     tabs.forEach(t => {
@@ -133,182 +180,190 @@ async function postApiUpdate(action, payload = {}) {
 
 // Budget data loading
 window.loadBudgetData = async () => {
-    try {
-        const response = await fetch('/api/finops/budget/data');
-        
-        if (!response.ok) {
-            console.warn('[ui-interactions] Budget data endpoint returned non-OK status:', response.status);
-            return;
-        }
-        
-        const data = await response.json();
-        
-        if (!response.ok || data.status === 'error') {
-            // Show error message to user
-            const errorMessage = data.message || data.user_message || 'Unable to fetch budget data';
-            if (typeof notify === 'function') {
-                notify(errorMessage + '. Please connect your cloud provider in Settings.', 'error');
-            } else {
-                alert(errorMessage + '. Please connect your cloud provider in Settings.');
+    return await loadDataWithCredentialCheck(async () => {
+        try {
+            const response = await fetch('/api/finops/budget/data');
+            
+            if (!response.ok) {
+                console.warn('[ui-interactions] Budget data endpoint returned non-OK status:', response.status);
+                return;
             }
-            return;
+            
+            const data = await response.json();
+            
+            if (!response.ok || data.status === 'error') {
+                // Show error message to user
+                const errorMessage = data.message || data.user_message || 'Unable to fetch budget data';
+                if (typeof notify === 'function') {
+                    notify(errorMessage, 'error');
+                } else {
+                    alert(errorMessage);
+                }
+                return;
+            }
+            
+            if (data.status === 'success') {
+                const budget = data.data;
+                // Update UI elements
+                const capEl = document.getElementById('display-budget-cap');
+                if (capEl) capEl.textContent = `$${budget.budget_cap}`;
+                
+                const burnRateEl = document.getElementById('display-burn-rate');
+                if (burnRateEl) burnRateEl.textContent = `$${budget.burn_rate.toFixed(2)}`;
+                
+                const forecastEl = document.getElementById('display-forecast');
+                if (forecastEl) forecastEl.textContent = `$${budget.forecast.toFixed(2)}`;
+                
+                const percentText = document.getElementById('budget-percentage-text');
+                if (percentText) percentText.textContent = `${budget.utilization_percent.toFixed(1)}% used`;
+                
+                const progressBar = document.getElementById('budget-progress-bar');
+                if (progressBar) progressBar.style.width = `${Math.min(budget.utilization_percent, 100)}%`;
+            }
+        } catch (e) {
+            console.error('[ui-interactions] Failed to load budget data:', e);
+            if (typeof notify === 'function') {
+                notify('Network error: Unable to fetch budget data. Please check your connection.', 'error');
+            } else {
+                alert('Network error: Unable to fetch budget data. Please check your connection.');
+            }
         }
-        
-        if (data.status === 'success') {
-            const budget = data.data;
-            // Update UI elements
-            const capEl = document.getElementById('display-budget-cap');
-            if (capEl) capEl.textContent = `$${budget.budget_cap}`;
-            
-            const burnRateEl = document.getElementById('display-burn-rate');
-            if (burnRateEl) burnRateEl.textContent = `$${budget.burn_rate.toFixed(2)}`;
-            
-            const forecastEl = document.getElementById('display-forecast');
-            if (forecastEl) forecastEl.textContent = `$${budget.forecast.toFixed(2)}`;
-            
-            const percentText = document.getElementById('budget-percentage-text');
-            if (percentText) percentText.textContent = `${budget.utilization_percent.toFixed(1)}% used`;
-            
-            const progressBar = document.getElementById('budget-progress-bar');
-            if (progressBar) progressBar.style.width = `${Math.min(budget.utilization_percent, 100)}%`;
-        }
-    } catch (e) {
-        console.error('[ui-interactions] Failed to load budget data:', e);
-        if (typeof notify === 'function') {
-            notify('Network error: Unable to fetch budget data. Please check your connection and ensure cloud provider is configured.', 'error');
-        } else {
-            alert('Network error: Unable to fetch budget data. Please check your connection and ensure cloud provider is configured.');
-        }
-    }
+    }, 'Unable to fetch budget data. Please check your cloud provider credentials.');
 };
 
 // Load budget chart
 window.loadBudgetChart = async () => {
-    try {
-        const response = await fetch('/api/finops/budget/chart');
-        
-        if (!response.ok) {
-            console.warn('[ui-interactions] Budget chart endpoint returned non-OK status:', response.status);
-            return;
-        }
-        
-        const data = await response.json();
-        
-        if (!response.ok || data.status === 'error') {
-            // Show error message to user
-            const errorMessage = data.message || data.user_message || 'Unable to fetch budget chart data';
+    return await loadDataWithCredentialCheck(async () => {
+        try {
+            const response = await fetch('/api/finops/budget/chart');
+            
+            if (!response.ok) {
+                console.warn('[ui-interactions] Budget chart endpoint returned non-OK status:', response.status);
+                return;
+            }
+            
+            const data = await response.json();
+            
+            if (!response.ok || data.status === 'error') {
+                // Show error message to user
+                const errorMessage = data.message || data.user_message || 'Unable to fetch budget chart data';
+                if (typeof notify === 'function') {
+                    notify(errorMessage, 'error');
+                } else {
+                    alert(errorMessage);
+                }
+                return;
+            }
+            
+            if (data.status === 'success' && typeof Chart !== 'undefined') {
+                // Update or create budget chart
+                const ctx = document.getElementById('budgetChart');
+                if (ctx) {
+                    // Chart update logic would go here
+                    console.log('Budget chart data loaded:', data.chart);
+                }
+            }
+        } catch (e) {
+            console.error('[ui-interactions] Failed to load budget chart:', e);
             if (typeof notify === 'function') {
-                notify(errorMessage + '. Please connect your cloud provider in Settings.', 'error');
+                notify('Network error: Unable to fetch budget chart data. Please check your connection.', 'error');
             } else {
-                alert(errorMessage + '. Please connect your cloud provider in Settings.');
-            }
-            return;
-        }
-        
-        if (data.status === 'success' && typeof Chart !== 'undefined') {
-            // Update or create budget chart
-            const ctx = document.getElementById('budgetChart');
-            if (ctx) {
-                // Chart update logic would go here
-                console.log('Budget chart data loaded:', data.chart);
+                alert('Network error: Unable to fetch budget chart data. Please check your connection.');
             }
         }
-    } catch (e) {
-        console.error('[ui-interactions] Failed to load budget chart:', e);
-        if (typeof notify === 'function') {
-            notify('Network error: Unable to fetch budget chart data. Please check your connection and ensure cloud provider is configured.', 'error');
-        } else {
-            alert('Network error: Unable to fetch budget chart data. Please check your connection and ensure cloud provider is configured.');
-        }
-    }
+    }, 'Unable to fetch budget chart data. Please check your cloud provider credentials.');
 };
 
 // Load issues data
 window.loadIssuesData = async () => {
-    try {
-        const response = await fetch('/api/finops/issues/data');
-        
-        if (!response.ok) {
-            console.warn('[ui-interactions] Issues data endpoint returned non-OK status:', response.status);
-            return;
-        }
-        
-        const data = await response.json();
-        
-        if (!response.ok || data.status === 'error') {
-            // Show error message to user
-            const errorMessage = data.message || data.user_message || 'Unable to fetch issues data';
+    return await loadDataWithCredentialCheck(async () => {
+        try {
+            const response = await fetch('/api/finops/issues/data');
+            
+            if (!response.ok) {
+                console.warn('[ui-interactions] Issues data endpoint returned non-OK status:', response.status);
+                return;
+            }
+            
+            const data = await response.json();
+            
+            if (!response.ok || data.status === 'error') {
+                // Show error message to user
+                const errorMessage = data.message || data.user_message || 'Unable to fetch issues data';
+                if (typeof notify === 'function') {
+                    notify(errorMessage, 'error');
+                } else {
+                    alert(errorMessage);
+                }
+                return;
+            }
+            
+            if (data.status === 'success') {
+                // Update issues list
+                const issuesList = document.getElementById('issues-list-container');
+                if (issuesList && data.data.issues) {
+                    // Dynamic rendering would go here
+                    console.log('Issues loaded:', data.data.issues);
+                }
+            }
+        } catch (e) {
+            console.error('[ui-interactions] Failed to load issues data:', e);
             if (typeof notify === 'function') {
-                notify(errorMessage + '. Please connect your cloud provider in Settings.', 'error');
+                notify('Network error: Unable to fetch issues data. Please check your connection.', 'error');
             } else {
-                alert(errorMessage + '. Please connect your cloud provider in Settings.');
-            }
-            return;
-        }
-        
-        if (data.status === 'success') {
-            // Update issues list
-            const issuesList = document.getElementById('issues-list-container');
-            if (issuesList && data.data.issues) {
-                // Dynamic rendering would go here
-                console.log('Issues loaded:', data.data.issues);
+                alert('Network error: Unable to fetch issues data. Please check your connection.');
             }
         }
-    } catch (e) {
-        console.error('[ui-interactions] Failed to load issues data:', e);
-        if (typeof notify === 'function') {
-            notify('Network error: Unable to fetch issues data. Please check your connection and ensure cloud provider is configured.', 'error');
-        } else {
-            alert('Network error: Unable to fetch issues data. Please check your connection and ensure cloud provider is configured.');
-        }
-    }
+    }, 'Unable to fetch issues data. Please check your cloud provider credentials.');
 };
 
 // Load commitments data
 window.loadCommitmentsData = async () => {
-    try {
-        const response = await fetch('/api/finops/commitments/data');
-        
-        if (!response.ok) {
-            console.warn('[ui-interactions] Commitments data endpoint returned non-OK status:', response.status);
-            return;
-        }
-        
-        const data = await response.json();
-        
-        if (!response.ok || data.status === 'error') {
-            // Show error message to user
-            const errorMessage = data.message || data.user_message || 'Unable to fetch commitments data';
-            if (typeof notify === 'function') {
-                notify(errorMessage + '. Please connect your cloud provider in Settings.', 'error');
-            } else {
-                alert(errorMessage + '. Please connect your cloud provider in Settings.');
-            }
-            return;
-        }
-        
-        if (data.status === 'success') {
-            const commitments = data.data.active_commitments;
-            const portfolio = document.getElementById('commitments-portfolio-container');
-            if (portfolio && commitments) {
-                // Update portfolio UI
-                console.log('Commitments loaded:', commitments);
+    return await loadDataWithCredentialCheck(async () => {
+        try {
+            const response = await fetch('/api/finops/commitments/data');
+            
+            if (!response.ok) {
+                console.warn('[ui-interactions] Commitments data endpoint returned non-OK status:', response.status);
+                return;
             }
             
-            // Update coverage stats
-            const coverage = data.data.coverage_analysis;
-            if (coverage) {
-                console.log('Coverage analysis:', coverage);
+            const data = await response.json();
+            
+            if (!response.ok || data.status === 'error') {
+                // Show error message to user
+                const errorMessage = data.message || data.user_message || 'Unable to fetch commitments data';
+                if (typeof notify === 'function') {
+                    notify(errorMessage, 'error');
+                } else {
+                    alert(errorMessage);
+                }
+                return;
+            }
+            
+            if (data.status === 'success') {
+                const commitments = data.data.active_commitments;
+                const portfolio = document.getElementById('commitments-portfolio-container');
+                if (portfolio && commitments) {
+                    // Update portfolio UI
+                    console.log('Commitments loaded:', commitments);
+                }
+                
+                // Update coverage stats
+                const coverage = data.data.coverage_analysis;
+                if (coverage) {
+                    console.log('Coverage analysis:', coverage);
+                }
+            }
+        } catch (e) {
+            console.error('[ui-interactions] Failed to load commitments data:', e);
+            if (typeof notify === 'function') {
+                notify('Network error: Unable to fetch commitments data. Please check your connection.', 'error');
+            } else {
+                alert('Network error: Unable to fetch commitments data. Please check your connection.');
             }
         }
-    } catch (e) {
-        console.error('[ui-interactions] Failed to load commitments data:', e);
-        if (typeof notify === 'function') {
-            notify('Network error: Unable to fetch commitments data. Please check your connection and ensure cloud provider is configured.', 'error');
-        } else {
-            alert('Network error: Unable to fetch commitments data. Please check your connection and ensure cloud provider is configured.');
-        }
-    }
+    }, 'Unable to fetch commitments data. Please check your cloud provider credentials.');
 };
 
 // Enhanced commitment simulation
@@ -1260,7 +1315,137 @@ window.fetchTelemetryInsights = async () => {
 };
 
 window.openWebhookModal = (type) => {
-    notify(`Opening ${type} webhook modal.`, "success");
+    const modal = document.getElementById('webhook-modal');
+    const title = document.getElementById('webhook-modal-title');
+    const input = document.getElementById('webhook-url-input');
+    
+    if (!modal || !title || !input) {
+        console.error('Webhook modal elements not found');
+        return;
+    }
+    
+    // Set modal title based on type
+    if (type === 'discord') {
+        title.textContent = 'Configure Discord Webhook';
+        input.placeholder = 'https://discord.com/api/webhooks/...';
+    } else if (type === 'slack') {
+        title.textContent = 'Configure Slack Webhook';
+        input.placeholder = 'https://hooks.slack.com/services/...';
+    }
+    
+    // Clear input and show modal
+    input.value = '';
+    modal.classList.remove('hidden');
+    
+    // Store current webhook type
+    modal.dataset.webhookType = type;
+};
+
+window.closeWebhookModal = () => {
+    const modal = document.getElementById('webhook-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+};
+
+window.saveWebhook = async () => {
+    const modal = document.getElementById('webhook-modal');
+    const input = document.getElementById('webhook-url-input');
+    const type = modal?.dataset.webhookType;
+    
+    if (!input || !type) {
+        notify('Error: Modal or input not found', 'error');
+        return;
+    }
+    
+    const webhookUrl = input.value.trim();
+    
+    if (!webhookUrl) {
+        notify('Please enter a webhook URL', 'error');
+        return;
+    }
+    
+    try {
+        const payload = {};
+        if (type === 'discord') {
+            payload.discord_webhook_url = webhookUrl;
+        } else if (type === 'slack') {
+            payload.slack_webhook_url = webhookUrl;
+        }
+        
+        const response = await fetch('/api/settings/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'update_integrations',
+                ...payload
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+            notify(`${type.charAt(0).toUpperCase() + type.slice(1)} webhook saved successfully`, 'success');
+            closeWebhookModal();
+            // Refresh page to show updated status
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            notify(data.msg || 'Failed to save webhook', 'error');
+        }
+    } catch (e) {
+        console.error('[ui-interactions] Error saving webhook:', e);
+        notify('Error saving webhook configuration', 'error');
+    }
+};
+
+window.testWebhook = async () => {
+    const modal = document.getElementById('webhook-modal');
+    const input = document.getElementById('webhook-url-input');
+    const type = modal?.dataset.webhookType;
+    
+    if (!input || !type) {
+        notify('Error: Modal or input not found', 'error');
+        return;
+    }
+    
+    const webhookUrl = input.value.trim();
+    
+    if (!webhookUrl) {
+        notify('Please enter a webhook URL first', 'error');
+        return;
+    }
+    
+    try {
+        const payload = {};
+        if (type === 'discord') {
+            payload.discord_webhook_url = webhookUrl;
+        } else if (type === 'slack') {
+            payload.slack_webhook_url = webhookUrl;
+        }
+        
+        const response = await fetch('/api/v1/finops/test-webhook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+            notify('Test notification sent successfully', 'success');
+        } else {
+            notify('Failed to send test notification', 'error');
+        }
+    } catch (e) {
+        console.error('[ui-interactions] Error testing webhook:', e);
+        notify('Error sending test notification', 'error');
+    }
 };
 
 // --- Pricing (pricing.html) ---

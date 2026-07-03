@@ -115,16 +115,31 @@ class DataPusher:
         action_type: str | None,
         metadata: dict | None,
     ) -> bool:
-        """Push savings data to Prometheus (placeholder for future implementation).
+        """Push savings data to Prometheus (future enhancement).
 
         This method is a placeholder for future Prometheus integration.
+        When implemented, it will:
+        1. Use prometheus_client to push metrics to a Prometheus pushgateway
+        2. Create custom metrics for savings tracking by provider and action type
+        3. Include resource_id and action_type as metric labels
+        4. Handle connection errors and retry logic
+
+        Example implementation:
+            from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
+            registry = CollectorRegistry()
+            g = Gauge('cloud_reaper_savings', 'Savings achieved by Cloud Reaper', 
+                     ['provider', 'action_type'], registry=registry)
+            g.labels(provider=provider, action_type=action_type or 'unknown').set(amount)
+            push_to_gateway('localhost:9091', job='cloud-reaper', registry=registry)
+
+        For now, this logs the data that would be pushed and returns True.
         """
         logger.info(
             f"Prometheus backend not yet implemented. "
-            f"Would push: provider={provider}, amount={amount}, "
+            f"Would push: provider={provider}, amount=${amount:.2f}, "
             f"resource_id={resource_id}, action_type={action_type}"
         )
-        # TODO: Implement Prometheus client integration
+        # For now, just log the data - don't store it (Prometheus is optional)
         return True
 
     def push_metric(

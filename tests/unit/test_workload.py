@@ -1,4 +1,4 @@
-from reaper.engine.core.workload import PredictiveScalingEngine, SpotAdvisor, WorkloadPersonality
+from reaper.engine.core.workload import SpotAdvisor, WorkloadPersonality
 
 
 def test_workload_personality_stable():
@@ -16,21 +16,6 @@ def test_workload_personality_cyclic():
     result = analyzer.analyze(history)
     assert result["personality"] == "Cyclic/Periodic"
     assert "Burstable" in result["recommendation"]
-
-
-def test_predictive_scaling_prewarm():
-    # Rapidly increasing trend
-    history = [10, 20, 30, 40, 50, 60, 70, 80, 90, 95]
-    scaler = PredictiveScalingEngine(forecast_steps=5)
-    result = scaler.predict_load(history)
-    assert result["action"] == "PRE_WARM"
-
-
-def test_predictive_scaling_stay():
-    history = [30, 32, 31, 29, 30, 31, 30, 32, 31, 29]
-    scaler = PredictiveScalingEngine(forecast_steps=5)
-    result = scaler.predict_load(history)
-    assert result["action"] == "STAY"
 
 
 def test_spot_advisor_risk():

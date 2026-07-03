@@ -47,16 +47,21 @@ engine_config = (
         "connect_args": {"check_same_thread": False},
         "pool_pre_ping": True,  # Verify connections before using
         "echo": False,  # Disable SQL logging for performance
-        "pool_size": 10,  # SQLite connection pool
+        "pool_size": 20,  # Increased SQLite connection pool for better concurrency
+        "max_overflow": 10,  # Allow overflow for peak loads
     }
     if "sqlite" in DATABASE_URL
     else {
-        "pool_size": 30,  # Increased pool size for better concurrency
-        "max_overflow": 40,  # Increased max overflow for peak loads
+        "pool_size": 40,  # Increased pool size for better concurrency
+        "max_overflow": 60,  # Increased max overflow for peak loads
         "pool_pre_ping": True,  # Verify connections before using
-        "pool_recycle": 1800,  # Recycle connections after 30 minutes
-        "pool_timeout": 30,  # Timeout for getting connection from pool
+        "pool_recycle": 3600,  # Recycle connections after 1 hour (reduced churn)
+        "pool_timeout": 15,  # Reduced timeout for faster connection acquisition
         "echo": False,  # Disable SQL logging for performance
+        "connect_args": {
+            "connect_timeout": 10,  # Faster connection timeout
+            "options": "-c statement_timeout=30000",  # Prevent long-running queries
+        } if "postgresql" in DATABASE_URL else {},
     }
 )
 

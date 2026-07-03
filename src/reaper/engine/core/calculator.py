@@ -84,13 +84,7 @@ class CostCalculator:
         # Vectorized monthly-to-hourly normalisation using np.where on the frequency column
         df["hourly_cost"] = np.where(
             df["frequency"] == "monthly",
-            df.apply(
-                lambda row: self.calculate_monthly_cost(
-                    row["provider"], row["resource_type"], row["sku"], row["quantity"]
-                ),
-                axis=1,
-            )
-            / 730.0,
+            df["rate"] / 730.0,
             df["rate"],
         )
 

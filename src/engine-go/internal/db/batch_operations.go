@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -52,6 +53,7 @@ func NewBatchDB(driver, dsn string, workers int) (*BatchDB, error) {
 }
 
 // BatchInsertResources performs concurrent batch insert of resources
+// Note: This function uses the Resource struct from db.go
 func (bdb *BatchDB) BatchInsertResources(ctx context.Context, resources []Resource) (*BatchInsertResult, error) {
 	if len(resources) == 0 {
 		return &BatchInsertResult{}, nil
@@ -62,10 +64,19 @@ func (bdb *BatchDB) BatchInsertResources(ctx context.Context, resources []Resour
 		Errors: make([]error, 0),
 	}
 
-	// Prepare insert statement
+	// Prepare insert statement matching db.go schema
 	stmt, err := bdb.pool.PrepareContext(ctx, `
-		INSERT INTO resources (resource_id, provider, resource_type, region, tags, cost, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO resources (id, name, type, region, tags, active, is_protected, is_unallocated, last_seen)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (id) DO UPDATE SET
+			name = EXCLUDED.name,
+			type = EXCLUDED.type,
+			region = EXCLUDED.region,
+			tags = EXCLUDED.tags,
+			active = EXCLUDED.active,
+			is_protected = EXCLUDED.is_protected,
+			is_unallocated = EXCLUDED.is_unallocated,
+			last_seen = EXCLUDED.last_seen
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare statement: %w", err)
@@ -82,14 +93,24 @@ func (bdb *BatchDB) BatchInsertResources(ctx context.Context, resources []Resour
 		go func() {
 			defer wg.Done()
 			for resource := range jobs {
+				// Convert tags map to JSON string for storage
+				tagsJSON := "{}"
+				if resource.Tags != nil && len(resource.Tags) > 0 {
+					if jsonBytes, err := json.Marshal(resource.Tags); err == nil {
+						tagsJSON = string(jsonBytes)
+					}
+				}
+
 				_, err := stmt.ExecContext(ctx,
-					resource.ResourceID,
-					resource.Provider,
-					resource.ResourceType,
+					resource.ID,
+					resource.Name,
+					resource.Type,
 					resource.Region,
-					resource.Tags,
-					resource.Cost,
-					time.Now(),
+					tagsJSON,
+					resource.Active,
+					resource.IsProtected,
+					resource.IsUnallocated,
+					resource.LastSeen,
 				)
 				results <- err
 			}
@@ -233,17 +254,6 @@ func (tm *TransactionManager) ExecuteInTransaction(ctx context.Context, fn func(
 	}
 
 	return nil
-}
-
-// Resource represents a cloud resource for database operations
-type Resource struct {
-	ResourceID   string
-	Provider     string
-	ResourceType string
-	Region       string
-	Tags         string // JSON string
-	Cost         float64
-	CreatedAt    time.Time
 }
 
 // QueryBuilder helps build complex SQL queries
