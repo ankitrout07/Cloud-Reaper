@@ -58,7 +58,7 @@ class DataPusher:
         except (ValueError, TypeError) as e:
             logger.error(f"Invalid data format for savings push: {e}")
             return False
-        except (IOError, OSError) as e:
+        except OSError as e:
             logger.error(f"I/O error pushing savings data: {e}")
             return False
         except Exception as e:

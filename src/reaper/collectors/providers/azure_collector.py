@@ -86,15 +86,15 @@ def _cleanup_expired_locks():
     """Clean up locks for cache keys that no longer exist in the cache."""
     global _LAST_CLEANUP
     now = time.time()
-    
+
     # Only cleanup periodically to avoid contention
     if now - _LAST_CLEANUP < _CLEANUP_INTERVAL:
         return
-    
+
     with _CACHE_LOCK:
         _LAST_CLEANUP = now
         active_keys = set(_GLOBAL_CACHE.keys())
-        expired_locks = [k for k in _FETCH_LOCKS.keys() if k not in active_keys]
+        expired_locks = [k for k in _FETCH_LOCKS if k not in active_keys]
         for k in expired_locks:
             del _FETCH_LOCKS[k]
 
@@ -130,7 +130,7 @@ def get_cached_data(cache_key, fetch_fn, ttl_seconds=60):
             for k in expired_keys:
                 del _GLOBAL_CACHE[k]
                 _FETCH_LOCKS.pop(k, None)
-            
+
             # Periodically cleanup locks
             _cleanup_expired_locks()
 

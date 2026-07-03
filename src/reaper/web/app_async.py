@@ -213,11 +213,15 @@ class RateLimiter:
                 )
                 return False
             except (ConnectionError, TimeoutError) as e:
-                print(f"[Go Rate Limiter] Connection error checking rate limit: {e}, falling back to Python")
+                print(
+                    f"[Go Rate Limiter] Connection error checking rate limit: {e}, falling back to Python"
+                )
             except (ImportError, AttributeError) as e:
                 print(f"[Go Rate Limiter] Go backend not available: {e}, falling back to Python")
             except Exception as e:
-                print(f"[Go Rate Limiter] Unexpected error checking rate limit: {e}, falling back to Python")
+                print(
+                    f"[Go Rate Limiter] Unexpected error checking rate limit: {e}, falling back to Python"
+                )
 
         # Fall back to Python implementation
         return self.can_proceed()
@@ -235,11 +239,15 @@ class RateLimiter:
                     await asyncio.sleep(wait_duration / 1000.0)  # Convert ms to seconds
                 return
             except (ConnectionError, TimeoutError) as e:
-                print(f"[Go Rate Limiter] Connection error waiting for rate limit: {e}, falling back to Python")
+                print(
+                    f"[Go Rate Limiter] Connection error waiting for rate limit: {e}, falling back to Python"
+                )
             except (ImportError, AttributeError) as e:
                 print(f"[Go Rate Limiter] Go backend not available: {e}, falling back to Python")
             except Exception as e:
-                print(f"[Go Rate Limiter] Unexpected error waiting for rate limit: {e}, falling back to Python")
+                print(
+                    f"[Go Rate Limiter] Unexpected error waiting for rate limit: {e}, falling back to Python"
+                )
 
         # Fall back to Python implementation
         while not self.can_proceed():
@@ -294,7 +302,9 @@ class WebSocketBatcher:
                 self.use_go_backend = False
                 self.go_batcher = None
             except Exception as e:
-                print(f"[Go WebSocket Batcher] Unexpected error initializing: {e}, falling back to Python")
+                print(
+                    f"[Go WebSocket Batcher] Unexpected error initializing: {e}, falling back to Python"
+                )
                 self.use_go_backend = False
                 self.go_batcher = None
 
@@ -315,7 +325,9 @@ class WebSocketBatcher:
             except (ConnectionError, TimeoutError) as e:
                 print(f"[Go WebSocket Batcher] Connection error: {e}, falling back to Python")
             except (ImportError, AttributeError) as e:
-                print(f"[Go WebSocket Batcher] Go backend not available: {e}, falling back to Python")
+                print(
+                    f"[Go WebSocket Batcher] Go backend not available: {e}, falling back to Python"
+                )
             except Exception as e:
                 print(f"[Go WebSocket Batcher] Unexpected error: {e}, falling back to Python")
 
