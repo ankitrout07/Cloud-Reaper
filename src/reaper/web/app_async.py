@@ -30,8 +30,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from starlette.middleware.sessions import SessionMiddleware
 
+from reaper.services.credential_service import get_credential_service
 from reaper.utils.error_handler import ErrorCategory, get_logger, handle_exception
-from reaper.services.credential_service import get_credential_service, require_credentials
 
 # Try to import Go WebSocket batcher for enhanced performance
 try:
@@ -512,8 +512,10 @@ async def background_metrics_worker():
 async def startup_event():
     # Initialize global credential service
     credential_service = get_credential_service()
-    logger.info(f"Credential service initialized with providers: {list(credential_service.get_all_providers().keys())}")
-    
+    logger.info(
+        f"Credential service initialized with providers: {list(credential_service.get_all_providers().keys())}"
+    )
+
     asyncio.create_task(background_metrics_worker())
 
 
@@ -1135,10 +1137,10 @@ async def connect_cloud(request: Request):
     try:
         # Use global credential service for validation and storage
         credential_service = get_credential_service()
-        
+
         # First set the credentials temporarily for validation
         credential_service.set_credentials(provider, credentials)
-        
+
         # Validate credentials by actually connecting to the cloud service
         validation_result = credential_service.validate_credentials(provider)
 
@@ -1153,7 +1155,7 @@ async def connect_cloud(request: Request):
 
         # Set as active provider
         credential_service.set_active_provider(provider)
-        
+
         _set_cloud_env(provider, credentials)
         db = SessionLocal()
         try:
@@ -1213,7 +1215,7 @@ async def credentials_status(request: Request):
     try:
         credential_service = get_credential_service()
         active_provider = credential_service.get_active_provider()
-        
+
         if not active_provider:
             return JSONResponse(
                 status_code=503,
@@ -1221,10 +1223,10 @@ async def credentials_status(request: Request):
                     "status": "error",
                     "message": "No active cloud provider configured",
                     "code": "NO_ACTIVE_PROVIDER",
-                    "user_message": "Please connect your cloud provider in Settings to access real-time data"
-                }
+                    "user_message": "Please connect your cloud provider in Settings to access real-time data",
+                },
             )
-        
+
         if not credential_service.has_credentials(active_provider):
             return JSONResponse(
                 status_code=503,
@@ -1233,13 +1235,13 @@ async def credentials_status(request: Request):
                     "message": f"No credentials configured for {active_provider.upper()}",
                     "code": "NO_CREDENTIALS",
                     "provider": active_provider,
-                    "user_message": f"Please configure {active_provider.upper()} credentials in Settings to access real-time data"
-                }
+                    "user_message": f"Please configure {active_provider.upper()} credentials in Settings to access real-time data",
+                },
             )
-        
+
         # Validate credentials are still valid
         validation_result = credential_service.validate_credentials(active_provider)
-        
+
         if not validation_result["valid"]:
             return JSONResponse(
                 status_code=503,
@@ -1248,30 +1250,30 @@ async def credentials_status(request: Request):
                     "message": f"Credential validation failed: {validation_result['message']}",
                     "code": "CREDENTIAL_VALIDATION_FAILED",
                     "provider": active_provider,
-                    "user_message": f"Your {active_provider.upper()} credentials are invalid. Please reconfigure them in Settings."
-                }
+                    "user_message": f"Your {active_provider.upper()} credentials are invalid. Please reconfigure them in Settings.",
+                },
             )
-        
+
         return JSONResponse(
             status_code=200,
             content={
                 "status": "success",
                 "provider": active_provider,
                 "message": f"Valid credentials configured for {active_provider.upper()}",
-                "validation_details": validation_result.get("details", "")
-            }
+                "validation_details": validation_result.get("details", ""),
+            },
         )
-        
+
     except Exception as e:
         logger.error(f"Credential status check failed: {e}")
         return JSONResponse(
             status_code=503,
             content={
                 "status": "error",
-                "message": f"Credential check failed: {str(e)}",
+                "message": f"Credential check failed: {e!s}",
                 "code": "CREDENTIAL_CHECK_ERROR",
-                "user_message": "Unable to verify cloud provider credentials. Please check your Settings."
-            }
+                "user_message": "Unable to verify cloud provider credentials. Please check your Settings.",
+            },
         )
 
 

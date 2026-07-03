@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import datetime
 import json
 import os
@@ -27,21 +26,25 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Extended Azure SDK imports (lazy-loaded to avoid startup overhead for unused services)
 _AZURE_CLIENTS = {
-    'containerservice': ('azure.mgmt.containerservice', 'ContainerServiceClient'),
-    'containerinstance': ('azure.mgmt.containerinstance', 'ContainerInstanceManagementClient'),
-    'keyvault': ('azure.mgmt.keyvault', 'KeyVaultManagementClient'),
-    'redis': ('azure.mgmt.redis', 'RedisManagementClient'),
-    'cosmosdb': ('azure.mgmt.cosmosdb', 'CosmosDBManagementClient'),
-    'datafactory': ('azure.mgmt.datafactory', 'DataFactoryManagementClient'),
-    'logic': ('azure.mgmt.logic', 'LogicManagementClient'),
-    'eventhub': ('azure.mgmt.eventhub', 'EventHubManagementClient'),
-    'servicebus': ('azure.mgmt.servicebus', 'ServiceBusManagementClient'),
-    'iothub': ('azure.mgmt.iothub', 'IotHubClient'),
-    'cognitiveservices': ('azure.mgmt.cognitiveservices', 'CognitiveServicesManagementClient'),
-    'applicationinsights': ('azure.mgmt.applicationinsights', 'ApplicationInsightsManagementClient'),
-    'cdn': ('azure.mgmt.cdn', 'CdnManagementClient'),
-    'apimanagement': ('azure.mgmt.apimanagement', 'ApiManagementClient'),
+    "containerservice": ("azure.mgmt.containerservice", "ContainerServiceClient"),
+    "containerinstance": ("azure.mgmt.containerinstance", "ContainerInstanceManagementClient"),
+    "keyvault": ("azure.mgmt.keyvault", "KeyVaultManagementClient"),
+    "redis": ("azure.mgmt.redis", "RedisManagementClient"),
+    "cosmosdb": ("azure.mgmt.cosmosdb", "CosmosDBManagementClient"),
+    "datafactory": ("azure.mgmt.datafactory", "DataFactoryManagementClient"),
+    "logic": ("azure.mgmt.logic", "LogicManagementClient"),
+    "eventhub": ("azure.mgmt.eventhub", "EventHubManagementClient"),
+    "servicebus": ("azure.mgmt.servicebus", "ServiceBusManagementClient"),
+    "iothub": ("azure.mgmt.iothub", "IotHubClient"),
+    "cognitiveservices": ("azure.mgmt.cognitiveservices", "CognitiveServicesManagementClient"),
+    "applicationinsights": (
+        "azure.mgmt.applicationinsights",
+        "ApplicationInsightsManagementClient",
+    ),
+    "cdn": ("azure.mgmt.cdn", "CdnManagementClient"),
+    "apimanagement": ("azure.mgmt.apimanagement", "ApiManagementClient"),
 }
+
 
 def _get_azure_client(service_name):
     """Lazy-load Azure SDK clients on demand to reduce startup overhead."""
@@ -53,6 +56,7 @@ def _get_azure_client(service_name):
         return getattr(module, class_name)
     except ImportError:
         return None
+
 
 from reaper.collectors.prices.azure import AzurePriceClient
 from reaper.engine.core.logic import BudgetForecaster
@@ -1854,7 +1858,7 @@ class AzureCollector:
 
     def _get_container_service(self):
         if self._container_service is None:
-            client_class = _get_azure_client('containerservice')
+            client_class = _get_azure_client("containerservice")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
                 self._container_service = client_class(self.credentials, self.subscription_id)
@@ -1862,17 +1866,15 @@ class AzureCollector:
 
     def _get_container_instance(self):
         if self._container_instance is None:
-            client_class = _get_azure_client('containerinstance')
+            client_class = _get_azure_client("containerinstance")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
-                self._container_instance = client_class(
-                    self.credentials, self.subscription_id
-                )
+                self._container_instance = client_class(self.credentials, self.subscription_id)
         return self._container_instance
 
     def _get_keyvault(self):
         if self._keyvault is None:
-            client_class = _get_azure_client('keyvault')
+            client_class = _get_azure_client("keyvault")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
                 self._keyvault = client_class(self.credentials, self.subscription_id)
@@ -1880,7 +1882,7 @@ class AzureCollector:
 
     def _get_redis(self):
         if self._redis is None:
-            client_class = _get_azure_client('redis')
+            client_class = _get_azure_client("redis")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
                 self._redis = client_class(self.credentials, self.subscription_id)
@@ -1888,7 +1890,7 @@ class AzureCollector:
 
     def _get_cosmosdb(self):
         if self._cosmosdb is None:
-            client_class = _get_azure_client('cosmosdb')
+            client_class = _get_azure_client("cosmosdb")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
                 self._cosmosdb = client_class(self.credentials, self.subscription_id)
@@ -1896,7 +1898,7 @@ class AzureCollector:
 
     def _get_datafactory(self):
         if self._datafactory is None:
-            client_class = _get_azure_client('datafactory')
+            client_class = _get_azure_client("datafactory")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
                 self._datafactory = client_class(self.credentials, self.subscription_id)
@@ -1904,7 +1906,7 @@ class AzureCollector:
 
     def _get_logic(self):
         if self._logic is None:
-            client_class = _get_azure_client('logic')
+            client_class = _get_azure_client("logic")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
                 self._logic = client_class(self.credentials, self.subscription_id)
@@ -1912,7 +1914,7 @@ class AzureCollector:
 
     def _get_eventhub(self):
         if self._eventhub is None:
-            client_class = _get_azure_client('eventhub')
+            client_class = _get_azure_client("eventhub")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
                 self._eventhub = client_class(self.credentials, self.subscription_id)
@@ -1920,7 +1922,7 @@ class AzureCollector:
 
     def _get_servicebus(self):
         if self._servicebus is None:
-            client_class = _get_azure_client('servicebus')
+            client_class = _get_azure_client("servicebus")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
                 self._servicebus = client_class(self.credentials, self.subscription_id)
@@ -1928,7 +1930,7 @@ class AzureCollector:
 
     def _get_iothub(self):
         if self._iothub is None:
-            client_class = _get_azure_client('iothub')
+            client_class = _get_azure_client("iothub")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
                 self._iothub = client_class(self.credentials, self.subscription_id)
@@ -1936,27 +1938,23 @@ class AzureCollector:
 
     def _get_cognitive(self):
         if self._cognitive is None:
-            client_class = _get_azure_client('cognitiveservices')
+            client_class = _get_azure_client("cognitiveservices")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
-                self._cognitive = client_class(
-                    self.credentials, self.subscription_id
-                )
+                self._cognitive = client_class(self.credentials, self.subscription_id)
         return self._cognitive
 
     def _get_appinsights(self):
         if self._appinsights is None:
-            client_class = _get_azure_client('applicationinsights')
+            client_class = _get_azure_client("applicationinsights")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
-                self._appinsights = client_class(
-                    self.credentials, self.subscription_id
-                )
+                self._appinsights = client_class(self.credentials, self.subscription_id)
         return self._appinsights
 
     def _get_cdn(self):
         if self._cdn is None:
-            client_class = _get_azure_client('cdn')
+            client_class = _get_azure_client("cdn")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
                 self._cdn = client_class(self.credentials, self.subscription_id)
@@ -1964,7 +1962,7 @@ class AzureCollector:
 
     def _get_apim(self):
         if self._apim is None:
-            client_class = _get_azure_client('apimanagement')
+            client_class = _get_azure_client("apimanagement")
             if client_class:
                 # pyrefly: ignore [bad-argument-type]
                 self._apim = client_class(self.credentials, self.subscription_id)

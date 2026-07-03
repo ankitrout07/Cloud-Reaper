@@ -61,7 +61,9 @@ engine_config = (
         "connect_args": {
             "connect_timeout": 10,  # Faster connection timeout
             "options": "-c statement_timeout=30000",  # Prevent long-running queries
-        } if "postgresql" in DATABASE_URL else {},
+        }
+        if "postgresql" in DATABASE_URL
+        else {},
     }
 )
 

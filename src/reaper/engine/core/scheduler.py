@@ -512,10 +512,10 @@ class FinOpsPipeline:
                 }
 
             # Commitment Analysis Implementation Guide:
-            # 
+            #
             # This section should analyze the optimized baseline to recommend
             # Reserved Instances (RIs) and Savings Plans (SPs) to maximize savings.
-            # 
+            #
             # Implementation Steps:
             # 1. Query the optimized baseline from SQLite to get rightsized resource recommendations
             # 2. Calculate commitment coverage based on optimized usage patterns:

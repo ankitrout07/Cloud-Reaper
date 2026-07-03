@@ -135,10 +135,9 @@ class ZombieScorer:
             )
             # Fire-and-forget Discord alert in background thread to avoid blocking
             import threading
+
             threading.Thread(
-                target=send_discord_alert,
-                args=(title, msg, 0xEF4444),
-                daemon=True
+                target=send_discord_alert, args=(title, msg, 0xEF4444), daemon=True
             ).start()
 
         return {"is_zombie": is_zombie, "score": score, "reasons": reasons}

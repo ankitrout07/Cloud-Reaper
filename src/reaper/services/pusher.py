@@ -127,7 +127,7 @@ class DataPusher:
         Example implementation:
             from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
             registry = CollectorRegistry()
-            g = Gauge('cloud_reaper_savings', 'Savings achieved by Cloud Reaper', 
+            g = Gauge('cloud_reaper_savings', 'Savings achieved by Cloud Reaper',
                      ['provider', 'action_type'], registry=registry)
             g.labels(provider=provider, action_type=action_type or 'unknown').set(amount)
             push_to_gateway('localhost:9091', job='cloud-reaper', registry=registry)
