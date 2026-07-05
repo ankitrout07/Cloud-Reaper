@@ -109,13 +109,13 @@ func (rs *ResourceScorer) BatchScoreResources(config ScoringConfig) []ScoreResul
 	// Vectorized calculations using goroutines
 	var wg sync.WaitGroup
 	var resultsMu sync.Mutex
-	
+
 	for i := 0; i < numResources; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
 			score := rs.scoreResource(idx, config)
-			
+
 			// Protect results slice write with mutex
 			resultsMu.Lock()
 			results[idx] = score
@@ -280,13 +280,13 @@ func (zs *ZombieScorer) BatchScoreZombieResources(resources []map[string]interfa
 
 	var wg sync.WaitGroup
 	var resultsMu sync.Mutex
-	
+
 	for i, resource := range resources {
 		wg.Add(1)
 		go func(idx int, res map[string]interface{}) {
 			defer wg.Done()
 			score := zs.ScoreResource(res)
-			
+
 			// Protect results slice write with mutex
 			resultsMu.Lock()
 			results[idx] = score
@@ -342,13 +342,13 @@ func BatchCalculateMeans(matrix [][]float64) []float64 {
 
 	var wg sync.WaitGroup
 	var resultsMu sync.Mutex
-	
+
 	for i, row := range matrix {
 		wg.Add(1)
 		go func(idx int, data []float64) {
 			defer wg.Done()
 			meanValue := mean(data)
-			
+
 			// Protect results slice write with mutex
 			resultsMu.Lock()
 			results[idx] = meanValue
@@ -366,13 +366,13 @@ func BatchCalculateMax(matrix [][]float64) []float64 {
 
 	var wg sync.WaitGroup
 	var resultsMu sync.Mutex
-	
+
 	for i, row := range matrix {
 		wg.Add(1)
 		go func(idx int, data []float64) {
 			defer wg.Done()
 			maxValue := max(data)
-			
+
 			// Protect results slice write with mutex
 			resultsMu.Lock()
 			results[idx] = maxValue
@@ -404,7 +404,7 @@ func MatrixMultiply(a, b [][]float64) ([][]float64, error) {
 	// Parallel computation
 	var wg sync.WaitGroup
 	var resultMu sync.Mutex
-	
+
 	for i := 0; i < rowsA; i++ {
 		wg.Add(1)
 		go func(row int) {
@@ -417,7 +417,7 @@ func MatrixMultiply(a, b [][]float64) ([][]float64, error) {
 				}
 				rowData[j] = sum
 			}
-			
+
 			// Protect result slice write with mutex
 			resultMu.Lock()
 			result[row] = rowData

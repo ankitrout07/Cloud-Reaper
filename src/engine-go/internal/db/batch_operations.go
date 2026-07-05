@@ -254,7 +254,7 @@ func (bdb *BatchDB) BatchUpdate(ctx context.Context, table string, updates map[s
 			adjustedWhereClause = strings.ReplaceAll(adjustedWhereClause, oldParam, newParam)
 		}
 		args = append(args, whereArgs...)
-		
+
 		query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", table, setClause, adjustedWhereClause)
 	} else {
 		query := fmt.Sprintf("UPDATE %s SET %s", table, setClause)
@@ -409,17 +409,17 @@ func (im *IndexManager) CreateIndex(ctx context.Context, table, indexName, colum
 	if !isValidTableName(table) {
 		return fmt.Errorf("invalid table name: %s", table)
 	}
-	
+
 	// Validate index name
 	if !isValidSQLIdentifier(indexName) {
 		return fmt.Errorf("invalid index name: %s", indexName)
 	}
-	
+
 	// Validate columns (basic check for SQL injection)
 	if columns == "" {
 		return fmt.Errorf("columns cannot be empty")
 	}
-	
+
 	// Check for dangerous patterns in columns
 	dangerousPatterns := []string{";", "--", "/*", "*/", "drop ", "delete ", "truncate ", "alter "}
 	lowerColumns := strings.ToLower(columns)
@@ -445,7 +445,7 @@ func (im *IndexManager) DropIndex(ctx context.Context, indexName string) error {
 	if !isValidSQLIdentifier(indexName) {
 		return fmt.Errorf("invalid index name: %s", indexName)
 	}
-	
+
 	query := fmt.Sprintf("DROP INDEX IF EXISTS %s", indexName)
 	_, err := im.db.pool.ExecContext(ctx, query)
 	return err
@@ -457,7 +457,7 @@ func (im *IndexManager) ListIndexes(ctx context.Context, table string) ([]string
 	if !isValidTableName(table) {
 		return nil, fmt.Errorf("invalid table name: %s", table)
 	}
-	
+
 	// Use parameterized query to prevent SQL injection
 	// Using ? for SQLite parameter placeholder
 	query := "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name = ?"

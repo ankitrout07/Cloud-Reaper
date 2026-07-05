@@ -176,7 +176,7 @@ func (cc *CostCalculator) calculateItemHourlyCost(item BurnItem) float64 {
 	if quantity == 0 {
 		quantity = 1
 	}
-	
+
 	frequency := item.Frequency
 	if frequency == "" {
 		frequency = "hourly"
@@ -196,13 +196,13 @@ func (cc *CostCalculator) BatchCalculateMonthlyCost(items []BurnItem) []float64 
 
 	var wg sync.WaitGroup
 	var resultsMu sync.Mutex
-	
+
 	for i, item := range items {
 		wg.Add(1)
 		go func(idx int, burnItem BurnItem) {
 			defer wg.Done()
 			cost := cc.CalculateMonthlyCost(burnItem.Provider, burnItem.ResourceType, burnItem.SKU, burnItem.Quantity)
-			
+
 			// Protect results slice write with mutex
 			resultsMu.Lock()
 			results[idx] = cost
@@ -220,13 +220,13 @@ func (cc *CostCalculator) BatchCalculateHourlyCost(items []BurnItem) []float64 {
 
 	var wg sync.WaitGroup
 	var resultsMu sync.Mutex
-	
+
 	for i, item := range items {
 		wg.Add(1)
 		go func(idx int, burnItem BurnItem) {
 			defer wg.Done()
 			cost := cc.CalculateHourlyCost(burnItem.Provider, burnItem.ResourceType, burnItem.SKU, burnItem.Quantity)
-			
+
 			// Protect results slice write with mutex
 			resultsMu.Lock()
 			results[idx] = cost

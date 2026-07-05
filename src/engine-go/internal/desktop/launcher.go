@@ -62,7 +62,7 @@ func Run() {
 	defer func() {
 		// Shutdown HTTP server gracefully
 		cancel()
-		
+
 		if processStarted && cmd.Process != nil {
 			_ = cmd.Process.Kill()
 			_ = cmd.Wait()
