@@ -1,0 +1,226 @@
+{% extends "layouts/_console.html" %}
+
+{% block title %}Governance Dashboard - Cloud-Reaper{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Governance Dashboard</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-1">Multi-cloud policy, compliance, and best practices management</p>
+        </div>
+        <div class="flex space-x-3">
+            <button onclick="runComplianceScan()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                Run Compliance Scan
+            </button>
+            <button onclick="generateReport()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                Generate Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 dark:text-gray-400 text-sm">Active Policies</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="active-policies-count">0</p>
+                </div>
+                <div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
+                    <svg class="w-6 h-6 text-blue-600 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 dark:text-gray-400 text-sm">Compliance Score</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="compliance-score">0%</p>
+                </div>
+                <div class="p-3 bg-green-100 dark:bg-green-900 rounded-full">
+                    <svg class="w-6 h-6 text-green-600 dark:text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 dark:text-gray-400 text-sm">Violations</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="violations-count">0</p>
+                </div>
+                <div class="p-3 bg-red-100 dark:bg-red-900 rounded-full">
+                    <svg class="w-6 h-6 text-red-600 dark:text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-gray-600 dark:text-gray-400 text-sm">Recommendations</p>
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white" id="recommendations-count">0</p>
+                </div>
+                <div class="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-full">
+                    <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="border-b border-gray-200 dark:border-gray-700">
+            <nav class="flex space-x-8 px-6" aria-label="Tabs">
+                <button onclick="switchTab('policies')" id="tab-policies" class="tab-button active border-b-2 border-blue-500 py-4 px-1 text-sm font-medium text-blue-600 dark:text-blue-400">
+                    Policy Templates
+                </button>
+                <button onclick="switchTab('migration')" id="tab-migration" class="tab-button border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                    Migration Advisor
+                </button>
+                <button onclick="switchTab('cost')" id="tab-cost" class="tab-button border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                    Cost Aggregation
+                </button>
+                <button onclick="switchTab('best-practices')" id="tab-best-practices" class="tab-button border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                    Best Practices
+                </button>
+            </nav>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="p-6">
+            <!-- Policies Tab -->
+            <div id="content-policies" class="tab-content">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Policy Templates</h2>
+                    <button onclick="createPolicy()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        Create Policy
+                    </button>
+                </div>
+                <div id="policies-list" class="space-y-4">
+                    <!-- Policies will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Migration Tab -->
+            <div id="content-migration" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Migration Advisor</h2>
+                    <button onclick="newMigrationAssessment()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        New Assessment
+                    </button>
+                </div>
+                <div id="migration-list" class="space-y-4">
+                    <!-- Migration assessments will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Cost Aggregation Tab -->
+            <div id="content-cost" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Multi-Cloud Cost Aggregation</h2>
+                    <button onclick="generateCostReport()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        Generate Report
+                    </button>
+                </div>
+                <div id="cost-summary" class="space-y-4">
+                    <!-- Cost aggregation summary will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Best Practices Tab -->
+            <div id="content-best-practices" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Provider Best Practices</h2>
+                    <div class="flex space-x-2">
+                        <select id="provider-filter" onchange="filterBestPractices()" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="">All Providers</option>
+                            <option value="azure">Azure</option>
+                            <option value="aws">AWS</option>
+                            <option value="gcp">GCP</option>
+                        </select>
+                        <button onclick="evaluateBestPractices()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                            Evaluate
+                        </button>
+                    </div>
+                </div>
+                <div id="best-practices-list" class="space-y-4">
+                    <!-- Best practices will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for creating policy -->
+<div id="policy-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Create Policy Template</h3>
+                <button onclick="closePolicyModal()" class="text-gray-400 hover:text-gray-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <form id="policy-form" onsubmit="savePolicy(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Policy ID</label>
+                        <input type="text" id="policy-id" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                        <input type="text" id="policy-name" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                        <select id="policy-category" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="cost_optimization">Cost Optimization</option>
+                            <option value="security_governance">Security Governance</option>
+                            <option value="operational_excellence">Operational Excellence</option>
+                            <option value="sustainability">Sustainability</option>
+                            <option value="compliance">Compliance</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Severity</label>
+                        <select id="policy-severity" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                            <option value="critical">Critical</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                        <textarea id="policy-description" rows="3" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></textarea>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closePolicyModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        Save Policy
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/governance.js"></script>
+{% endblock %}

@@ -461,6 +461,12 @@ app.include_router(search_router)
 from reaper.web.metrics_router import telemetry_router
 
 app.include_router(telemetry_router)
+from reaper.web.ml_router import router as ml_router
+
+app.include_router(ml_router)
+from reaper.web.governance_router import governance_router
+
+app.include_router(governance_router)
 from reaper.integrations import go_bridge  # async Go engine bridge (non-blocking)
 
 VAULT_UNLOCK_TTL_SEC = int(os.getenv("VAULT_UNLOCK_TTL_SEC", "3600"))
@@ -1662,6 +1668,18 @@ async def pricing(request: Request):
 @app.get("/finops")
 async def finops(request: Request):
     return templates.TemplateResponse(request, "pages/finops.html", {"request": request})
+
+
+@app.get("/ai-ml-dashboard")
+async def ai_ml_dashboard(request: Request):
+    """Renders the AI/ML Dashboard for advanced machine learning features."""
+    return templates.TemplateResponse(request, "pages/ai-ml-dashboard.html", {"request": request})
+
+
+@app.get("/governance")
+async def governance(request: Request):
+    """Renders the Governance Dashboard for policy, compliance, and best practices management."""
+    return templates.TemplateResponse(request, "pages/governance.html", {"request": request})
 
 
 @app.get("/financial")

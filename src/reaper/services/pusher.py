@@ -4,6 +4,7 @@ Supports local database storage and extensible telemetry backends.
 """
 
 import logging
+import os
 from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
@@ -121,32 +122,66 @@ class DataPusher:
         action_type: str | None,
         metadata: dict | None,
     ) -> bool:
-        """Push savings data to Prometheus (future enhancement).
+        """Push savings data to Prometheus Pushgateway.
 
-        This method is a placeholder for future Prometheus integration.
-        When implemented, it will:
-        1. Use prometheus_client to push metrics to a Prometheus pushgateway
-        2. Create custom metrics for savings tracking by provider and action type
-        3. Include resource_id and action_type as metric labels
-        4. Handle connection errors and retry logic
-
-        Example implementation:
-            from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
-            registry = CollectorRegistry()
-            g = Gauge('cloud_reaper_savings', 'Savings achieved by Cloud Reaper',
-                     ['provider', 'action_type'], registry=registry)
-            g.labels(provider=provider, action_type=action_type or 'unknown').set(amount)
-            push_to_gateway('localhost:9091', job='cloud-reaper', registry=registry)
-
-        For now, this logs the data that would be pushed and returns True.
+        This method pushes savings metrics to Prometheus using the Pushgateway.
+        It creates custom metrics for savings tracking by provider and action type,
+        includes resource_id and action_type as metric labels, and handles connection errors.
         """
-        logger.info(
-            f"Prometheus backend not yet implemented. "
-            f"Would push: provider={provider}, amount=${amount:.2f}, "
-            f"resource_id={resource_id}, action_type={action_type}"
-        )
-        # For now, just log the data - don't store it (Prometheus is optional)
-        return True
+        try:
+            from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
+            
+            # Get Prometheus pushgateway URL from environment
+            pushgateway_url = os.getenv("PROMETHEUS_PUSHGATEWAY_URL", "localhost:9091")
+            job_name = os.getenv("PROMETHEUS_JOB_NAME", "cloud-reaper")
+            
+            # Create a collector registry for this push
+            registry = CollectorRegistry()
+            
+            # Create a gauge metric for savings
+            savings_gauge = Gauge(
+                'cloud_reaper_savings',
+                'Savings achieved by Cloud Reaper',
+                ['provider', 'action_type', 'resource_id'],
+                registry=registry
+            )
+            
+            # Set the gauge value with labels
+            labels = {
+                'provider': provider,
+                'action_type': action_type or 'unknown',
+                'resource_id': resource_id or 'unknown'
+            }
+            savings_gauge.labels(**labels).set(amount)
+            
+            # Push to Prometheus Pushgateway
+            push_to_gateway(pushgateway_url, job=job_name, registry=registry)
+            
+            logger.info(
+                f"Successfully pushed to Prometheus: provider={provider}, amount=${amount:.2f}, "
+                f"resource_id={resource_id}, action_type={action_type}"
+            )
+            return True
+            
+        except ImportError:
+            logger.warning(
+                "prometheus_client not installed. "
+                "Install it with: pip install prometheus_client"
+            )
+            # Fallback to logging if prometheus_client is not available
+            logger.info(
+                f"[SAVINGS] Provider: {provider}, Amount: ${amount:.2f}, "
+                f"Resource: {resource_id}, Action: {action_type}"
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to push to Prometheus: {e}")
+            # Fallback to logging on error
+            logger.info(
+                f"[SAVINGS] Provider: {provider}, Amount: ${amount:.2f}, "
+                f"Resource: {resource_id}, Action: {action_type}"
+            )
+            return False
 
     def push_metric(
         self,
@@ -169,12 +204,67 @@ class DataPusher:
             return False
 
         try:
-            logger.debug(f"Pushing metric: {metric_name}={value} labels={labels}")
-            # For now, just log the metric
-            # Future implementations can push to Prometheus, Grafana, etc.
-            return True
+            if self.backend == "prometheus":
+                return self._push_metric_to_prometheus(metric_name, value, labels)
+            else:
+                logger.debug(f"Pushing metric: {metric_name}={value} labels={labels}")
+                return True
         except Exception as e:
             logger.error(f"Failed to push metric: {e}")
+            return False
+
+    def _push_metric_to_prometheus(
+        self,
+        metric_name: str,
+        value: float,
+        labels: dict | None = None,
+    ) -> bool:
+        """Push a generic metric to Prometheus Pushgateway."""
+        try:
+            from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
+            
+            # Get Prometheus pushgateway URL from environment
+            pushgateway_url = os.getenv("PROMETHEUS_PUSHGATEWAY_URL", "localhost:9091")
+            job_name = os.getenv("PROMETHEUS_JOB_NAME", "cloud-reaper")
+            
+            # Create a collector registry for this push
+            registry = CollectorRegistry()
+            
+            # Sanitize metric name (Prometheus requirements)
+            sanitized_name = metric_name.replace("-", "_").replace(" ", "_")
+            
+            # Create a gauge metric
+            metric_gauge = Gauge(
+                sanitized_name,
+                f'Cloud Reaper metric: {metric_name}',
+                list(labels.keys()) if labels else [],
+                registry=registry
+            )
+            
+            # Set the gauge value with labels
+            if labels:
+                metric_gauge.labels(**labels).set(value)
+            else:
+                metric_gauge.set(value)
+            
+            # Push to Prometheus Pushgateway
+            push_to_gateway(pushgateway_url, job=job_name, registry=registry)
+            
+            logger.info(f"Successfully pushed metric to Prometheus: {metric_name}={value}")
+            return True
+            
+        except ImportError:
+            logger.warning(
+                "prometheus_client not installed. "
+                "Install it with: pip install prometheus_client"
+            )
+            # Fallback to logging
+            logger.info(f"[METRIC] {metric_name}={value} labels={labels}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to push metric to Prometheus: {e}")
+            # Fallback to logging
+            logger.info(f"[METRIC] {metric_name}={value} labels={labels}")
             return False
 
     def close(self) -> None:

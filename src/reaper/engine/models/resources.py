@@ -15,6 +15,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Text,
     create_engine,
 )
 from sqlalchemy.exc import OperationalError
@@ -391,3 +392,86 @@ def retry_on_db_error(max_retries=3, delay=1.0):
         return wrapper
 
     return decorator
+
+
+# AI/ML Enhancement Tables
+
+
+class CapacityPrediction(Base):
+    """Predictive capacity planning forecasts."""
+    __tablename__ = "capacity_predictions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    resource_id = Column(String, index=True)
+    prediction_date = Column(DateTime, default=datetime.now)
+    forecast_horizon_days = Column(Integer)
+    predicted_cpu = Column(Float, nullable=True)
+    predicted_memory = Column(Float, nullable=True)
+    predicted_cost = Column(Float)
+    confidence_interval_lower = Column(Float, nullable=True)
+    confidence_interval_upper = Column(Float, nullable=True)
+    model_version = Column(String)
+    forecast_data = Column(JSON)  # Stores full forecast details
+    created_at = Column(DateTime, default=datetime.now)
+
+
+class AnomalyExplanation(Base):
+    """Root cause analysis for cost anomalies."""
+    __tablename__ = "anomaly_explanations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    anomaly_id = Column(String, index=True)
+    resource_id = Column(String, index=True)
+    root_cause = Column(String)
+    causal_factors = Column(JSON)
+    explanation_text = Column(Text)
+    confidence_score = Column(Float)
+    recommendations = Column(JSON)
+    analysis_timestamp = Column(DateTime, default=datetime.now)
+
+
+class ChatConversation(Base):
+    """Natural language query conversation history."""
+    __tablename__ = "chat_conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, index=True)
+    session_id = Column(String, index=True)
+    query_text = Column(Text)
+    intent_classification = Column(String)
+    sql_query = Column(Text, nullable=True)
+    response_text = Column(Text)
+    response_data = Column(JSON, nullable=True)
+    processing_time_seconds = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=datetime.now)
+
+
+class AlertFeedback(Base):
+    """User feedback on alerts for intelligent tuning."""
+    __tablename__ = "alert_feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    alert_id = Column(String, index=True)
+    user_id = Column(String, index=True)
+    feedback_type = Column(String)  # 'acknowledge', 'dismiss', 'snooze', 'action_taken'
+    feedback_value = Column(Integer, nullable=True)  # 1-5 rating
+    feedback_text = Column(Text, nullable=True)
+    response_time_seconds = Column(Integer, nullable=True)
+    timestamp = Column(DateTime, default=datetime.now)
+
+
+class AlertOptimization(Base):
+    """Optimized alert thresholds and settings."""
+    __tablename__ = "alert_optimizations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    alert_type = Column(String, index=True)
+    user_id = Column(String, index=True, nullable=True)
+    original_threshold = Column(Float)
+    optimized_threshold = Column(Float)
+    adjustment_percentage = Column(Float)
+    user_sensitivity = Column(Float)
+    historical_quality = Column(Float)
+    rationale = Column(Text)
+    confidence = Column(String)
+    created_at = Column(DateTime, default=datetime.now)

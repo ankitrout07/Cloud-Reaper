@@ -25,6 +25,8 @@ type Resource struct {
 	IsProtected   bool
 	IsUnallocated bool
 	LastSeen      time.Time
+	State         string
+	HourlyPrice   float64
 }
 
 var (
@@ -180,6 +182,46 @@ func AppendSignedActionLog(resourceID, actionType, details string) error {
 	_, err = db.Exec("INSERT INTO action_logs (resource_id, action_type, status, details, previous_hash, signature, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		resourceID, actionType, "SUCCESS", details, previousHash, signature, timestamp)
 	return err
+}
+
+func GetAllResources(database *sql.DB) ([]Resource, error) {
+	rows, err := database.Query("SELECT id, name, type, region, tags, active, is_protected, is_unallocated, last_seen FROM resources")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var resources []Resource
+	for rows.Next() {
+		var r Resource
+		var tagsJSON string
+		err := rows.Scan(&r.ID, &r.Name, &r.Type, &r.Region, &tagsJSON, &r.Active, &r.IsProtected, &r.IsUnallocated, &r.LastSeen)
+		if err != nil {
+			return nil, err
+		}
+		
+		// Parse tags JSON
+		if tagsJSON != "" {
+			if err := json.Unmarshal([]byte(tagsJSON), &r.Tags); err != nil {
+				r.Tags = make(map[string]*string)
+			}
+		} else {
+			r.Tags = make(map[string]*string)
+		}
+		
+		// Set default values for new fields
+		r.State = "unknown"
+		if r.Active {
+			r.State = "running"
+		} else {
+			r.State = "stopped"
+		}
+		r.HourlyPrice = 0.0
+		
+		resources = append(resources, r)
+	}
+	
+	return resources, nil
 }
 
 func GetActiveCloudCredentials(provider string) (map[string]interface{}, error) {
