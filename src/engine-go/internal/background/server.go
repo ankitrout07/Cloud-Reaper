@@ -243,7 +243,7 @@ func getTaskFunction(taskType string) (TaskFunc, error) {
 // Real task implementations using actual collectors and database operations
 func priceScanTask(ctx context.Context, args []interface{}) (interface{}, error) {
 	log.Printf("Starting price scan task with args: %v", args)
-	
+
 	// Extract provider from args
 	provider := "azure" // default
 	if len(args) > 0 {
@@ -251,13 +251,13 @@ func priceScanTask(ctx context.Context, args []interface{}) (interface{}, error)
 			provider = p
 		}
 	}
-	
+
 	// Create provider scraper
 	cloudProvider, err := collectors.NewProvider(provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create provider: %w", err)
 	}
-	
+
 	// Get credentials from environment or args
 	creds := make(map[string]string)
 	if len(args) > 1 {
@@ -267,22 +267,22 @@ func priceScanTask(ctx context.Context, args []interface{}) (interface{}, error)
 			}
 		}
 	}
-	
+
 	// Authenticate
 	if err := cloudProvider.Authenticate(creds); err != nil {
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
-	
+
 	// Scan resources to get SKUs
 	resources, err := cloudProvider.ScanResources()
 	if err != nil {
 		return nil, fmt.Errorf("resource scan failed: %w", err)
 	}
-	
+
 	// Collect unique SKUs and regions
 	skuSet := make(map[string]bool)
 	regionSet := make(map[string]bool)
-	
+
 	for _, resource := range resources {
 		if resource.SKU != "" {
 			skuSet[resource.SKU] = true
@@ -291,18 +291,18 @@ func priceScanTask(ctx context.Context, args []interface{}) (interface{}, error)
 			regionSet[resource.Region] = true
 		}
 	}
-	
+
 	// Convert to slices
 	skus := make([]string, 0, len(skuSet))
 	regions := make([]string, 0, len(regionSet))
-	
+
 	for sku := range skuSet {
 		skus = append(skus, sku)
 	}
 	for region := range regionSet {
 		regions = append(regions, region)
 	}
-	
+
 	result := map[string]interface{}{
 		"skus_scanned": len(skus),
 		"regions":      regions,
@@ -310,14 +310,14 @@ func priceScanTask(ctx context.Context, args []interface{}) (interface{}, error)
 		"timestamp":    time.Now().Unix(),
 		"provider":     provider,
 	}
-	
+
 	log.Printf("Price scan completed: %d SKUs across %d regions", len(skus), len(regions))
 	return result, nil
 }
 
 func resourceAuditTask(ctx context.Context, args []interface{}) (interface{}, error) {
 	log.Printf("Starting resource audit task with args: %v", args)
-	
+
 	// Extract provider from args
 	provider := "azure" // default
 	if len(args) > 0 {
@@ -325,13 +325,13 @@ func resourceAuditTask(ctx context.Context, args []interface{}) (interface{}, er
 			provider = p
 		}
 	}
-	
+
 	// Create provider scraper
 	cloudProvider, err := collectors.NewProvider(provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create provider: %w", err)
 	}
-	
+
 	// Get credentials from environment or args
 	creds := make(map[string]string)
 	if len(args) > 1 {
@@ -341,22 +341,22 @@ func resourceAuditTask(ctx context.Context, args []interface{}) (interface{}, er
 			}
 		}
 	}
-	
+
 	// Authenticate
 	if err := cloudProvider.Authenticate(creds); err != nil {
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
-	
+
 	// Scan resources
 	resources, err := cloudProvider.ScanResources()
 	if err != nil {
 		return nil, fmt.Errorf("resource scan failed: %w", err)
 	}
-	
+
 	// Perform audit checks
 	issuesFound := 0
 	auditedResources := len(resources)
-	
+
 	for _, resource := range resources {
 		// Check for common issues
 		if resource.Tags == nil || len(resource.Tags) == 0 {
@@ -367,44 +367,44 @@ func resourceAuditTask(ctx context.Context, args []interface{}) (interface{}, er
 			issuesFound++
 		}
 	}
-	
+
 	result := map[string]interface{}{
 		"resources_audited": auditedResources,
 		"issues_found":      issuesFound,
 		"timestamp":         time.Now().Unix(),
-		"provider":         provider,
+		"provider":          provider,
 	}
-	
+
 	log.Printf("Resource audit completed: %d resources audited, %d issues found", auditedResources, issuesFound)
 	return result, nil
 }
 
 func costAnalysisTask(ctx context.Context, args []interface{}) (interface{}, error) {
 	log.Printf("Starting cost analysis task with args: %v", args)
-	
+
 	// Connect to database
 	database, err := db.Connect()
 	if err != nil {
 		return nil, fmt.Errorf("database connection failed: %w", err)
 	}
 	defer database.Close()
-	
+
 	// Get resources from database
 	resources, err := db.GetAllResources(database)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch resources: %w", err)
 	}
-	
+
 	// Calculate total cost and potential savings
 	totalCost := 0.0
 	potentialSavings := 0.0
-	
+
 	for _, resource := range resources {
 		if resource.HourlyPrice > 0 {
 			// Estimate monthly cost (720 hours)
 			monthlyCost := resource.HourlyPrice * 720
 			totalCost += monthlyCost
-			
+
 			// Simple savings estimation
 			if resource.State == "running" && resource.HourlyPrice > 0.5 {
 				// Potential savings from rightsizing or stopping
@@ -412,21 +412,21 @@ func costAnalysisTask(ctx context.Context, args []interface{}) (interface{}, err
 			}
 		}
 	}
-	
+
 	result := map[string]interface{}{
-		"total_cost":       totalCost,
-		"savings_found":    potentialSavings,
-		"resources_count":  len(resources),
-		"timestamp":        time.Now().Unix(),
+		"total_cost":      totalCost,
+		"savings_found":   potentialSavings,
+		"resources_count": len(resources),
+		"timestamp":       time.Now().Unix(),
 	}
-	
+
 	log.Printf("Cost analysis completed: total cost $%.2f, potential savings $%.2f", totalCost, potentialSavings)
 	return result, nil
 }
 
 func metricsFetchTask(ctx context.Context, args []interface{}) (interface{}, error) {
 	log.Printf("Starting metrics fetch task with args: %v", args)
-	
+
 	// Extract provider from args
 	provider := "azure" // default
 	if len(args) > 0 {
@@ -434,13 +434,13 @@ func metricsFetchTask(ctx context.Context, args []interface{}) (interface{}, err
 			provider = p
 		}
 	}
-	
+
 	// Create provider scraper
 	cloudProvider, err := collectors.NewProvider(provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create provider: %w", err)
 	}
-	
+
 	// Get credentials from environment or args
 	creds := make(map[string]string)
 	if len(args) > 1 {
@@ -450,50 +450,50 @@ func metricsFetchTask(ctx context.Context, args []interface{}) (interface{}, err
 			}
 		}
 	}
-	
+
 	// Authenticate
 	if err := cloudProvider.Authenticate(creds); err != nil {
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
-	
+
 	// Scan resources to get metrics
 	resources, err := cloudProvider.ScanResources()
 	if err != nil {
 		return nil, fmt.Errorf("resource scan failed: %w", err)
 	}
-	
+
 	// Calculate aggregate metrics
 	totalResources := len(resources)
 	runningResources := 0
 	totalHourlyCost := 0.0
-	
+
 	for _, resource := range resources {
 		if resource.State == "running" {
 			runningResources++
 		}
 		totalHourlyCost += resource.HourlyPrice
 	}
-	
+
 	// Calculate utilization metrics
 	cpuUtilization := 0.0
 	memoryUsage := 0.0
-	
+
 	if totalResources > 0 {
 		cpuUtilization = float64(runningResources) / float64(totalResources) * 100
 		memoryUsage = cpuUtilization * 0.8 // Simplified memory estimation
 	}
-	
+
 	result := map[string]interface{}{
-		"total_resources":    totalResources,
-		"running_resources":  runningResources,
-		"cpu_utilization":    cpuUtilization,
-		"memory_usage":       memoryUsage,
-		"total_hourly_cost":  totalHourlyCost,
-		"timestamp":          time.Now().Unix(),
+		"total_resources":   totalResources,
+		"running_resources": runningResources,
+		"cpu_utilization":   cpuUtilization,
+		"memory_usage":      memoryUsage,
+		"total_hourly_cost": totalHourlyCost,
+		"timestamp":         time.Now().Unix(),
 		"provider":          provider,
 	}
-	
-	log.Printf("Metrics fetch completed: %d total resources, %d running, %.1f%% CPU utilization", 
+
+	log.Printf("Metrics fetch completed: %d total resources, %d running, %.1f%% CPU utilization",
 		totalResources, runningResources, cpuUtilization)
 	return result, nil
 }

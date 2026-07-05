@@ -13,15 +13,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 # Set up minimal environment
 os.environ.setdefault("DATABASE_URL", "sqlite:///./data/reaper.db")
 
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Text, JSON, inspect
-from sqlalchemy.orm import declarative_base
 from datetime import datetime
+
+from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, Text, create_engine, inspect
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
 
 class CapacityPrediction(Base):
     """Predictive capacity planning forecasts."""
+
     __tablename__ = "capacity_predictions"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -39,6 +41,7 @@ class CapacityPrediction(Base):
 
 class AnomalyExplanation(Base):
     """Root cause analysis for cost anomalies."""
+
     __tablename__ = "anomaly_explanations"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -54,6 +57,7 @@ class AnomalyExplanation(Base):
 
 class ChatConversation(Base):
     """Natural language query conversation history."""
+
     __tablename__ = "chat_conversations"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -70,6 +74,7 @@ class ChatConversation(Base):
 
 class AlertFeedback(Base):
     """User feedback on alerts for intelligent tuning."""
+
     __tablename__ = "alert_feedback"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -84,6 +89,7 @@ class AlertFeedback(Base):
 
 class AlertOptimization(Base):
     """Optimized alert thresholds and settings."""
+
     __tablename__ = "alert_optimizations"
 
     id = Column(Integer, primary_key=True, index=True)

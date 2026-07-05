@@ -399,6 +399,7 @@ def retry_on_db_error(max_retries=3, delay=1.0):
 
 class CapacityPrediction(Base):
     """Predictive capacity planning forecasts."""
+
     __tablename__ = "capacity_predictions"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -417,6 +418,7 @@ class CapacityPrediction(Base):
 
 class AnomalyExplanation(Base):
     """Root cause analysis for cost anomalies."""
+
     __tablename__ = "anomaly_explanations"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -432,6 +434,7 @@ class AnomalyExplanation(Base):
 
 class ChatConversation(Base):
     """Natural language query conversation history."""
+
     __tablename__ = "chat_conversations"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -448,6 +451,7 @@ class ChatConversation(Base):
 
 class AlertFeedback(Base):
     """User feedback on alerts for intelligent tuning."""
+
     __tablename__ = "alert_feedback"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -462,6 +466,7 @@ class AlertFeedback(Base):
 
 class AlertOptimization(Base):
     """Optimized alert thresholds and settings."""
+
     __tablename__ = "alert_optimizations"
 
     id = Column(Integer, primary_key=True, index=True)

@@ -5,15 +5,12 @@ Multi-model ensemble system for predicting future resource needs
 using historical patterns, business growth, and seasonal trends.
 """
 
-import json
-import logging
 from datetime import datetime, timedelta
 from typing import Any
 
 import numpy as np
 import pandas as pd
 from statsmodels.tsa.arima.model import ARIMA
-from statsmodels.tsa.seasonal import seasonal_decompose
 
 from reaper.engine.models.resources import SessionLocal
 from reaper.utils.error_handler import get_logger
@@ -72,9 +69,7 @@ class PredictiveCapacityPlanner:
             )
 
             # Step 5: Calculate confidence intervals
-            confidence_intervals = self._calculate_confidence_intervals(
-                time_series, forecasts
-            )
+            confidence_intervals = self._calculate_confidence_intervals(time_series, forecasts)
 
             return {
                 "resource_id": resource_id,
@@ -156,9 +151,7 @@ class PredictiveCapacityPlanner:
 
         return daily_data
 
-    def _generate_ensemble_forecast(
-        self, time_series: pd.Series, horizon: str
-    ) -> dict[str, Any]:
+    def _generate_ensemble_forecast(self, time_series: pd.Series, horizon: str) -> dict[str, Any]:
         """Generate ensemble forecast using multiple models."""
         forecast_days = self.forecast_horizons.get(horizon, 30)
 
@@ -293,9 +286,7 @@ class PredictiveCapacityPlanner:
         forecast_values = [avg_value] * days
 
         last_date = time_series.index[-1] if len(time_series) > 0 else datetime.now()
-        forecast_dates = pd.date_range(
-            start=last_date + timedelta(days=1), periods=days, freq="D"
-        )
+        forecast_dates = pd.date_range(start=last_date + timedelta(days=1), periods=days, freq="D")
 
         return {
             "model": "Historical Average",
@@ -381,7 +372,9 @@ class PredictiveCapacityPlanner:
         # Compare with historical average
         if historical_data:
             historical_avg = np.mean([d["cost"] for d in historical_data])
-            growth_rate = (avg_forecast - historical_avg) / historical_avg if historical_avg > 0 else 0
+            growth_rate = (
+                (avg_forecast - historical_avg) / historical_avg if historical_avg > 0 else 0
+            )
 
             if growth_rate > 0.2:  # >20% growth
                 recommendations.append(

@@ -5,12 +5,10 @@ Advanced cost-benefit analysis system for evaluating workload
 migration between cloud providers with risk assessment and planning.
 """
 
-import json
-import logging
-from typing import Any
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
-from datetime import datetime, timedelta
+from typing import Any
 
 from reaper.utils.error_handler import get_logger
 
@@ -19,6 +17,7 @@ logger = get_logger(__name__)
 
 class MigrationDirection(Enum):
     """Direction of migration"""
+
     AZURE_TO_AWS = "azure_to_aws"
     AZURE_TO_GCP = "azure_to_gcp"
     AWS_TO_AZURE = "aws_to_azure"
@@ -29,6 +28,7 @@ class MigrationDirection(Enum):
 
 class RiskLevel(Enum):
     """Risk levels for migration"""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -38,6 +38,7 @@ class RiskLevel(Enum):
 @dataclass
 class ResourceMapping:
     """Mapping between cloud provider resources"""
+
     source_type: str
     target_type: str
     size_mapping: dict[str, str]
@@ -48,6 +49,7 @@ class ResourceMapping:
 @dataclass
 class MigrationAssessment:
     """Complete migration assessment for a workload"""
+
     assessment_id: str
     source_provider: str
     target_provider: str
@@ -87,7 +89,7 @@ class CloudMigrationAdvisor:
                         "Standard_E8s_v3": "r5.xlarge",
                     },
                     feature_parity_score=0.92,
-                    effort_level="medium"
+                    effort_level="medium",
                 ),
                 "storage": ResourceMapping(
                     source_type="Microsoft.Storage/storageAccounts",
@@ -99,7 +101,7 @@ class CloudMigrationAdvisor:
                         "Premium_LRS": "INTELLIGENT_TIERING",
                     },
                     feature_parity_score=0.95,
-                    effort_level="low"
+                    effort_level="low",
                 ),
                 "database": ResourceMapping(
                     source_type="Microsoft.Sql/servers/databases",
@@ -112,8 +114,8 @@ class CloudMigrationAdvisor:
                         "Premium_P1": "db.m5.large",
                     },
                     feature_parity_score=0.88,
-                    effort_level="high"
-                )
+                    effort_level="high",
+                ),
             },
             "aws_to_azure": {
                 "compute": ResourceMapping(
@@ -129,7 +131,7 @@ class CloudMigrationAdvisor:
                         "m5.xlarge": "Standard_D8s_v3",
                     },
                     feature_parity_score=0.90,
-                    effort_level="medium"
+                    effort_level="medium",
                 ),
                 "storage": ResourceMapping(
                     source_type="AWS::S3::Bucket",
@@ -141,7 +143,7 @@ class CloudMigrationAdvisor:
                         "INTELLIGENT_TIERING": "Premium_LRS",
                     },
                     feature_parity_score=0.93,
-                    effort_level="low"
+                    effort_level="low",
                 ),
                 "database": ResourceMapping(
                     source_type="AWS::RDS::DBInstance",
@@ -154,8 +156,8 @@ class CloudMigrationAdvisor:
                         "db.m5.large": "Premium_P1",
                     },
                     feature_parity_score=0.85,
-                    effort_level="high"
-                )
+                    effort_level="high",
+                ),
             },
             "azure_to_gcp": {
                 "compute": ResourceMapping(
@@ -170,7 +172,7 @@ class CloudMigrationAdvisor:
                         "Standard_D8s_v3": "n2-standard-4",
                     },
                     feature_parity_score=0.89,
-                    effort_level="medium"
+                    effort_level="medium",
                 ),
                 "storage": ResourceMapping(
                     source_type="Microsoft.Storage/storageAccounts",
@@ -182,8 +184,8 @@ class CloudMigrationAdvisor:
                         "Premium_LRS": "ARCHIVE",
                     },
                     feature_parity_score=0.91,
-                    effort_level="low"
-                )
+                    effort_level="low",
+                ),
             },
             "gcp_to_azure": {
                 "compute": ResourceMapping(
@@ -198,7 +200,7 @@ class CloudMigrationAdvisor:
                         "n2-standard-4": "Standard_D8s_v3",
                     },
                     feature_parity_score=0.87,
-                    effort_level="medium"
+                    effort_level="medium",
                 ),
                 "storage": ResourceMapping(
                     source_type="storage.googleapis.com/Bucket",
@@ -210,9 +212,9 @@ class CloudMigrationAdvisor:
                         "ARCHIVE": "Premium_LRS",
                     },
                     feature_parity_score=0.90,
-                    effort_level="low"
-                )
-            }
+                    effort_level="low",
+                ),
+            },
         }
 
     def _load_pricing_data(self) -> dict[str, dict[str, float]]:
@@ -236,7 +238,7 @@ class CloudMigrationAdvisor:
                     "Standard_S0": 0.015,
                     "Standard_S1": 0.030,
                     "Premium_P1": 0.465,
-                }
+                },
             },
             "aws": {
                 "compute": {
@@ -255,7 +257,7 @@ class CloudMigrationAdvisor:
                     "db.t3.small": 0.034,
                     "db.t3.medium": 0.068,
                     "db.m5.large": 0.173,
-                }
+                },
             },
             "gcp": {
                 "compute": {
@@ -270,8 +272,8 @@ class CloudMigrationAdvisor:
                     "NEARLINE": 0.010,
                     "COLDLINE": 0.004,
                     "ARCHIVE": 0.002,
-                }
-            }
+                },
+            },
         }
 
     def assess_migration(
@@ -279,7 +281,7 @@ class CloudMigrationAdvisor:
         source_provider: str,
         target_provider: str,
         resource_inventory: list[dict],
-        assessment_name: str = None
+        assessment_name: str = None,
     ) -> dict[str, Any]:
         """
         Perform comprehensive migration assessment.
@@ -326,20 +328,14 @@ class CloudMigrationAdvisor:
                 risk_assessment=risk_assessment,
                 roi_analysis=roi_analysis,
                 migration_plan=migration_plan,
-                created_at=datetime.now()
+                created_at=datetime.now(),
             )
 
-            return {
-                "success": True,
-                "assessment": self._assessment_to_dict(assessment)
-            }
+            return {"success": True, "assessment": self._assessment_to_dict(assessment)}
 
         except Exception as e:
             logger.error(f"Migration assessment failed: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     def _analyze_costs(
         self, source_provider: str, target_provider: str, resources: list[dict]
@@ -367,22 +363,28 @@ class CloudMigrationAdvisor:
             if mapping:
                 # Map to target SKU
                 target_sku = mapping.size_mapping.get(sku, sku)
-                
+
                 # Get target pricing
                 target_pricing = self.pricing_data.get(target_provider, {})
-                category_pricing = target_pricing.get(mapping.source_type.split("/")[-1].lower(), {})
+                category_pricing = target_pricing.get(
+                    mapping.source_type.split("/")[-1].lower(), {}
+                )
                 target_cost = category_pricing.get(target_sku, current_cost)
 
                 cost_diff = target_cost - current_cost
-                cost_differences.append({
-                    "resource_id": resource.get("id"),
-                    "source_sku": sku,
-                    "target_sku": target_sku,
-                    "source_cost": current_cost,
-                    "target_cost": target_cost,
-                    "cost_difference": cost_diff,
-                    "savings_percentage": (cost_diff / current_cost * 100) if current_cost > 0 else 0
-                })
+                cost_differences.append(
+                    {
+                        "resource_id": resource.get("id"),
+                        "source_sku": sku,
+                        "target_sku": target_sku,
+                        "source_cost": current_cost,
+                        "target_cost": target_cost,
+                        "cost_difference": cost_diff,
+                        "savings_percentage": (cost_diff / current_cost * 100)
+                        if current_cost > 0
+                        else 0,
+                    }
+                )
 
                 source_total += current_cost
                 target_total += target_cost
@@ -397,7 +399,7 @@ class CloudMigrationAdvisor:
             "savings_percentage": savings_percentage,
             "annual_savings": total_savings * 730 * 12,
             "cost_differences": cost_differences,
-            "break_even_months": self._calculate_break_even(cost_differences)
+            "break_even_months": self._calculate_break_even(cost_differences),
         }
 
     def _assess_risks(
@@ -414,52 +416,60 @@ class CloudMigrationAdvisor:
 
         for resource in resources:
             resource_type = resource.get("type", "unknown")
-            
+
             for category, mapping in mappings.items():
                 if category in resource_type.lower():
                     if mapping.feature_parity_score < 0.9:
-                        technical_risks.append({
-                            "resource_id": resource.get("id"),
-                            "risk_type": "feature_parity",
-                            "description": f"Feature parity score: {mapping.feature_parity_score}",
-                            "mitigation": "Review feature requirements and consider workarounds"
-                        })
-                    
+                        technical_risks.append(
+                            {
+                                "resource_id": resource.get("id"),
+                                "risk_type": "feature_parity",
+                                "description": f"Feature parity score: {mapping.feature_parity_score}",
+                                "mitigation": "Review feature requirements and consider workarounds",
+                            }
+                        )
+
                     if mapping.effort_level == "high":
-                        operational_risks.append({
-                            "resource_id": resource.get("id"),
-                            "risk_type": "migration_complexity",
-                            "description": "High migration complexity",
-                            "mitigation": "Allocate additional time and resources"
-                        })
+                        operational_risks.append(
+                            {
+                                "resource_id": resource.get("id"),
+                                "risk_type": "migration_complexity",
+                                "description": "High migration complexity",
+                                "mitigation": "Allocate additional time and resources",
+                            }
+                        )
 
         # Operational risks
-        operational_risks.extend([
-            {
-                "risk_type": "downtime",
-                "description": "Potential downtime during migration",
-                "mitigation": "Plan migration during maintenance windows"
-            },
-            {
-                "risk_type": "data_loss",
-                "description": "Data loss during transfer",
-                "mitigation": "Implement backup and validation procedures"
-            }
-        ])
+        operational_risks.extend(
+            [
+                {
+                    "risk_type": "downtime",
+                    "description": "Potential downtime during migration",
+                    "mitigation": "Plan migration during maintenance windows",
+                },
+                {
+                    "risk_type": "data_loss",
+                    "description": "Data loss during transfer",
+                    "mitigation": "Implement backup and validation procedures",
+                },
+            ]
+        )
 
         # Business risks
-        business_risks.extend([
-            {
-                "risk_type": "contractual_obligations",
-                "description": "Existing contractual commitments with source provider",
-                "mitigation": "Review contracts and plan exit strategy"
-            },
-            {
-                "risk_type": "team_expertise",
-                "description": "Team may lack expertise with target provider",
-                "mitigation": "Provide training and certification"
-            }
-        ])
+        business_risks.extend(
+            [
+                {
+                    "risk_type": "contractual_obligations",
+                    "description": "Existing contractual commitments with source provider",
+                    "mitigation": "Review contracts and plan exit strategy",
+                },
+                {
+                    "risk_type": "team_expertise",
+                    "description": "Team may lack expertise with target provider",
+                    "mitigation": "Provide training and certification",
+                },
+            ]
+        )
 
         # Calculate overall risk level
         total_risks = len(technical_risks) + len(operational_risks) + len(business_risks)
@@ -476,7 +486,9 @@ class CloudMigrationAdvisor:
             "operational_risks": operational_risks,
             "business_risks": business_risks,
             "total_risks": total_risks,
-            "risk_score": self._calculate_risk_score(technical_risks, operational_risks, business_risks)
+            "risk_score": self._calculate_risk_score(
+                technical_risks, operational_risks, business_risks
+            ),
         }
 
     def _calculate_roi(
@@ -501,7 +513,7 @@ class CloudMigrationAdvisor:
             payback_months = total_migration_cost / (annual_savings / 12)
             roi_percentage = (annual_savings / total_migration_cost) * 100
         else:
-            payback_months = float('inf')
+            payback_months = float("inf")
             roi_percentage = -100
 
         return {
@@ -509,14 +521,20 @@ class CloudMigrationAdvisor:
             "migration_costs": migration_costs,
             "total_migration_cost": total_migration_cost,
             "payback_period_months": payback_months,
-            "payback_period_years": payback_months / 12 if payback_months != float('inf') else float('inf'),
+            "payback_period_years": payback_months / 12
+            if payback_months != float("inf")
+            else float("inf"),
             "roi_percentage": roi_percentage,
             "net_present_value": self._calculate_npv(annual_savings, total_migration_cost),
-            "risk_adjusted_roi": roi_percentage * (1 - risk_score)
+            "risk_adjusted_roi": roi_percentage * (1 - risk_score),
         }
 
     def _generate_migration_plan(
-        self, source_provider: str, target_provider: str, resources: list[dict], risk_assessment: dict
+        self,
+        source_provider: str,
+        target_provider: str,
+        resources: list[dict],
+        risk_assessment: dict,
     ) -> dict[str, Any]:
         """Generate detailed migration plan."""
         phases = [
@@ -528,8 +546,8 @@ class CloudMigrationAdvisor:
                     "Detailed resource inventory",
                     "Dependency mapping",
                     "Cost optimization review",
-                    "Risk assessment and mitigation planning"
-                ]
+                    "Risk assessment and mitigation planning",
+                ],
             },
             {
                 "phase": 2,
@@ -539,8 +557,8 @@ class CloudMigrationAdvisor:
                     "Target provider account setup",
                     "Network configuration",
                     "Security configuration",
-                    "Initial resource provisioning"
-                ]
+                    "Initial resource provisioning",
+                ],
             },
             {
                 "phase": 3,
@@ -550,8 +568,8 @@ class CloudMigrationAdvisor:
                     "Data backup and validation",
                     "Data transfer",
                     "Data verification",
-                    "Cutover planning"
-                ]
+                    "Cutover planning",
+                ],
             },
             {
                 "phase": 4,
@@ -561,8 +579,8 @@ class CloudMigrationAdvisor:
                     "Application reconfiguration",
                     "Testing and validation",
                     "Performance optimization",
-                    "User acceptance testing"
-                ]
+                    "User acceptance testing",
+                ],
             },
             {
                 "phase": 5,
@@ -572,9 +590,9 @@ class CloudMigrationAdvisor:
                     "Final cutover",
                     "Monitoring and optimization",
                     "Documentation and handover",
-                    "Source resource cleanup"
-                ]
-            }
+                    "Source resource cleanup",
+                ],
+            },
         ]
 
         total_duration = sum(phase["duration_weeks"] for phase in phases)
@@ -584,43 +602,37 @@ class CloudMigrationAdvisor:
             "total_duration_months": total_duration / 4,
             "phases": phases,
             "critical_path": self._identify_critical_path(resources),
-            "rollback_plan": self._generate_rollback_plan()
+            "rollback_plan": self._generate_rollback_plan(),
         }
 
     def _calculate_break_even(self, cost_differences: list[dict]) -> int:
         """Calculate break-even period in months."""
         total_monthly_savings = sum(diff["cost_difference"] * 730 for diff in cost_differences)
-        
+
         # Estimate migration costs
         migration_cost = 50000  # $50,000 estimated migration cost
-        
+
         if total_monthly_savings > 0:
             return migration_cost / total_monthly_savings
-        return float('inf')
+        return float("inf")
 
-    def _calculate_risk_score(
-        self, technical: list, operational: list, business: list
-    ) -> float:
+    def _calculate_risk_score(self, technical: list, operational: list, business: list) -> float:
         """Calculate overall risk score (0-1)."""
         # Weight different risk types
-        weights = {
-            "technical": 0.4,
-            "operational": 0.3,
-            "business": 0.3
-        }
-        
+        weights = {"technical": 0.4, "operational": 0.3, "business": 0.3}
+
         max_risks = 10  # Assume 10 is maximum expected risks per category
-        
+
         technical_score = min(len(technical) / max_risks, 1.0)
         operational_score = min(len(operational) / max_risks, 1.0)
         business_score = min(len(business) / max_risks, 1.0)
-        
+
         total_score = (
-            technical_score * weights["technical"] +
-            operational_score * weights["operational"] +
-            business_score * weights["business"]
+            technical_score * weights["technical"]
+            + operational_score * weights["operational"]
+            + business_score * weights["business"]
         )
-        
+
         return total_score
 
     def _calculate_npv(self, annual_savings: float, initial_cost: float, years: int = 3) -> float:
@@ -638,12 +650,12 @@ class CloudMigrationAdvisor:
         """Identify critical path items in migration."""
         # Simplified critical path identification
         critical_items = []
-        
+
         for resource in resources:
             resource_type = resource.get("type", "").lower()
             if "database" in resource_type or "storage" in resource_type:
                 critical_items.append(resource.get("id"))
-        
+
         return critical_items
 
     def _generate_rollback_plan(self) -> dict[str, Any]:
@@ -653,15 +665,15 @@ class CloudMigrationAdvisor:
             "triggers": [
                 "critical_failures",
                 "performance_degradation_gt_50_percent",
-                "data_corruption"
+                "data_corruption",
             ],
             "procedures": [
                 "Switch DNS back to source provider",
                 "Re-enable source resources",
                 "Data synchronization from target to source",
-                "User notification and communication"
+                "User notification and communication",
             ],
-            "max_rollback_time_hours": 24
+            "max_rollback_time_hours": 24,
         }
 
     def _assessment_to_dict(self, assessment: MigrationAssessment) -> dict[str, Any]:
@@ -675,7 +687,7 @@ class CloudMigrationAdvisor:
             "risk_assessment": assessment.risk_assessment,
             "roi_analysis": assessment.roi_analysis,
             "migration_plan": assessment.migration_plan,
-            "created_at": assessment.created_at.isoformat()
+            "created_at": assessment.created_at.isoformat(),
         }
 
     def compare_providers(
@@ -699,5 +711,5 @@ class CloudMigrationAdvisor:
         return {
             "current_provider": current_provider,
             "comparisons": comparisons,
-            "recommended_option": comparisons[0] if comparisons else None
+            "recommended_option": comparisons[0] if comparisons else None,
         }

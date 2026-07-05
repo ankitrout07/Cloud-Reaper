@@ -5,8 +5,6 @@ Machine learning system that learns from user behavior to optimize
 alert thresholds, reduce fatigue, and improve alert relevance.
 """
 
-import json
-import logging
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -111,8 +109,7 @@ class IntelligentAlertTuner:
         # Update sensitivity based on feedback
         if feedback_type == "dismiss":
             preferences["dismissal_rate"] = (
-                preferences["dismissal_rate"] * (preferences["total_feedback_count"] - 1)
-                + 1.0
+                preferences["dismissal_rate"] * (preferences["total_feedback_count"] - 1) + 1.0
             ) / preferences["total_feedback_count"]
             # Reduce sensitivity if user dismisses alerts
             preferences["alert_sensitivity"] = max(0.1, preferences["alert_sensitivity"] - 0.05)
@@ -199,7 +196,11 @@ class IntelligentAlertTuner:
                 "avg_response_time_seconds": avg_response_time,
                 "total_feedback_count": total_feedback,
             },
-            "confidence": "high" if total_feedback >= 5 else "medium" if total_feedback >= 2 else "low",
+            "confidence": "high"
+            if total_feedback >= 5
+            else "medium"
+            if total_feedback >= 2
+            else "low",
         }
 
     def optimize_alert_thresholds(
@@ -289,9 +290,13 @@ class IntelligentAlertTuner:
 
         # Quality rationale
         if quality < 0.3:
-            rationale_parts.append("Historical alert quality is low, increasing threshold to reduce false positives")
+            rationale_parts.append(
+                "Historical alert quality is low, increasing threshold to reduce false positives"
+            )
         elif quality > 0.7:
-            rationale_parts.append("Historical alert quality is high, decreasing threshold to catch more issues")
+            rationale_parts.append(
+                "Historical alert quality is high, decreasing threshold to catch more issues"
+            )
         else:
             rationale_parts.append("Historical alert quality is average, maintaining threshold")
 
@@ -420,14 +425,10 @@ class IntelligentAlertTuner:
                 "avg_response_time_seconds": avg_response_time,
                 "median_response_time_seconds": median_response_time,
             },
-            "quality_assessment": self._assess_overall_quality(
-                dismissals, actions, total_feedback
-            ),
+            "quality_assessment": self._assess_overall_quality(dismissals, actions, total_feedback),
         }
 
-    def _assess_overall_quality(
-        self, dismissals: int, actions: int, total: int
-    ) -> dict[str, Any]:
+    def _assess_overall_quality(self, dismissals: int, actions: int, total: int) -> dict[str, Any]:
         """Assess overall alert quality."""
         if total == 0:
             return {"assessment": "no_data", "message": "No data available"}
@@ -440,18 +441,17 @@ class IntelligentAlertTuner:
                 "assessment": "excellent",
                 "message": "Alerts are highly relevant and actionable",
             }
-        elif action_rate > 0.5 and dismissal_rate < 0.3:
+        if action_rate > 0.5 and dismissal_rate < 0.3:
             return {
                 "assessment": "good",
                 "message": "Alerts are generally relevant with some room for improvement",
             }
-        elif action_rate > 0.3 and dismissal_rate < 0.5:
+        if action_rate > 0.3 and dismissal_rate < 0.5:
             return {
                 "assessment": "fair",
                 "message": "Alerts have moderate relevance, consider threshold optimization",
             }
-        else:
-            return {
-                "assessment": "poor",
-                "message": "Alerts may be causing fatigue, review thresholds and criteria",
-            }
+        return {
+            "assessment": "poor",
+            "message": "Alerts may be causing fatigue, review thresholds and criteria",
+        }

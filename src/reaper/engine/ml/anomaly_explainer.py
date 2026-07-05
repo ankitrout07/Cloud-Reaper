@@ -6,7 +6,6 @@ multiple data dimensions and generating human-readable explanations.
 """
 
 import json
-import logging
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -36,9 +35,7 @@ class AnomalyRootCauseAnalyzer:
         self.client = genai.Client(api_key=api_key)
         self.model_identity = "gemini-2.5-flash"
 
-    def analyze_anomaly(
-        self, anomaly_id: str, anomaly_data: dict[str, Any]
-    ) -> dict[str, Any]:
+    def analyze_anomaly(self, anomaly_id: str, anomaly_data: dict[str, Any]) -> dict[str, Any]:
         """
         Analyze an anomaly to determine its root cause and generate explanation.
 
@@ -150,7 +147,9 @@ class AnomalyRootCauseAnalyzer:
                 # Calculate trend
                 amounts = [ch["amount"] for ch in cost_history]
                 if len(amounts) >= 2:
-                    recent_change = (amounts[-1] - amounts[-2]) / amounts[-2] if amounts[-2] > 0 else 0
+                    recent_change = (
+                        (amounts[-1] - amounts[-2]) / amounts[-2] if amounts[-2] > 0 else 0
+                    )
                     correlations.append(
                         {
                             "factor": "cost_trend",
@@ -291,9 +290,7 @@ class AnomalyRootCauseAnalyzer:
 
         return recommendations
 
-    def batch_analyze_anomalies(
-        self, anomalies: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    def batch_analyze_anomalies(self, anomalies: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Analyze multiple anomalies in batch.
 

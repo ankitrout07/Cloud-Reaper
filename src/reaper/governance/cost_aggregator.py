@@ -5,12 +5,9 @@ Unified billing view across all cloud providers with currency conversion,
 cost normalization, and comprehensive financial reporting.
 """
 
-import json
-import logging
-from typing import Any
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from decimal import Decimal
+from typing import Any
 
 from reaper.utils.error_handler import get_logger
 
@@ -20,6 +17,7 @@ logger = get_logger(__name__)
 @dataclass
 class CurrencyRate:
     """Currency exchange rate information"""
+
     from_currency: str
     to_currency: str
     rate: float
@@ -29,6 +27,7 @@ class CurrencyRate:
 @dataclass
 class UnifiedCostRecord:
     """Unified cost record across providers"""
+
     provider: str
     resource_id: str
     resource_type: str
@@ -60,31 +59,17 @@ class MultiCloudCostAggregator:
         """Load currency exchange rates (simplified for demo)."""
         # In production, this would call a currency API
         current_date = datetime.now()
-        
+
         return {
-            "EUR": {
-                "USD": CurrencyRate("EUR", "USD", 1.08, current_date)
-            },
-            "GBP": {
-                "USD": CurrencyRate("GBP", "USD", 1.27, current_date)
-            },
-            "JPY": {
-                "USD": CurrencyRate("JPY", "USD", 0.0067, current_date)
-            },
-            "INR": {
-                "USD": CurrencyRate("INR", "USD", 0.012, current_date)
-            },
-            "CAD": {
-                "USD": CurrencyRate("CAD", "USD", 0.74, current_date)
-            },
-            "AUD": {
-                "USD": CurrencyRate("AUD", "USD", 0.65, current_date)
-            }
+            "EUR": {"USD": CurrencyRate("EUR", "USD", 1.08, current_date)},
+            "GBP": {"USD": CurrencyRate("GBP", "USD", 1.27, current_date)},
+            "JPY": {"USD": CurrencyRate("JPY", "USD", 0.0067, current_date)},
+            "INR": {"USD": CurrencyRate("INR", "USD", 0.012, current_date)},
+            "CAD": {"USD": CurrencyRate("CAD", "USD", 0.74, current_date)},
+            "AUD": {"USD": CurrencyRate("AUD", "USD", 0.65, current_date)},
         }
 
-    def convert_currency(
-        self, amount: float, from_currency: str, to_currency: str = None
-    ) -> float:
+    def convert_currency(self, amount: float, from_currency: str, to_currency: str = None) -> float:
         """
         Convert amount from one currency to another.
 
@@ -134,7 +119,7 @@ class MultiCloudCostAggregator:
         billing_period_start: datetime,
         billing_period_end: datetime,
         cost_type: str = "opex",
-        tags: dict = None
+        tags: dict = None,
     ) -> UnifiedCostRecord:
         """
         Normalize cost data to unified format.
@@ -173,30 +158,32 @@ class MultiCloudCostAggregator:
             billing_period_start=billing_period_start,
             billing_period_end=billing_period_end,
             cost_type=cost_type,
-            tags=tags or {}
+            tags=tags or {},
         )
 
     def _determine_service_category(self, resource_type: str) -> str:
         """Determine service category from resource type."""
         resource_type_lower = resource_type.lower()
 
-        if any(keyword in resource_type_lower for keyword in ["vm", "instance", "compute", "container"]):
+        if any(
+            keyword in resource_type_lower for keyword in ["vm", "instance", "compute", "container"]
+        ):
             return "compute"
-        elif any(keyword in resource_type_lower for keyword in ["storage", "disk", "blob", "bucket"]):
+        if any(keyword in resource_type_lower for keyword in ["storage", "disk", "blob", "bucket"]):
             return "storage"
-        elif any(keyword in resource_type_lower for keyword in ["network", "vnet", "subnet", "firewall", "loadbalancer"]):
+        if any(
+            keyword in resource_type_lower
+            for keyword in ["network", "vnet", "subnet", "firewall", "loadbalancer"]
+        ):
             return "network"
-        elif any(keyword in resource_type_lower for keyword in ["database", "sql", "nosql", "db"]):
+        if any(keyword in resource_type_lower for keyword in ["database", "sql", "nosql", "db"]):
             return "database"
-        elif any(keyword in resource_type_lower for keyword in ["function", "lambda", "serverless"]):
+        if any(keyword in resource_type_lower for keyword in ["function", "lambda", "serverless"]):
             return "serverless"
-        else:
-            return "other"
+        return "other"
 
     def aggregate_costs(
-        self,
-        cost_records: list[UnifiedCostRecord],
-        group_by: str = "provider"
+        self, cost_records: list[UnifiedCostRecord], group_by: str = "provider"
     ) -> dict[str, Any]:
         """
         Aggregate costs by specified dimension.
@@ -209,11 +196,7 @@ class MultiCloudCostAggregator:
             Dictionary with aggregated costs
         """
         if not cost_records:
-            return {
-                "total_cost": 0.0,
-                "currency": self.base_currency,
-                "groups": []
-            }
+            return {"total_cost": 0.0, "currency": self.base_currency, "groups": []}
 
         groups = {}
         total_cost = 0.0
@@ -232,20 +215,17 @@ class MultiCloudCostAggregator:
                 group_key = "other"
 
             if group_key not in groups:
-                groups[group_key] = {
-                    "key": group_key,
-                    "cost": 0.0,
-                    "count": 0,
-                    "resources": []
-                }
+                groups[group_key] = {"key": group_key, "cost": 0.0, "count": 0, "resources": []}
 
             groups[group_key]["cost"] += record.converted_amount
             groups[group_key]["count"] += 1
-            groups[group_key]["resources"].append({
-                "resource_id": record.resource_id,
-                "resource_type": record.resource_type,
-                "cost": record.converted_amount
-            })
+            groups[group_key]["resources"].append(
+                {
+                    "resource_id": record.resource_id,
+                    "resource_type": record.resource_type,
+                    "cost": record.converted_amount,
+                }
+            )
 
             total_cost += record.converted_amount
 
@@ -257,13 +237,11 @@ class MultiCloudCostAggregator:
             "total_cost": total_cost,
             "currency": self.base_currency,
             "group_by": group_by,
-            "groups": group_list
+            "groups": group_list,
         }
 
     def get_cost_trends(
-        self,
-        cost_records: list[UnifiedCostRecord],
-        period: str = "monthly"
+        self, cost_records: list[UnifiedCostRecord], period: str = "monthly"
     ) -> dict[str, Any]:
         """
         Analyze cost trends over time.
@@ -276,11 +254,7 @@ class MultiCloudCostAggregator:
             Dictionary with trend analysis
         """
         if not cost_records:
-            return {
-                "trend": "insufficient_data",
-                "period": period,
-                "data_points": []
-            }
+            return {"trend": "insufficient_data", "period": period, "data_points": []}
 
         # Group by time period
         time_groups = {}
@@ -295,11 +269,7 @@ class MultiCloudCostAggregator:
                 time_key = record.billing_period_start.strftime("%Y-%m")
 
             if time_key not in time_groups:
-                time_groups[time_key] = {
-                    "period": time_key,
-                    "cost": 0.0,
-                    "count": 0
-                }
+                time_groups[time_key] = {"period": time_key, "cost": 0.0, "count": 0}
 
             time_groups[time_key]["cost"] += record.converted_amount
             time_groups[time_key]["count"] += 1
@@ -311,7 +281,7 @@ class MultiCloudCostAggregator:
         if len(trend_data) >= 2:
             recent_cost = trend_data[-1]["cost"]
             previous_cost = trend_data[-2]["cost"]
-            
+
             if recent_cost > previous_cost * 1.05:
                 trend = "increasing"
             elif recent_cost < previous_cost * 0.95:
@@ -326,14 +296,16 @@ class MultiCloudCostAggregator:
             "period": period,
             "currency": self.base_currency,
             "data_points": trend_data,
-            "average_cost": sum(d["cost"] for d in trend_data) / len(trend_data) if trend_data else 0
+            "average_cost": sum(d["cost"] for d in trend_data) / len(trend_data)
+            if trend_data
+            else 0,
         }
 
     def generate_multi_cloud_report(
         self,
         cost_records: list[UnifiedCostRecord],
         report_period_start: datetime,
-        report_period_end: datetime
+        report_period_end: datetime,
     ) -> dict[str, Any]:
         """
         Generate comprehensive multi-cloud cost report.
@@ -348,7 +320,8 @@ class MultiCloudCostAggregator:
         """
         # Filter records by period
         filtered_records = [
-            r for r in cost_records
+            r
+            for r in cost_records
             if r.billing_period_start >= report_period_start
             and r.billing_period_end <= report_period_end
         ]
@@ -367,7 +340,7 @@ class MultiCloudCostAggregator:
         cost_distribution = {
             group["key"]: {
                 "cost": group["cost"],
-                "percentage": (group["cost"] / total_cost * 100) if total_cost > 0 else 0
+                "percentage": (group["cost"] / total_cost * 100) if total_cost > 0 else 0,
             }
             for group in by_provider["groups"]
         }
@@ -375,14 +348,14 @@ class MultiCloudCostAggregator:
         return {
             "report_period": {
                 "start": report_period_start.isoformat(),
-                "end": report_period_end.isoformat()
+                "end": report_period_end.isoformat(),
             },
             "currency": self.base_currency,
             "summary": {
                 "total_cost": total_cost,
                 "total_resources": len(filtered_records),
                 "unique_providers": len(set(r.provider for r in filtered_records)),
-                "unique_regions": len(set(r.region for r in filtered_records))
+                "unique_regions": len(set(r.region for r in filtered_records)),
             },
             "by_provider": by_provider,
             "by_service": by_service,
@@ -390,7 +363,7 @@ class MultiCloudCostAggregator:
             "by_cost_type": by_cost_type,
             "cost_distribution": cost_distribution,
             "trends": trends,
-            "generated_at": datetime.now().isoformat()
+            "generated_at": datetime.now().isoformat(),
         }
 
     def _aggregate_by_cost_type(self, cost_records: list[UnifiedCostRecord]) -> dict[str, Any]:
@@ -400,11 +373,7 @@ class MultiCloudCostAggregator:
         for record in cost_records:
             cost_type = record.cost_type
             if cost_type not in groups:
-                groups[cost_type] = {
-                    "cost_type": cost_type,
-                    "cost": 0.0,
-                    "count": 0
-                }
+                groups[cost_type] = {"cost_type": cost_type, "cost": 0.0, "count": 0}
 
             groups[cost_type]["cost"] += record.converted_amount
             groups[cost_type]["count"] += 1
@@ -412,13 +381,11 @@ class MultiCloudCostAggregator:
         return {
             "total_cost": sum(g["cost"] for g in groups.values()),
             "currency": self.base_currency,
-            "groups": list(groups.values())
+            "groups": list(groups.values()),
         }
 
     def compare_provider_costs(
-        self,
-        cost_records: list[UnifiedCostRecord],
-        period_days: int = 30
+        self, cost_records: list[UnifiedCostRecord], period_days: int = 30
     ) -> dict[str, Any]:
         """
         Compare costs between providers for a specified period.
@@ -432,21 +399,14 @@ class MultiCloudCostAggregator:
         """
         # Filter records by period
         cutoff_date = datetime.now() - timedelta(days=period_days)
-        filtered_records = [
-            r for r in cost_records
-            if r.billing_period_start >= cutoff_date
-        ]
+        filtered_records = [r for r in cost_records if r.billing_period_start >= cutoff_date]
 
         # Aggregate by provider
         provider_costs = {}
         for record in filtered_records:
             provider = record.provider
             if provider not in provider_costs:
-                provider_costs[provider] = {
-                    "cost": 0.0,
-                    "count": 0,
-                    "services": set()
-                }
+                provider_costs[provider] = {"cost": 0.0, "count": 0, "services": set()}
 
             provider_costs[provider]["cost"] += record.converted_amount
             provider_costs[provider]["count"] += 1
@@ -455,13 +415,17 @@ class MultiCloudCostAggregator:
         # Convert to comparable format
         comparison = []
         for provider, data in provider_costs.items():
-            comparison.append({
-                "provider": provider,
-                "cost": data["cost"],
-                "resource_count": data["count"],
-                "service_count": len(data["services"]),
-                "average_cost_per_resource": data["cost"] / data["count"] if data["count"] > 0 else 0
-            })
+            comparison.append(
+                {
+                    "provider": provider,
+                    "cost": data["cost"],
+                    "resource_count": data["count"],
+                    "service_count": len(data["services"]),
+                    "average_cost_per_resource": data["cost"] / data["count"]
+                    if data["count"] > 0
+                    else 0,
+                }
+            )
 
         # Sort by cost
         comparison.sort(key=lambda x: x["cost"], reverse=True)
@@ -471,13 +435,11 @@ class MultiCloudCostAggregator:
             "currency": self.base_currency,
             "comparison": comparison,
             "most_expensive": comparison[0] if comparison else None,
-            "least_expensive": comparison[-1] if comparison else None
+            "least_expensive": comparison[-1] if comparison else None,
         }
 
     def forecast_costs(
-        self,
-        cost_records: list[UnifiedCostRecord],
-        forecast_days: int = 30
+        self, cost_records: list[UnifiedCostRecord], forecast_days: int = 30
     ) -> dict[str, Any]:
         """
         Forecast future costs based on historical data.
@@ -494,27 +456,26 @@ class MultiCloudCostAggregator:
                 "forecast_days": forecast_days,
                 "currency": self.base_currency,
                 "forecast_cost": 0.0,
-                "method": "insufficient_data"
+                "method": "insufficient_data",
             }
 
         # Calculate daily average from recent data
         cutoff_date = datetime.now() - timedelta(days=30)
-        recent_records = [
-            r for r in cost_records
-            if r.billing_period_start >= cutoff_date
-        ]
+        recent_records = [r for r in cost_records if r.billing_period_start >= cutoff_date]
 
         if not recent_records:
             return {
                 "forecast_days": forecast_days,
                 "currency": self.base_currency,
                 "forecast_cost": 0.0,
-                "method": "insufficient_data"
+                "method": "insufficient_data",
             }
 
         # Calculate average daily cost
         total_cost = sum(r.converted_amount for r in recent_records)
-        days_covered = (recent_records[-1].billing_period_end - recent_records[0].billing_period_start).days or 1
+        days_covered = (
+            recent_records[-1].billing_period_end - recent_records[0].billing_period_start
+        ).days or 1
         daily_average = total_cost / days_covered
 
         # Simple forecast (linear extrapolation)
@@ -526,5 +487,5 @@ class MultiCloudCostAggregator:
             "forecast_cost": forecast_cost,
             "daily_average": daily_average,
             "method": "linear_extrapolation",
-            "confidence": "low"
+            "confidence": "low",
         }

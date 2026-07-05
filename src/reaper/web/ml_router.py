@@ -5,14 +5,13 @@ API endpoints for natural language queries, anomaly explanations,
 capacity planning, and intelligent alert tuning.
 """
 
-import logging
 import os
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from reaper.engine.ml.anomaly_explainer import AnomalyRootCauseAnalyzer
 from reaper.engine.ml.alert_optimizer import IntelligentAlertTuner
+from reaper.engine.ml.anomaly_explainer import AnomalyRootCauseAnalyzer
 from reaper.engine.ml.capacity_planner import PredictiveCapacityPlanner
 from reaper.engine.ml.natural_language_interface import CostQueryInterface
 from reaper.engine.models.resources import (
@@ -196,9 +195,7 @@ async def get_anomaly_explanation(anomaly_id: str) -> dict[str, Any]:
     try:
         db = SessionLocal()
         explanation = (
-            db.query(AnomalyExplanation)
-            .filter(AnomalyExplanation.anomaly_id == anomaly_id)
-            .first()
+            db.query(AnomalyExplanation).filter(AnomalyExplanation.anomaly_id == anomaly_id).first()
         )
         db.close()
 
@@ -378,7 +375,9 @@ async def record_alert_feedback(request: dict[str, Any]) -> dict[str, Any]:
     feedback_type = request.get("feedback_type")
 
     if not alert_id or not user_id or not feedback_type:
-        raise HTTPException(status_code=400, detail="alert_id, user_id, and feedback_type are required")
+        raise HTTPException(
+            status_code=400, detail="alert_id, user_id, and feedback_type are required"
+        )
 
     try:
         result = alert_tuner.record_alert_feedback(

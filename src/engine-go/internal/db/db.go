@@ -199,7 +199,7 @@ func GetAllResources(database *sql.DB) ([]Resource, error) {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Parse tags JSON
 		if tagsJSON != "" {
 			if err := json.Unmarshal([]byte(tagsJSON), &r.Tags); err != nil {
@@ -208,7 +208,7 @@ func GetAllResources(database *sql.DB) ([]Resource, error) {
 		} else {
 			r.Tags = make(map[string]*string)
 		}
-		
+
 		// Set default values for new fields
 		r.State = "unknown"
 		if r.Active {
@@ -217,10 +217,10 @@ func GetAllResources(database *sql.DB) ([]Resource, error) {
 			r.State = "stopped"
 		}
 		r.HourlyPrice = 0.0
-		
+
 		resources = append(resources, r)
 	}
-	
+
 	return resources, nil
 }
 

@@ -8,10 +8,14 @@ migration advisor, cost aggregator, and best practices engine.
 import unittest
 from datetime import datetime
 
-from reaper.governance.policy_engine import CrossCloudPolicyEngine, PolicyCategory, PolicySeverity, PolicyStatus
-from reaper.governance.migration_advisor import CloudMigrationAdvisor
+from reaper.governance.best_practices import ProviderBestPracticesEngine
 from reaper.governance.cost_aggregator import MultiCloudCostAggregator
-from reaper.governance.best_practices import ProviderBestPracticesEngine, PracticeCategory
+from reaper.governance.migration_advisor import CloudMigrationAdvisor
+from reaper.governance.policy_engine import (
+    CrossCloudPolicyEngine,
+    PolicyCategory,
+    PolicySeverity,
+)
 
 
 class TestPolicyEngine(unittest.TestCase):
@@ -51,7 +55,7 @@ class TestPolicyEngine(unittest.TestCase):
             severity=PolicySeverity.MEDIUM,
             description="Test policy for unit testing",
             universal_rules=[],
-            provider_translations={}
+            provider_translations={},
         )
 
         result = self.policy_engine.create_template(new_template)
@@ -72,7 +76,7 @@ class TestPolicyEngine(unittest.TestCase):
             severity=PolicySeverity.MEDIUM,
             description="Test policy for deletion",
             universal_rules=[],
-            provider_translations={}
+            provider_translations={},
         )
         self.policy_engine.create_template(new_template)
 
@@ -92,15 +96,11 @@ class TestPolicyEngine(unittest.TestCase):
                 "id": "test-resource-1",
                 "type": "Microsoft.Compute/virtualMachines",
                 "sku": "Standard_D64s_v3",
-                "hourly_cost": 1.5
+                "hourly_cost": 1.5,
             }
         ]
 
-        result = self.policy_engine.evaluate_policy_compliance(
-            "vm-size-limits",
-            resources,
-            "azure"
-        )
+        result = self.policy_engine.evaluate_policy_compliance("vm-size-limits", resources, "azure")
 
         self.assertTrue(result["success"])
         self.assertIn("compliance_percentage", result)
@@ -120,21 +120,17 @@ class TestMigrationAdvisor(unittest.TestCase):
                 "id": "vm-1",
                 "type": "Microsoft.Compute/virtualMachines",
                 "sku": "Standard_D2s_v3",
-                "hourly_rate": 0.096
+                "hourly_rate": 0.096,
             },
             {
                 "id": "storage-1",
                 "type": "Microsoft.Storage/storageAccounts",
                 "sku": "Standard_LRS",
-                "hourly_rate": 0.018
-            }
+                "hourly_rate": 0.018,
+            },
         ]
 
-        result = self.migration_advisor.assess_migration(
-            "azure",
-            "aws",
-            resource_inventory
-        )
+        result = self.migration_advisor.assess_migration("azure", "aws", resource_inventory)
 
         self.assertTrue(result["success"])
         self.assertIn("assessment", result)
@@ -149,14 +145,11 @@ class TestMigrationAdvisor(unittest.TestCase):
                 "id": "vm-1",
                 "type": "Microsoft.Compute/virtualMachines",
                 "sku": "Standard_D2s_v3",
-                "hourly_rate": 0.096
+                "hourly_rate": 0.096,
             }
         ]
 
-        result = self.migration_advisor.compare_providers(
-            resource_inventory,
-            "azure"
-        )
+        result = self.migration_advisor.compare_providers(resource_inventory, "azure")
 
         self.assertIn("current_provider", result)
         self.assertIn("comparisons", result)
@@ -189,7 +182,7 @@ class TestCostAggregator(unittest.TestCase):
             currency="EUR",
             billing_period_start=datetime.now(),
             billing_period_end=datetime.now(),
-            cost_type="opex"
+            cost_type="opex",
         )
 
         self.assertEqual(record.provider, "azure")
@@ -214,7 +207,7 @@ class TestCostAggregator(unittest.TestCase):
                 billing_period_start=datetime.now(),
                 billing_period_end=datetime.now(),
                 cost_type="opex",
-                tags={}
+                tags={},
             ),
             UnifiedCostRecord(
                 provider="aws",
@@ -229,8 +222,8 @@ class TestCostAggregator(unittest.TestCase):
                 billing_period_start=datetime.now(),
                 billing_period_end=datetime.now(),
                 cost_type="opex",
-                tags={}
-            )
+                tags={},
+            ),
         ]
 
         result = self.cost_aggregator.aggregate_costs(cost_records, "provider")
@@ -272,14 +265,11 @@ class TestBestPracticesEngine(unittest.TestCase):
                 "id": "vm-1",
                 "type": "Microsoft.Compute/virtualMachines",
                 "billing_model": "pay_as_you_go",
-                "avg_monthly_uptime": 95
+                "avg_monthly_uptime": 95,
             }
         ]
 
-        result = self.best_practices_engine.evaluate_practice(
-            "azure-reserved-instances",
-            resources
-        )
+        result = self.best_practices_engine.evaluate_practice("azure-reserved-instances", resources)
 
         self.assertTrue(result["success"])
         self.assertIn("compliance_percentage", result)
@@ -291,14 +281,11 @@ class TestBestPracticesEngine(unittest.TestCase):
                 "id": "vm-1",
                 "type": "Microsoft.Compute/virtualMachines",
                 "billing_model": "pay_as_you_go",
-                "avg_monthly_uptime": 95
+                "avg_monthly_uptime": 95,
             }
         ]
 
-        result = self.best_practices_engine.evaluate_provider_compliance(
-            "azure",
-            resources
-        )
+        result = self.best_practices_engine.evaluate_provider_compliance("azure", resources)
 
         self.assertIn("provider", result)
         self.assertIn("overall_compliance_percentage", result)

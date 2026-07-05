@@ -6,8 +6,6 @@ intent recognition, SQL generation, and context management.
 """
 
 import json
-import logging
-import re
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -85,7 +83,9 @@ class CostQueryInterface:
             )
 
             result = json.loads(response.text)
-            logger.info(f"Intent classified: {result.get('intent')} with confidence {result.get('confidence')}")
+            logger.info(
+                f"Intent classified: {result.get('intent')} with confidence {result.get('confidence')}"
+            )
             return result
 
         except Exception as e:
@@ -295,8 +295,8 @@ class CostQueryInterface:
         You are a cloud cost management assistant. Answer the user's question based on the query results.
 
         User Query: "{query}"
-        Intent: {intent_result.get('intent')}
-        Entities: {json.dumps(intent_result.get('entities', {}))}
+        Intent: {intent_result.get("intent")}
+        Entities: {json.dumps(intent_result.get("entities", {}))}
 
         Query Results:
         {json.dumps(query_results, indent=2, default=str)}
@@ -337,16 +337,15 @@ class CostQueryInterface:
             total_cost = sum(r.get("total_cost", 0) for r in query_results)
             return f"Based on the data, the total cost is ${total_cost:.2f} across {len(query_results)} resource categories."
 
-        elif intent == "resource_inventory":
+        if intent == "resource_inventory":
             count = len(query_results)
             return f"Found {count} resources matching your criteria."
 
-        elif intent == "comparison":
+        if intent == "comparison":
             providers = set(r.get("provider") for r in query_results)
             return f"Cost comparison across {len(providers)} providers: {', '.join(providers)}"
 
-        else:
-            return f"Found {len(query_results)} results related to your query."
+        return f"Found {len(query_results)} results related to your query."
 
     def process_query(self, query: str, session_id: str = "default") -> dict[str, Any]:
         """

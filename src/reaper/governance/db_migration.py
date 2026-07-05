@@ -13,15 +13,29 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 # Set up minimal environment
 os.environ.setdefault("DATABASE_URL", "sqlite:///./data/reaper.db")
 
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Text, JSON, Boolean, ForeignKey, inspect
-from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    create_engine,
+    inspect,
+)
+from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
 
 
 class PolicyTemplate(Base):
     """Cross-cloud policy templates."""
+
     __tablename__ = "policy_templates"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -40,6 +54,7 @@ class PolicyTemplate(Base):
 
 class PolicyEvaluation(Base):
     """Policy compliance evaluation results."""
+
     __tablename__ = "policy_evaluations"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -50,7 +65,7 @@ class PolicyEvaluation(Base):
     compliant = Column(Boolean, default=False)
     violations = Column(JSON)
     evaluated_at = Column(DateTime, default=datetime, index=True)
-    
+
     # Relationship to policy template
     policy_template_id = Column(Integer, ForeignKey("policy_templates.id"))
     policy_template = relationship("PolicyTemplate", backref="evaluations")
@@ -58,6 +73,7 @@ class PolicyEvaluation(Base):
 
 class MigrationAssessment(Base):
     """Cloud provider migration assessments."""
+
     __tablename__ = "migration_assessments"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -75,6 +91,7 @@ class MigrationAssessment(Base):
 
 class UnifiedCostRecord(Base):
     """Multi-cloud cost aggregation records."""
+
     __tablename__ = "unified_cost_records"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -96,6 +113,7 @@ class UnifiedCostRecord(Base):
 
 class BestPractice(Base):
     """Provider-specific best practices."""
+
     __tablename__ = "best_practices"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -117,6 +135,7 @@ class BestPractice(Base):
 
 class PracticeEvaluation(Base):
     """Best practice evaluation results."""
+
     __tablename__ = "practice_evaluations"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -130,7 +149,7 @@ class PracticeEvaluation(Base):
     estimated_effort = Column(String)
     estimated_cost_impact = Column(String)
     evaluated_at = Column(DateTime, default=datetime, index=True)
-    
+
     # Relationship to best practice
     best_practice_id = Column(Integer, ForeignKey("best_practices.id"))
     best_practice = relationship("BestPractice", backref="evaluations")
@@ -138,11 +157,14 @@ class PracticeEvaluation(Base):
 
 class GovernanceReport(Base):
     """Generated governance reports."""
+
     __tablename__ = "governance_reports"
 
     id = Column(Integer, primary_key=True, index=True)
     report_id = Column(String, unique=True, index=True, nullable=False)
-    report_type = Column(String, nullable=False)  # policy_compliance, cost_analysis, migration_assessment, best_practices
+    report_type = Column(
+        String, nullable=False
+    )  # policy_compliance, cost_analysis, migration_assessment, best_practices
     provider = Column(String, index=True)
     period_start = Column(DateTime, index=True)
     period_end = Column(DateTime, index=True)
@@ -154,6 +176,7 @@ class GovernanceReport(Base):
 
 class GovernanceMetric(Base):
     """Governance metrics for tracking and alerting."""
+
     __tablename__ = "governance_metrics"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -210,6 +233,7 @@ def migrate_governance_tables():
     except Exception as e:
         print(f"❌ Migration failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
