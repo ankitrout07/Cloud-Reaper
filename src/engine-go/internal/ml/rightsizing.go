@@ -236,11 +236,18 @@ func (ra *RightsizingAgent) BatchEvaluateMigration(metricsList []map[string]floa
 	results := make([]map[string]interface{}, len(metricsList))
 
 	var wg sync.WaitGroup
+	var resultsMu sync.Mutex
+	
 	for i, metrics := range metricsList {
 		wg.Add(1)
 		go func(idx int, m map[string]float64, sku string) {
 			defer wg.Done()
-			results[idx] = ra.EvaluateMigration(m, sku, "")
+			result := ra.EvaluateMigration(m, sku, "")
+			
+			// Protect results slice write with mutex
+			resultsMu.Lock()
+			results[idx] = result
+			resultsMu.Unlock()
 		}(i, metrics, currentSKUs[i])
 	}
 

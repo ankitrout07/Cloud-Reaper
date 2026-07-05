@@ -242,8 +242,11 @@ func (tm *TaskManager) CancelTask(taskID string) error {
 		case <-time.After(5 * time.Minute):
 			tm.mu.Lock()
 			// Only delete if task manager is still running and task exists
-			if tm.ctx.Err() == nil {
-				delete(tm.tasks, taskID)
+			// Additional safety checks to prevent race conditions
+			if tm.ctx.Err() == nil && tm.tasks != nil {
+				if _, exists := tm.tasks[taskID]; exists {
+					delete(tm.tasks, taskID)
+				}
 			}
 			tm.mu.Unlock()
 		case <-tm.ctx.Done():

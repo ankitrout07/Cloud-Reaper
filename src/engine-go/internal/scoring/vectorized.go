@@ -108,11 +108,18 @@ func (rs *ResourceScorer) BatchScoreResources(config ScoringConfig) []ScoreResul
 
 	// Vectorized calculations using goroutines
 	var wg sync.WaitGroup
+	var resultsMu sync.Mutex
+	
 	for i := 0; i < numResources; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			results[idx] = rs.scoreResource(idx, config)
+			score := rs.scoreResource(idx, config)
+			
+			// Protect results slice write with mutex
+			resultsMu.Lock()
+			results[idx] = score
+			resultsMu.Unlock()
 		}(i)
 	}
 
@@ -272,11 +279,18 @@ func (zs *ZombieScorer) BatchScoreZombieResources(resources []map[string]interfa
 	results := make([]ZombieScore, len(resources))
 
 	var wg sync.WaitGroup
+	var resultsMu sync.Mutex
+	
 	for i, resource := range resources {
 		wg.Add(1)
 		go func(idx int, res map[string]interface{}) {
 			defer wg.Done()
-			results[idx] = zs.ScoreResource(res)
+			score := zs.ScoreResource(res)
+			
+			// Protect results slice write with mutex
+			resultsMu.Lock()
+			results[idx] = score
+			resultsMu.Unlock()
 		}(i, resource)
 	}
 
@@ -327,11 +341,18 @@ func BatchCalculateMeans(matrix [][]float64) []float64 {
 	results := make([]float64, len(matrix))
 
 	var wg sync.WaitGroup
+	var resultsMu sync.Mutex
+	
 	for i, row := range matrix {
 		wg.Add(1)
 		go func(idx int, data []float64) {
 			defer wg.Done()
-			results[idx] = mean(data)
+			meanValue := mean(data)
+			
+			// Protect results slice write with mutex
+			resultsMu.Lock()
+			results[idx] = meanValue
+			resultsMu.Unlock()
 		}(i, row)
 	}
 
@@ -344,11 +365,18 @@ func BatchCalculateMax(matrix [][]float64) []float64 {
 	results := make([]float64, len(matrix))
 
 	var wg sync.WaitGroup
+	var resultsMu sync.Mutex
+	
 	for i, row := range matrix {
 		wg.Add(1)
 		go func(idx int, data []float64) {
 			defer wg.Done()
-			results[idx] = max(data)
+			maxValue := max(data)
+			
+			// Protect results slice write with mutex
+			resultsMu.Lock()
+			results[idx] = maxValue
+			resultsMu.Unlock()
 		}(i, row)
 	}
 
@@ -372,23 +400,28 @@ func MatrixMultiply(a, b [][]float64) ([][]float64, error) {
 	}
 
 	result := make([][]float64, rowsA)
-	for i := 0; i < rowsA; i++ {
-		result[i] = make([]float64, colsB)
-	}
 
 	// Parallel computation
 	var wg sync.WaitGroup
+	var resultMu sync.Mutex
+	
 	for i := 0; i < rowsA; i++ {
 		wg.Add(1)
 		go func(row int) {
 			defer wg.Done()
+			rowData := make([]float64, colsB)
 			for j := 0; j < colsB; j++ {
 				sum := 0.0
 				for k := 0; k < colsA; k++ {
 					sum += a[row][k] * b[k][j]
 				}
-				result[row][j] = sum
+				rowData[j] = sum
 			}
+			
+			// Protect result slice write with mutex
+			resultMu.Lock()
+			result[row] = rowData
+			resultMu.Unlock()
 		}(i)
 	}
 

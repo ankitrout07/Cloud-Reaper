@@ -117,11 +117,18 @@ func (ad *AnomalyDetector) DetectAnomaliesBatch(metrics []MetricData) []AnomalyR
 	results := make([]AnomalyResult, len(metrics))
 
 	var wg sync.WaitGroup
+	var resultsMu sync.Mutex
+	
 	for i, metric := range metrics {
 		wg.Add(1)
 		go func(idx int, m MetricData) {
 			defer wg.Done()
-			results[idx] = ad.DetectAnomaly(m)
+			anomaly := ad.DetectAnomaly(m)
+			
+			// Protect results slice write with mutex
+			resultsMu.Lock()
+			results[idx] = anomaly
+			resultsMu.Unlock()
 		}(i, metric)
 	}
 

@@ -171,20 +171,23 @@ func (cc *CostCalculator) CalculateTotalHourlyBurn(items []BurnItem) float64 {
 
 // calculateItemHourlyCost calculates hourly cost for a single item
 func (cc *CostCalculator) calculateItemHourlyCost(item BurnItem) float64 {
-	// Set defaults
-	if item.Quantity == 0 {
-		item.Quantity = 1
+	// Set defaults using local variables to avoid confusion
+	quantity := item.Quantity
+	if quantity == 0 {
+		quantity = 1
 	}
-	if item.Frequency == "" {
-		item.Frequency = "hourly"
+	
+	frequency := item.Frequency
+	if frequency == "" {
+		frequency = "hourly"
 	}
 
-	if item.Frequency == "monthly" {
-		monthlyCost := cc.CalculateMonthlyCost(item.Provider, item.ResourceType, item.SKU, item.Quantity)
+	if frequency == "monthly" {
+		monthlyCost := cc.CalculateMonthlyCost(item.Provider, item.ResourceType, item.SKU, quantity)
 		return monthlyCost / 730
 	}
 
-	return cc.CalculateHourlyCost(item.Provider, item.ResourceType, item.SKU, item.Quantity)
+	return cc.CalculateHourlyCost(item.Provider, item.ResourceType, item.SKU, quantity)
 }
 
 // BatchCalculateMonthlyCost performs batch monthly cost calculations
@@ -192,11 +195,18 @@ func (cc *CostCalculator) BatchCalculateMonthlyCost(items []BurnItem) []float64 
 	results := make([]float64, len(items))
 
 	var wg sync.WaitGroup
+	var resultsMu sync.Mutex
+	
 	for i, item := range items {
 		wg.Add(1)
 		go func(idx int, burnItem BurnItem) {
 			defer wg.Done()
-			results[idx] = cc.CalculateMonthlyCost(burnItem.Provider, burnItem.ResourceType, burnItem.SKU, burnItem.Quantity)
+			cost := cc.CalculateMonthlyCost(burnItem.Provider, burnItem.ResourceType, burnItem.SKU, burnItem.Quantity)
+			
+			// Protect results slice write with mutex
+			resultsMu.Lock()
+			results[idx] = cost
+			resultsMu.Unlock()
 		}(i, item)
 	}
 
@@ -209,11 +219,18 @@ func (cc *CostCalculator) BatchCalculateHourlyCost(items []BurnItem) []float64 {
 	results := make([]float64, len(items))
 
 	var wg sync.WaitGroup
+	var resultsMu sync.Mutex
+	
 	for i, item := range items {
 		wg.Add(1)
 		go func(idx int, burnItem BurnItem) {
 			defer wg.Done()
-			results[idx] = cc.CalculateHourlyCost(burnItem.Provider, burnItem.ResourceType, burnItem.SKU, burnItem.Quantity)
+			cost := cc.CalculateHourlyCost(burnItem.Provider, burnItem.ResourceType, burnItem.SKU, burnItem.Quantity)
+			
+			// Protect results slice write with mutex
+			resultsMu.Lock()
+			results[idx] = cost
+			resultsMu.Unlock()
 		}(i, item)
 	}
 
