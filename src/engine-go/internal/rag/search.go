@@ -1,7 +1,6 @@
 package rag
 
 import (
-	"encoding/json"
 	"math"
 	"regexp"
 	"sort"
@@ -254,10 +253,10 @@ func (re *RAGEngine) SparseSearch(query string, topK int) []SearchResult {
 			}
 
 			// IDF calculation with smoothing
-			idf := math.Log(1 + float64(re.bm25Index.N-df+0.5)/float64(df+0.5))
+			idf := math.Log(1 + (float64(re.bm25Index.N-df)+0.5)/(float64(df)+0.5))
 
 			tf := termFreqs[term]
-			numerator := float64(tf * (re.bm25Index.k1 + 1))
+			numerator := float64(tf) * (re.bm25Index.k1 + 1)
 			denominator := float64(tf) + re.bm25Index.k1*(1-re.bm25Index.b+re.bm25Index.b*(float64(docLen)/re.bm25Index.avgDocLength))
 
 			score += idf * (numerator / denominator)
