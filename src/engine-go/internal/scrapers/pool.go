@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"cloud-reaper/engine-go/internal/ratelimiter"
 )
 
 // ScrapingJob represents a single scraping task
@@ -30,7 +32,7 @@ type ScrapingPool struct {
 	workers     int
 	jobQueue    chan ScrapingJob
 	results     chan ScrapingResult
-	rateLimiter *TokenBucket
+	rateLimiter *ratelimiter.TokenBucketRateLimiter
 	workerWg    sync.WaitGroup
 	ctx         context.Context
 	cancel      context.CancelFunc
@@ -89,7 +91,7 @@ func NewScrapingPool(config PoolConfig) *ScrapingPool {
 		ctx:         ctx,
 		cancel:      cancel,
 		scrapers:    make(map[string]Scraper),
-		rateLimiter: NewTokenBucket(config.RateLimit),
+		rateLimiter: ratelimiter.NewTokenBucketRateLimiter(config.RateLimit, int(config.RateLimit)),
 	}
 
 	// Start workers

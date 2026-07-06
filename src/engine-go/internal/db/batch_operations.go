@@ -244,6 +244,7 @@ func (bdb *BatchDB) BatchUpdate(ctx context.Context, table string, updates map[s
 	}
 
 	// Add where clause parameters if provided
+	var query string
 	if whereClause != "" {
 		// Update parameter indices in where clause to match the total number of parameters
 		adjustedWhereClause := whereClause
@@ -255,9 +256,9 @@ func (bdb *BatchDB) BatchUpdate(ctx context.Context, table string, updates map[s
 		}
 		args = append(args, whereArgs...)
 
-		query := fmt.Sprintf("UPDATE %s SET %s WHERE %s", table, setClause, adjustedWhereClause)
+		query = fmt.Sprintf("UPDATE %s SET %s WHERE %s", table, setClause, adjustedWhereClause)
 	} else {
-		query := fmt.Sprintf("UPDATE %s SET %s", table, setClause)
+		query = fmt.Sprintf("UPDATE %s SET %s", table, setClause)
 	}
 
 	// Execute update

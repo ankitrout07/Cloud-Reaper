@@ -2,7 +2,6 @@ package websocket
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"

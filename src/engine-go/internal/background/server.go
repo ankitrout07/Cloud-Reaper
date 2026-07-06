@@ -362,8 +362,8 @@ func resourceAuditTask(ctx context.Context, args []interface{}) (interface{}, er
 		if resource.Tags == nil || len(resource.Tags) == 0 {
 			issuesFound++ // Missing tags
 		}
-		if resource.State == "running" && resource.HourlyPrice > 1.0 {
-			// Check for expensive running instances
+		if resource.Active && resource.Usage > 80.0 {
+			// Check for expensive running instances with high utilization
 			issuesFound++
 		}
 	}
@@ -468,10 +468,11 @@ func metricsFetchTask(ctx context.Context, args []interface{}) (interface{}, err
 	totalHourlyCost := 0.0
 
 	for _, resource := range resources {
-		if resource.State == "running" {
+		if resource.Active {
 			runningResources++
 		}
-		totalHourlyCost += resource.HourlyPrice
+		// Simplified cost estimation based on usage
+		totalHourlyCost += resource.Usage * 0.1 // Placeholder cost calculation
 	}
 
 	// Calculate utilization metrics

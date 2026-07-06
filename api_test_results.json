@@ -1,0 +1,151 @@
+{
+  "timestamp": "2026-07-07T02:18:29.724144",
+  "fastapi_tests": [
+    {
+      "test_name": "Copilot Optimization",
+      "status": "passed",
+      "response_time_ms": 5.25,
+      "error": null,
+      "details": "Status: 400",
+      "timestamp": "2026-07-07T02:18:29.773754"
+    },
+    {
+      "test_name": "Documentation Search",
+      "status": "passed",
+      "response_time_ms": 1.04,
+      "error": null,
+      "details": "Status: 503",
+      "timestamp": "2026-07-07T02:18:29.774808"
+    },
+    {
+      "test_name": "Telemetry Insights",
+      "status": "passed",
+      "response_time_ms": 2.4,
+      "error": null,
+      "details": "Status: 200",
+      "timestamp": "2026-07-07T02:18:29.777218"
+    },
+    {
+      "test_name": "Webhook Test",
+      "status": "passed",
+      "response_time_ms": 2.45,
+      "error": null,
+      "details": "Status: 200",
+      "timestamp": "2026-07-07T02:18:29.779684"
+    },
+    {
+      "test_name": "ML Chat Query",
+      "status": "passed",
+      "response_time_ms": 1.02,
+      "error": null,
+      "details": "Status: 503",
+      "timestamp": "2026-07-07T02:18:29.780721"
+    },
+    {
+      "test_name": "Governance Health Check",
+      "status": "passed",
+      "response_time_ms": 0.94,
+      "error": null,
+      "details": "Status: 200",
+      "timestamp": "2026-07-07T02:18:29.781669"
+    },
+    {
+      "test_name": "List Policies",
+      "status": "passed",
+      "response_time_ms": 1.74,
+      "error": null,
+      "details": "Status: 200",
+      "timestamp": "2026-07-07T02:18:29.783419"
+    },
+    {
+      "test_name": "List Best Practices",
+      "status": "passed",
+      "response_time_ms": 1.6,
+      "error": null,
+      "details": "Status: 200",
+      "timestamp": "2026-07-07T02:18:29.785036"
+    }
+  ],
+  "go_bridge_tests": [
+    {
+      "test_name": "Go Bridge Health Check",
+      "status": "passed",
+      "response_time_ms": 1.12,
+      "error": null,
+      "details": "Status: 200",
+      "timestamp": "2026-07-07T02:18:29.798987"
+    },
+    {
+      "test_name": "Go Bridge Prices",
+      "status": "passed",
+      "response_time_ms": 6125.19,
+      "error": null,
+      "details": "Status: 200",
+      "timestamp": "2026-07-07T02:18:35.924196"
+    },
+    {
+      "test_name": "Go Bridge Scan",
+      "status": "passed",
+      "response_time_ms": 7355.37,
+      "error": null,
+      "details": "Status: 200",
+      "timestamp": "2026-07-07T02:18:43.279580"
+    }
+  ],
+  "go_service_tests": [
+    {
+      "test_name": "Anomaly Health Check",
+      "status": "passed",
+      "response_time_ms": 1.26,
+      "error": null,
+      "details": "Port: 7076",
+      "timestamp": "2026-07-07T02:18:43.293591"
+    },
+    {
+      "test_name": "Calculator Health Check",
+      "status": "passed",
+      "response_time_ms": 0.9,
+      "error": null,
+      "details": "Port: 7075",
+      "timestamp": "2026-07-07T02:18:43.294502"
+    },
+    {
+      "test_name": "Rag Health Check",
+      "status": "passed",
+      "response_time_ms": 0.88,
+      "error": null,
+      "details": "Port: 7074",
+      "timestamp": "2026-07-07T02:18:43.295391"
+    },
+    {
+      "test_name": "Ratelimit Health Check",
+      "status": "passed",
+      "response_time_ms": 0.87,
+      "error": null,
+      "details": "Port: 7073",
+      "timestamp": "2026-07-07T02:18:43.296276"
+    },
+    {
+      "test_name": "Task Health Check",
+      "status": "passed",
+      "response_time_ms": 0.89,
+      "error": null,
+      "details": "Port: 7071",
+      "timestamp": "2026-07-07T02:18:43.297178"
+    },
+    {
+      "test_name": "Websocket Health Check",
+      "status": "passed",
+      "response_time_ms": 0.91,
+      "error": null,
+      "details": "Port: 7072",
+      "timestamp": "2026-07-07T02:18:43.298099"
+    }
+  ],
+  "summary": {
+    "total": 17,
+    "passed": 17,
+    "failed": 0,
+    "skipped": 0
+  }
+}

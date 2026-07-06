@@ -4,7 +4,6 @@ import (
 	"math"
 	"math/rand"
 	"sync"
-	"time"
 )
 
 // RightsizingAgent implements Q-learning for workload rightsizing decisions

@@ -562,6 +562,7 @@ async def background_metrics_worker():
 async def startup_event():
     # Initialize global credential service
     credential_service = get_credential_service()
+    logger = get_logger(__name__)
     logger.info(
         f"Credential service initialized with providers: {list(credential_service.get_all_providers().keys())}"
     )

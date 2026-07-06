@@ -5,7 +5,6 @@ import (
 	"math"
 	"sort"
 	"sync"
-	"time"
 )
 
 // TimeSeriesEngine provides fast time-series analytics operations
@@ -269,9 +268,9 @@ func (tse *TimeSeriesEngine) ARIMAForecast(steps int, p int, d int, q int) (*For
 	}
 
 	phi := 0.0
-	denominator := n*sumX2 - sumX*sumX
+	denominator := float64(n)*sumX2 - sumX*sumX
 	if denominator != 0 {
-		phi = (n*sumXY - sumX*sumY) / denominator
+		phi = (float64(n)*sumXY - sumX*sumY) / denominator
 	}
 
 	// Forecast
@@ -341,12 +340,12 @@ func (tse *TimeSeriesEngine) LinearTrendForecast(steps int) (*ForecastResult, er
 		sumX2 += x * x
 	}
 
-	denominator := n*sumX2 - sumX*sumX
+	denominator := float64(n)*sumX2 - sumX*sumX
 	if denominator == 0 {
 		return nil, fmt.Errorf("cannot calculate linear trend")
 	}
 
-	slope := (n*sumXY - sumX*sumY) / denominator
+	slope := (float64(n)*sumXY - sumX*sumY) / denominator
 	intercept := (sumY - slope*sumX) / float64(n)
 
 	// Forecast
