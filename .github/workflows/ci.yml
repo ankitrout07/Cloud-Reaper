@@ -25,17 +25,8 @@ jobs:
           ref: ${{ github.head_ref || github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
           
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: 'pip'
-          
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-          cache: true
-          cache-dependency-path: src/engine-go/go.mod
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
           
       - name: Auto-fix Python (Ruff)
         run: |
@@ -63,10 +54,10 @@ jobs:
     needs: auto-lint-format
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
         with:
-          python-version: "3.12"
-          cache: 'pip'
+          setup_go: 'false'
       - name: Install Dependencies
         run: |
           pip install -r requirements.txt
@@ -86,12 +77,10 @@ jobs:
     needs: auto-lint-format
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
         with:
-          go-version: '1.25'
-          cache: true
-          cache-dependency-path: src/engine-go/go.mod
+          setup_python: 'false'
       - name: Install System Dependencies
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.0-dev
       - name: Run Tests
@@ -117,9 +106,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
         with:
-          python-version: "3.12"
+          setup_go: 'false'
       - name: Run Bandit
         run: |
           pip install bandit
@@ -155,10 +145,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: 'pip'
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
       - name: Download Go Engine
         uses: actions/download-artifact@v4
         with:
@@ -167,13 +155,35 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install -r requirements.txt
+          pip install uvicorn pytest httpx
           chmod +x src/engine-go/reaper-engine
       - name: Verify Core Wiring
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cloud_reaper
         run: |
           python -c "from reaper.collectors.providers.azure_collector import AzureCollector; from reaper.engine.core.calculator import CostCalculator; print('✅ Wiring OK')"
-          ./src/engine-go/reaper-engine --help || true
+      - name: Run API Tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cloud_reaper
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: |
+          # Start FastAPI server in the background
+          python3 -m uvicorn reaper.web.app_async:app --port 5001 &
+          
+          # Start Go engine in the background
+          ./src/engine-go/reaper-engine &
+          
+          # Wait for servers to start
+          sleep 5
+          
+          # Run the comprehensive API tests
+          python3 test_all_apis.py
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-results
+          path: api_test_results.json
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest

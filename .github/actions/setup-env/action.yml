@@ -1,0 +1,28 @@
+name: 'Setup Environment'
+description: 'Sets up Python and Go environments with caching'
+inputs:
+  setup_go:
+    description: 'Whether to set up Go'
+    required: false
+    default: 'true'
+  setup_python:
+    description: 'Whether to set up Python'
+    required: false
+    default: 'true'
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      if: inputs.setup_python == 'true'
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: 'pip'
+
+    - name: Set up Go
+      if: inputs.setup_go == 'true'
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+        cache: true
+        cache-dependency-path: src/engine-go/go.mod
