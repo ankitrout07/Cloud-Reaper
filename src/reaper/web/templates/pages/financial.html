@@ -618,6 +618,16 @@ input[type="range"].tmf-range::-moz-range-thumb {
       </div>
     </div>
 
+    <!-- ── DETAILED ACTION PLAN ── -->
+    <div class="tmf-recs tmf-section" id="tmf-detailed-container" style="display: none; margin-top: 1rem;">
+      <div class="flex items-center justify-between mb-3.5">
+        <div class="tmf-panel-hdr mb-0">Detailed Action Plan</div>
+        <span style="font-size:.68rem;color:#334155;font-weight:600;" id="detailed-recs-count"></span>
+      </div>
+      <div id="tmf-detailed-recs-list" class="flex flex-col gap-3">
+      </div>
+    </div>
+
     <!-- ── ACTION BAR ── -->
     <div class="tmf-action">
       <div class="tmf-status-line">
@@ -1000,6 +1010,40 @@ function _renderRecsFromBackend(actions) {
   }).join('');
 }
 
+function _renderDetailedRecsFromBackend(detailedActions) {
+  const container = document.getElementById('tmf-detailed-container');
+  const list = document.getElementById('tmf-detailed-recs-list');
+  const count = document.getElementById('detailed-recs-count');
+  
+  if (!detailedActions || !detailedActions.length) {
+    container.style.display = 'none';
+    return;
+  }
+  
+  container.style.display = 'block';
+  count.textContent = detailedActions.length + ' specific element' + (detailedActions.length > 1 ? 's' : '') + ' to reduce';
+  
+  const cMap = { 'rightsizing':'#60a5fa', 'idle_elimination':'#f87171', 'storage_optimization':'#fbbf24', 'commitment_adoption':'#a78bfa', 'network_cleanup':'#22d3ee' };
+  
+  list.innerHTML = detailedActions.map(a => {
+    const c = cMap[a.type] || '#94a3b8';
+    const imp = typeof a.potential_savings === 'number' ? TMF.fmt(a.potential_savings) : '$0.00';
+    return `<div class="tmf-rec" style="background: rgba(30, 41, 59, 0.5); border-left: 3px solid ${c};">
+      <div class="tmf-rec-body" style="flex: 1;">
+        <div class="tmf-rec-name" style="font-size: 0.85rem; color: #e2e8f0; display: flex; align-items: center; gap: 6px;">
+          <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${c};"></span>
+          ${a.resource_name || 'Resource'}
+        </div>
+        <div class="tmf-rec-desc" style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">${a.description || ''}</div>
+      </div>
+      <div class="tmf-rec-impact" style="text-align: right;">
+        <div class="tmf-rec-impact-val" style="font-size: 0.9rem; color: #34d399;">${imp}</div>
+        <div class="tmf-rec-impact-lbl" style="font-size: 0.65rem;">/ mo</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function _emptyEl() {
   const d = document.createElement('div');
   d.id = 'tmf-empty-state';
@@ -1040,6 +1084,7 @@ async function tmfCalculate() {
       tmfUpdate();
 
       if (data.recommended_actions?.length) _renderRecsFromBackend(data.recommended_actions);
+      if (data.detailed_recommendations?.length) _renderDetailedRecsFromBackend(data.detailed_recommendations);
 
       const nOpp = data.optimization_details?.total_opportunities_analyzed ?? 0;
       const nSel = data.optimization_details?.selected_optimizations ?? 0;
@@ -1058,11 +1103,13 @@ async function tmfCalculate() {
     } else {
       tmfToast('Error from backend: ' + (data.message || 'Unknown'), 'error');
       _localOptimalPath(current, target);
+      document.getElementById('tmf-detailed-container').style.display = 'none';
       setStatus('Error — using local estimation');
     }
   } catch (err) {
     console.warn('[TMF] Backend error:', err);
     tmfToast('Backend unavailable — unable to calculate optimal path', 'error');
+    document.getElementById('tmf-detailed-container').style.display = 'none';
     setStatus('Error: Backend unavailable');
   } finally {
     btn.innerHTML = orig;
