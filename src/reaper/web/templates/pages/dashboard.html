@@ -753,6 +753,16 @@ body {
                 </div>
             </div>
 
+            <!-- Context Switcher -->
+            <div class="flex items-center gap-4">
+                <div class="relative">
+                    <i class="fas fa-filter absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10 pointer-events-none"></i>
+                    <select id="projectScopeFilter" onchange="if(window.reaperDashboardRefreshCharts) window.reaperDashboardRefreshCharts();" class="pl-11 pr-10 py-3 rounded-xl border border-gray-600 bg-gray-800/80 text-gray-300 font-semibold text-sm focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition appearance-none cursor-pointer hover:bg-gray-700/80 shadow-lg min-w-[200px]">
+                        <option value="">All Projects / Global</option>
+                    </select>
+                    <i class="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs"></i>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -1174,6 +1184,25 @@ body {
             badge.offsetHeight; // Trigger reflow
             badge.style.animation = 'badge-pulse 2s infinite';
         });
+
+        // Fetch and populate scopes
+        (async function loadScopes() {
+            try {
+                const res = await fetch('/api/dashboard/scopes');
+                const data = await res.json();
+                const select = document.getElementById('projectScopeFilter');
+                if (data.status === 'ok' && data.scopes && data.scopes.length > 0) {
+                    data.scopes.forEach(scope => {
+                        const option = document.createElement('option');
+                        option.value = scope;
+                        option.textContent = `Project: ${scope}`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to load project scopes', e);
+            }
+        })();
     });
 </script>
 {% endblock %}

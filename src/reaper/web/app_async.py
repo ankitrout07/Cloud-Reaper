@@ -4022,12 +4022,15 @@ async def dashboard(request: Request):
 
 
 @app.get("/api/dashboard/finops-charts")
-async def api_dashboard_finops_charts(request: Request):
+async def api_dashboard_finops_charts(request: Request, resource_group: Optional[str] = None):
     """HTTP snapshot for heavier FinOps charts (refreshed periodically from the client)."""
     if is_first_run():
         return JSONResponse(status_code=200, content={"status": "unconfigured", "charts": None})
 
     cache_key = "finops_charts_data"
+    if resource_group:
+        cache_key += f"_{resource_group}"
+        
     cache_ttl = 60  # 60 seconds cache for chart data
 
     # Check session cache first
@@ -4043,7 +4046,7 @@ async def api_dashboard_finops_charts(request: Request):
         def _fetch_charts():
             c = AzureCollector()
             budget = float(settings_state.get("budget_threshold", 1000.0))
-            return c.get_finops_dashboard_snapshot(monthly_budget=budget)
+            return c.get_finops_dashboard_snapshot(monthly_budget=budget, resource_group=resource_group)
 
         charts = await asyncio.to_thread(_fetch_charts)
 
@@ -4055,6 +4058,38 @@ async def api_dashboard_finops_charts(request: Request):
     except Exception as e:
         return JSONResponse(
             status_code=500, content={"status": "error", "message": str(e), "charts": None}
+        )
+
+
+@app.get("/api/dashboard/scopes")
+async def api_dashboard_scopes(request: Request):
+    """Returns available resource scopes (projects/resource groups) for the context switcher."""
+    if is_first_run():
+        return JSONResponse(status_code=200, content={"status": "unconfigured", "scopes": []})
+
+    cache_key = "dashboard_scopes"
+    cache_ttl = 300  # 5 minutes cache
+
+    cached_scopes = request.session.get(cache_key)
+    cached_timestamp = request.session.get(f"{cache_key}_timestamp")
+
+    if cached_scopes and cached_timestamp and time.time() - float(cached_timestamp) < cache_ttl:
+        return {"status": "ok", "scopes": cached_scopes, "cached": True}
+
+    try:
+        def _fetch_scopes():
+            c = AzureCollector()
+            return c.get_resource_groups()
+
+        scopes = await asyncio.to_thread(_fetch_scopes)
+
+        request.session[cache_key] = scopes
+        request.session[f"{cache_key}_timestamp"] = str(time.time())
+
+        return {"status": "ok", "scopes": scopes, "cached": False}
+    except Exception as e:
+        return JSONResponse(
+            status_code=500, content={"status": "error", "message": str(e), "scopes": []}
         )
 
 

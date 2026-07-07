@@ -262,7 +262,13 @@
 
         async function refresh() {
             try {
-                const res = await fetch('/api/dashboard/finops-charts');
+                const scopeSelect = document.getElementById('projectScopeFilter');
+                const scope = scopeSelect ? scopeSelect.value : '';
+                let url = '/api/dashboard/finops-charts';
+                if (scope) {
+                    url += '?resource_group=' + encodeURIComponent(scope);
+                }
+                const res = await fetch(url);
                 const body = await res.json();
                 if (!body.charts) {
                     return;
@@ -311,6 +317,9 @@
                 console.warn('[reaper] finops charts refresh failed', e);
             }
         }
+
+        // Expose refresh globally for context switcher
+        window.reaperDashboardRefreshCharts = refresh;
 
         // Delay initial refresh to not block page render
         setTimeout(() => {

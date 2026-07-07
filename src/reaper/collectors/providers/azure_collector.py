@@ -17,6 +17,7 @@ from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.consumption import ConsumptionManagementClient
 from azure.mgmt.monitor import MonitorManagementClient
 from azure.mgmt.network import NetworkManagementClient
+from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.sql import SqlManagementClient
 from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.subscription import SubscriptionClient
@@ -197,6 +198,11 @@ class AzureCollector:
             self.cost_management = CostManagementClient(self.credentials)
         except ImportError:
             self.cost_management = None  # pyrefly: ignore [bad-assignment]
+
+        try:
+            self.resource_client = ResourceManagementClient(self.credentials, self.subscription_id)
+        except Exception:
+            self.resource_client = None
 
         # Extended clients — lazily initialized via properties
         self._container_service: Any | None = None
@@ -557,9 +563,19 @@ class AzureCollector:
         _CPU_AVERAGE_CACHE[self.subscription_id] = (now, avg)
         return avg
 
-    def get_cost_vs_budget_series(self, monthly_budget: float = 5000.0) -> dict:
+    def get_resource_groups(self) -> list[str]:
+        """Returns a list of all resource group names in the current subscription."""
+        if not self.resource_client:
+            return []
+        try:
+            return sorted([rg.name for rg in self.resource_client.resource_groups.list()])
+        except Exception as e:
+            print(f"[!] Error fetching resource groups: {e}")
+            return []
+
+    def get_cost_vs_budget_series(self, monthly_budget: float = 5000.0, resource_group: str = None) -> dict:
         """Cumulative daily spend vs linear budget pace (FinOps burn view)."""
-        burn = self.get_burn_rate_forecast()
+        burn = self.get_burn_rate_forecast(resource_group)
         daily = burn.get("daily_history") or []
         if len(daily) > 30:
             daily = daily[-30:]
@@ -578,7 +594,7 @@ class AzureCollector:
             "budget_cap": monthly_budget,
         }
 
-    def get_service_bucket_spend(self) -> dict:
+    def get_service_bucket_spend(self, resource_group: str = None) -> dict:
         """Aggregate last-30-day cost into Compute / Storage / Networking / Other."""
         default = {
             "labels": ["Compute", "Storage", "Networking", "Other"],
@@ -588,6 +604,9 @@ class AzureCollector:
             return default
 
         scope = f"/subscriptions/{self.subscription_id}"
+        if resource_group:
+            scope += f"/resourceGroups/{resource_group}"
+
         end_date = datetime.datetime.now(datetime.UTC)
         start_date = end_date - datetime.timedelta(days=30)
 
@@ -659,7 +678,7 @@ class AzureCollector:
             "data": [round(v, 2) for v in buckets.values()],
         }
 
-    def get_instance_family_cpu_ram(self) -> dict:
+    def get_instance_family_cpu_ram(self, resource_group: str = None) -> dict:
         """
         Per VM-series: average 24h CPU and optional ``Available Memory Bytes`` (GiB) from host metrics.
         """
@@ -668,6 +687,8 @@ class AzureCollector:
         by_fam: dict[str, dict[str, list[float]]] = defaultdict(lambda: {"cpu": [], "mem_gib": []})
 
         for row in report[:24]:
+            if resource_group and row.get("rg") != resource_group:
+                continue
             name = row.get("name")
             size = inv.get(name)
             if not size:
@@ -676,6 +697,8 @@ class AzureCollector:
             by_fam[fam]["cpu"].append(float(row.get("usage", 0)))
 
         def process_memory(row):
+            if resource_group and row.get("rg") != resource_group:
+                return None
             name = row.get("name")
             size = inv.get(name)
             rg = row.get("rg")
@@ -708,10 +731,13 @@ class AzureCollector:
 
         return {"labels": labels, "cpu": cpu_avgs, "memory_gib": mem_gib_avgs}
 
-    def get_hourly_cpu_profile(self) -> dict:
+    def get_hourly_cpu_profile(self, resource_group: str = None) -> dict:
         """Last ~24h hourly Percentage CPU for the first VM (auto-shutdown / heatmap signal)."""
         empty = {"labels": [f"{h:02d}:00" for h in range(24)], "values": [0.0] * 24}
         vms = list(self.compute.virtual_machines.list_all())
+        if resource_group:
+            vms = [vm for vm in vms if vm.id and len(vm.id.split("/")) > 4 and vm.id.split("/")[4] == resource_group]
+        
         if not vms or not self.subscription_id:
             return empty
 
@@ -752,13 +778,13 @@ class AzureCollector:
             print(f"[-] Hourly CPU profile failed: {e}")
             return empty
 
-    def get_finops_dashboard_snapshot(self, monthly_budget: float) -> dict:
+    def get_finops_dashboard_snapshot(self, monthly_budget: float, resource_group: str = None) -> dict:
         """Single JSON payload for FinOps dashboard charts (HTTP refresh, not WebSocket)."""
         return {
-            "cost_vs_budget": self.get_cost_vs_budget_series(monthly_budget),
-            "services": self.get_service_bucket_spend(),
-            "families": self.get_instance_family_cpu_ram(),
-            "hourly_cpu": self.get_hourly_cpu_profile(),
+            "cost_vs_budget": self.get_cost_vs_budget_series(monthly_budget, resource_group),
+            "services": self.get_service_bucket_spend(resource_group),
+            "families": self.get_instance_family_cpu_ram(resource_group),
+            "hourly_cpu": self.get_hourly_cpu_profile(resource_group),
         }
 
     def get_unassociated_public_ips(self):
@@ -1350,19 +1376,22 @@ class AzureCollector:
         except Exception as e:
             return {"error": str(e)}
 
-    def get_burn_rate_forecast(self):
+    def get_burn_rate_forecast(self, resource_group: str = None):
         """Calculates burn rate and EOM forecast using real Azure Cost data and ARIMA."""
         now = datetime.datetime.now(datetime.UTC)
         spend_data = []
+        cache_key = self.subscription_id + (f"_{resource_group}" if resource_group else "")
 
         # Check in-memory cache first to avoid rate-limiting (429)
         with _COST_CACHE_LOCK:
-            cache_entry = _COST_FORECAST_CACHE.get(self.subscription_id)
+            cache_entry = _COST_FORECAST_CACHE.get(cache_key)
             if cache_entry and (now - cache_entry[0] < datetime.timedelta(minutes=15)):
                 spend_data = cache_entry[1]
 
         if not spend_data and self.cost_management:
             scope = f"/subscriptions/{self.subscription_id}"
+            if resource_group:
+                scope += f"/resourceGroups/{resource_group}"
             end_date = datetime.datetime.now(datetime.UTC)
             start_date = end_date - datetime.timedelta(days=30)
 
@@ -1392,7 +1421,7 @@ class AzureCollector:
                     spend_data = [float(r[0]) for r in rows]
                     # Update cache
                     with _COST_CACHE_LOCK:
-                        _COST_FORECAST_CACHE[self.subscription_id] = (now, spend_data)
+                        _COST_FORECAST_CACHE[cache_key] = (now, spend_data)
             except Exception as e:
                 print(f"Cost Management API Error: {e}")
 
