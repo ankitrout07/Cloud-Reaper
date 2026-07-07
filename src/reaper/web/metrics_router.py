@@ -1,6 +1,7 @@
 # src/reaper/web/metrics_router.py
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter
@@ -17,28 +18,30 @@ analyzer = FinOpsTelemetryAnalyzer(prometheus_url="http://localhost:9090")
 
 @telemetry_router.post("/api/v1/finops/telemetry-insights")
 async def get_telemetry_driven_insights():
-    db = SessionLocal()
-    try:
-        resources = db.query(Resource).filter(Resource.active).all()
-        db_inventory = []
-        for r in resources:
-            tags = r.tags or {}
-            db_inventory.append(
+    # Offload blocking SQLAlchemy query to thread pool
+    def _fetch_inventory():
+        db = SessionLocal()
+        try:
+            resources = db.query(Resource).filter(Resource.active).all()
+            return [
                 {
                     "resource_id": r.id,
-                    "private_ip": tags.get("private_ip") or "",
-                    "sku_size": tags.get("sku_size") or r.type or "Unknown",
-                    "monthly_cost": float(tags.get("monthly_cost", 0.0)),
+                    "private_ip": (r.tags or {}).get("private_ip") or "",
+                    "sku_size": (r.tags or {}).get("sku_size") or r.type or "Unknown",
+                    "monthly_cost": float((r.tags or {}).get("monthly_cost", 0.0)),
                 }
-            )
+                for r in resources
+            ]
+        finally:
+            db.close()
+
+    try:
+        db_inventory = await asyncio.to_thread(_fetch_inventory)
     except Exception as e:
-        db.close()
         return JSONResponse(
             status_code=500,
             content={"status": "error", "message": f"Database fetch failure: {e!s}"},
         )
-    finally:
-        db.close()
 
     try:
         actionable_insights = analyzer.analyze_compute_waste_index(db_inventory)
@@ -76,14 +79,18 @@ async def test_alert_webhook(payload: dict[str, Any] | None = None):
     try:
         success = False
         if platform == "discord" or "discord.com" in webhook_url:
-            success = send_discord_alert(
+            # send_discord_alert calls requests.post — offload to thread
+            success = await asyncio.to_thread(
+                send_discord_alert,
                 title="🔔 Cloud-Reaper Webhook Active",
                 message="Your Discord notification channel has been successfully verified!",
                 color=0x00F3FF,
                 webhook_url=webhook_url,
             )
         elif platform == "slack" or "slack.com" in webhook_url:
-            success = send_slack_alert(
+            # send_slack_alert calls requests.post — offload to thread
+            success = await asyncio.to_thread(
+                send_slack_alert,
                 message="🔔 *Cloud-Reaper Webhook Active*\nYour Slack notification channel has been successfully verified!",
                 webhook_url=webhook_url,
             )

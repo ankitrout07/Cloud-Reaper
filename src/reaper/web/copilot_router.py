@@ -1,6 +1,7 @@
 # src/reaper/web/copilot_router.py
 from __future__ import annotations
 
+import asyncio
 from functools import lru_cache
 from typing import Any
 
@@ -36,8 +37,12 @@ async def process_optimization_request(payload: dict[str, Any] | None = None):
     try:
         budget_float = float(budget_limit)
         engine = get_engine()
-        optimized_result = engine.compile_max_performance_infrastructure(
-            cloud_provider=provider, user_intent=user_intent, budget_limit=budget_float
+        # compile_max_performance_infrastructure is synchronous (CPU + DB) — run in thread pool
+        optimized_result = await asyncio.to_thread(
+            engine.compile_max_performance_infrastructure,
+            cloud_provider=provider,
+            user_intent=user_intent,
+            budget_limit=budget_float,
         )
         return {"status": "success", "blueprint": optimized_result.model_dump()}
 

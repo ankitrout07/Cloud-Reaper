@@ -461,12 +461,6 @@ app.include_router(search_router)
 from reaper.web.metrics_router import telemetry_router
 
 app.include_router(telemetry_router)
-from reaper.web.ml_router import router as ml_router
-
-app.include_router(ml_router)
-from reaper.web.governance_router import governance_router
-
-app.include_router(governance_router)
 from reaper.integrations import go_bridge  # async Go engine bridge (non-blocking)
 
 VAULT_UNLOCK_TTL_SEC = int(os.getenv("VAULT_UNLOCK_TTL_SEC", "3600"))
@@ -601,14 +595,15 @@ def _run_collector(method_name: str, *args, **kwargs) -> Any:
 async def sync_settings(request: Request):
     data = (await request.json() if await request.body() else {}) or {}
     try:
-        # 1. Update the .env file physically
-        set_key(ENV_PATH, "AZURE_SUBSCRIPTION_ID", data.get("subscriptionId"))
-        set_key(ENV_PATH, "AZURE_TENANT_ID", data.get("tenantId"))
-        set_key(ENV_PATH, "AZURE_CLIENT_ID", data.get("clientId"))
-        set_key(ENV_PATH, "AZURE_CLIENT_SECRET", data.get("clientSecret"))
+        # Offload blocking file I/O to a thread so the event loop stays free
+        def _write_env():
+            set_key(ENV_PATH, "AZURE_SUBSCRIPTION_ID", data.get("subscriptionId"))
+            set_key(ENV_PATH, "AZURE_TENANT_ID", data.get("tenantId"))
+            set_key(ENV_PATH, "AZURE_CLIENT_ID", data.get("clientId"))
+            set_key(ENV_PATH, "AZURE_CLIENT_SECRET", data.get("clientSecret"))
+            load_dotenv(ENV_PATH, override=True)
 
-        # 2. Reload the environment variables for the current running process
-        load_dotenv(ENV_PATH, override=True)
+        await asyncio.to_thread(_write_env)
 
         return JSONResponse(
             status_code=200, content={"status": "success", "message": "Credentials Sync Complete"}
@@ -714,7 +709,11 @@ async def index(request: Request):
 
 
 def _cloud_connections_summary() -> tuple[dict[str, dict[str, Any]], str]:
-    """Latest connection per provider and active provider label for settings UI."""
+    """Latest connection per provider and active provider label for settings UI.
+
+    NOTE: This is a synchronous helper intentionally — callers must wrap it
+    in ``asyncio.to_thread`` when calling from an async context.
+    """
     db = SessionLocal()
     try:
         rows = (
@@ -744,6 +743,7 @@ def _cloud_connections_summary() -> tuple[dict[str, dict[str, Any]], str]:
 
 
 def _vault_settings_row() -> VaultSettings | None:
+    """Synchronous helper — callers must wrap in asyncio.to_thread from async context."""
     db = SessionLocal()
     try:
         return db.query(VaultSettings).first()
@@ -789,8 +789,8 @@ def _unlock_vault_session(request: Request, passcode: str, settings: VaultSettin
 
 @app.get("/settings")
 async def settings(request: Request):
-    cloud_summary, active_provider = _cloud_connections_summary()
-    vault_configured = _vault_settings_row() is not None
+    cloud_summary, active_provider = await asyncio.to_thread(_cloud_connections_summary)
+    vault_configured = await asyncio.to_thread(_vault_settings_row) is not None
     return render_template(
         "pages/settings.html",
         request=request,
@@ -1118,39 +1118,48 @@ async def switch_context(request: Request):
             status_code=400, content={"status": "error", "message": "Unsupported provider."}
         )
 
-    db = SessionLocal()
-    try:
-        conn = (
-            db.query(CloudConnection)
-            .filter_by(provider_type=provider)
-            .order_by(CloudConnection.updated_at.desc())
-            .first()
-        )
-        if not conn:
-            return jsonify(
-                {
-                    "status": "redirect",
-                    "url": url_for("settings", tab="cloud", provider=provider),
-                }
+    def _do_switch():
+        db = SessionLocal()
+        try:
+            conn = (
+                db.query(CloudConnection)
+                .filter_by(provider_type=provider)
+                .order_by(CloudConnection.updated_at.desc())
+                .first()
             )
+            if not conn:
+                return None, None  # Signal: redirect needed
+            db.query(CloudConnection).filter_by(provider_type=provider).update({"is_active": False})
+            conn.is_active = True
+            db.commit()
+            return provider, conn.credentials
+        except Exception as e:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
-        db.query(CloudConnection).filter_by(provider_type=provider).update({"is_active": False})
-        conn.is_active = True
-        db.commit()
-        _set_cloud_env(provider, conn.credentials)
+    try:
+        active_provider, credentials = await asyncio.to_thread(_do_switch)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+    if active_provider is None:
         return jsonify(
             {
-                "status": "success",
-                "provider": provider,
-                "message": f"{provider.upper()} context activated.",
+                "status": "redirect",
+                "url": url_for("settings", tab="cloud", provider=provider),
             }
         )
-    except Exception as e:
-        db.rollback()
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-    finally:
-        db.close()
+
+    _set_cloud_env(provider, credentials)
+    return jsonify(
+        {
+            "status": "success",
+            "provider": provider,
+            "message": f"{provider.upper()} context activated.",
+        }
+    )
 
 
 @app.post("/api/settings/connect-cloud")
@@ -1208,49 +1217,52 @@ async def connect_cloud(request: Request):
         credential_service.set_active_provider(provider)
 
         _set_cloud_env(provider, credentials)
-        db = SessionLocal()
-        try:
-            db.query(CloudConnection).filter_by(provider_type=provider).update({"is_active": False})
 
-            conn = CloudConnection(
-                provider_type=provider,
-                connection_name=connection_name,
-                credentials=credentials,
-                is_active=True,
-            )
-            db.add(conn)
-            db.commit()
+        def _save_connection():
+            db = SessionLocal()
+            try:
+                db.query(CloudConnection).filter_by(provider_type=provider).update({"is_active": False})
+                conn = CloudConnection(
+                    provider_type=provider,
+                    connection_name=connection_name,
+                    credentials=credentials,
+                    is_active=True,
+                )
+                db.add(conn)
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db.close()
 
-            # Update global provider authentication state
-            PROVIDER_AUTH_STATE["provider"] = provider
-            PROVIDER_AUTH_STATE["authenticated"] = True
-            PROVIDER_AUTH_STATE["subscription_id"] = (
-                credentials.get("subscription_id")
-                if provider == "azure"
-                else credentials.get("project_id")
-                if provider == "gcp"
-                else None
-            )
-            PROVIDER_AUTH_STATE["last_sync"] = datetime.datetime.now(datetime.UTC).isoformat()
+        await asyncio.to_thread(_save_connection)
 
-            return jsonify(
-                {
-                    "status": "success",
-                    "message": f"{provider.capitalize()} credentials validated and activated successfully. {validation_result['details']}",
-                }
-            )
-        except Exception as e:
-            db.rollback()
-            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-        finally:
-            db.close()
+        # Update global provider authentication state
+        PROVIDER_AUTH_STATE["provider"] = provider
+        PROVIDER_AUTH_STATE["authenticated"] = True
+        PROVIDER_AUTH_STATE["subscription_id"] = (
+            credentials.get("subscription_id")
+            if provider == "azure"
+            else credentials.get("project_id")
+            if provider == "gcp"
+            else None
+        )
+        PROVIDER_AUTH_STATE["last_sync"] = datetime.datetime.now(datetime.UTC).isoformat()
+
+        return jsonify(
+            {
+                "status": "success",
+                "message": f"{provider.capitalize()} credentials validated and activated successfully. {validation_result['details']}",
+            }
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
 @app.get("/api/settings/cloud-connections")
 async def list_cloud_connections(request: Request):
-    summary, active_provider = _cloud_connections_summary()
+    summary, active_provider = await asyncio.to_thread(_cloud_connections_summary)
     return jsonify(
         {
             "status": "success",
@@ -1346,7 +1358,7 @@ async def auth_status(request: Request):
 
 @app.get("/api/vault/status")
 async def vault_status(request: Request):
-    configured = _vault_settings_row() is not None
+    configured = await asyncio.to_thread(_vault_settings_row) is not None
     return jsonify(
         {
             "status": "success",
@@ -1385,51 +1397,68 @@ async def vault_setup(request: Request):
             status_code=400, content={"status": "error", "message": "Passcodes do not match."}
         )
 
-    db = SessionLocal()
-    try:
-        if db.query(VaultSettings).first():
-            return JSONResponse(
-                status_code=400,
-                content={"status": "error", "message": "Vault is already configured."},
+    def _create_vault():
+        db = SessionLocal()
+        try:
+            if db.query(VaultSettings).first():
+                return "already_configured", None
+            salt = generate_salt()
+            vs = VaultSettings(
+                salt=base64.b64encode(salt).decode("utf-8"),
+                passcode_verifier=hash_passcode(passcode, salt),
             )
+            db.add(vs)
+            db.commit()
+            db.refresh(vs)
+            return "ok", vs
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
-        salt = generate_salt()
-        settings = VaultSettings(
-            salt=base64.b64encode(salt).decode("utf-8"),
-            passcode_verifier=hash_passcode(passcode, salt),
-        )
-        db.add(settings)
-        db.commit()
-        _unlock_vault_session(request, passcode, settings)
-        return {"status": "success", "message": "Vault created and unlocked."}
+    try:
+        status, vault_settings = await asyncio.to_thread(_create_vault)
     except Exception as e:
-        db.rollback()
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-    finally:
-        db.close()
+
+    if status == "already_configured":
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": "Vault is already configured."},
+        )
+
+    _unlock_vault_session(request, passcode, vault_settings)
+    return {"status": "success", "message": "Vault created and unlocked."}
 
 
 @app.post("/api/vault/reset")
 async def vault_reset(request: Request):
     """Erases all stored vault entries and resets the passcode setup status."""
-    db = SessionLocal()
+    def _do_reset():
+        db = SessionLocal()
+        try:
+            db.query(VaultEntry).delete()
+            db.query(VaultSettings).delete()
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
     try:
-        db.query(VaultEntry).delete()
-        db.query(VaultSettings).delete()
-        db.commit()
-
-        request.session.pop("vault_unlocked", None)
-        request.session.pop("vault_unlock_expires", None)
-        request.session.pop("vault_fernet_key", None)
-
-        return jsonify(
-            {"status": "success", "message": "Vault successfully reset. All stored secrets erased."}
-        )
+        await asyncio.to_thread(_do_reset)
     except Exception as e:
-        db.rollback()
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-    finally:
-        db.close()
+
+    request.session.pop("vault_unlocked", None)
+    request.session.pop("vault_unlock_expires", None)
+    request.session.pop("vault_fernet_key", None)
+
+    return jsonify(
+        {"status": "success", "message": "Vault successfully reset. All stored secrets erased."}
+    )
 
 
 @app.post("/api/vault/unlock")
@@ -1446,7 +1475,7 @@ async def vault_unlock(request: Request):
             status_code=400, content={"status": "error", "message": "Passcode is required."}
         )
 
-    settings = _vault_settings_row()
+    settings = await asyncio.to_thread(_vault_settings_row)
     if not settings:
         return JSONResponse(
             status_code=400, content={"status": "error", "message": "Vault is not configured yet."}
@@ -1473,24 +1502,28 @@ async def vault_list_entries(request: Request):
             status_code=403, content={"status": "error", "message": "Vault is locked."}
         )
 
-    db = SessionLocal()
+    def _list_entries():
+        db = SessionLocal()
+        try:
+            rows = db.query(VaultEntry).order_by(VaultEntry.updated_at.desc()).all()
+            return [
+                {
+                    "id": row.id,
+                    "label": row.label,
+                    "entry_type": row.entry_type,
+                    "created_at": row.created_at.isoformat() if row.created_at else None,
+                    "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+                }
+                for row in rows
+            ]
+        finally:
+            db.close()
+
     try:
-        rows = db.query(VaultEntry).order_by(VaultEntry.updated_at.desc()).all()
-        entries = [
-            {
-                "id": row.id,
-                "label": row.label,
-                "entry_type": row.entry_type,
-                "created_at": row.created_at.isoformat() if row.created_at else None,
-                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
-            }
-            for row in rows
-        ]
+        entries = await asyncio.to_thread(_list_entries)
         return {"status": "success", "entries": entries}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-    finally:
-        db.close()
 
 
 @app.post("/api/vault/entries")
@@ -1536,23 +1569,31 @@ async def vault_create_entry(request: Request):
             status_code=500, content={"status": "error", "message": f"Encryption failed: {e!s}"}
         )
 
-    db = SessionLocal()
+    def _save_entry():
+        db = SessionLocal()
+        try:
+            e = VaultEntry(label=label, entry_type=entry_type, encrypted_payload=token)
+            db.add(e)
+            db.commit()
+            db.refresh(e)
+            return {"id": e.id, "label": e.label, "entry_type": e.entry_type}
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
     try:
-        entry = VaultEntry(label=label, entry_type=entry_type, encrypted_payload=token)
-        db.add(entry)
-        db.commit()
+        saved = await asyncio.to_thread(_save_entry)
         return jsonify(
             {
                 "status": "success",
                 "message": "Entry saved.",
-                "entry": {"id": entry.id, "label": entry.label, "entry_type": entry.entry_type},
+                "entry": saved,
             }
         )
     except Exception as e:
-        db.rollback()
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-    finally:
-        db.close()
 
 
 @app.get("/api/vault/entries/{entry_id}")
@@ -1568,39 +1609,48 @@ async def vault_get_entry(request: Request, entry_id: int):
             status_code=403, content={"status": "error", "message": "Vault session expired."}
         )
 
-    db = SessionLocal()
-    try:
-        row = db.query(VaultEntry).filter_by(id=entry_id).first()
-        if not row:
-            return JSONResponse(
-                status_code=404, content={"status": "error", "message": "Entry not found."}
-            )
+    def _fetch_entry():
+        db = SessionLocal()
         try:
-            payload = json.loads(
-                fernet.decrypt(row.encrypted_payload.encode("utf-8")).decode("utf-8")
-            )
-        except Exception as e:
-            return JSONResponse(
-                status_code=500,
-                content={"status": "error", "message": f"Unable to decrypt entry: {e!s}"},
-            )
-        return jsonify(
-            {
-                "status": "success",
-                "entry": {
-                    "id": row.id,
-                    "label": row.label,
-                    "entry_type": row.entry_type,
-                    "username": payload.get("username", ""),
-                    "value": payload.get("value", ""),
-                    "notes": payload.get("notes", ""),
-                },
-            }
-        )
+            row = db.query(VaultEntry).filter_by(id=entry_id).first()
+            if not row:
+                return None
+            return row.encrypted_payload, row.id, row.label, row.entry_type
+        finally:
+            db.close()
+
+    try:
+        result = await asyncio.to_thread(_fetch_entry)
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-    finally:
-        db.close()
+
+    if result is None:
+        return JSONResponse(
+            status_code=404, content={"status": "error", "message": "Entry not found."}
+        )
+
+    encrypted_payload, row_id, row_label, row_entry_type = result
+    try:
+        payload = json.loads(fernet.decrypt(encrypted_payload.encode("utf-8")).decode("utf-8"))
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": f"Unable to decrypt entry: {e!s}"},
+        )
+
+    return jsonify(
+        {
+            "status": "success",
+            "entry": {
+                "id": row_id,
+                "label": row_label,
+                "entry_type": row_entry_type,
+                "username": payload.get("username", ""),
+                "value": payload.get("value", ""),
+                "notes": payload.get("notes", ""),
+            },
+        }
+    )
 
 
 @app.delete("/api/vault/entries/{entry_id}")
@@ -1610,21 +1660,31 @@ async def vault_delete_entry(request: Request, entry_id: int):
             status_code=403, content={"status": "error", "message": "Vault is locked."}
         )
 
-    db = SessionLocal()
+    def _delete_entry():
+        db = SessionLocal()
+        try:
+            row = db.query(VaultEntry).filter_by(id=entry_id).first()
+            if not row:
+                return False
+            db.delete(row)
+            db.commit()
+            return True
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
     try:
-        row = db.query(VaultEntry).filter_by(id=entry_id).first()
-        if not row:
-            return JSONResponse(
-                status_code=404, content={"status": "error", "message": "Entry not found."}
-            )
-        db.delete(row)
-        db.commit()
-        return {"status": "success", "message": "Entry deleted."}
+        found = await asyncio.to_thread(_delete_entry)
     except Exception as e:
-        db.rollback()
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-    finally:
-        db.close()
+
+    if not found:
+        return JSONResponse(
+            status_code=404, content={"status": "error", "message": "Entry not found."}
+        )
+    return {"status": "success", "message": "Entry deleted."}
 
 
 @app.get("/api/settings/auth")
@@ -1671,18 +1731,6 @@ async def finops(request: Request):
     return templates.TemplateResponse(request, "pages/finops.html", {"request": request})
 
 
-@app.get("/ai-ml-dashboard")
-async def ai_ml_dashboard(request: Request):
-    """Renders the AI/ML Dashboard for advanced machine learning features."""
-    return templates.TemplateResponse(request, "pages/ai-ml-dashboard.html", {"request": request})
-
-
-@app.get("/governance")
-async def governance(request: Request):
-    """Renders the Governance Dashboard for policy, compliance, and best practices management."""
-    return templates.TemplateResponse(request, "pages/governance.html", {"request": request})
-
-
 @app.get("/financial")
 async def financial(request: Request):
     tab = request.query_params.get("tab", "budget")
@@ -1698,14 +1746,17 @@ async def financial(request: Request):
     if tab not in allowed_tabs:
         tab = "budget"
 
-    # Get settings state for rendering
-    db = SessionLocal()
-    try:
-        db_metrics = db.query(BusinessMetric).order_by(BusinessMetric.date.desc()).all()
-    except Exception:
-        db_metrics = []
-    finally:
-        db.close()
+    # Offload DB query to thread so the event loop stays free
+    def _fetch_metrics():
+        db = SessionLocal()
+        try:
+            return db.query(BusinessMetric).order_by(BusinessMetric.date.desc()).all()
+        except Exception:
+            return []
+        finally:
+            db.close()
+
+    db_metrics = await asyncio.to_thread(_fetch_metrics)
 
     return render_template(
         "pages/financial.html",
@@ -3832,22 +3883,25 @@ async def add_business_metric(request: Request):
                 status_code=400, content={"status": "error", "message": "All fields are required."}
             )
 
-        db = SessionLocal()
-        try:
-            metric = BusinessMetric(
-                metric_name=name.upper().replace(" ", "_"), value=float(value), unit=unit
-            )
-            db.add(metric)
-            db.commit()
-            return JSONResponse(
-                status_code=201,
-                content={"status": "success", "message": f"Metric '{name}' recorded successfully."},
-            )
-        except Exception as e:
-            db.rollback()
-            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-        finally:
-            db.close()
+        def _save_metric():
+            db = SessionLocal()
+            try:
+                metric = BusinessMetric(
+                    metric_name=name.upper().replace(" ", "_"), value=float(value), unit=unit
+                )
+                db.add(metric)
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db.close()
+
+        await asyncio.to_thread(_save_metric)
+        return JSONResponse(
+            status_code=201,
+            content={"status": "success", "message": f"Metric '{name}' recorded successfully."},
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -3861,7 +3915,8 @@ async def build_with_ai(request: Request):
 @app.get("/api/v1/architect/status")
 async def api_architect_status(request: Request):
     """Returns the validation state of the configured OpenAI, Gemini, and Claude API keys."""
-    status = architect_manager.verify_api_status()
+    # verify_api_status makes blocking HTTP requests — run in a thread
+    status = await asyncio.to_thread(architect_manager.verify_api_status)
     return jsonify(
         {
             "status": "success",
@@ -3887,13 +3942,14 @@ async def api_architect_estimate(request: Request):
         )
 
     try:
-        # Step 1: Run Cognitive Extraction Contract
-        blueprint = architect_manager.generate_blueprint(
-            user_prompt, provider, model_provider=model_provider
-        )
+        # Both calls are synchronous (blocking HTTP + CPU work) — offload to thread pool
+        def _run_estimate():
+            bp = architect_manager.generate_blueprint(
+                user_prompt, provider, model_provider=model_provider
+            )
+            return resolve_component_costs(bp, provider, region)
 
-        # Step 2: Resolve financial cost metrics against PostgreSQL cache
-        calculated_payload = resolve_component_costs(blueprint, provider, region)
+        calculated_payload = await asyncio.to_thread(_run_estimate)
 
         return JSONResponse(status_code=200, content=calculated_payload)
 
@@ -4529,34 +4585,41 @@ async def export_bom(request: Request):
 @app.get("/api/finops/tag-health")
 async def tag_health(request: Request):
     try:
-        session = SessionLocal()
-        try:
-            resources = session.query(Resource).all()
-            unallocated = [r for r in resources if r.is_unallocated]
-
-            total = len(resources)
-            count = len(unallocated)
-            rate = (total - count) / total * 100 if total > 0 else 100
-
-            return jsonify(
-                {
-                    "status": "success",
-                    "total_resources": total,
-                    "compliant_count": total - count,
-                    "unallocated_count": count,
-                    "compliance_rate": round(rate, 1),
-                    "unallocated_spend": 0.0,
-                    "missing_tags_summary": [
+        def _fetch_tag_health():
+            session = SessionLocal()
+            try:
+                resources = session.query(Resource).all()
+                unallocated = [r for r in resources if r.is_unallocated]
+                total = len(resources)
+                count = len(unallocated)
+                rate = (total - count) / total * 100 if total > 0 else 100
+                return {
+                    "total": total,
+                    "count": count,
+                    "rate": rate,
+                    "missing": [
                         {"resource": r.name, "type": r.type, "missing": "Owner, Project"}
                         for r in unallocated
                     ],
                 }
-            )
-        except Exception as e:
-            session.rollback()
-            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-        finally:
-            session.close()
+            except Exception:
+                session.rollback()
+                raise
+            finally:
+                session.close()
+
+        data = await asyncio.to_thread(_fetch_tag_health)
+        return jsonify(
+            {
+                "status": "success",
+                "total_resources": data["total"],
+                "compliant_count": data["total"] - data["count"],
+                "unallocated_count": data["count"],
+                "compliance_rate": round(data["rate"], 1),
+                "unallocated_spend": 0.0,
+                "missing_tags_summary": data["missing"],
+            }
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -4607,54 +4670,58 @@ async def anomalies_triage(request: Request):
 @app.get("/api/finops/unit-economics")
 async def unit_economics(request: Request):
     try:
-        session = SessionLocal()
-        try:
-            db_metrics = (
-                session.query(BusinessMetric).order_by(BusinessMetric.date.desc()).limit(10).all()
-            )
-            actual = (
-                session.query(func.sum(CostHistory.cost))
-                .filter(CostHistory.cost_type == "ACTUAL")
-                .scalar()
-                or 10000.0
-            )
-            amortized = (
-                session.query(func.sum(CostHistory.cost))
-                .filter(CostHistory.cost_type == "AMORTIZED")
-                .scalar()
-                or 7500.0
-            )
-
-            metrics = []
-            for m in db_metrics:
-                divisor = 1000 if "1K" in m.unit else (1000000 if "1M" in m.unit else 1)
-                unit_count = m.value / divisor
-                metric_spend = float(actual) * 0.25
-                metrics.append(
-                    {
-                        "metric": m.metric_name.replace("_", " ").title(),
-                        "unit": m.unit,
-                        "count": m.value,
-                        "total_spend": round(metric_spend, 2),
-                        # pyrefly: ignore [no-matching-overload]
-                        "cost_per_unit": round(metric_spend / max(unit_count, 1), 4),
-                        "trend": 8.5,
-                    }
+        def _fetch_unit_economics():
+            session = SessionLocal()
+            try:
+                db_metrics = (
+                    session.query(BusinessMetric).order_by(BusinessMetric.date.desc()).limit(10).all()
                 )
+                actual = (
+                    session.query(func.sum(CostHistory.cost))
+                    .filter(CostHistory.cost_type == "ACTUAL")
+                    .scalar()
+                    or 10000.0
+                )
+                amortized = (
+                    session.query(func.sum(CostHistory.cost))
+                    .filter(CostHistory.cost_type == "AMORTIZED")
+                    .scalar()
+                    or 7500.0
+                )
+                return db_metrics, float(actual), float(amortized)
+            except Exception:
+                session.rollback()
+                raise
+            finally:
+                session.close()
 
-            return jsonify(
+        db_metrics, actual, amortized = await asyncio.to_thread(_fetch_unit_economics)
+
+        metrics = []
+        for m in db_metrics:
+            divisor = 1000 if "1K" in m.unit else (1000000 if "1M" in m.unit else 1)
+            unit_count = m.value / divisor
+            metric_spend = actual * 0.25
+            metrics.append(
                 {
-                    "status": "success",
-                    "metrics": metrics,
-                    "total_actual_spend": round(float(actual), 2),
-                    "total_amortized_spend": round(float(amortized), 2),
+                    "metric": m.metric_name.replace("_", " ").title(),
+                    "unit": m.unit,
+                    "count": m.value,
+                    "total_spend": round(metric_spend, 2),
+                    # pyrefly: ignore [no-matching-overload]
+                    "cost_per_unit": round(metric_spend / max(unit_count, 1), 4),
+                    "trend": 8.5,
                 }
             )
-        except Exception as e:
-            session.rollback()
-            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-        finally:
-            session.close()
+
+        return jsonify(
+            {
+                "status": "success",
+                "metrics": metrics,
+                "total_actual_spend": round(actual, 2),
+                "total_amortized_spend": round(amortized, 2),
+            }
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
@@ -4880,24 +4947,27 @@ async def get_arbitrage(request: Request):
 @app.get("/api/activity")
 async def get_activity(request: Request):
     try:
-        session = SessionLocal()
-        try:
-            logs = session.query(ActionLog).order_by(ActionLog.timestamp.desc()).limit(10).all()
-            result = [
-                {
-                    "resource": log.resource.name if log.resource else "Unknown",
-                    "action": log.action_type,
-                    "status": log.status,
-                    "time": log.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                }
-                for log in logs
-            ]
-            return {"status": "success", "activity": result}
-        except Exception as e:
-            session.rollback()
-            return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
-        finally:
-            session.close()
+        def _fetch_activity():
+            session = SessionLocal()
+            try:
+                logs = session.query(ActionLog).order_by(ActionLog.timestamp.desc()).limit(10).all()
+                return [
+                    {
+                        "resource": log.resource.name if log.resource else "Unknown",
+                        "action": log.action_type,
+                        "status": log.status,
+                        "time": log.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                    for log in logs
+                ]
+            except Exception:
+                session.rollback()
+                raise
+            finally:
+                session.close()
+
+        result = await asyncio.to_thread(_fetch_activity)
+        return {"status": "success", "activity": result}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
