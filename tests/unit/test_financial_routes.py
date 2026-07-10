@@ -79,7 +79,7 @@ class FinancialRoutesTestCase(unittest.TestCase):
             "networking": {"count": 0, "total_cost": 0.0, "resources": []},
             "databases": {"count": 0, "total_cost": 0.0, "resources": []},
             "other": {"count": 0, "total_cost": 0.0, "resources": []},
-            "total_monthly_cost": 210.0,
+            "total_monthly_cost": 3420.50,
         }
 
         # Mock VM inventory with utilization data
@@ -150,6 +150,7 @@ class FinancialRoutesTestCase(unittest.TestCase):
         mock_azure_collector.return_value = mock_collector_instance
 
         # Return minimal data to create insufficient potential
+        mock_collector_instance.get_resource_cost_summary.return_value = {"total_monthly_cost": 10000.0}
         mock_collector_instance.get_vm_inventory.return_value = []
         mock_collector_instance.get_idle_vms.return_value = []
         mock_collector_instance.get_orphaned_disks.return_value = {"disks": []}

@@ -1,27 +1,37 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 )
 
 // Global batcher instance
 var (
-	globalBatcher *WebSocketBatcher
-	batcherInit   sync.Once
-	emitter       MessageEmitter
+	globalBatcher    *WebSocketBatcher
+	batcherInit      sync.Once
+	emitter          MessageEmitter
+	metricsBroadcaster *MetricsBroadcaster
+	broadcasterInit  sync.Once
 )
 
 // SetEmitter sets the global message emitter
 func SetEmitter(e MessageEmitter) {
 	emitter = e
+	// Initialize metrics broadcaster first
+	GetMetricsBroadcaster()
 	batcherInit.Do(func() {
 		globalBatcher = NewWebSocketBatcher(e, DefaultBatcherConfig())
-		log.Println("[WebSocket Batcher] Initialized with default configuration")
+		// Integrate with metrics broadcaster
+		globalBatcher.SetMetricsBroadcaster(GetMetricsBroadcaster())
+		log.Println("[WebSocket Batcher] Initialized with default configuration and metrics broadcaster")
 	})
 }
 
@@ -32,6 +42,16 @@ func GetBatcher() *WebSocketBatcher {
 		SetEmitter(NewMockEmitter())
 	}
 	return globalBatcher
+}
+
+// GetMetricsBroadcaster returns the singleton metrics broadcaster instance
+func GetMetricsBroadcaster() *MetricsBroadcaster {
+	broadcasterInit.Do(func() {
+		metricsBroadcaster = NewMetricsBroadcaster()
+		go metricsBroadcaster.Run()
+		log.Println("[Metrics Broadcaster] Initialized")
+	})
+	return metricsBroadcaster
 }
 
 // HTTPResponse is a standard response wrapper
@@ -50,14 +70,19 @@ type BatchRequest struct {
 
 // ConfigRequest represents a request to update batcher configuration
 type ConfigRequest struct {
-	BatchIntervalMs int `json:"batch_interval_ms"`
-	MaxBatchSize    int `json:"max_batch_size"`
-	MaxQueueSize    int `json:"max_queue_size"`
+	BatchIntervalMs      int  `json:"batch_interval_ms"`
+	MaxBatchSize         int  `json:"max_batch_size"`
+	MaxQueueSize         int  `json:"max_queue_size"`
+	EnableCompression    *bool `json:"enable_compression"`
+	AdaptiveBatching     *bool `json:"adaptive_batching"`
+	MaxConcurrentFlush   int  `json:"max_concurrent_flush"`
+	BufferPoolSize       int  `json:"buffer_pool_size"`
 }
 
 // RegisterBatcherHandlers registers HTTP handlers for WebSocket batching
 func RegisterBatcherHandlers(mux *http.ServeMux) {
 	batcher := GetBatcher()
+	broadcaster := GetMetricsBroadcaster()
 
 	// Health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -67,6 +92,9 @@ func RegisterBatcherHandlers(mux *http.ServeMux) {
 		}
 		sendJSONResponse(w, map[string]string{"status": "healthy", "service": "websocket_batcher"})
 	})
+
+	// Register metrics broadcaster handlers
+	RegisterMetricsBroadcasterHandlers(mux, broadcaster)
 
 	// Send a batched message
 	mux.HandleFunc("/api/ws/batch/send", func(w http.ResponseWriter, r *http.Request) {
@@ -138,6 +166,18 @@ func RegisterBatcherHandlers(mux *http.ServeMux) {
 		if req.MaxQueueSize > 0 {
 			batcher.config.MaxQueueSize = req.MaxQueueSize
 		}
+		if req.EnableCompression != nil {
+			batcher.config.EnableCompression = *req.EnableCompression
+		}
+		if req.AdaptiveBatching != nil {
+			batcher.config.AdaptiveBatching = *req.AdaptiveBatching
+		}
+		if req.MaxConcurrentFlush > 0 {
+			batcher.config.MaxConcurrentFlush = req.MaxConcurrentFlush
+		}
+		if req.BufferPoolSize > 0 {
+			batcher.config.BufferPoolSize = req.BufferPoolSize
+		}
 		batcher.mu.Unlock()
 
 		sendJSONResponse(w, batcher.GetStatistics())
@@ -196,5 +236,37 @@ func StartBatcherServer(port int) error {
 
 	addr := ":" + strconv.Itoa(port)
 	log.Printf("Starting WebSocket batching server on %s", addr)
-	return http.ListenAndServe(addr, mux)
+	
+	server := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
+	// Setup graceful shutdown
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		<-sigChan
+
+		log.Println("Shutting down server gracefully...")
+		
+		// Stop broadcaster
+		if metricsBroadcaster != nil {
+			metricsBroadcaster.Stop()
+		}
+		
+		// Stop batcher
+		if globalBatcher != nil {
+			globalBatcher.Stop()
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		
+		if err := server.Shutdown(ctx); err != nil {
+			log.Printf("Server shutdown error: %v", err)
+		}
+	}()
+
+	return server.ListenAndServe()
 }

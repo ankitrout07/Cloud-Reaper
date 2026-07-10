@@ -4,7 +4,7 @@ from reaper.collectors.prices.gcp import GCPPriceClient
 
 def test_aws_price_client_init():
     client = AWSPriceClient()
-    assert client.URL == "https://ec2instances.info/instances.json"
+    assert client.URL == "https://instances.vantage.sh/instances.json"
     assert hasattr(client, "get_live_prices")
 
 

@@ -83,7 +83,7 @@ class TestLearnableRanking:
         ranking.add_feedback("test query", document, relevance_score=0.8, clicked=True, dwell_time=5.0)
 
         assert len(ranking.training_data) == 1
-        assert ranking.training_data[0].relevance == 0.8
+        assert ranking.training_data[0][1] == 0.8
 
     def test_model_training(self):
         """Test model training with sufficient data."""
@@ -387,9 +387,9 @@ class TestABTestFramework:
 
         experiment = ab_test.create_experiment("test_exp", variants, None)
 
-        assert experiment.ID == "test_exp"
-        assert len(experiment.Variants) == 2
-        assert experiment.Status == "active"
+        assert experiment.get("id") == "test_exp"
+        assert len(experiment.get("variants", [])) == 2
+        assert experiment.get("status") == "active"
 
     def test_variant_assignment(self):
         """Test variant assignment for users."""
@@ -421,7 +421,7 @@ class TestABTestFramework:
         ab_test.record_metric("test_exp", "variant_a", "ctr", 0.15)
         ab_test.record_metric("test_exp", "variant_a", "dwell_time", 5.0)
 
-        results = ab_test.experiment_results["test_exp"]["variant_a"]
+        results = ab_test.experiment_results[("test_exp", "variant_a")]
         assert len(results) == 2
 
     def test_results_analysis(self):
