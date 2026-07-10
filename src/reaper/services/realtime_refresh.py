@@ -1,23 +1,33 @@
 """
 Real-time Data Refresh Service
-Provides periodic data refresh and WebSocket push updates for dashboard metrics.
+================================
+Periodic data refresh and WebSocket push updates for dashboard metrics.
 
-Fast Path (when Go bridge is running)
---------------------------------------
-Tasks registered via register_refresh_task() are proxied into the Go streaming
-processor (bridge/server.go → internal/streaming/). The Go scheduler replaces
-the Python threading.Thread loop with goroutine-based workers that dispatch in
-sub-millisecond latency vs 10-50 ms in Python.
+All scheduling is now handled by the Go streaming processor
+(internal/streaming/scheduler.go) via the bridge API on :7070.
 
-Fallback Path (when Go bridge is absent)
------------------------------------------
-The original threading.Thread loop is used unchanged, so existing behaviour is
-preserved in environments that haven't built the Go binary.
+Usage
+-----
+    from reaper.services.realtime_refresh import get_refresh_service
+
+    svc = get_refresh_service()
+
+    # Register a task (Go scheduler takes ownership automatically)
+    svc.register_refresh_task(
+        "metrics_azure",
+        data_fetcher=my_fetcher,
+        interval=60,
+        task_type="metrics_fetch",   # native Go type → Go handles data collection
+    )
+
+    # Activate Go mode (call once at app startup)
+    await svc.start_go_streaming()
+
+    # One-shot manual refresh (still available for ad-hoc use)
+    data = await svc.refresh_task("metrics_azure")
 """
 
 import asyncio
-import threading
-import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -26,36 +36,32 @@ from reaper.utils.error_handler import get_logger
 
 logger = get_logger("realtime_refresh")
 
-# Built-in task types that have native Go fetchers in the streaming package.
-# Tasks with these types are handed off entirely to the Go scheduler.
+# Task types with native Go fetchers in internal/streaming/bridge_handlers.go.
+# Tasks of these types are executed entirely inside the Go process.
 _GO_NATIVE_TASK_TYPES = frozenset({"price_scan", "metrics_fetch", "cost_analysis"})
 
 
 class RealtimeRefreshService:
-    """Service for managing real-time data refresh and WebSocket push updates.
+    """
+    Real-time refresh service backed by the Go streaming scheduler.
 
-    Two operating modes, selected automatically at runtime:
+    Tasks registered here are proxied to the Go bridge scheduler
+    (POST /stream/task/register).  The Go process runs them at the requested
+    interval using goroutine-based workers — replacing the old Python
+    threading.Thread loop.
 
-    1. **Go mode** (preferred): tasks are registered with the Go streaming
-       scheduler over the bridge HTTP API. The Python threading loop is idle.
-    2. **Python mode** (fallback): original threading.Thread loop runs
-       when the Go bridge binary is not present or not started.
+    For one-shot ad-hoc refreshes, call refresh_task() directly.
     """
 
     def __init__(self, refresh_interval: int = 60):
         """
-        Initialize the real-time refresh service.
-
         Args:
-            refresh_interval: Default refresh interval in seconds (default: 60)
+            refresh_interval: Default interval in seconds (default: 60).
         """
         self.refresh_interval = refresh_interval
         self.refresh_tasks: dict[str, dict[str, Any]] = {}
         self.is_running = False
-        self.refresh_thread: threading.Thread | None = None
-        self._stop_event = threading.Event()
 
-        # Go streaming bridge state
         self._go_mode_active = False
         self._go_synced_tasks: set[str] = set()
 
@@ -76,13 +82,12 @@ class RealtimeRefreshService:
         Register a data refresh task.
 
         Args:
-            task_id: Unique identifier for the task
-            data_fetcher: Async function to fetch data
-            websocket_emitter: Optional function to emit data via WebSocket
-            interval: Custom refresh interval (uses default if not specified)
-            enabled: Whether the task is initially enabled
-            task_type: Hint for Go scheduler ('price_scan', 'metrics_fetch',
-                       'cost_analysis', or 'custom')
+            task_id: Unique task identifier.
+            data_fetcher: Async callable that returns the refreshed data.
+            websocket_emitter: Optional async callable to push data via WebSocket.
+            interval: Refresh interval in seconds (uses default if omitted).
+            enabled: Whether the task starts active.
+            task_type: 'price_scan', 'metrics_fetch', 'cost_analysis', or 'custom'.
         """
         self.refresh_tasks[task_id] = {
             "data_fetcher": data_fetcher,
@@ -96,115 +101,87 @@ class RealtimeRefreshService:
             "task_type": task_type,
         }
         logger.info(
-            f"Registered refresh task: {task_id} "
-            f"(interval: {interval or self.refresh_interval}s)"
+            f"Registered task: {task_id!r} "
+            f"(interval={interval or self.refresh_interval}s, type={task_type})"
         )
 
-        # If already in Go mode, sync the new task immediately
+        # Sync immediately if Go mode is already active
         if self._go_mode_active and enabled:
             asyncio.create_task(self._sync_task_to_go(task_id, self.refresh_tasks[task_id]))
 
     def unregister_refresh_task(self, task_id: str):
-        """Unregister a refresh task."""
+        """Remove a task from the service and disable it on the Go scheduler."""
         if task_id in self.refresh_tasks:
             del self.refresh_tasks[task_id]
             self._go_synced_tasks.discard(task_id)
-            logger.info(f"Unregistered refresh task: {task_id}")
+            logger.info(f"Unregistered task: {task_id!r}")
 
     def enable_task(self, task_id: str):
-        """Enable a refresh task."""
+        """Enable a task (propagated to Go scheduler)."""
         if task_id in self.refresh_tasks:
             self.refresh_tasks[task_id]["enabled"] = True
-            logger.info(f"Enabled refresh task: {task_id}")
             if self._go_mode_active:
                 asyncio.create_task(self._go_enable_task(task_id, True))
+            logger.info(f"Enabled task: {task_id!r}")
 
     def disable_task(self, task_id: str):
-        """Disable a refresh task."""
+        """Disable a task (propagated to Go scheduler)."""
         if task_id in self.refresh_tasks:
             self.refresh_tasks[task_id]["enabled"] = False
-            logger.info(f"Disabled refresh task: {task_id}")
             if self._go_mode_active:
                 asyncio.create_task(self._go_enable_task(task_id, False))
+            logger.info(f"Disabled task: {task_id!r}")
 
     def set_refresh_interval(self, task_id: str, interval: int):
-        """Update refresh interval for a specific task."""
+        """Update interval for a task (propagated to Go scheduler)."""
         if task_id in self.refresh_tasks:
             self.refresh_tasks[task_id]["interval"] = interval
-            logger.info(f"Updated refresh interval for {task_id}: {interval}s")
             if self._go_mode_active and task_id in self._go_synced_tasks:
                 asyncio.create_task(self._go_set_interval(task_id, interval))
+            logger.info(f"Updated interval for {task_id!r}: {interval}s")
 
     # ─── Lifecycle ────────────────────────────────────────────────────────────
 
-    def start(self):
-        """Start the background refresh thread (Python fallback mode)."""
-        if self.is_running:
-            logger.warning("Refresh service is already running")
-            return
-
-        self._stop_event.clear()
-        self.refresh_thread = threading.Thread(target=self._refresh_loop, daemon=True)
-        self.refresh_thread.start()
-        self.is_running = True
-        logger.info("RealtimeRefreshService started (Python mode)")
-
     async def start_go_streaming(self) -> bool:
         """
-        Attempt to offload all registered tasks to the Go streaming scheduler.
+        Register all enabled tasks with the Go scheduler and activate Go mode.
 
-        When successful:
-        - All enabled tasks are registered with the Go bridge scheduler
-        - The Python threading loop is stopped (avoids double-work)
-        - self._go_mode_active is set to True
+        Call once at application startup (e.g. in the FastAPI lifespan handler).
 
         Returns:
-            True if Go mode was activated, False if the bridge is unavailable
-            (Python loop continues as fallback in that case).
+            True if Go mode activated, False if the bridge is unreachable.
         """
         from reaper.integrations.go_stream_bridge import get_stream_bridge
 
         bridge = get_stream_bridge()
-
         if not await bridge.is_alive():
-            logger.info(
-                "Go bridge not reachable — using Python refresh loop (fallback mode)"
+            logger.warning(
+                "Go bridge unreachable — realtime refresh disabled. "
+                "Start the Go engine with --mode serve to activate."
             )
             return False
 
-        logger.info("Go bridge reachable — migrating tasks to Go streaming scheduler")
-
-        # Stop Python loop if it was running
-        if self.is_running and not self._go_mode_active:
-            self.stop()
-
-        # Register all current tasks with Go
+        logger.info("Go bridge reachable — registering tasks with Go scheduler")
         for task_id, task in self.refresh_tasks.items():
             if task["enabled"]:
                 await self._sync_task_to_go(task_id, task)
 
         self._go_mode_active = True
-        self.is_running = True  # Mark service as "running" (via Go mode)
+        self.is_running = True
         logger.info(
-            f"Go streaming mode active — "
-            f"{len(self._go_synced_tasks)} tasks registered with Go scheduler"
+            f"Go streaming active — {len(self._go_synced_tasks)} task(s) registered"
         )
         return True
 
-    def stop(self):
-        """Stop the background refresh thread."""
-        if not self.is_running:
-            return
-
-        self._stop_event.set()
-        if self.refresh_thread:
-            self.refresh_thread.join(timeout=5)
-        self.is_running = False
-        self._go_mode_active = False
-        logger.info("RealtimeRefreshService stopped")
+    def start(self):
+        """No-op stub kept for API compatibility. Use start_go_streaming() instead."""
+        logger.warning(
+            "start() called — Python threading loop removed. "
+            "Call 'await start_go_streaming()' to activate the Go scheduler."
+        )
 
     async def stop_go_streaming(self):
-        """Disable all Go-managed tasks and reset to Python mode."""
+        """Disable all Go-managed tasks and mark the service as stopped."""
         if not self._go_mode_active:
             return
 
@@ -218,58 +195,68 @@ class RealtimeRefreshService:
         self._go_mode_active = False
         self._go_synced_tasks.clear()
         self.is_running = False
-        logger.info("Go streaming stopped — revert to Python mode with start()")
+        logger.info("Go streaming stopped")
 
-    # ─── Manual refresh ───────────────────────────────────────────────────────
+    def stop(self):
+        """Synchronous stop — schedules stop_go_streaming() if a loop is running."""
+        if not self.is_running:
+            return
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(self.stop_go_streaming())
+            else:
+                loop.run_until_complete(self.stop_go_streaming())
+        except Exception:
+            self._go_mode_active = False
+            self.is_running = False
+
+    # ─── One-shot manual refresh ──────────────────────────────────────────────
 
     async def refresh_task(self, task_id: str) -> Any | None:
         """
-        Manually trigger a refresh for a specific task.
+        Manually trigger a single refresh cycle for task_id.
+
+        Useful for ad-hoc data pulls independent of the scheduler interval.
 
         Args:
-            task_id: Task identifier to refresh
+            task_id: Registered task identifier.
 
         Returns:
-            Fetched data or None if failed
+            Fetched data or None on failure.
         """
         if task_id not in self.refresh_tasks:
-            logger.warning(f"Task not found: {task_id}")
+            logger.warning(f"refresh_task: {task_id!r} not found")
             return None
 
         task = self.refresh_tasks[task_id]
-
         try:
-            logger.debug(f"Refreshing task: {task_id}")
             data = await task["data_fetcher"]()
-
             task["last_data"] = data
             task["last_refresh"] = datetime.now(UTC)
             task["error_count"] = 0
             task["last_error"] = None
 
-            # Emit via WebSocket if emitter is available
             if task["websocket_emitter"]:
                 try:
                     await task["websocket_emitter"](data)
                 except Exception as e:
-                    logger.error(f"WebSocket emit failed for {task_id}: {e}")
+                    logger.error(f"WebSocket emit failed for {task_id!r}: {e}")
 
-            logger.info(f"Successfully refreshed task: {task_id}")
+            logger.info(f"Refreshed task: {task_id!r}")
             return data
-
         except Exception as e:
             task["error_count"] += 1
             task["last_error"] = str(e)
-            logger.error(f"Failed to refresh task {task_id}: {e}", exc_info=True)
+            logger.error(f"Failed to refresh {task_id!r}: {e}", exc_info=True)
             return None
 
-    # ─── Status / observability ───────────────────────────────────────────────
+    # ─── Observability ────────────────────────────────────────────────────────
 
     def get_task_status(self, task_id: str) -> dict[str, Any] | None:
-        """Get status information for a specific task."""
+        """Return a status snapshot for task_id."""
         if task_id not in self.refresh_tasks:
             return None
-
         task = self.refresh_tasks[task_id]
         return {
             "task_id": task_id,
@@ -285,15 +272,15 @@ class RealtimeRefreshService:
         }
 
     def get_all_status(self) -> dict[str, dict[str, Any]]:
-        """Get status for all registered tasks."""
-        return {task_id: self.get_task_status(task_id) for task_id in self.refresh_tasks}
+        """Return status snapshots for all registered tasks."""
+        return {tid: self.get_task_status(tid) for tid in self.refresh_tasks}
 
     async def get_go_stats(self) -> dict[str, Any] | None:
         """
-        Fetch real-time processor + scheduler metrics from the Go bridge.
+        Return live processor + scheduler metrics from the Go bridge.
 
         Returns:
-            Combined stats dict or None if Go mode is not active.
+            {"processor": {...}, "scheduler": {...}} or None if Go mode is off.
         """
         if not self._go_mode_active:
             return None
@@ -303,66 +290,16 @@ class RealtimeRefreshService:
 
     @property
     def go_mode_active(self) -> bool:
-        """True when the Go streaming scheduler is handling task dispatch."""
+        """True when the Go scheduler is managing task dispatch."""
         return self._go_mode_active
-
-    # ─── Python fallback loop (unchanged behaviour) ───────────────────────────
-
-    def _refresh_loop(self):
-        """Background thread loop for periodic refresh (Python fallback)."""
-        logger.info("Starting Python refresh loop (fallback mode)")
-
-        while not self._stop_event.is_set():
-            start_time = time.time()
-
-            for task_id, task in self.refresh_tasks.items():
-                if not task["enabled"]:
-                    continue
-                # Skip tasks already managed by Go to avoid double-work
-                if task_id in self._go_synced_tasks:
-                    continue
-
-                # Check if task needs refresh
-                if task["last_refresh"] is None:
-                    needs_refresh = True
-                else:
-                    elapsed = (datetime.now(UTC) - task["last_refresh"]).total_seconds()
-                    needs_refresh = elapsed >= task["interval"]
-
-                if needs_refresh:
-                    try:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        loop.run_until_complete(self.refresh_task(task_id))
-                        loop.close()
-                    except Exception as e:
-                        logger.error(f"Error in refresh loop for {task_id}: {e}")
-
-            elapsed = time.time() - start_time
-            sleep_time = max(0, self.refresh_interval - elapsed)
-
-            if not self._stop_event.wait(sleep_time):
-                break
-
-        logger.info("Python refresh loop stopped")
 
     # ─── Go bridge helpers ────────────────────────────────────────────────────
 
     async def _sync_task_to_go(self, task_id: str, task: dict[str, Any]) -> bool:
-        """
-        Register a single Python task with the Go scheduler.
-
-        For native task types (price_scan, metrics_fetch, cost_analysis), Go
-        handles data collection internally.  For custom Python tasks, the task
-        is registered as a no-op Go task; Python drives it by submitting
-        DataPoints to /stream/submit at appropriate times.
-        """
         from reaper.integrations.go_stream_bridge import get_stream_bridge
 
         bridge = get_stream_bridge()
         task_type = task.get("task_type", "custom")
-
-        # Map to a Go-native type if possible; fall back to "custom"
         go_task_type = task_type if task_type in _GO_NATIVE_TASK_TYPES else "custom"
 
         ok = await bridge.register_task(
@@ -373,13 +310,12 @@ class RealtimeRefreshService:
         )
         if ok:
             self._go_synced_tasks.add(task_id)
-            logger.debug(f"Task {task_id!r} synced to Go scheduler (type={go_task_type})")
+            logger.debug(f"Synced {task_id!r} → Go scheduler (type={go_task_type})")
         else:
-            logger.warning(f"Failed to sync task {task_id!r} to Go scheduler")
+            logger.warning(f"Failed to sync {task_id!r} to Go scheduler")
         return ok
 
     async def _go_enable_task(self, task_id: str, enabled: bool) -> None:
-        """Enable / disable a task on the Go scheduler."""
         from reaper.integrations.go_stream_bridge import get_stream_bridge
 
         bridge = get_stream_bridge()
@@ -387,7 +323,6 @@ class RealtimeRefreshService:
             await bridge.enable_task(task_id, enabled=enabled)
 
     async def _go_set_interval(self, task_id: str, interval: int) -> None:
-        """Update a task's interval on the Go scheduler."""
         from reaper.integrations.go_stream_bridge import get_stream_bridge
 
         bridge = get_stream_bridge()
@@ -395,10 +330,11 @@ class RealtimeRefreshService:
             await bridge.set_task_interval(task_id, float(interval))
 
 
-# Global refresh service instance
+# ─── Module-level singleton ────────────────────────────────────────────────────
+
 refresh_service = RealtimeRefreshService(refresh_interval=60)
 
 
 def get_refresh_service() -> RealtimeRefreshService:
-    """Get the global refresh service instance."""
+    """Return the module-level RealtimeRefreshService singleton."""
     return refresh_service
