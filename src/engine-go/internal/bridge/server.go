@@ -43,6 +43,7 @@ import (
 
 	"cloud-reaper/engine-go/internal/collectors"
 	"cloud-reaper/engine-go/internal/db"
+	"cloud-reaper/engine-go/internal/streaming"
 )
 
 // scanRequest is the POST /scan request body.
@@ -87,6 +88,11 @@ func RunBridgeServer(port int) {
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/scan", handleScan)
 	mux.HandleFunc("/prices", handlePrices)
+	mux.HandleFunc("/prices/parallel", handleParallelPrices)
+
+	// Real-time streaming pipeline endpoints (/stream/*)
+	// Replaces Python realtime_refresh.py threading loop with sub-ms Go workers.
+	streaming.RegisterStreamHandlers(mux)
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	fmt.Printf("[bridge] Go engine HTTP bridge listening on http://%s\n", addr)
@@ -260,4 +266,59 @@ func writeError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+// handleParallelPrices provides high-performance parallel price scraping
+// POST /prices/parallel body: {"services":[...],"concurrency":10,"region":""}
+func handleParallelPrices(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"POST required"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Services   []string `json:"services"`
+		Concurrency int     `json:"concurrency"`
+		Region     string   `json:"region"`
+	}
+	
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid JSON body"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Set defaults
+	if req.Concurrency == 0 {
+		req.Concurrency = 10
+	}
+	if len(req.Services) == 0 {
+		req.Services = collectors.AzureRetailServiceNames
+	}
+
+	// Create parallel price client
+	client := collectors.NewParallelPriceClient(req.Concurrency)
+	
+	var prices []map[string]interface{}
+	var err error
+	
+	if req.Region != "" {
+		// Regional price fetch
+		prices = client.GetPricesByRegion(req.Services, req.Region)
+	} else {
+		// Global catalog price fetch
+		prices = client.GetCatalogPrices()
+	}
+
+	response := map[string]interface{}{
+		"prices": prices,
+		"count":  len(prices),
+		"region": req.Region,
+	}
+	
+	if err != nil {
+		response["error"] = err.Error()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(response)
 }

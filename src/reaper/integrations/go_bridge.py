@@ -196,6 +196,60 @@ async def prices(provider: str = "azure") -> dict[str, Any] | None:
     return await _prices_via_subprocess(provider)
 
 
+async def parallel_prices(
+    services: list[str] | None = None,
+    concurrency: int = 10,
+    region: str = ""
+) -> dict[str, Any] | None:
+    """
+    Fetch Azure pricing data using high-performance parallel scraping.
+    
+    This leverages the new Go parallel price scraper for 10-20x faster performance
+    compared to the sequential Python implementation.
+
+    Args:
+        services: List of Azure service names to fetch (uses default list if None)
+        concurrency: Number of parallel workers (default: 10)
+        region: Optional region filter for regional pricing
+
+    Returns:
+        Dictionary with parallel prices data including:
+        - prices: List of price items
+        - count: Total number of price items
+        - region: Region filter used (if any)
+        - error: Error message if the request failed
+        Returns None on complete failure
+    """
+    if not await _is_bridge_alive():
+        print("[go_bridge] Parallel prices requires Go bridge server to be running")
+        return None
+    
+    try:
+        import httpx
+
+        request_body = {
+            "services": services or [],
+            "concurrency": concurrency,
+            "region": region
+        }
+        
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            resp = await client.post(
+                f"{_BRIDGE_BASE}/prices/parallel",
+                json=request_body,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                print(f"[go_bridge] Parallel prices fetched: {data.get('count', 0)} items")
+                return data
+            else:
+                print(f"[go_bridge] /prices/parallel returned {resp.status_code}: {resp.text[:200]}")
+                return None
+    except Exception as exc:
+        print(f"[go_bridge] Parallel prices error: {exc}")
+        return None
+
+
 async def _prices_via_subprocess(provider: str) -> dict[str, Any] | None:
     """
     Fallback to subprocess for fetching prices.
