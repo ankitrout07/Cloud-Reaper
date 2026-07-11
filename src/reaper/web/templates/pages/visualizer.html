@@ -5,7 +5,9 @@
 <meta name="description" content="Real-time infrastructure topology visualizer. Explore your entire Azure cloud architecture as a directed, interactive graph powered by Cytoscape.js.">
 <link rel="preconnect" href="https://cdnjs.cloudflare.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+{% endblock %}
 
+{% block content %}
 <style>
 /* ── Reset & base ─────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
@@ -493,9 +495,7 @@
     box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
 }
 </style>
-{% endblock %}
 
-{% block content %}
 <div class="viz-page" id="viz-page">
 
     <!-- ── Header ─────────────────────────────────────────────── -->

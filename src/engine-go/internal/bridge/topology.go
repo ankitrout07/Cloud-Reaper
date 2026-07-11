@@ -113,13 +113,14 @@ func handleTopologyGraph(w http.ResponseWriter, r *http.Request) {
 
 	elements, err := buildTopologyFromDB()
 	if err != nil || len(elements) == 0 {
-		fmt.Printf("[topology] DB empty/unavailable (%v) — serving mock data\n", err)
-		elements = mockTopologyElements()
-		nodeCount, edgeCount := countElements(elements)
+		fmt.Printf("[topology] DB empty/unavailable (%v) — serving empty topology\n", err)
+		elements = []GraphElement{
+			{Data: GraphData{ID: "azure_cloud", Label: "Azure Cloud Sub", Type: "cloud", Kind: "node"}},
+		}
 		writeJSON(w, topologyResponse{
 			Elements:  elements,
-			NodeCount: nodeCount,
-			EdgeCount: edgeCount,
+			NodeCount: 1,
+			EdgeCount: 0,
 			LiveScan:  false,
 		})
 		return
@@ -329,46 +330,7 @@ func buildTopologyFromResources(resources []models.Resource, subscriptionID stri
 	return elements
 }
 
-// ── Mock data ──────────────────────────────────────────────────────────────
-
-// mockTopologyElements returns a representative Azure topology used on first-run
-// or when no credentials have been supplied yet.
-func mockTopologyElements() []GraphElement {
-	type mock struct{ id, label, t, region string }
-	samples := []mock{
-		{"vm-prod-api-01", "api-server-01", "VirtualMachine", "eastus"},
-		{"vm-prod-worker-01", "worker-node-01", "VirtualMachine", "eastus"},
-		{"vm-prod-worker-02", "worker-node-02", "VirtualMachine", "westus2"},
-		{"vm-staging-api-01", "staging-api", "VirtualMachine", "westeurope"},
-		{"disk-prod-os-01", "prod-os-disk", "ManagedDisk", "eastus"},
-		{"disk-prod-data-01", "prod-data-disk", "ManagedDisk", "eastus"},
-		{"disk-orphaned-01", "orphaned-disk", "OrphanedDisk", "eastus"},
-		{"snap-backup-01", "backup-snapshot", "Snapshot", "eastus"},
-		{"snap-weekly-01", "weekly-snapshot", "Snapshot", "eastus"},
-		{"vnet-prod-001", "prod-vnet", "VirtualNetwork", "eastus"},
-		{"nsg-prod-api", "api-nsg", "NetworkSecurityGroup", "eastus"},
-		{"pip-prod-lb", "prod-lb-ip", "PublicIPAddress", "eastus"},
-		{"storage-prod-001", "prod-storage", "StorageAccount", "eastus"},
-		{"storage-logs-001", "logs-storage", "StorageAccount", "westus2"},
-		{"app-api-gateway", "api-gateway", "AppService", "eastus"},
-		{"app-func-alerts", "alert-functions", "FunctionApp", "eastus"},
-		{"aks-prod-cluster", "prod-k8s-cluster", "KubernetesService", "eastus"},
-	}
-
-	elements := []GraphElement{
-		{Data: GraphData{ID: "azure_cloud", Label: "Azure Cloud Sub (demo)", Type: "cloud", Kind: "node"}},
-	}
-	for i, s := range samples {
-		elements = append(elements,
-			GraphElement{Data: GraphData{ID: s.id, Label: s.label, Type: s.t, Kind: "node", Region: s.region}},
-			GraphElement{Data: GraphData{
-				ID:     fmt.Sprintf("mock-edge-%d", i+1),
-				Source: s.id, Target: "azure_cloud", Kind: "edge",
-			}},
-		)
-	}
-	return elements
-}
+// ── Mock data removed ────────────────────────────────────────────────────────
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
