@@ -4006,6 +4006,14 @@ async def monitor(request: Request):
     return templates.TemplateResponse(request, "pages/monitor.html", {"request": request})
 
 
+@app.get("/visualizer")
+async def visualizer(request: Request):
+    """Infrastructure Topology Visualizer — renders a Cytoscape.js directed graph
+    of all cloud resources pulled in real-time from the Go Engine bridge.
+    """
+    return templates.TemplateResponse(request, "pages/visualizer.html", {"request": request})
+
+
 @app.get("/dashboard")
 async def dashboard(request: Request):
     user_name, sub_name = await _get_cached_user_info(request)

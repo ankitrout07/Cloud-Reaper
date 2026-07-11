@@ -90,6 +90,10 @@ func RunBridgeServer(port int) {
 	mux.HandleFunc("/prices", handlePrices)
 	mux.HandleFunc("/prices/parallel", handleParallelPrices)
 
+	// Infrastructure topology graph endpoints (Cytoscape.js compatible)
+	mux.HandleFunc("/api/v1/topology/graph", handleTopologyGraph)
+	mux.HandleFunc("/api/v1/topology/scan", handleTopologyScan)
+
 	// Real-time streaming pipeline endpoints (/stream/*)
 	// Replaces Python realtime_refresh.py threading loop with sub-ms Go workers.
 	streaming.RegisterStreamHandlers(mux)

@@ -1,0 +1,1124 @@
+{% extends "layouts/_base.html" if not request.headers.get("HX-Request") else "layouts/_empty.html" %}
+
+{% block head %}
+<title>Infrastructure Topology — Cloud Reaper</title>
+<meta name="description" content="Real-time infrastructure topology visualizer. Explore your entire Azure cloud architecture as a directed, interactive graph powered by Cytoscape.js.">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+
+<style>
+/* ── Reset & base ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* ── Page wrapper ─────────────────────────────────────────────────────── */
+.viz-page {
+    min-height: 100vh;
+    background: linear-gradient(160deg, #060b14 0%, #0a0e1a 45%, #060c16 100%);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Ambient background glow blobs */
+.viz-page::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 800px 600px at 15% 20%, rgba(59,130,246,0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 600px 500px at 85% 75%, rgba(6,182,212,0.06) 0%, transparent 70%),
+        radial-gradient(ellipse 500px 400px at 50% 50%, rgba(139,92,246,0.04) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Animated grid overlay */
+.viz-page::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+    animation: gridDrift 30s linear infinite;
+    pointer-events: none;
+    z-index: 0;
+}
+
+@keyframes gridDrift {
+    0%   { background-position: 0 0; }
+    100% { background-position: 48px 48px; }
+}
+
+/* ── Page header ─────────────────────────────────────────────────────── */
+.viz-header {
+    position: relative;
+    z-index: 10;
+    padding: 28px 36px 20px;
+    background: rgba(10,14,26,0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(59,130,246,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.viz-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.viz-header-icon {
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, rgba(59,130,246,0.25), rgba(6,182,212,0.15));
+    border: 1px solid rgba(59,130,246,0.3);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 20px rgba(59,130,246,0.15);
+}
+
+.viz-header-icon svg { color: #60a5fa; width: 22px; height: 22px; }
+
+.viz-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #f1f5f9;
+    letter-spacing: -0.3px;
+    line-height: 1;
+    margin: 0;
+}
+
+.viz-subtitle {
+    font-size: 13px;
+    color: #64748b;
+    margin-top: 4px;
+    font-weight: 400;
+}
+
+/* Status pills */
+.viz-stats {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.stat-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 14px;
+    background: rgba(15,23,42,0.6);
+    border: 1px solid rgba(59,130,246,0.2);
+    border-radius: 20px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #94a3b8;
+    transition: border-color 0.3s;
+}
+
+.stat-pill:hover { border-color: rgba(59,130,246,0.4); }
+
+.stat-pill-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    animation: pulse 2s ease-in-out infinite;
+}
+.stat-pill-dot.blue  { background: #3b82f6; box-shadow: 0 0 6px #3b82f6; }
+.stat-pill-dot.green { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+.stat-pill-dot.cyan  { background: #06b6d4; box-shadow: 0 0 6px #06b6d4; }
+.stat-pill-dot.amber { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+}
+
+/* Header action buttons */
+.viz-actions { display: flex; gap: 10px; }
+
+.btn-viz {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    font-family: 'Outfit', sans-serif;
+}
+
+.btn-viz-primary {
+    background: linear-gradient(135deg, #1d4ed8, #1e40af);
+    color: #fff;
+    border: 1px solid rgba(59,130,246,0.4);
+    box-shadow: 0 2px 12px rgba(29,78,216,0.3);
+}
+.btn-viz-primary:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 18px rgba(29,78,216,0.45);
+}
+
+.btn-viz-ghost {
+    background: rgba(15,23,42,0.5);
+    color: #94a3b8;
+    border: 1px solid rgba(51,65,85,0.5);
+}
+.btn-viz-ghost:hover {
+    background: rgba(30,41,59,0.7);
+    color: #cbd5e1;
+    border-color: rgba(100,116,139,0.5);
+}
+
+/* ── Main canvas area ─────────────────────────────────────────────────── */
+.viz-body {
+    position: relative;
+    z-index: 5;
+    flex: 1;
+    display: flex;
+    min-height: 0;
+}
+
+/* Graph canvas */
+#architecture-canvas {
+    flex: 1;
+    min-height: calc(100vh - 150px);
+    background: transparent;
+    position: relative;
+}
+
+/* ── Legend panel ─────────────────────────────────────────────────────── */
+.viz-legend {
+    position: absolute;
+    bottom: 28px;
+    left: 28px;
+    z-index: 20;
+    background: rgba(10,14,26,0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(59,130,246,0.2);
+    border-radius: 12px;
+    padding: 16px 18px;
+    min-width: 180px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.legend-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #475569;
+    margin-bottom: 12px;
+    font-family: 'Outfit', sans-serif;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 9px;
+    font-size: 12px;
+    color: #94a3b8;
+    font-family: 'Outfit', sans-serif;
+}
+
+.legend-item:last-child { margin-bottom: 0; }
+
+.legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 2px solid transparent;
+}
+
+/* ── Tooltip card ─────────────────────────────────────────────────────── */
+.node-tooltip {
+    position: absolute;
+    z-index: 30;
+    background: rgba(10,14,26,0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(59,130,246,0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    min-width: 220px;
+    max-width: 300px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(59,130,246,0.1);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.node-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.tooltip-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.tooltip-label {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 10px;
+    word-break: break-all;
+    font-family: 'Outfit', sans-serif;
+}
+
+.tooltip-field {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 12px;
+}
+
+.tooltip-field-key {
+    color: #475569;
+    flex-shrink: 0;
+    min-width: 40px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+}
+
+.tooltip-field-val {
+    color: #94a3b8;
+    word-break: break-all;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+}
+
+/* ── Loading / error overlays ─────────────────────────────────────────── */
+.viz-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 25;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    background: rgba(6,11,20,0.85);
+    backdrop-filter: blur(8px);
+    transition: opacity 0.4s ease;
+}
+
+.viz-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.spinner {
+    width: 48px; height: 48px;
+    border: 3px solid rgba(59,130,246,0.15);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.overlay-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #e2e8f0;
+    font-family: 'Outfit', sans-serif;
+}
+
+.overlay-sub {
+    font-size: 13px;
+    color: #64748b;
+    font-family: 'JetBrains Mono', monospace;
+    text-align: center;
+    max-width: 360px;
+}
+
+.error-icon {
+    width: 48px; height: 48px;
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ef4444;
+}
+
+/* ── Controls bar ─────────────────────────────────────────────────────── */
+.viz-controls {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ctrl-btn {
+    width: 36px; height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10,14,26,0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(59,130,246,0.2);
+    border-radius: 8px;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 16px;
+    font-family: monospace;
+}
+
+.ctrl-btn:hover {
+    background: rgba(30,41,59,0.8);
+    color: #94a3b8;
+    border-color: rgba(59,130,246,0.4);
+    box-shadow: 0 0 12px rgba(59,130,246,0.15);
+}
+
+/* ── Scan mode badge ──────────────────────────────────────────────────── */
+.scan-badge {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+    background: rgba(10,14,26,0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 20px;
+    font-size: 12px;
+    color: #86efac;
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0;
+    transition: opacity 0.4s;
+}
+
+.scan-badge.visible { opacity: 1; }
+
+.scan-badge-dot {
+    width: 7px; height: 7px;
+    background: #22c55e;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #22c55e;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ── Scan Modal ───────────────────────────────────────────────────────── */
+.scan-modal-content {
+    background: rgba(10,14,26,0.95);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(59,130,246,0.3);
+    border-radius: 12px;
+    padding: 24px;
+    width: 400px;
+    max-width: 90vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(59,130,246,0.1);
+}
+
+.scan-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    border-bottom: 1px solid rgba(51,65,85,0.5);
+    padding-bottom: 12px;
+}
+
+.form-group {
+    margin-bottom: 12px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-family: 'Outfit', sans-serif;
+}
+
+.form-group input {
+    width: 100%;
+    background: rgba(15,23,42,0.6);
+    border: 1px solid rgba(51,65,85,0.8);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: #f1f5f9;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="viz-page" id="viz-page">
+
+    <!-- ── Header ─────────────────────────────────────────────── -->
+    <header class="viz-header">
+        <div class="viz-header-left">
+            <div class="viz-header-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="18" cy="5" r="3"/>
+                    <circle cx="6" cy="12" r="3"/>
+                    <circle cx="18" cy="19" r="3"/>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="viz-title">Infrastructure Topology</h1>
+                <p class="viz-subtitle">Real-time Azure architecture graph — powered by Go Engine</p>
+            </div>
+        </div>
+
+        <div class="viz-stats">
+            <div class="stat-pill" id="stat-nodes">
+                <span class="stat-pill-dot blue" aria-hidden="true"></span>
+                <span id="node-count-label">— nodes</span>
+            </div>
+            <div class="stat-pill" id="stat-edges">
+                <span class="stat-pill-dot cyan" aria-hidden="true"></span>
+                <span id="edge-count-label">— edges</span>
+            </div>
+            <div class="stat-pill" id="stat-source">
+                <span class="stat-pill-dot green" id="data-source-dot" aria-hidden="true"></span>
+                <span id="data-source-label">connecting…</span>
+            </div>
+        </div>
+
+        <div class="viz-actions">
+            <button id="btn-export" class="btn-viz btn-viz-ghost" onclick="exportGraph()" aria-label="Export Image">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export
+            </button>
+            <button id="btn-scan" class="btn-viz btn-viz-primary" onclick="openScanModal()" aria-label="Live Scan">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+                Live Scan
+            </button>
+            <button id="btn-refresh" class="btn-viz btn-viz-ghost" onclick="refreshTopology()" aria-label="Refresh topology">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+            </button>
+            <button id="btn-fit" class="btn-viz btn-viz-ghost" onclick="fitGraph()" aria-label="Fit graph to screen">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="15 3 21 3 21 9"/>
+                    <polyline points="9 21 3 21 3 15"/>
+                    <line x1="21" y1="3" x2="14" y2="10"/>
+                    <line x1="3" y1="21" x2="10" y2="14"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- ── Canvas body ────────────────────────────────────────── -->
+    <section class="viz-body" aria-label="Topology graph canvas">
+
+        <!-- Cytoscape.js render target -->
+        <div id="architecture-canvas" role="img" aria-label="Cloud infrastructure topology graph"></div>
+
+        <!-- Zoom controls -->
+        <div class="viz-controls" role="toolbar" aria-label="Graph zoom controls">
+            <button class="ctrl-btn" id="ctrl-zoom-in"  onclick="zoomIn()"  title="Zoom in"  aria-label="Zoom in">＋</button>
+            <button class="ctrl-btn" id="ctrl-zoom-out" onclick="zoomOut()" title="Zoom out" aria-label="Zoom out">－</button>
+            <button class="ctrl-btn" id="ctrl-reset"    onclick="fitGraph()" title="Reset view" aria-label="Reset view">⊙</button>
+        </div>
+
+        <!-- Live scan badge -->
+        <div class="scan-badge" id="scan-badge" role="status" aria-live="polite">
+            <span class="scan-badge-dot" aria-hidden="true"></span>
+            LIVE DATA
+        </div>
+
+        <!-- Loading overlay -->
+        <div class="viz-overlay" id="overlay-loading" role="status" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <div class="overlay-title">Fetching topology…</div>
+            <div class="overlay-sub">Querying Go Engine at <span id="bridge-url-label"></span></div>
+        </div>
+
+        <!-- Error overlay -->
+        <div class="viz-overlay hidden" id="overlay-error" role="alert" aria-live="assertive">
+            <div class="error-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+            </div>
+            <div class="overlay-title">Connection Failed</div>
+            <div class="overlay-sub" id="error-detail">Could not reach the Go engine bridge.</div>
+            <button class="btn-viz btn-viz-primary" onclick="refreshTopology()" style="margin-top:8px;">
+                Retry
+            </button>
+        </div>
+
+        <!-- Node tooltip -->
+        <div class="node-tooltip" id="node-tooltip" role="tooltip" aria-hidden="true">
+            <div class="tooltip-type-badge" id="tooltip-badge"></div>
+            <div class="tooltip-label"  id="tooltip-label"></div>
+            <div class="tooltip-field">
+                <span class="tooltip-field-key">id</span>
+                <span class="tooltip-field-val" id="tooltip-id"></span>
+            </div>
+            <div class="tooltip-field">
+                <span class="tooltip-field-key">type</span>
+                <span class="tooltip-field-val" id="tooltip-type"></span>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <aside class="viz-legend" aria-label="Graph node legend">
+            <div class="legend-title">Node Types</div>
+            <div class="legend-item">
+                <span class="legend-dot" style="background:#3b82f6;border-color:#60a5fa;"></span>
+                Azure Cloud Root
+            </div>
+            <div class="legend-item">
+                <span class="legend-dot" style="background:#22c55e;border-color:#4ade80;"></span>
+                Virtual Machine
+            </div>
+            <div class="legend-item">
+                <span class="legend-dot" style="background:#f59e0b;border-color:#fbbf24;"></span>
+                Managed Disk
+            </div>
+            <div class="legend-item">
+                <span class="legend-dot" style="background:#a78bfa;border-color:#c4b5fd;"></span>
+                Snapshot
+            </div>
+            <div class="legend-item">
+                <span class="legend-dot" style="background:#ef4444;border-color:#f87171;"></span>
+                Orphaned Resource
+            </div>
+            <div class="legend-item">
+                <span class="legend-dot" style="background:#06b6d4;border-color:#22d3ee;"></span>
+                Other Resource
+            </div>
+        </aside>
+
+        <!-- Scan Modal -->
+        <div class="viz-overlay hidden" id="scan-modal" role="dialog" aria-modal="true" aria-labelledby="scan-modal-title">
+            <div class="scan-modal-content">
+                <div class="scan-modal-header">
+                    <h2 id="scan-modal-title" class="overlay-title" style="margin:0;">Live Resource Scan</h2>
+                    <button class="ctrl-btn" type="button" onclick="closeScanModal()" aria-label="Close modal" style="width:28px;height:28px;">×</button>
+                </div>
+                <div class="scan-modal-body">
+                    <p class="overlay-sub" style="text-align:left; margin-bottom:16px;">Provide your Azure Service Principal credentials to perform a real-time topology scan.</p>
+                    <form id="scan-form" onsubmit="submitScan(event)">
+                        <div class="form-group">
+                            <label for="scan-sub">Subscription ID (required)</label>
+                            <input type="text" id="scan-sub" required placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                        </div>
+                        <div class="form-group">
+                            <label for="scan-tenant">Tenant ID (optional)</label>
+                            <input type="text" id="scan-tenant" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                        </div>
+                        <div class="form-group">
+                            <label for="scan-client">Client ID (optional)</label>
+                            <input type="text" id="scan-client" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                        </div>
+                        <div class="form-group">
+                            <label for="scan-secret">Client Secret (optional)</label>
+                            <input type="password" id="scan-secret" placeholder="••••••••••••••••" />
+                        </div>
+                        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+                            <button type="button" class="btn-viz btn-viz-ghost" onclick="closeScanModal()">Cancel</button>
+                            <button type="submit" class="btn-viz btn-viz-primary">Start Scan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </section>
+</div>
+
+<!-- ── Cytoscape.js ───────────────────────────────────────────────────── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+
+<script>
+/* ============================================================
+   Cloud Reaper — Infrastructure Topology Visualizer
+   ============================================================ */
+
+'use strict';
+
+// ── Configuration ──────────────────────────────────────────────────────
+const GO_BRIDGE_URL = window.GO_BRIDGE_URL || 'http://localhost:7070';
+const TOPOLOGY_ENDPOINT = `${GO_BRIDGE_URL}/api/v1/topology/graph`;
+const SCAN_ENDPOINT     = `${GO_BRIDGE_URL}/api/v1/topology/scan`;
+const FETCH_TIMEOUT_MS  = 30_000; // Scans can take a bit longer
+
+// ── State ──────────────────────────────────────────────────────────────
+let cy = null;   // Cytoscape instance
+let isMockData = false;
+
+// ── DOM refs ───────────────────────────────────────────────────────────
+const elCanvas       = document.getElementById('architecture-canvas');
+const elOverloadLoad = document.getElementById('overlay-loading');
+const elOverlayErr   = document.getElementById('overlay-error');
+const elErrDetail    = document.getElementById('error-detail');
+const elNodeCount    = document.getElementById('node-count-label');
+const elEdgeCount    = document.getElementById('edge-count-label');
+const elSrcLabel     = document.getElementById('data-source-label');
+const elSrcDot       = document.getElementById('data-source-dot');
+const elBridgeLabel  = document.getElementById('bridge-url-label');
+const elScanBadge    = document.getElementById('scan-badge');
+const elTooltip      = document.getElementById('node-tooltip');
+const elScanModal    = document.getElementById('scan-modal');
+const elScanForm     = document.getElementById('scan-form');
+
+document.addEventListener('DOMContentLoaded', () => {
+    elBridgeLabel.textContent = GO_BRIDGE_URL;
+    initCytoscape([]);   // mount empty canvas immediately
+    fetchAndRender();    // kick off data fetch
+});
+
+// ── Node colour by type ────────────────────────────────────────────────
+function nodeColour(type) {
+    const t = (type || '').toLowerCase();
+    if (t === 'cloud')                                    return { bg: '#1d4ed8', border: '#3b82f6', text: '#bfdbfe' };
+    if (t.includes('virtualmachine') || t === 'vm')       return { bg: '#166534', border: '#22c55e', text: '#bbf7d0' };
+    if (t.includes('disk') && t.includes('orphan'))       return { bg: '#991b1b', border: '#ef4444', text: '#fecaca' };
+    if (t.includes('disk'))                               return { bg: '#92400e', border: '#f59e0b', text: '#fde68a' };
+    if (t.includes('snapshot'))                           return { bg: '#4c1d95', border: '#a78bfa', text: '#ede9fe' };
+    if (t.includes('network') || t.includes('vnet'))      return { bg: '#0e7490', border: '#22d3ee', text: '#a5f3fc' };
+    if (t.includes('storage'))                            return { bg: '#1e3a5f', border: '#60a5fa', text: '#bfdbfe' };
+    if (t.includes('appservice') || t.includes('func'))   return { bg: '#5b21b6', border: '#8b5cf6', text: '#ddd6fe' };
+    if (t.includes('kubernetes') || t.includes('aks'))    return { bg: '#065f46', border: '#34d399', text: '#a7f3d0' };
+    return { bg: '#164e63', border: '#06b6d4', text: '#a5f3fc' };  // default — cyan
+}
+
+// ── Cytoscape initialisation ───────────────────────────────────────────
+function initCytoscape(elements) {
+    if (cy) cy.destroy();
+
+    cy = cytoscape({
+        container: elCanvas,
+        elements:  elements,
+        userZoomingEnabled:    true,
+        userPanningEnabled:    true,
+        boxSelectionEnabled:   false,
+        autounselectify:       false,
+
+        style: buildStylesheet(),
+
+        layout: {
+            name:           'breadthfirst',
+            directed:       true,
+            roots:          elements.length ? ['#azure_cloud'] : [],
+            padding:        80,
+            spacingFactor:  1.6,
+            avoidOverlap:   true,
+            animate:        true,
+            animationDuration: 700,
+            animationEasing:   'ease-in-out-cubic',
+        },
+    });
+
+    // ── Node click → tooltip ─────────────────────────────────
+    cy.on('tap', 'node', evt => {
+        const node = evt.target;
+        showTooltip(node, evt.renderedPosition);
+    });
+
+    // ── Click on background → hide tooltip ───────────────────
+    cy.on('tap', evt => {
+        if (evt.target === cy) hideTooltip();
+    });
+
+    // ── Drag or pan → reposition tooltip ─────────────────────
+    cy.on('pan zoom', () => hideTooltip());
+
+    return cy;
+}
+
+// ── Cytoscape stylesheet ───────────────────────────────────────────────
+function buildStylesheet() {
+    return [
+        // Cloud root node
+        {
+            selector: 'node[type = "cloud"]',
+            style: {
+                'shape':                     'roundrectangle',
+                'background-color':          '#1d4ed8',
+                'border-color':              '#60a5fa',
+                'border-width':              2.5,
+                'label':                     'data(label)',
+                'color':                     '#bfdbfe',
+                'font-size':                 13,
+                'font-family':               "'Outfit', sans-serif",
+                'font-weight':               700,
+                'text-valign':               'center',
+                'text-halign':               'center',
+                'padding':                   '16px',
+                'width':                     'label',
+                'height':                    'label',
+                'box-shadow':                '0 0 24px #3b82f6',
+                'background-gradient-stop-colors': '#1d4ed8 #1e40af',
+                'background-gradient-direction':  'to-bottom',
+            },
+        },
+        // All other nodes — colour is set dynamically in mapElements()
+        {
+            selector: 'node:not([type = "cloud"])',
+            style: {
+                'shape':         'ellipse',
+                'label':         'data(label)',
+                'color':         '#e2e8f0',
+                'font-size':     11,
+                'font-family':   "'Outfit', sans-serif",
+                'font-weight':   500,
+                'text-valign':   'bottom',
+                'text-halign':   'center',
+                'text-margin-y': 6,
+                'padding':       '10px',
+                'width':         42,
+                'height':        42,
+                'border-width':  2,
+            },
+        },
+        // Hover effect
+        {
+            selector: 'node:hover',
+            style: {
+                'border-width': 3,
+                'overlay-padding': 6,
+                'overlay-color':   '#3b82f6',
+                'overlay-opacity': 0.1,
+            },
+        },
+        // Selected node
+        {
+            selector: 'node:selected',
+            style: {
+                'overlay-padding': 6,
+                'overlay-color':   '#3b82f6',
+                'overlay-opacity': 0.2,
+                'border-width':    3,
+            },
+        },
+        // Edges
+        {
+            selector: 'edge',
+            style: {
+                'width':                  1.5,
+                'line-color':             'rgba(59,130,246,0.25)',
+                'target-arrow-color':     'rgba(59,130,246,0.5)',
+                'target-arrow-shape':     'vee',
+                'arrow-scale':            1.2,
+                'curve-style':            'bezier',
+                'line-style':             'dashed',
+                'line-dash-pattern':      [6, 4],
+                'line-dash-offset':       0,
+                'transition-property':    'line-color',
+                'transition-duration':    '0.3s',
+            },
+        },
+        // Edge hover
+        {
+            selector: 'edge:hover',
+            style: {
+                'line-color':         'rgba(59,130,246,0.55)',
+                'target-arrow-color': 'rgba(96,165,250,0.9)',
+                'width':              2,
+            },
+        },
+    ];
+}
+
+// ── Map raw JSON elements to Cytoscape + apply colours ────────────────
+function mapElements(rawElements) {
+    return rawElements.map(el => {
+        const d = el.data;
+        if (!d.source) {
+            // Node
+            const c = nodeColour(d.type);
+            return {
+                group: 'nodes',
+                data:  { id: d.id, label: d.label || d.id, type: d.type || '' },
+                style: {
+                    'background-color': c.bg,
+                    'border-color':     c.border,
+                    'color':            c.text,
+                },
+            };
+        } else {
+            // Edge
+            return {
+                group: 'edges',
+                data:  { id: d.id, source: d.source, target: d.target },
+            };
+        }
+    });
+}
+
+// ── Fetch & render ─────────────────────────────────────────────────────
+async function fetchAndRender() {
+    showOverlay('loading');
+
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+        const resp = await fetch(TOPOLOGY_ENDPOINT, {
+            signal: controller.signal,
+            headers: { 'Accept': 'application/json' },
+        });
+        clearTimeout(timer);
+
+        if (!resp.ok) throw new Error(`HTTP ${resp.status} — ${resp.statusText}`);
+
+        const payload = await resp.json();
+        const elements = payload.elements || [];
+
+        // Detect mock data (mock node IDs start with vm-prod, disk-prod, etc.)
+        isMockData = elements.some(e => e.data?.id?.startsWith('vm-prod'));
+
+        renderGraph(elements, payload.node_count ?? 0, payload.edge_count ?? 0);
+        hideOverlay();
+        showScanBadge(!isMockData);
+
+    } catch (err) {
+        console.error('[topology] fetch error:', err);
+        let msg = err.message;
+        if (err.name === 'AbortError') msg = 'Request timed out after 10s.';
+        if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+            msg = `Cannot reach Go engine at ${GO_BRIDGE_URL}. Is the bridge running?`;
+        }
+        showOverlay('error', msg);
+    }
+}
+
+function renderGraph(elements, nodeCount, edgeCount) {
+    const mapped = mapElements(elements);
+    initCytoscape(mapped);
+
+    // Update stat pills
+    elNodeCount.textContent = `${nodeCount} node${nodeCount !== 1 ? 's' : ''}`;
+    elEdgeCount.textContent = `${edgeCount} edge${edgeCount !== 1 ? 's' : ''}`;
+
+    if (isMockData) {
+        elSrcDot.className   = 'stat-pill-dot amber';
+        elSrcLabel.textContent = 'MOCK DATA';
+    } else {
+        elSrcDot.className   = 'stat-pill-dot green';
+        elSrcLabel.textContent = 'LIVE DB';
+    }
+}
+
+// ── Overlay helpers ────────────────────────────────────────────────────
+function showOverlay(type, detail = '') {
+    elOverloadLoad.classList.toggle('hidden', type !== 'loading');
+    elOverlayErr.classList.toggle('hidden',   type !== 'error');
+    if (type === 'error' && detail) elErrDetail.textContent = detail;
+}
+
+function hideOverlay() {
+    elOverloadLoad.classList.add('hidden');
+    elOverlayErr.classList.add('hidden');
+    elScanModal.classList.add('hidden');
+}
+
+// ── Live Scan Modal ────────────────────────────────────────────────────
+function openScanModal() {
+    hideTooltip();
+    elScanModal.classList.remove('hidden');
+}
+
+function closeScanModal() {
+    elScanModal.classList.add('hidden');
+}
+
+async function submitScan(event) {
+    event.preventDefault();
+    
+    const subId  = document.getElementById('scan-sub').value.trim();
+    const tenant = document.getElementById('scan-tenant').value.trim();
+    const client = document.getElementById('scan-client').value.trim();
+    const secret = document.getElementById('scan-secret').value.trim();
+    
+    if (!subId) return;
+    
+    closeScanModal();
+    showOverlay('loading');
+    
+    try {
+        const payload = {
+            subscription_id: subId
+        };
+        if (tenant) payload.tenant_id = tenant;
+        if (client) payload.client_id = client;
+        if (secret) payload.client_secret = secret;
+        
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+        const resp = await fetch(SCAN_ENDPOINT, {
+            method: 'POST',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        clearTimeout(timer);
+
+        if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${resp.status} — ${resp.statusText}`);
+        }
+
+        const data = await resp.json();
+        const elements = data.elements || [];
+        
+        isMockData = false;
+        renderGraph(elements, data.node_count ?? 0, data.edge_count ?? 0);
+        hideOverlay();
+        showScanBadge(true);
+
+    } catch (err) {
+        console.error('[topology] scan error:', err);
+        let msg = err.message;
+        if (err.name === 'AbortError') msg = 'Scan timed out after 30s.';
+        if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+            msg = `Cannot reach Go engine at ${GO_BRIDGE_URL}.`;
+        }
+        showOverlay('error', msg);
+    }
+}
+
+// ── Export functionality ───────────────────────────────────────────────
+function exportGraph() {
+    if (!cy) return;
+    // We use cy.jpg() since Cytoscape provides a solid white background by default for JPG
+    // or cy.png() with a specified background. Let's export as PNG with the dark background.
+    const b64 = cy.png({ bg: '#0a0e1a', full: true, scale: 2 });
+    
+    // Create an invisible download link
+    const link = document.createElement('a');
+    link.href = b64;
+    link.download = `cloud-reaper-topology-${new Date().toISOString().slice(0,10)}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// ── Scan badge ─────────────────────────────────────────────────────────
+function showScanBadge(show) {
+    elScanBadge.classList.toggle('visible', show);
+    if (show) setTimeout(() => elScanBadge.classList.remove('visible'), 4000);
+}
+
+// ── Tooltip ────────────────────────────────────────────────────────────
+function showTooltip(node, pos) {
+    const data = node.data();
+    const c    = nodeColour(data.type);
+
+    document.getElementById('tooltip-badge').textContent  = data.type || 'resource';
+    document.getElementById('tooltip-badge').style.background = c.bg + '55';
+    document.getElementById('tooltip-badge').style.color      = c.border;
+    document.getElementById('tooltip-badge').style.border     = `1px solid ${c.border}44`;
+    document.getElementById('tooltip-label').textContent  = data.label || data.id;
+    document.getElementById('tooltip-id').textContent     = data.id;
+    document.getElementById('tooltip-type').textContent   = data.type || '—';
+
+    // Position relative to the canvas container
+    const canvasRect = elCanvas.getBoundingClientRect();
+    const x = Math.min(pos.x + 16, canvasRect.width  - 320);
+    const y = Math.min(pos.y + 16, canvasRect.height - 160);
+
+    elTooltip.style.left = `${x}px`;
+    elTooltip.style.top  = `${y}px`;
+    elTooltip.classList.add('visible');
+    elTooltip.removeAttribute('aria-hidden');
+}
+
+function hideTooltip() {
+    elTooltip.classList.remove('visible');
+    elTooltip.setAttribute('aria-hidden', 'true');
+}
+
+// ── Public graph controls ──────────────────────────────────────────────
+function fitGraph() {
+    if (cy) cy.fit(undefined, 60);
+}
+
+function zoomIn() {
+    if (cy) cy.zoom({ level: cy.zoom() * 1.25, renderedPosition: { x: elCanvas.clientWidth / 2, y: elCanvas.clientHeight / 2 } });
+}
+
+function zoomOut() {
+    if (cy) cy.zoom({ level: cy.zoom() * 0.80, renderedPosition: { x: elCanvas.clientWidth / 2, y: elCanvas.clientHeight / 2 } });
+}
+
+function refreshTopology() {
+    hideTooltip();
+    fetchAndRender();
+}
+
+// ── Keyboard shortcuts ─────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+    if (e.key === 'r' || e.key === 'R') refreshTopology();
+    if (e.key === 'f' || e.key === 'F') fitGraph();
+    if (e.key === '+' || e.key === '=') zoomIn();
+    if (e.key === '-' || e.key === '_') zoomOut();
+    if (e.key === 'Escape')             hideTooltip();
+});
+</script>
+{% endblock %}
