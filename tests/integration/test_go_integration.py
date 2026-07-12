@@ -46,7 +46,7 @@ async def test_task_manager_bridge():
     print("=" * 50)
 
     try:
-        from reaper.engine.core.go_task_manager import (
+        from reaper.integrations.go_task_manager import (
             GoTaskManagerBridge,
             TaskStatus,
             get_task_manager_bridge,
@@ -94,7 +94,7 @@ async def test_websocket_batcher_bridge():
     print("=" * 50)
 
     try:
-        from reaper.web.go_websocket import GoWebSocketBatcher, get_websocket_batcher
+        from reaper.integrations.go_websocket import GoWebSocketBatcher, get_websocket_batcher
 
         batcher = await get_websocket_batcher()
 
@@ -139,7 +139,7 @@ async def test_rate_limiter_bridge():
     print("=" * 50)
 
     try:
-        from reaper.web.go_ratelimiter import GoRateLimiter, get_rate_limiter
+        from reaper.integrations.go_ratelimiter import GoRateLimiter, get_rate_limiter
 
         limiter = await get_rate_limiter()
 
@@ -180,7 +180,7 @@ async def test_base_bridge_functionality():
     print("=" * 50)
 
     try:
-        from reaper.web.go_bridge_base import (
+        from reaper.integrations.go_bridge_base import (
             BaseGoBridge,
             GoBridgeConfig,
             GoBridgeConnectionError,
