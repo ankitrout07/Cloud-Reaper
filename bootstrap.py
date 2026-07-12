@@ -278,32 +278,46 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
     engine_dir = REPO_ROOT / "src" / "engine-go"
     bin_dir = REPO_ROOT / "bin"
     bin_dir.mkdir(exist_ok=True)
-    binary_name = "reaper-engine.exe" if platform.system() == "Windows" else "reaper-engine"
-    output_path = (bin_dir / binary_name).resolve()
-
+    
     if not engine_dir.is_dir():
         print(c(f"[!] Go engine directory not found: {engine_dir}", RED))
         return 1
 
-    print(c(f"  Building → {output_path}", CYAN))
     build_env = os.environ.copy()
-    # Add pkg-config path to environment if we set it earlier
     if os.environ.get("PKG_CONFIG_PATH"):
         build_env["PKG_CONFIG_PATH"] = os.environ["PKG_CONFIG_PATH"]
 
-    if not run_cmd(
-        [go_bin, "build", "-tags", "cli", "-o", str(output_path), "."],
-        cwd=engine_dir,
-        env=build_env,
-    ):
-        print(c("[!] Go engine build failed. Dashboard features may be limited.", YELLOW))
+    exe_ext = ".exe" if platform.system() == "Windows" else ""
+    
+    targets = [
+        {"name": "reaper-engine", "path": ".", "tags": "cli"},
+        {"name": "taskserver", "path": "./cmd/taskserver", "tags": ""},
+        {"name": "websocketserver", "path": "./cmd/websocketserver", "tags": ""},
+        {"name": "ratelimitserver", "path": "./cmd/ratelimitserver", "tags": ""},
+    ]
+
+    failed = False
+    for target in targets:
+        binary_name = f"{target['name']}{exe_ext}"
+        output_path = (bin_dir / binary_name).resolve()
+        print(c(f"  Building → {output_path}", CYAN))
+        
+        cmd = [go_bin, "build"]
+        if target["tags"]:
+            cmd.extend(["-tags", target["tags"]])
+        cmd.extend(["-o", str(output_path), target["path"]])
+        
+        if not run_cmd(cmd, cwd=engine_dir, env=build_env):
+            print(c(f"[!] Build failed for {target['name']}.", YELLOW))
+            failed = True
+        elif platform.system() != "Windows":
+            output_path.chmod(0o755)
+
+    if failed:
+        print(c("\n[!] Go engine build completed with errors. Dashboard features may be limited.\n", YELLOW))
         return 0  # Return 0 to continue since this is not critical
-
-    # Ensure binary is executable on Unix
-    if platform.system() != "Windows":
-        output_path.chmod(0o755)
-
-    print(c(f"\n[✔] Go engine built: {output_path}\n", GREEN))
+    
+    print(c("\n[✔] Go engine and microservices built successfully.\n", GREEN))
     return 0
 
 
@@ -461,27 +475,32 @@ def cmd_web(args: argparse.Namespace) -> int:
 
     _print_success_report(str(port))
 
-    go_proc = None
+    go_procs = []
     try:
-        # Start Go bridge server first
-        go_bin = (
-            REPO_ROOT
-            / "bin"
-            / ("reaper-engine.exe" if platform.system() == "Windows" else "reaper-engine")
-        )
-        if go_bin.exists():
-            print(c("  Starting Go HTTP bridge (port 7070) …", CYAN))
-            go_proc = subprocess.Popen(
-                [str(go_bin), "--mode", "serve", "--port", "7070"],
-                cwd=str(REPO_ROOT),
-                env=env,
-                stdout=subprocess.DEVNULL,  # Keep Uvicorn logs clean
-                stderr=subprocess.DEVNULL,
-            )
-        else:
-            print(
-                c("  [⚠] Go engine binary not found in bin/. Bridge features may fallback.", YELLOW)
-            )
+        exe_ext = ".exe" if platform.system() == "Windows" else ""
+        
+        # Define Go microservices to start
+        services = [
+            {"name": "reaper-engine", "args": ["--mode", "serve", "--port", "7070"], "port": 7070},
+            {"name": "taskserver", "args": ["-port", env.get("GO_TASK_MANAGER_PORT", "7071")], "port": 7071},
+            {"name": "websocketserver", "args": ["-port", env.get("GO_WEBSOCKET_PORT", "7072")], "port": 7072},
+            {"name": "ratelimitserver", "args": ["-port", env.get("GO_RATELIMITER_PORT", "7073")], "port": 7073},
+        ]
+        
+        for svc in services:
+            go_bin = REPO_ROOT / "bin" / f"{svc['name']}{exe_ext}"
+            if go_bin.exists():
+                print(c(f"  Starting {svc['name']} (port {svc['port']}) …", CYAN))
+                proc = subprocess.Popen(
+                    [str(go_bin)] + svc["args"],
+                    cwd=str(REPO_ROOT),
+                    env=env,
+                    stdout=subprocess.DEVNULL,  # Keep Uvicorn logs clean
+                    stderr=subprocess.DEVNULL,
+                )
+                go_procs.append(proc)
+            else:
+                print(c(f"  [⚠] {svc['name']} binary not found in bin/. Features may fallback.", YELLOW))
 
         subprocess.run(
             [
@@ -510,9 +529,12 @@ def cmd_web(args: argparse.Namespace) -> int:
         print("    PYTHONPATH=src python -m uvicorn reaper.web.app_async:socket_app")
         return 1
     finally:
-        if go_proc:
-            go_proc.terminate()
-            go_proc.wait()
+        for proc in go_procs:
+            try:
+                proc.terminate()
+                proc.wait(timeout=2)
+            except Exception:
+                pass
 
 
 def cmd_pr_simulation(args: argparse.Namespace) -> int:

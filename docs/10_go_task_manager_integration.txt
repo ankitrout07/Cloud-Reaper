@@ -60,10 +60,10 @@ go build -o ../../bin/task-server ./cmd/taskserver/main.go
 ### Start the Server
 ```bash
 # Linux/macOS
-./src/engine-go/scripts/start_task_server.sh
+./scripts/start_task_server.sh
 
 # Windows
-.\src\engine-go\scripts\start_task_server.bat
+.\scripts\start_task_server.bat
 
 # Or directly
 ./bin/task-server --port=7071
