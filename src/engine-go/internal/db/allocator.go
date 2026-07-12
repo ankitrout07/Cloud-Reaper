@@ -52,20 +52,20 @@ import (
 // than repeated small grow-and-copy cycles inside a scan loop.
 const initialPoolCap = 5_000
 
-// ResourcePool recycles []models.Resource backing arrays between scans.
+// ResourcePool recycles *[]models.Resource backing arrays between scans.
 // Retrieving a buffer with Get() and returning it with Put() keeps the
 // GC from touching scan-lifetime allocations entirely.
 //
 // Usage:
 //
-//	buf := ResourcePool.Get().([]models.Resource)
-//	defer ResourcePool.Put(buf[:0])
-//	buf = append(buf, ...)
+//	buf := ResourcePool.Get().(*[]models.Resource)
+//	defer ResourcePool.Put(buf)
+//	*buf = append(*buf, ...)
 var ResourcePool = sync.Pool{
 	New: func() any {
 		// Pre-allocate the backing array once; subsequent scans reuse it.
 		s := make([]models.Resource, 0, initialPoolCap)
-		return s
+		return &s
 	},
 }
 
@@ -94,8 +94,8 @@ func BatchUpsert(resources []models.Resource) (BatchUpsertStats, error) {
 	}
 
 	// --- acquire -------------------------------------------------------
-	raw := ResourcePool.Get()
-	buf := raw.([]models.Resource)
+	bufPtr := ResourcePool.Get().(*[]models.Resource)
+	buf := *bufPtr
 	preCap := cap(buf)
 
 	// --- fill ----------------------------------------------------------
@@ -111,7 +111,8 @@ func BatchUpsert(resources []models.Resource) (BatchUpsertStats, error) {
 
 	// --- release -------------------------------------------------------
 	// Always return the buffer, even on error, so the pool does not leak.
-	ResourcePool.Put(buf[:0])
+	*bufPtr = buf[:0]
+	ResourcePool.Put(bufPtr)
 
 	if err != nil {
 		return BatchUpsertStats{}, fmt.Errorf("db: BatchUpsert: %w", err)

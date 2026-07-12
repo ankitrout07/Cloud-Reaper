@@ -118,18 +118,7 @@ func RegisterRAGHandlers(mux *http.ServeMux) {
 			req.EnableDense = true
 		}
 
-		query := SearchQuery{
-			Query:          req.Query,
-			QueryVector:    req.QueryVector,
-			TopK:           req.TopK,
-			FileFilter:     req.FileFilter,
-			FileTypeFilter: req.FileTypeFilter,
-			LambdaParam:    req.LambdaParam,
-			RRFConstant:    req.RRFConstant,
-			EnableBM25:     req.EnableBM25,
-			EnableDense:    req.EnableDense,
-			EnableMMR:      req.EnableMMR,
-		}
+		query := SearchQuery(req)
 
 		results := rag.HybridSearch(query)
 

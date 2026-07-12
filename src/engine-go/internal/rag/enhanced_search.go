@@ -679,8 +679,7 @@ func (ab *ABTestFramework) AssignVariant(experimentID string, userID string) str
 		return variantIDs[variantIndex]
 	}
 
-	// Random assignment
-	rand.Seed(time.Now().UnixNano())
+	// Random assignment — global rand is auto-seeded since Go 1.20
 	r := rand.Float64()
 	cumulative := 0.0
 	for variantID, split := range experiment.TrafficSplit {

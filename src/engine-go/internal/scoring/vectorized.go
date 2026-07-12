@@ -322,18 +322,7 @@ func max(data []float64) float64 {
 	return maxVal
 }
 
-func min(data []float64) float64 {
-	if len(data) == 0 {
-		return 0
-	}
-	minVal := data[0]
-	for _, v := range data {
-		if v < minVal {
-			minVal = v
-		}
-	}
-	return minVal
-}
+
 
 // BatchCalculateMeans calculates means for multiple vectors in parallel
 func BatchCalculateMeans(matrix [][]float64) []float64 {

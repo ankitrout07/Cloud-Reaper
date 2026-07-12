@@ -359,7 +359,7 @@ func resourceAuditTask(ctx context.Context, args []interface{}) (interface{}, er
 
 	for _, resource := range resources {
 		// Check for common issues
-		if resource.Tags == nil || len(resource.Tags) == 0 {
+		if len(resource.Tags) == 0 {
 			issuesFound++ // Missing tags
 		}
 		if resource.Active && resource.Usage > 80.0 {

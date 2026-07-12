@@ -15,7 +15,6 @@ type BatchDB struct {
 	pool    *sql.DB
 	workers int
 	timeout time.Duration
-	mu      sync.RWMutex
 }
 
 // QueryResult represents the result of a database query
@@ -95,7 +94,7 @@ func (bdb *BatchDB) BatchInsertResources(ctx context.Context, resources []Resour
 			for resource := range jobs {
 				// Convert tags map to JSON string for storage
 				tagsJSON := "{}"
-				if resource.Tags != nil && len(resource.Tags) > 0 {
+				if len(resource.Tags) > 0 {
 					if jsonBytes, err := json.Marshal(resource.Tags); err == nil {
 						tagsJSON = string(jsonBytes)
 					}

@@ -244,9 +244,7 @@ func (tm *TaskManager) CancelTask(taskID string) error {
 			// Only delete if task manager is still running and task exists
 			// Additional safety checks to prevent race conditions
 			if tm.ctx.Err() == nil && tm.tasks != nil {
-				if _, exists := tm.tasks[taskID]; exists {
-					delete(tm.tasks, taskID)
-				}
+				delete(tm.tasks, taskID)
 			}
 			tm.mu.Unlock()
 		case <-tm.ctx.Done():

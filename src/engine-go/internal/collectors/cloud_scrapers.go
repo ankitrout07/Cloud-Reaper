@@ -71,72 +71,82 @@ func (s *AWSScraper) ScanResources() ([]models.Resource, error) {
 	var resources []models.Resource
 	now := time.Now().UTC()
 
-	instances, err := s.client.DescribeInstances(ctx, &ec2.DescribeInstancesInput{})
-	if err != nil {
-		return nil, fmt.Errorf("aws: describe instances: %w", err)
-	}
-	for _, reservation := range instances.Reservations {
-		for _, inst := range reservation.Instances {
-			if inst.InstanceId == nil {
-				continue
+	instPager := ec2.NewDescribeInstancesPaginator(s.client, &ec2.DescribeInstancesInput{})
+	for instPager.HasMorePages() {
+		page, err := instPager.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("aws: describe instances: %w", err)
+		}
+		for _, reservation := range page.Reservations {
+			for _, inst := range reservation.Instances {
+				if inst.InstanceId == nil {
+					continue
+				}
+				tags := awsTagsToMap(inst.Tags)
+				name := *inst.InstanceId
+				if v, ok := tags["Name"]; ok {
+					name = v
+				}
+				sku := string(inst.InstanceType)
+				state := string(inst.State.Name)
+				resources = append(resources, models.Resource{
+					ID:            *inst.InstanceId,
+					Name:          name,
+					Type:          "EC2Instance",
+					Region:        s.region,
+					Tags:          tags,
+					Active:        state == string(types.InstanceStateNameRunning),
+					IsProtected:   isAWSProtected(tags),
+					IsUnallocated: state == string(types.InstanceStateNameStopped),
+					LastSeen:      now,
+					Provider:      ProviderAWS,
+					SKU:           sku,
+				})
 			}
-			tags := awsTagsToMap(inst.Tags)
-			name := *inst.InstanceId
-			if v, ok := tags["Name"]; ok {
-				name = v
-			}
-			sku := string(inst.InstanceType)
-			state := string(inst.State.Name)
-			resources = append(resources, models.Resource{
-				ID:            *inst.InstanceId,
-				Name:          name,
-				Type:          "EC2Instance",
-				Region:        s.region,
-				Tags:          tags,
-				Active:        state == string(types.InstanceStateNameRunning),
-				IsProtected:   isAWSProtected(tags),
-				IsUnallocated: state == string(types.InstanceStateNameStopped),
-				LastSeen:      now,
-				Provider:      ProviderAWS,
-				SKU:           sku,
-			})
 		}
 	}
 
-	volumes, err := s.client.DescribeVolumes(ctx, &ec2.DescribeVolumesInput{
+	volPager := ec2.NewDescribeVolumesPaginator(s.client, &ec2.DescribeVolumesInput{
 		Filters: []types.Filter{{
 			Name:   aws.String("status"),
 			Values: []string{"available"},
 		}},
 	})
-	if err != nil {
-		return resources, fmt.Errorf("aws: describe volumes: %w", err)
-	}
-	for _, vol := range volumes.Volumes {
-		if vol.VolumeId == nil {
-			continue
+	for volPager.HasMorePages() {
+		page, err := volPager.NextPage(ctx)
+		if err != nil {
+			return resources, fmt.Errorf("aws: describe volumes: %w", err)
 		}
-		tags := awsTagsToMap(vol.Tags)
-		resources = append(resources, models.Resource{
-			ID:            *vol.VolumeId,
-			Name:          *vol.VolumeId,
-			Type:          "OrphanedEBSVolume",
-			Region:        s.region,
-			Tags:          tags,
-			Active:        true,
-			IsProtected:   isAWSProtected(tags),
-			IsUnallocated: true,
-			LastSeen:      now,
-			Provider:      ProviderAWS,
-			SKU:           string(vol.VolumeType),
-		})
+		for _, vol := range page.Volumes {
+			if vol.VolumeId == nil {
+				continue
+			}
+			tags := awsTagsToMap(vol.Tags)
+			resources = append(resources, models.Resource{
+				ID:            *vol.VolumeId,
+				Name:          *vol.VolumeId,
+				Type:          "OrphanedEBSVolume",
+				Region:        s.region,
+				Tags:          tags,
+				Active:        true,
+				IsProtected:   isAWSProtected(tags),
+				IsUnallocated: true,
+				LastSeen:      now,
+				Provider:      ProviderAWS,
+				SKU:           string(vol.VolumeType),
+			})
+		}
 	}
 
-	snapshots, err := s.client.DescribeSnapshots(ctx, &ec2.DescribeSnapshotsInput{
+	snapPager := ec2.NewDescribeSnapshotsPaginator(s.client, &ec2.DescribeSnapshotsInput{
 		OwnerIds: []string{"self"},
 	})
-	if err == nil {
-		for _, snap := range snapshots.Snapshots {
+	for snapPager.HasMorePages() {
+		page, err := snapPager.NextPage(ctx)
+		if err != nil {
+			break // Non-fatal; skip snapshots on error
+		}
+		for _, snap := range page.Snapshots {
 			if snap.StartTime != nil && time.Since(*snap.StartTime) > 30*24*time.Hour {
 				tags := awsTagsToMap(snap.Tags)
 				resources = append(resources, models.Resource{
@@ -269,6 +279,11 @@ func (a *AzureScraper) scanVMs(ctx context.Context) ([]models.Resource, error) {
 
 	var resources []models.Resource
 	pager := vmClient.NewListAllPager(nil)
+
+	// semaphore limits concurrent Azure Monitor API calls to avoid 429s
+	const maxConcurrent = 10
+	sem := make(chan struct{}, maxConcurrent)
+
 	for pager.More() {
 		_ = a.limiter.Wait(ctx)
 		page, err := pager.NextPage(ctx)
@@ -293,6 +308,8 @@ func (a *AzureScraper) scanVMs(ctx context.Context) ([]models.Resource, error) {
 			wg.Add(1)
 			go func(vm *armcompute.VirtualMachine) {
 				defer wg.Done()
+				sem <- struct{}{}        // acquire slot
+				defer func() { <-sem }() // release slot
 				usage := a.latestCPUPercent(ctx, monitorClient, *vm.ID)
 				resultChan <- vmResult{vm: vm, usage: usage}
 			}(vm)

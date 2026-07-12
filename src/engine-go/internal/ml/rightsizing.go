@@ -170,7 +170,7 @@ func (ra *RightsizingAgent) EvaluateMigration(metrics map[string]float64, curren
 	}
 
 	// Set appropriate thresholds
-	thresholds := ra.riskThresholds
+	var thresholds map[string]float64
 	if env == "production" {
 		thresholds = map[string]float64{
 			"high_utilization":   80.0,
