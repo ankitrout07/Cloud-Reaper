@@ -46,6 +46,7 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 |---|---|
 | **⚡ High-Velocity Go Scanner** | Custom Go engine with goroutines and token-bucket rate limiting (10 req/s) for sub-second Azure resource auditing |
 | **🚀 In-Memory Cache** | Thread-safe global memory caching (`threading.Lock`) with custom TTLs for sub-millisecond dashboard rendering |
+| **🕸️ Topology Visualizer** | Real-time interactive graph of cloud architecture powered by Cytoscape.js |
 | **🏷️ Hierarchical Virtual Tagging** | Builds nested logical metadata tags to map costs to internal business taxonomies without altering cloud tags |
 | **🧠 Unified AI/LLM Token Tracking** | Connects to AI providers (OpenAI, Google Gemini) to track generative AI billing alongside infrastructure costs |
 | **🏷️ Tag Health Score** | Automated audit of critical tags (`owner`, `project`) for 100% cost attribution |
@@ -758,6 +759,7 @@ Schema auto-initializes via `bootstrap.py` or `init_db()`.
 | `GET` | `/pricing` | Regional price intelligence dashboard |
 | `GET` | `/integrations` | Multi-channel alerting hub configuration |
 | `GET` | `/monitor` | Real-time monitoring dashboard |
+| `GET` | `/topology` | Real-time infrastructure topology visualizer |
 | `GET` | `/settings` | Settings & vault management UI |
 | `GET` | `/about` | Project info & architecture overview |
 | `GET` | `/docs` | In-app RAG-powered documentation browser |
