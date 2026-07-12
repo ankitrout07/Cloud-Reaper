@@ -310,6 +310,31 @@ func (a *AzureScraper) scanVMs(ctx context.Context) ([]models.Resource, error) {
 			usage := result.usage
 
 			tags := azureTagsToMap(vm.Tags)
+			
+			edges := []string{}
+			if vm.Properties != nil {
+				if vm.Properties.StorageProfile != nil {
+					if vm.Properties.StorageProfile.OSDisk != nil && vm.Properties.StorageProfile.OSDisk.ManagedDisk != nil && vm.Properties.StorageProfile.OSDisk.ManagedDisk.ID != nil {
+						edges = append(edges, *vm.Properties.StorageProfile.OSDisk.ManagedDisk.ID)
+					}
+					for _, disk := range vm.Properties.StorageProfile.DataDisks {
+						if disk != nil && disk.ManagedDisk != nil && disk.ManagedDisk.ID != nil {
+							edges = append(edges, *disk.ManagedDisk.ID)
+						}
+					}
+				}
+				if vm.Properties.NetworkProfile != nil && vm.Properties.NetworkProfile.NetworkInterfaces != nil {
+					for _, nic := range vm.Properties.NetworkProfile.NetworkInterfaces {
+						if nic != nil && nic.ID != nil {
+							edges = append(edges, *nic.ID)
+						}
+					}
+				}
+			}
+			if len(edges) > 0 {
+				tags["_reaper_edges"] = strings.Join(edges, ",")
+			}
+
 			sku := "Unknown"
 			if vm.Properties != nil && vm.Properties.HardwareProfile != nil && vm.Properties.HardwareProfile.VMSize != nil {
 				sku = string(*vm.Properties.HardwareProfile.VMSize)
@@ -350,19 +375,26 @@ func (a *AzureScraper) scanDisks(ctx context.Context) ([]models.Resource, error)
 			break
 		}
 		for _, disk := range page.Value {
-			if disk == nil || disk.ManagedBy != nil || disk.ID == nil || disk.Name == nil {
+			if disk == nil || disk.ID == nil || disk.Name == nil {
 				continue
 			}
+			
+			isOrphaned := disk.ManagedBy == nil
+			diskType := "ManagedDisk"
+			if isOrphaned {
+				diskType = "OrphanedDisk"
+			}
+			
 			tags := azureTagsToMap(disk.Tags)
 			resources = append(resources, models.Resource{
 				ID:            *disk.ID,
 				Name:          *disk.Name,
-				Type:          "OrphanedDisk",
+				Type:          diskType,
 				Region:        stringValue(disk.Location),
 				Tags:          tags,
 				Active:        true,
 				IsProtected:   isAzureProtected(tags),
-				IsUnallocated: true,
+				IsUnallocated: isOrphaned,
 				LastSeen:      time.Now().UTC(),
 				Provider:      ProviderAzure,
 				SKU:           diskSKU(disk),

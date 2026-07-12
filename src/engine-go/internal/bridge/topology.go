@@ -37,7 +37,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
+	"strings"
 	"sync"
+	"database/sql"
 
 	"cloud-reaper/engine-go/internal/collectors"
 	"cloud-reaper/engine-go/internal/db"
@@ -243,7 +246,7 @@ func buildTopologyFromDB() ([]GraphElement, error) {
 		return nil, fmt.Errorf("connect: %w", err)
 	}
 
-	rows, err := database.Query("SELECT id, name, type FROM resources")
+	rows, err := database.Query("SELECT id, name, type, tags FROM resources")
 	if err != nil {
 		return nil, fmt.Errorf("query: %w", err)
 	}
@@ -256,13 +259,19 @@ func buildTopologyFromDB() ([]GraphElement, error) {
 		Kind:  "node",
 	}}
 	elements := []GraphElement{root}
+	rgNodes := make(map[string]bool)
 
-	edgeIdx := 0
 	for rows.Next() {
 		var resID, resName, resType string
-		if err := rows.Scan(&resID, &resName, &resType); err != nil {
+		var tagsJSON sql.NullString
+		if err := rows.Scan(&resID, &resName, &resType, &tagsJSON); err != nil {
 			continue
 		}
+		var tags map[string]string
+		if tagsJSON.Valid && tagsJSON.String != "" {
+			json.Unmarshal([]byte(tagsJSON.String), &tags)
+		}
+
 		label := resName
 		if label == "" {
 			label = resID
@@ -270,15 +279,55 @@ func buildTopologyFromDB() ([]GraphElement, error) {
 		elements = append(elements,
 			GraphElement{Data: GraphData{ID: resID, Label: label, Type: resType, Kind: "node"}},
 		)
-		edgeIdx++
+		
+		rgName := extractResourceGroup(resID)
+		parentID := "azure_cloud"
+		if rgName != "" {
+			rgID := "rg-" + rgName
+			if !rgNodes[rgID] {
+				rgNodes[rgID] = true
+				elements = append(elements, GraphElement{Data: GraphData{
+					ID:    rgID,
+					Label: rgName,
+					Type:  "ResourceGroup",
+					Kind:  "node",
+				}})
+				// link RG to azure_cloud
+				elements = append(elements, GraphElement{Data: GraphData{
+					ID:     fmt.Sprintf("edge-%s", rgID),
+					Source: rgID,
+					Target: "azure_cloud",
+					Kind:   "edge",
+				}})
+			}
+			parentID = rgID
+		}
+
+		// Connect to parent (RG or azure_cloud)
 		elements = append(elements,
 			GraphElement{Data: GraphData{
-				ID:     fmt.Sprintf("edge-%d", edgeIdx),
+				ID:     fmt.Sprintf("edge-parent-%s", resID),
 				Source: resID,
-				Target: "azure_cloud",
+				Target: parentID,
 				Kind:   "edge",
 			}},
 		)
+
+		// Connect dependencies from _reaper_edges
+		if tags != nil {
+			if edgesStr, ok := tags["_reaper_edges"]; ok && edgesStr != "" {
+				for _, targetID := range strings.Split(edgesStr, ",") {
+					if targetID != "" {
+						elements = append(elements, GraphElement{Data: GraphData{
+							ID:     fmt.Sprintf("edge-dep-%s-%s", resID, targetID),
+							Source: resID,
+							Target: targetID,
+							Kind:   "edge",
+						}})
+					}
+				}
+			}
+		}
 	}
 
 	if err := rows.Err(); err != nil {
@@ -302,8 +351,9 @@ func buildTopologyFromResources(resources []models.Resource, subscriptionID stri
 	elements := []GraphElement{
 		{Data: GraphData{ID: "azure_cloud", Label: label, Type: "cloud", Kind: "node"}},
 	}
+	rgNodes := make(map[string]bool)
 
-	for i, res := range resources {
+	for _, res := range resources {
 		name := res.Name
 		if name == "" {
 			name = res.ID
@@ -318,14 +368,50 @@ func buildTopologyFromResources(resources []models.Resource, subscriptionID stri
 				SKU:    res.SKU,
 			}},
 		)
+
+		rgName := extractResourceGroup(res.ID)
+		parentID := "azure_cloud"
+		if rgName != "" {
+			rgID := "rg-" + rgName
+			if !rgNodes[rgID] {
+				rgNodes[rgID] = true
+				elements = append(elements, GraphElement{Data: GraphData{
+					ID:    rgID,
+					Label: rgName,
+					Type:  "ResourceGroup",
+					Kind:  "node",
+				}})
+				elements = append(elements, GraphElement{Data: GraphData{
+					ID:     fmt.Sprintf("live-edge-%s", rgID),
+					Source: rgID,
+					Target: "azure_cloud",
+					Kind:   "edge",
+				}})
+			}
+			parentID = rgID
+		}
+
 		elements = append(elements,
 			GraphElement{Data: GraphData{
-				ID:     fmt.Sprintf("live-edge-%d", i+1),
+				ID:     fmt.Sprintf("live-edge-parent-%s", res.ID),
 				Source: res.ID,
-				Target: "azure_cloud",
+				Target: parentID,
 				Kind:   "edge",
 			}},
 		)
+
+		if edgesStr, ok := res.Tags["_reaper_edges"]; ok && edgesStr != "" {
+			for _, targetID := range strings.Split(edgesStr, ",") {
+				if targetID != "" {
+					elements = append(elements, GraphElement{Data: GraphData{
+						ID:     fmt.Sprintf("live-edge-dep-%s-%s", res.ID, targetID),
+						Source: res.ID,
+						Target: targetID,
+						Kind:   "edge",
+					}})
+				}
+			}
+		}
 	}
 	return elements
 }
@@ -333,6 +419,16 @@ func buildTopologyFromResources(resources []models.Resource, subscriptionID stri
 // ── Mock data removed ────────────────────────────────────────────────────────
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+var rgRegex = regexp.MustCompile(`(?i)/resourceGroups/([^/]+)`)
+
+func extractResourceGroup(id string) string {
+	matches := rgRegex.FindStringSubmatch(id)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
+}
 
 func countElements(elements []GraphElement) (nodes, edges int) {
 	for _, el := range elements {

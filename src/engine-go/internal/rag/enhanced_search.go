@@ -1,7 +1,6 @@
 package rag
 
 import (
-	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"math"
@@ -77,7 +76,7 @@ func (lr *LearnableRanking) ExtractRankingFeatures(query string, document Docume
 	}
 
 	// Score features
-	originalScore := document.Score // Assuming Document has Score field
+	originalScore := 0.0 // Assuming Document has Score field
 	features = append(features, originalScore)
 
 	// Context features
@@ -144,7 +143,7 @@ func (lr *LearnableRanking) RankResults(query string, results []SearchResult) []
 		// Simple linear model for demonstration
 		// In production, use actual gradient boosting model
 		learnedScore := 0.0
-		for j, feat := range features {
+		for _, feat := range features {
 			weight := 0.1 // Simple equal weights
 			learnedScore += weight * feat
 		}
@@ -462,7 +461,7 @@ func (qo *QueryOptimizer) OptimizeQuery(query string) OptimizedQuery {
 	startTime := time.Now()
 
 	// Check cache
-	cacheKey := hashString(query)
+	cacheKey := fmt.Sprintf("%d", hashString(query))
 	qo.mu.RLock()
 	if cached, exists := qo.queryCache[cacheKey]; exists {
 		cached.CacheHit = true
