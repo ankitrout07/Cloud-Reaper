@@ -11,6 +11,7 @@ from google import genai
 from google.genai import types
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from reaper.engine.ai_backends.ollama_backend import OllamaBackendFactory
 from reaper.engine.copilot.schemas import OptimizationBlueprintSchema
 from reaper.engine.core.calculator import CostCalculator
 
@@ -41,13 +42,30 @@ DOWNGRADE_PATHS = {
 
 class KnapsackCopilotEngine:
     def __init__(self):
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "CRITICAL: GEMINI_API_KEY environment variable is missing from runtime context."
-            )
-        self.client = genai.Client(api_key=api_key)
-        self.model_identity = "gemini-2.5-flash"
+        # Determine which AI backend to use
+        ai_backend = os.getenv("AI_BACKEND", "gemini").lower()
+        
+        if ai_backend == "ollama":
+            # Use Ollama local backend
+            self.generation_backend = OllamaBackendFactory.create_generation_backend()
+            self.client = None  # Not used for Ollama
+            self.model_identity = "ollama"
+            if not self.generation_backend.health_check():
+                raise ValueError(
+                    "CRITICAL: Ollama server is not accessible. "
+                    "Ensure Ollama is running and the generation model is downloaded."
+                )
+        else:
+            # Use Gemini cloud API (default)
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError(
+                    "CRITICAL: GEMINI_API_KEY environment variable is missing from runtime context."
+                )
+            self.client = genai.Client(api_key=api_key)
+            self.model_identity = "gemini-2.5-flash"
+            self.generation_backend = None  # Not used for Gemini
+        
         self._cache: dict[tuple[str, str, float], OptimizationBlueprintSchema] = {}
         self._cache_lock = threading.Lock()
         self.calculator = CostCalculator()
@@ -339,18 +357,28 @@ class KnapsackCopilotEngine:
             f"{pricing_cheat_sheet}"
         )
 
-        response = self.client.models.generate_content(
-            model=self.model_identity,
-            contents=f"Workload Goal Specification: {user_intent}",
-            config=types.GenerateContentConfig(
+        # Use Ollama backend if configured
+        if self.generation_backend:
+            response_text = self.generation_backend.generate_text(
+                prompt=f"Workload Goal Specification: {user_intent}",
                 system_instruction=system_rules,
-                response_mime_type="application/json",
-                response_schema=OptimizationBlueprintSchema,
-                temperature=0.1,  # Enforces rigid structural and mathematical compliance
-            ),
-        )
-
-        result = OptimizationBlueprintSchema.model_validate_json(response.text)
+                temperature=0.1,
+                response_format={"type": "json_object"},
+            )
+            result = OptimizationBlueprintSchema.model_validate_json(response_text)
+        else:
+            # Use Gemini cloud API (default)
+            response = self.client.models.generate_content(
+                model=self.model_identity,
+                contents=f"Workload Goal Specification: {user_intent}",
+                config=types.GenerateContentConfig(
+                    system_instruction=system_rules,
+                    response_mime_type="application/json",
+                    response_schema=OptimizationBlueprintSchema,
+                    temperature=0.1,  # Enforces rigid structural and mathematical compliance
+                ),
+            )
+            result = OptimizationBlueprintSchema.model_validate_json(response.text)
 
         # Recalculate & scale-down heuristic correction loop
         iteration = 0
@@ -420,13 +448,29 @@ class KnapsackCopilotEngine:
 
 class AnomalyTriager:
     def __init__(self):
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "CRITICAL: GEMINI_API_KEY environment variable is missing from runtime context."
-            )
-        self.client = genai.Client(api_key=api_key)
-        self.model_identity = "gemini-2.5-flash"
+        # Determine which AI backend to use
+        ai_backend = os.getenv("AI_BACKEND", "gemini").lower()
+        
+        if ai_backend == "ollama":
+            # Use Ollama local backend
+            self.generation_backend = OllamaBackendFactory.create_generation_backend()
+            self.client = None  # Not used for Ollama
+            self.model_identity = "ollama"
+            if not self.generation_backend.health_check():
+                raise ValueError(
+                    "CRITICAL: Ollama server is not accessible. "
+                    "Ensure Ollama is running and the generation model is downloaded."
+                )
+        else:
+            # Use Gemini cloud API (default)
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError(
+                    "CRITICAL: GEMINI_API_KEY environment variable is missing from runtime context."
+                )
+            self.client = genai.Client(api_key=api_key)
+            self.model_identity = "gemini-2.5-flash"
+            self.generation_backend = None  # Not used for Gemini
 
     @retry(
         wait=wait_exponential(multiplier=1, min=2, max=10), stop=stop_after_attempt(3), reraise=True
@@ -455,15 +499,26 @@ class AnomalyTriager:
         )
 
         try:
-            response = self.client.models.generate_content(
-                model=self.model_identity,
-                contents=prompt,
-                config=types.GenerateContentConfig(
+            # Use Ollama backend if configured
+            if self.generation_backend:
+                text = self.generation_backend.generate_text(
+                    prompt=prompt,
                     system_instruction=system_rules,
                     temperature=0.4,
-                ),
-            )
-            text = str(response.text).strip()
+                )
+            else:
+                # Use Gemini cloud API (default)
+                response = self.client.models.generate_content(
+                    model=self.model_identity,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_rules,
+                        temperature=0.4,
+                    ),
+                )
+                text = str(response.text).strip()
+            
+            # Clean up markdown formatting if present
             if text.startswith("```html"):
                 text = text[7:]
             if text.endswith("```"):

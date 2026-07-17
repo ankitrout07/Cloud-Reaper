@@ -28,6 +28,8 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 - [Cryptographic Audit Trails](#-cryptographic-audit-trails)
 - [Vault & Secret Management](#-vault--secret-management)
 - [Multi-Cloud Provider Support](#-multi-cloud-provider-support)
+- [AI Backend Configuration](#-ai-backend-configuration)
+- [Documentation Hub](#-documentation-hub)
 - [Database Schema](#-database-schema)
 - [API Reference](#-api-reference)
 - [CI/CD Pipeline](#-cicd-pipeline)
@@ -39,6 +41,12 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 ---
 
 ## 🚀 Key Features
+
+### 🤖 AI Backend Flexibility
+- **Multi-Provider Support**: Choose between Gemini, OpenAI, or Ollama local models
+- **Cost-Free Operations**: Use Ollama for zero API costs while maintaining privacy
+- **Hybrid Ensemble Mode**: Combine multiple AI backends for improved results
+- **Easy Switching**: Change AI backends via simple environment variable configuration
 
 ### 📊 Phase 1 — Inform: Visibility & High-Performance Discovery
 
@@ -311,6 +319,8 @@ The Cloud-Reaper project has been verified to be correctly wired and fully funct
   - **AWS**: `AWS_DEFAULT_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
   - **GCP**: `GOOGLE_CLOUD_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS`
 - `GEMINI_API_KEY` — Google AI Studio API key (required for AI Copilot & RAG search)
+- `AI_BACKEND` — AI backend selection: `gemini`, `openai`, `ollama`, or `ensemble` (default: `gemini`)
+- For Ollama local model support, see [Ollama Setup Guide](docs/OLLAMA_SETUP.md)
 
 ### One-Command Setup
 
@@ -647,47 +657,102 @@ type CloudProvider interface {
 
 # List all accessible Azure subscriptions
 ./bin/reaper-engine --list-subs
-
-# Fetch live Azure Retail Pricing (23 service categories)
-./bin/reaper-engine --mode prices
-
-# Regional arbitrage: compare SKU price across regions concurrently
-./bin/reaper-engine --mode arbitrage --sku "Standard_D4s_v3" --regions "eastus,westus,westeurope"
-
-# Scan AWS or GCP (credentials from vault or environment)
-./bin/reaper-engine --provider aws
-./bin/reaper-engine --provider gcp
 ```
-
-### Provider Authentication
-
-```bash
-# Azure — via Azure CLI or Service Principal
-az login
-
-# AWS — via environment or cloud_connections vault
-export AWS_ACCESS_KEY_ID=...
-export AWS_SECRET_ACCESS_KEY=...
-export AWS_REGION=us-east-1
-
-# GCP — via Service Account JSON or cloud_connections vault
-export GCP_PROJECT_ID=...
-export GCP_SERVICE_ACCOUNT_JSON=...
-```
-
-Credentials can also be stored in the **encrypted vault** via the Settings UI — the Go engine fetches them dynamically from `cloud_connections`.
 
 ---
 
-## 🛑 Shift-Left Cost Simulation (CLI)
+## 🤖 AI Backend Configuration
 
-Run a PR cost delta report without any live cloud connection — ideal for GitHub Actions pipelines:
+Cloud-Reaper supports multiple AI backends for flexibility in cost, performance, and privacy:
 
-```bash
-PYTHONPATH=src python -m reaper.cli --pr-simulation [optional-plan-file.json]
+### Available Backends
+
+| Backend | Cost | Privacy | Performance | Setup |
+|---------|------|---------|-------------|-------|
+| **Gemini** | Pay-per-token | Cloud | High | API Key |
+| **OpenAI** | Pay-per-token | Cloud | Highest | API Key |
+| **Ollama** | Free (hardware) | Local | Medium (CPU) / High (GPU) | Local setup |
+| **Ensemble** | Variable | Hybrid | Best | Multiple configs |
+
+### Configuration
+
+Set the `AI_BACKEND` environment variable:
+
+```env
+# Use Google Gemini (default)
+AI_BACKEND=gemini
+
+# Use OpenAI
+AI_BACKEND=openai
+
+# Use Ollama local models
+AI_BACKEND=ollama
+
+# Use ensemble mode (combine all available)
+AI_BACKEND=ensemble
 ```
 
-Outputs a Markdown table of infrastructure changes (CREATE/DESTROY), their cost delta, and governance recommendations — ready to post as a GitHub PR comment.
+### Ollama Setup
+
+For cost-free local AI operations, use Ollama:
+
+1. **Install Ollama**:
+   ```bash
+   curl -fsSL https://ollama.com/install.sh | sh
+   ```
+
+2. **Pull Required Models**:
+   ```bash
+   ollama pull nomic-embed-text  # For embeddings
+   ollama pull llama3.1          # For generation
+   ```
+
+3. **Configure Cloud-Reaper**:
+   ```env
+   AI_BACKEND=ollama
+   OLLAMA_BASE_URL=http://localhost:11434
+   OLLAMA_MODEL=llama3.1
+   OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+   ```
+
+4. **Start Ollama**:
+   ```bash
+   ollama serve
+   ```
+
+For detailed setup instructions, see [Ollama Setup Guide](docs/OLLAMA_SETUP.md).
+
+For complete documentation, see the [Documentation Hub](docs/README.md).
+
+### Backend Features
+
+| Feature | Gemini | OpenAI | Ollama |
+|---------|--------|--------|--------|
+| RAG Search | ✅ | ❌ | ✅ |
+| AI Copilot | ✅ | ❌ | ✅ |
+| AI Architect | ✅ | ✅ | ✅ |
+| Anomaly Triage | ✅ | ❌ | ✅ |
+| JSON Mode | ✅ | ✅ | ⚠️ |
+| Streaming | ✅ | ✅ | ❌ |
+
+### Health Check
+
+Check AI backend health:
+
+```python
+from reaper.engine.ai_backends.health import check_all_ai_backends
+
+health = check_all_ai_backends()
+print(health)
+```
+
+### Best Practices
+
+- **Development**: Use Ollama for cost savings
+- **Production**: Use cloud APIs for best quality
+- **Privacy**: Use Ollama for sensitive data
+- **Hybrid**: Use ensemble mode for best results
+- **Testing**: Test with local models before cloud APIs
 
 ---
 
