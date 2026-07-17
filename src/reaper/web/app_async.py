@@ -681,6 +681,10 @@ async def index(request: Request):
 
 @app.get("/settings")
 async def settings(request: Request):
+    # Lazy import to avoid circular dependencies
+    from reaper.web.routers.settings import _cloud_connections_summary
+    from reaper.web.routers.vault import _vault_settings_row
+    
     cloud_summary, active_provider = await asyncio.to_thread(_cloud_connections_summary)
     vault_configured = await asyncio.to_thread(_vault_settings_row) is not None
     return render_template(
