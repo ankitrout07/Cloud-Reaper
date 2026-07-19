@@ -198,14 +198,14 @@ function addCodeCopyButtons(container) {
 }
 
 function showDoc(filename) {
-    // If filename doesn't match expected format, try to find matching document
-    const docFilenames = [{% for doc in docs_data %}'{{ doc.filename }}'{% if not loop.last %},{% endif %}{% endfor %}];
+    // docFilenames is globally defined in docs.html via Jinja
+    const availableDocs = window.docFilenames || (typeof docFilenames !== 'undefined' ? docFilenames : []);
     
     // Handle both full filenames and potential partial matches
     let targetFilename = filename;
-    if (!docFilenames.includes(filename)) {
+    if (!availableDocs.includes(filename)) {
         // Try to find a partial match
-        const matched = docFilenames.find(f => f.includes(filename) || filename.includes(f.replace('.txt', '').replace('.md', '')));
+        const matched = availableDocs.find(f => f.includes(filename) || filename.includes(f.replace('.txt', '').replace('.md', '')));
         if (matched) {
             targetFilename = matched;
         }
