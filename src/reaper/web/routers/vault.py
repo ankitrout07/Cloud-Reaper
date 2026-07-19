@@ -36,112 +36,7 @@ logger = get_logger(__name__)
 
 router = APIRouter(tags=["vault"])
 
-def _vault_settings_row() -> VaultSettings | None:
-    """Synchronous helper — callers must wrap in asyncio.to_thread from async context."""
-    db = SessionLocal()
-    try:
-        return db.query(VaultSettings).first()
-    except Exception as e:
-        print(f"[!] Error fetching vault settings: {e}")
-        return None
-    finally:
-        db.close()
-
-def _vault_salt_bytes(settings: VaultSettings) -> bytes:
-    return base64.b64decode(settings.salt.encode("utf-8"))
-
-def _is_vault_unlocked(request: Request) -> bool:
-    if not request.session.get("vault_unlocked"):
-        return False
-    expires = request.session.get("vault_unlock_expires", 0)
-    if time.time() > float(expires):
-        request.session.pop("vault_unlocked", None)
-        request.session.pop("vault_unlock_expires", None)
-        request.session.pop("vault_fernet_key", None)
-        return False
-    return bool(request.session.get("vault_fernet_key"))
-
-def _session_fernet(request: Request) -> Fernet | None:
-    key = request.session.get("vault_fernet_key")
-    if not key or not _is_vault_unlocked(request):
-        return None
-    return Fernet(key.encode("utf-8"))
-
-def _unlock_vault_session(request: Request, passcode: str, settings: VaultSettings) -> bool:
-    salt = _vault_salt_bytes(settings)
-    if not verify_passcode(passcode, salt, cast(str, settings.passcode_verifier)):
-        return False
-    request.session["vault_fernet_key"] = derive_fernet_key(passcode, salt).decode("utf-8")
-    request.session["vault_unlocked"] = True
-    request.session["vault_unlock_expires"] = time.time() + VAULT_UNLOCK_TTL_SEC
-    return True
-
-async def credentials_status(request: Request):
-    """Check credential status across all pages - returns 503 if no credentials configured."""
-    try:
-        credential_service = get_credential_service()
-        active_provider = credential_service.get_active_provider()
-
-        if not active_provider:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "error",
-                    "message": "No active cloud provider configured",
-                    "code": "NO_ACTIVE_PROVIDER",
-                    "user_message": "Please connect your cloud provider in Settings to access real-time data",
-                },
-            )
-
-        if not credential_service.has_credentials(active_provider):
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "error",
-                    "message": f"No credentials configured for {active_provider.upper()}",
-                    "code": "NO_CREDENTIALS",
-                    "provider": active_provider,
-                    "user_message": f"Please configure {active_provider.upper()} credentials in Settings to access real-time data",
-                },
-            )
-
-        # Validate credentials are still valid
-        validation_result = credential_service.validate_credentials(active_provider)
-
-        if not validation_result["valid"]:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "error",
-                    "message": f"Credential validation failed: {validation_result['message']}",
-                    "code": "CREDENTIAL_VALIDATION_FAILED",
-                    "provider": active_provider,
-                    "user_message": f"Your {active_provider.upper()} credentials are invalid. Please reconfigure them in Settings.",
-                },
-            )
-
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success",
-                "provider": active_provider,
-                "message": f"Valid credentials configured for {active_provider.upper()}",
-                "validation_details": validation_result.get("details", ""),
-            },
-        )
-
-    except Exception as e:
-        logger.error(f"Credential status check failed: {e}")
-        return JSONResponse(
-            status_code=503,
-            content={
-                "status": "error",
-                "message": f"Credential check failed: {e!s}",
-                "code": "CREDENTIAL_CHECK_ERROR",
-                "user_message": "Unable to verify cloud provider credentials. Please check your Settings.",
-            },
-        )
-
+@router.get("/api/vault/status")
 async def vault_status(request: Request):
     configured = await asyncio.to_thread(_vault_settings_row) is not None
     return jsonify(
@@ -152,8 +47,12 @@ async def vault_status(request: Request):
         }
     )
 
+@router.post("/api/vault/setup")
 async def vault_setup(request: Request):
-    data = (await request.json() if await request.body() else {}) or {}
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
     if not data:
         return JSONResponse(
             status_code=400, content={"status": "error", "message": "Request body is required."}
@@ -214,6 +113,7 @@ async def vault_setup(request: Request):
     _unlock_vault_session(request, passcode, vault_settings)
     return {"status": "success", "message": "Vault created and unlocked."}
 
+@router.post("/api/vault/reset")
 async def vault_reset(request: Request):
     """Erases all stored vault entries and resets the passcode setup status."""
     def _do_reset():
@@ -241,8 +141,12 @@ async def vault_reset(request: Request):
         {"status": "success", "message": "Vault successfully reset. All stored secrets erased."}
     )
 
+@router.post("/api/vault/unlock")
 async def vault_unlock(request: Request):
-    data = (await request.json() if await request.body() else {}) or {}
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
     if not data:
         return JSONResponse(
             status_code=400, content={"status": "error", "message": "Request body is required."}
@@ -265,12 +169,14 @@ async def vault_unlock(request: Request):
         )
     return {"status": "success", "message": "Vault unlocked."}
 
+@router.post("/api/vault/lock")
 async def vault_lock(request: Request):
     request.session.pop("vault_unlocked", None)
     request.session.pop("vault_unlock_expires", None)
     request.session.pop("vault_fernet_key", None)
     return {"status": "success", "message": "Vault locked."}
 
+@router.get("/api/vault/entries")
 async def vault_list_entries(request: Request):
     if not _is_vault_unlocked(request):
         return JSONResponse(
@@ -300,6 +206,7 @@ async def vault_list_entries(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/vault/entries")
 async def vault_create_entry(request: Request):
     if not _is_vault_unlocked(request):
         return JSONResponse(
@@ -312,7 +219,10 @@ async def vault_create_entry(request: Request):
             status_code=403, content={"status": "error", "message": "Vault session expired."}
         )
 
-    data = (await request.json() if await request.body() else {}) or {}
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
     if not data:
         return JSONResponse(
             status_code=400, content={"status": "error", "message": "Request body is required."}
@@ -368,6 +278,7 @@ async def vault_create_entry(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/vault/entries/{entry_id}")
 async def vault_get_entry(request: Request, entry_id: int):
     if not _is_vault_unlocked(request):
         return JSONResponse(
@@ -423,6 +334,7 @@ async def vault_get_entry(request: Request, entry_id: int):
         }
     )
 
+@router.delete("/api/vault/entries/{entry_id}")
 async def vault_delete_entry(request: Request, entry_id: int):
     if not _is_vault_unlocked(request):
         return JSONResponse(
@@ -454,4 +366,44 @@ async def vault_delete_entry(request: Request, entry_id: int):
             status_code=404, content={"status": "error", "message": "Entry not found."}
         )
     return {"status": "success", "message": "Entry deleted."}
+
+def _vault_settings_row() -> VaultSettings | None:
+    """Synchronous helper — callers must wrap in asyncio.to_thread from async context."""
+    db = SessionLocal()
+    try:
+        return db.query(VaultSettings).first()
+    except Exception as e:
+        print(f"[!] Error fetching vault settings: {e}")
+        return None
+    finally:
+        db.close()
+
+def _vault_salt_bytes(settings: VaultSettings) -> bytes:
+    return base64.b64decode(settings.salt.encode("utf-8"))
+
+def _is_vault_unlocked(request: Request) -> bool:
+    if not request.session.get("vault_unlocked"):
+        return False
+    expires = request.session.get("vault_unlock_expires", 0)
+    if time.time() > float(expires):
+        request.session.pop("vault_unlocked", None)
+        request.session.pop("vault_unlock_expires", None)
+        request.session.pop("vault_fernet_key", None)
+        return False
+    return bool(request.session.get("vault_fernet_key"))
+
+def _session_fernet(request: Request) -> Fernet | None:
+    key = request.session.get("vault_fernet_key")
+    if not key or not _is_vault_unlocked(request):
+        return None
+    return Fernet(key.encode("utf-8"))
+
+def _unlock_vault_session(request: Request, passcode: str, settings: VaultSettings) -> bool:
+    salt = _vault_salt_bytes(settings)
+    if not verify_passcode(passcode, salt, cast(str, settings.passcode_verifier)):
+        return False
+    request.session["vault_fernet_key"] = derive_fernet_key(passcode, salt).decode("utf-8")
+    request.session["vault_unlocked"] = True
+    request.session["vault_unlock_expires"] = time.time() + VAULT_UNLOCK_TTL_SEC
+    return True
 

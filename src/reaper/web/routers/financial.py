@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from reaper.collectors.providers.azure_collector import AzureCollector
 from reaper.utils.error_handler import get_logger
-from reaper.web.app_async import settings_state
+from reaper.web.app_async import is_first_run, settings_state
 
 
 def jsonify(*args, **kwargs):
@@ -20,10 +20,13 @@ logger = get_logger(__name__)
 
 router = APIRouter(tags=["financial"])
 
+@router.post("/api/financial/target-margin/calculate")
 async def calculate_target_margin(request: Request):
     """Calculate optimal resource modifications to close the gap between current and target spend using actual Azure resource costs."""
     try:
-        data = (await request.json() if await request.body() else {}) or {}
+        data = await request.json()
+    except Exception:
+        data = {}
 
         current_spend = data.get("current_spend", 0.0)
         target_spend = data.get("target_spend", 0.0)
@@ -400,10 +403,14 @@ async def calculate_target_margin(request: Request):
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/financial/target-margin/apply")
 async def apply_target_margin_optimizations(request: Request):
     """Apply the calculated optimization recommendations physically to Azure."""
     try:
-        data = (await request.json() if await request.body() else {}) or {}
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
 
         optimizations = data.get("optimizations", {})
         detailed_recommendations = data.get("detailed_recommendations", [])
@@ -474,6 +481,7 @@ async def apply_target_margin_optimizations(request: Request):
         print(f"[!] Error applying optimizations: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/financial/current-spend")
 async def get_current_spend(request: Request):
     """Fetch current monthly spend from Azure resources and return persisted target spend.
 
@@ -572,6 +580,7 @@ async def get_current_spend(request: Request):
         print(f"[!] Error fetching current spend: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/financial/spend-config")
 async def update_spend_config(request: Request):
     """Persist current spend override and / or target spend.
 
@@ -580,7 +589,10 @@ async def update_spend_config(request: Request):
         target_spend   (float) – desired target monthly spend
     """
     try:
-        data = (await request.json() if await request.body() else {}) or {}
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
 
         updated: dict = {}
 

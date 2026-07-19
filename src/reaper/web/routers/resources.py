@@ -21,6 +21,7 @@ logger = get_logger(__name__)
 
 router = APIRouter(tags=["resources"])
 
+@router.get("/api/resources/inventory")
 async def get_resource_inventory(request: Request):
     """Get comprehensive inventory of all Azure resources for cost optimization with streaming response.
 
@@ -886,7 +887,7 @@ async def get_resource_inventory(request: Request):
                             "page_size": page_size,
                             "total": total,
                             "total_pages": max(1, (total + page_size - 1) // page_size),
-                            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+                            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                         }
                     )
                     + "\n"
@@ -931,12 +932,13 @@ async def get_resource_inventory(request: Request):
                 "page_size": page_size,
                 "total": total,
                 "total_pages": max(1, (total + page_size - 1) // page_size),
-                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             }
         )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/resources/inventory/summary")
 async def get_resource_inventory_summary(request: Request):
     """Lightweight endpoint returning only counts + cost — no resource lists.
     Suitable for dashboard widgets that don't need full resource data.
@@ -995,6 +997,7 @@ async def get_resource_inventory_summary(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/resources/search")
 async def search_resources(request: Request):
     """Full-text search across all Azure resources by name or type.
 

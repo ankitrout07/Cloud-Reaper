@@ -8,10 +8,11 @@ from fastapi.responses import JSONResponse
 
 from reaper.collectors.providers.azure_collector import AzureCollector
 from reaper.engine.core.cost_optimizer import (
+    CostOptimizer,
     Priority,
     ResourceMetrics,
 )
-from reaper.engine.core.cost_reporter import ReportFormat, ReportPeriod
+from reaper.engine.core.cost_reporter import CostReporter, ReportFormat, ReportPeriod
 from reaper.utils.error_handler import get_logger
 from reaper.web.app_async import is_first_run
 
@@ -24,13 +25,19 @@ def jsonify(*args, **kwargs):
 
 logger = get_logger(__name__)
 
+# Initialize global instances
+cost_optimizer = CostOptimizer()
+cost_reporter = CostReporter()
+
 router = APIRouter(tags=["cost_optimization"])
 
+@router.post("/api/cost-optimization/analyze")
 async def analyze_cost_optimization(request: Request):
     from reaper.services.cost_optimization_service import CostOptimizationService
     service = CostOptimizationService()
     return await service.analyze_cost_optimization(request)
 
+@router.get("/api/cost-optimization/summary")
 async def get_optimization_summary(request: Request):
     """Get a quick summary of cost optimization opportunities"""
     try:
@@ -39,6 +46,7 @@ async def get_optimization_summary(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/cost-optimization/categories")
 async def get_optimization_categories(request: Request):
     """Get recommendations grouped by optimization category"""
     try:
@@ -63,6 +71,7 @@ async def get_optimization_categories(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/cost-optimization/priority/{priority}")
 async def get_optimization_by_priority(request: Request, priority):
     """Get recommendations filtered by priority level"""
     try:
@@ -89,6 +98,7 @@ async def get_optimization_by_priority(request: Request, priority):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/cost-optimization/resource/{resource_id}")
 async def get_resource_optimizations(request: Request, resource_id):
     """Get all optimization recommendations for a specific resource"""
     try:
@@ -121,6 +131,7 @@ async def get_resource_optimizations(request: Request, resource_id):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/cost-optimization/dashboard")
 async def get_optimization_dashboard(request: Request):
     """Get dashboard data for cost optimization visualization"""
     try:
@@ -186,6 +197,7 @@ async def get_optimization_dashboard(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/cost-optimization/executive-summary")
 async def get_executive_summary(request: Request):
     """Generate executive summary of cost optimization efforts"""
     try:
@@ -199,6 +211,7 @@ async def get_executive_summary(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/cost-optimization/report/generate")
 async def generate_cost_report(request: Request):
     """Generate detailed cost optimization report"""
     try:
@@ -221,12 +234,13 @@ async def generate_cost_report(request: Request):
                 "status": "success",
                 "format": format_type,
                 "report": report_content,
-                "generated_at": datetime.now(datetime.UTC).isoformat(),
+                "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             }
         )
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/cost-optimization/report/download")
 async def download_cost_report(request: Request):
     """Download cost optimization report"""
     try:
@@ -254,6 +268,7 @@ async def download_cost_report(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/cost-optimization/recommendation/track")
 async def track_recommendation_status(request: Request):
     """Track implementation status of a recommendation"""
     try:
@@ -278,6 +293,7 @@ async def track_recommendation_status(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/cost-optimization/implementation/progress")
 async def get_implementation_progress(request: Request):
     """Get implementation progress of all recommendations"""
     try:
@@ -286,6 +302,7 @@ async def get_implementation_progress(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/cost-optimization/trends")
 async def get_cost_trends(request: Request):
     """Get cost optimization trends over time"""
     try:
@@ -297,6 +314,7 @@ async def get_cost_trends(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/cost-optimization/category-analysis")
 async def get_category_analysis(request: Request):
     """Get category-wise cost optimization analysis"""
     try:
@@ -305,6 +323,7 @@ async def get_category_analysis(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/cost-optimization/risk-assessment")
 async def get_risk_assessment(request: Request):
     """Get risk assessment for all recommendations"""
     try:
@@ -313,6 +332,7 @@ async def get_risk_assessment(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/cost-optimization/next-steps")
 async def get_next_steps(request: Request):
     """Get recommended next steps for cost optimization"""
     try:

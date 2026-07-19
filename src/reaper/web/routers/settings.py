@@ -41,8 +41,12 @@ logger = get_logger(__name__)
 
 router = APIRouter(tags=["settings"])
 
+@router.post("/api/settings/sync")
 async def sync_settings(request: Request):
-    data = (await request.json() if await request.body() else {}) or {}
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
     try:
         # Offload blocking file I/O to a thread so the event loop stays free
         def _write_env():
@@ -93,8 +97,12 @@ def _cloud_connections_summary() -> tuple[dict[str, dict[str, Any]], str]:
     finally:
         db.close()
 
+@router.post("/api/settings/update")
 async def update_settings(request: Request):
-    data = (await request.json() if await request.body() else {}) or {}
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
     action = data.get("action")
 
     handlers = {
@@ -185,8 +193,12 @@ def handle_initial_setup(data):
         status_code=500, content={"status": "error", "msg": "Could not write to .env"}
     )
 
+@router.post("/api/settings/connect-azure")
 async def connect_azure(request: Request):
-    data = await request.json() if await request.body() else {}
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
     if not data:
         return JSONResponse(
             status_code=400, content={"status": "error", "message": "Request body is required."}
@@ -213,7 +225,7 @@ async def connect_azure(request: Request):
             PROVIDER_AUTH_STATE["provider"] = "azure"
             PROVIDER_AUTH_STATE["authenticated"] = True
             PROVIDER_AUTH_STATE["subscription_id"] = data.get("subscription_id")
-            PROVIDER_AUTH_STATE["last_sync"] = datetime.datetime.now(datetime.UTC).isoformat()
+            PROVIDER_AUTH_STATE["last_sync"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
             return {"status": "success", "message": "Azure Cloud Connected Successfully!"}
         raise Exception("Failed to write to .env file")
@@ -386,9 +398,13 @@ def _validate_cloud_credentials(provider: str, credentials: dict[str, Any]) -> d
     except Exception as e:
         return {"valid": False, "message": f"Validation error: {e!s}", "details": ""}
 
+@router.post("/api/settings/connect-cloud")
 async def connect_cloud(request: Request):
     """Connect to cloud provider with credential validation."""
-    data = (await request.json() if await request.body() else {}) or {}
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
     provider = (data.get("provider") or "").lower()
     credentials = data.get("credentials") or {}
     connection_name = data.get("connection_name") or f"{provider.capitalize()} Connection"
@@ -471,7 +487,7 @@ async def connect_cloud(request: Request):
             if provider == "gcp"
             else None
         )
-        PROVIDER_AUTH_STATE["last_sync"] = datetime.datetime.now(datetime.UTC).isoformat()
+        PROVIDER_AUTH_STATE["last_sync"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
         return jsonify(
             {
@@ -482,6 +498,7 @@ async def connect_cloud(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/settings/cloud-connections")
 async def list_cloud_connections(request: Request):
     summary, active_provider = await asyncio.to_thread(_cloud_connections_summary)
     return jsonify(
@@ -492,6 +509,7 @@ async def list_cloud_connections(request: Request):
         }
     )
 
+@router.get("/api/settings/auth")
 async def check_auth(request: Request):
     try:
         await asyncio.to_thread(
@@ -503,6 +521,7 @@ async def check_auth(request: Request):
     except Exception:
         return {"status": "expired", "message": "Disconnected: Please run 'az login'"}
 
+@router.get("/api/settings/subscriptions")
 async def list_subscriptions(request: Request):
     try:
         binary_path = _reaper_engine_binary()
@@ -521,4 +540,71 @@ async def list_subscriptions(request: Request):
         return JSONResponse(status_code=500, content={"error": result.stderr})
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+@router.get("/api/settings/credentials/status")
+async def credentials_status(request: Request):
+    """Check credential status across all pages - returns 503 if no credentials configured."""
+    try:
+        credential_service = get_credential_service()
+        active_provider = credential_service.get_active_provider()
+
+        if not active_provider:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "error",
+                    "message": "No active cloud provider configured",
+                    "code": "NO_ACTIVE_PROVIDER",
+                    "user_message": "Please connect your cloud provider in Settings to access real-time data",
+                },
+            )
+
+        if not credential_service.has_credentials(active_provider):
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "error",
+                    "message": f"No credentials configured for {active_provider.upper()}",
+                    "code": "NO_CREDENTIALS",
+                    "provider": active_provider,
+                    "user_message": f"Please configure {active_provider.upper()} credentials in Settings to access real-time data",
+                },
+            )
+
+        # Validate credentials are still valid
+        validation_result = credential_service.validate_credentials(active_provider)
+
+        if not validation_result["valid"]:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "error",
+                    "message": f"Credential validation failed: {validation_result['message']}",
+                    "code": "CREDENTIAL_VALIDATION_FAILED",
+                    "provider": active_provider,
+                    "user_message": f"Your {active_provider.upper()} credentials are invalid. Please reconfigure them in Settings.",
+                },
+            )
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "provider": active_provider,
+                "message": f"Valid credentials configured for {active_provider.upper()}",
+                "validation_details": validation_result.get("details", ""),
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Credential status check failed: {e}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "message": f"Credential check failed: {e!s}",
+                "code": "CREDENTIAL_CHECK_ERROR",
+                "user_message": "Unable to verify cloud provider credentials. Please check your Settings.",
+            },
+        )
 

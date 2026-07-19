@@ -30,6 +30,15 @@ logger = get_logger(__name__)
 
 router = APIRouter(tags=["finops"])
 
+def _run_collector(method_name: str):
+    """Helper function to run AzureCollector methods synchronously."""
+    c = AzureCollector()
+    method = getattr(c, method_name, None)
+    if method and callable(method):
+        return method()
+    return []
+
+@router.get("/api/finops/budget/data")
 async def get_budget_data(request: Request):
     """Get comprehensive budget pacing data for the financial dashboard."""
     logger = get_logger("budget_api")
@@ -85,6 +94,7 @@ async def get_budget_data(request: Request):
         )
         return JSONResponse(status_code=500, content=error_response)
 
+@router.post("/api/finops/budget/threshold")
 async def update_budget_threshold(request: Request):
     """Direct endpoint to update budget threshold."""
     try:
@@ -106,6 +116,7 @@ async def update_budget_threshold(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/budget/chart")
 async def get_budget_chart_data(request: Request):
     """Get chart data for budget pacing visualization."""
     try:
@@ -136,6 +147,7 @@ async def get_budget_chart_data(request: Request):
         )
         return JSONResponse(status_code=500, content=error_response)
 
+@router.get("/api/finops/commitments/data")
 async def get_commitments_data(request: Request):
     """Get active commitment portfolio and recommendations."""
     try:
@@ -175,6 +187,7 @@ async def get_commitments_data(request: Request):
         )
         return JSONResponse(status_code=500, content=error_response)
 
+@router.get("/api/finops/issues/data")
 async def get_issues_data(request: Request):
     """Get cost governance issues requiring action."""
     try:
@@ -212,6 +225,7 @@ async def get_issues_data(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/finops/issues/remediate")
 async def remediate_issue(request: Request):
     """Execute remediation action on a cost governance issue."""
     try:
@@ -238,6 +252,7 @@ async def remediate_issue(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/finops/commitments/simulate")
 async def simulate_commitment_api(request: Request):
     """Enhanced commitment simulation with real calculations."""
     try:
@@ -282,6 +297,7 @@ async def simulate_commitment_api(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/finops/commitments/purchase")
 async def purchase_commitment_api(request: Request):
     """Purchase a commitment based on simulation results."""
     try:
@@ -308,6 +324,7 @@ async def purchase_commitment_api(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/finops/policy/simulate")
 async def simulate_policy_api(request: Request):
     """Simulate policy application with cost impact."""
     try:
@@ -341,6 +358,7 @@ async def simulate_policy_api(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/finops/policy/apply")
 async def apply_policy_api(request: Request):
     """Apply a governance policy."""
     try:
@@ -358,6 +376,7 @@ async def apply_policy_api(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/finops/metrics/add")
 async def add_business_metric(request: Request):
     try:
         data = (await request.json() if await request.body() else {}) or {}
@@ -392,6 +411,7 @@ async def add_business_metric(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/tags/health")
 async def tag_health(request: Request):
     try:
         def _fetch_tag_health():
@@ -432,6 +452,7 @@ async def tag_health(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/anomalies")
 async def anomalies(request: Request):
     try:
 
@@ -450,6 +471,7 @@ async def anomalies(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/finops/anomalies/triage")
 async def anomalies_triage(request: Request):
     try:
         data = (await request.json() if await request.body() else {}) or {}
@@ -471,6 +493,7 @@ async def anomalies_triage(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/unit-economics")
 async def unit_economics(request: Request):
     try:
         def _fetch_unit_economics():
@@ -528,6 +551,7 @@ async def unit_economics(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/ri-advisor")
 async def ri_advisor(request: Request):
     try:
 
@@ -546,6 +570,7 @@ async def ri_advisor(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/cold-storage")
 async def cold_storage(request: Request):
     try:
 
@@ -564,6 +589,7 @@ async def cold_storage(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/modernization")
 async def modernization(request: Request):
     try:
 
@@ -582,6 +608,7 @@ async def modernization(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/policy-violations")
 async def policy_violations(request: Request):
     try:
 
@@ -600,6 +627,7 @@ async def policy_violations(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/budget/status")
 async def budget_status(request: Request):
     try:
 
@@ -612,6 +640,7 @@ async def budget_status(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/finops/budget/killswitch")
 async def budget_killswitch(request: Request):
     try:
         data = (await request.json() if await request.body() else {}) or {}
@@ -628,6 +657,7 @@ async def budget_killswitch(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/burn-rate-forecast")
 async def burn_rate_forecast(request: Request):
     try:
 
@@ -640,6 +670,7 @@ async def burn_rate_forecast(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/virtual-tags")
 async def virtual_tags(request: Request):
     try:
 
@@ -652,6 +683,7 @@ async def virtual_tags(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/greenops")
 async def greenops(request: Request):
     try:
         return jsonify(
@@ -665,6 +697,7 @@ async def greenops(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.post("/api/finops/approve-reap")
 async def approve_reap(request: Request):
     try:
         data = (await request.json() if await request.body() else {}) or {}
@@ -682,6 +715,7 @@ async def approve_reap(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/arbitrage")
 async def get_arbitrage(request: Request):
     try:
         sku = request.query_params.get("sku")
@@ -699,6 +733,7 @@ async def get_arbitrage(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+@router.get("/api/finops/utilization")
 async def utilization(request: Request):
     try:
 
