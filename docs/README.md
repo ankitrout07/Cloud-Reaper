@@ -26,6 +26,7 @@ Welcome to the comprehensive documentation hub for Cloud-Reaper, a high-performa
 - [Anomaly Explainer Enhancements](anomaly_explainer_enhancements.md) - Advanced anomaly detection and explanation systems
 
 ### Security & Compliance
+- [Security & IAM Policies](SECURITY_IAM_POLICIES.md) - Security-first architecture, dry-run mode, and IAM policy configurations
 - [Audit Logs](4_audit_logs.txt) - Cryptographic audit trail system and SHA-256 hash ledger
 - [Vault & Secret Management](../README.md#vault--secret-management) - PBKDF2-HMAC-SHA256 encryption and secure credential storage
 
@@ -37,9 +38,10 @@ Welcome to the comprehensive documentation hub for Cloud-Reaper, a high-performa
 
 ### For New Users
 1. Start with [README](../README.md) for project overview and architecture
-2. Follow [How to Run](../HOW_TO_RUN.md) for comprehensive setup instructions
-3. Explore [Product Documentation](1_product_docs.txt) to understand capabilities
-4. Configure [Ollama Setup Guide](OLLAMA_SETUP.md) for AI backend setup
+2. Review [Security & IAM Policies](SECURITY_IAM_POLICIES.md) for security-first configuration
+3. Follow [How to Run](../HOW_TO_RUN.md) for comprehensive setup instructions
+4. Explore [Product Documentation](1_product_docs.txt) to understand capabilities
+5. Configure [Ollama Setup Guide](OLLAMA_SETUP.md) for AI backend setup
 
 ### For Developers
 1. Review [Executive Summary and Architecture](5_executive_summary_and_architecture.txt) for system design
@@ -48,10 +50,11 @@ Welcome to the comprehensive documentation hub for Cloud-Reaper, a high-performa
 4. Check [Database Schema and API Endpoints](9_database_schema_and_api_endpoints.txt) for data models
 
 ### For DevOps Engineers
-1. Read [Product Documentation](1_product_docs.txt) for feature overview
-2. Understand [Features Guide](2_features_guide.txt) for detailed capabilities
-3. Review [Audit Logs](4_audit_logs.txt) for security and compliance
-4. Explore [Go Task Manager Integration](10_go_task_manager_integration.txt) for deployment
+1. Review [Security & IAM Policies](SECURITY_IAM_POLICIES.md) for security-first deployment
+2. Read [Product Documentation](1_product_docs.txt) for feature overview
+3. Understand [Features Guide](2_features_guide.txt) for detailed capabilities
+4. Review [Audit Logs](4_audit_logs.txt) for security and compliance
+5. Explore [Go Task Manager Integration](10_go_task_manager_integration.txt) for deployment
 
 ### For AI/ML Engineers
 1. Study [AI Copilot and Token Usage](8_ai_copilot_and_token_usage.txt) for AI assistant
@@ -68,6 +71,8 @@ Welcome to the comprehensive documentation hub for Cloud-Reaper, a high-performa
 ## 🔄 Documentation Updates
 
 ### Recent Additions
+- **Security-First Architecture** - Implemented dry-run mode as default, read-only IAM policies, and explicit remediation toggles
+- **Orchestration Prompts** - Added UI prompts for secondary IAM role deployment when enabling orchestration
 - **Ollama Integration** - New local model support for cost-free AI operations
 - **Enhanced RAG** - Improved retrieval-augmented generation capabilities with hybrid search
 - **Anomaly Explainer** - Advanced anomaly detection and explanation system

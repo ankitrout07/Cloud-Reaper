@@ -292,6 +292,7 @@ The Cloud-Reaper project has been verified to be correctly wired and fully funct
 - ✅ **Entry Points**: CLI and web interfaces responding correctly
 - ✅ **Data Integrity**: All simulated/fake data removed - only real cloud provider data or proper errors
 - ✅ **Error Handling**: Enhanced UI error messages guide users to connect cloud providers
+- ✅ **Security First**: Dry-run mode enabled by default, read-only IAM policies, explicit remediation toggles
 - ⚠️ **AI Features**: Require `GEMINI_API_KEY` and `OPENAI_API_KEY` configuration
 - ⚠️ **Database URL**: Should be uncommented in `.env` for full functionality
 - ⚠️ **Cloud Credentials**: Required for metrics and cost optimization features
@@ -299,11 +300,43 @@ The Cloud-Reaper project has been verified to be correctly wired and fully funct
 **Test Coverage**: 53/53 Python unit tests passing across all core modules including RAG search, copilot engine, financial routes, workload analysis, and webhook integrations.
 
 **Recent Updates**:
+- **Security First**: Implemented dry-run mode as default, read-only IAM policies, and explicit remediation toggles
 - **Data Integrity**: Eliminated all simulated/fake data fallbacks from entire codebase
 - **Error Handling**: API endpoints return 503 errors with user-friendly messages when cloud provider data fetch fails
 - **UI Improvements**: Frontend error handling guides users to Settings to connect cloud providers
 - **Code Cleanup**: Removed unused classes (`ProportionalAllocator`, `PredictiveScalingEngine`) and ~120 lines of redundant code
 - **Security**: Removed placeholder simulation endpoints that returned fake data
+
+---
+
+## 🔒 Security & IAM Policies
+
+Cloud-Reaper implements a **Security-First Architecture** with blast radius paranoia:
+
+- **🔒 Dry-Run Mode by Default**: All operations run in read-only mode unless explicitly enabled
+- **👁️ Read-Only IAM Policies**: Default setup uses ReadOnlyAccess/ViewOnlyAccess permissions
+- **⚙️ Explicit Remediation Toggles**: Active remediation requires explicit configuration
+- **🔐 Scoped Write Permissions**: Remediation uses separate IAM roles with minimal required permissions
+- **📝 Audit Trail**: All actions logged with SHA-256 cryptographic signatures
+
+### Configuration
+
+The following security settings are configured in `.env`:
+
+```env
+# Dry-run mode (default: true)
+DRY_RUN_MODE=true
+
+# Active remediation (default: false)
+ENABLE_REMEDIATION=false
+
+# Orchestration mode (default: false)
+ENABLE_ORCHESTRATION=false
+```
+
+### IAM Policy Documentation
+
+For detailed IAM policies and security configuration, see [Security & IAM Policies](docs/SECURITY_IAM_POLICIES.md).
 
 ---
 
@@ -322,6 +355,8 @@ The Cloud-Reaper project has been verified to be correctly wired and fully funct
 - `AI_BACKEND` — AI backend selection: `gemini`, `openai`, `ollama`, or `ensemble` (default: `gemini`)
 - For Ollama local model support, see [Ollama Setup Guide](docs/OLLAMA_SETUP.md)
 
+**⚠️ Security Note**: Cloud-Reaper uses a security-first architecture. Start with read-only IAM policies (Reader/Viewer/ReadOnlyAccess) and dry-run mode enabled. See [Security & IAM Policies](docs/SECURITY_IAM_POLICIES.md) for detailed configuration guidance.
+
 ### One-Command Setup
 
 ```bash
@@ -339,6 +374,19 @@ python bootstrap.py
 6. Launches the dashboard at **http://localhost:5001**
 
 > Full setup guide → **[HOW_TO_RUN.md](HOW_TO_RUN.md)**
+
+### Security Architecture
+
+Cloud-Reaper implements a **"Blast Radius Paranoia"** security model by default:
+
+- **Read-Only Default**: Initial setup uses ReadOnlyAccess/ViewOnlyAccess IAM permissions
+- **Dry-Run Mode**: Enabled by default - only reports recommendations without executing changes
+- **Explicit Orchestration**: Active remediation requires explicit configuration toggle
+- **Scoped Permissions**: Remediation uses separate IAM roles with minimal required permissions
+
+> **Important**: Cloud-Reaper will not execute any changes to your infrastructure by default. You must explicitly enable remediation and orchestration after reviewing recommendations.
+> 
+> See [Security & IAM Policies Documentation](docs/SECURITY_IAM_POLICIES.md) for detailed security guidance.
 
 ### Metrics System
 
@@ -799,6 +847,7 @@ Schema auto-initializes via `bootstrap.py` or `init_db()`.
 | `POST` | `/api/settings/update` | Update currency, pricebook, rightsizing profile |
 | `POST` | `/api/settings/connect-azure` | Validate and save Azure credentials |
 | `POST` | `/api/settings/connect-cloud` | Connect AWS / GCP / Kubernetes credentials |
+| `POST` | `/api/settings/security` | Update security and remediation settings |
 | `GET` | `/api/context/switch?provider=<type>` | Switch active scanning context |
 
 ### Financial Intelligence

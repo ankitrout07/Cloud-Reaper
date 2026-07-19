@@ -608,3 +608,86 @@ async def credentials_status(request: Request):
             },
         )
 
+
+@router.post("/api/settings/security")
+async def update_security_settings(request: Request):
+    """Update security and remediation settings."""
+    try:
+        data = await request.json()
+        dry_run_mode = data.get("dry_run_mode", True)
+        enable_remediation = data.get("enable_remediation", False)
+        enable_orchestration = data.get("enable_orchestration", False)
+        
+        # Validation: orchestration requires remediation
+        if enable_orchestration and not enable_remediation:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "message": "Orchestration cannot be enabled without remediation",
+                    "code": "ORCHESTRATION_REQUIRES_REMEDIATION",
+                },
+            )
+        
+        # Validation: remediation/orchestration requires dry-run disabled
+        if (enable_remediation or enable_orchestration) and dry_run_mode:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "message": "Remediation/Orchestration cannot be enabled while dry-run mode is active",
+                    "code": "REMEDIATION_CONFLICTS_WITH_DRY_RUN",
+                },
+            )
+        
+        # Update .env file
+        try:
+            set_key(ENV_PATH, "DRY_RUN_MODE", "true" if dry_run_mode else "false")
+            set_key(ENV_PATH, "ENABLE_REMEDIATION", "true" if enable_remediation else "false")
+            set_key(ENV_PATH, "ENABLE_ORCHESTRATION", "true" if enable_orchestration else "false")
+            
+            # Update environment variables for current process
+            os.environ["DRY_RUN_MODE"] = "true" if dry_run_mode else "false"
+            os.environ["ENABLE_REMEDIATION"] = "true" if enable_remediation else "false"
+            os.environ["ENABLE_ORCHESTRATION"] = "true" if enable_orchestration else "false"
+            
+            logger.info(
+                f"Security settings updated: dry_run={dry_run_mode}, "
+                f"remediation={enable_remediation}, orchestration={enable_orchestration}"
+            )
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "status": "success",
+                    "message": "Security settings updated successfully",
+                    "settings": {
+                        "dry_run_mode": dry_run_mode,
+                        "enable_remediation": enable_remediation,
+                        "enable_orchestration": enable_orchestration,
+                    },
+                },
+            )
+            
+        except Exception as e:
+            logger.error(f"Error updating .env file: {e}")
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "status": "error",
+                    "message": f"Could not write to .env file: {e!s}",
+                    "code": "ENV_WRITE_ERROR",
+                },
+            )
+            
+    except Exception as e:
+        logger.error(f"Error updating security settings: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": f"Error updating security settings: {e!s}",
+                "code": "SECURITY_SETTINGS_ERROR",
+            },
+        )
+

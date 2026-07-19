@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] / Recent Updates
 
+### 🔒 Security-First Architecture
+- **Dry-Run Mode by Default**: Implemented dry-run mode as default behavior to prevent accidental resource modifications in production environments
+- **Read-Only IAM Policies**: Updated default IAM policies to use ReadOnlyAccess/ViewOnlyAccess permissions for initial setup
+- **Explicit Remediation Toggles**: Added configuration toggles (`ENABLE_REMEDIATION`, `ENABLE_ORCHESTRATION`) that require explicit user consent before enabling active remediation
+- **Secondary IAM Role Prompts**: Added UI prompts for secondary IAM role deployment when users enable orchestration mode
+- **Configuration Validation**: Implemented validation to prevent enabling remediation/orchestration while dry-run mode is active
+- **Security Documentation**: Updated all documentation to emphasize security-first approach and proper IAM configuration
+
 ### � Security & Data Integrity
 - **Eliminated All Simulated Data**: Removed all simulated/fake data fallbacks from the entire codebase. All API endpoints now fetch real data from cloud providers or return proper error responses.
 - **Enhanced Error Handling**: Updated all API endpoints (`/api/finops/budget/data`, `/api/finops/budget/chart`, `/api/finops/commitments/data`, `/api/finops/issues/data`) to return 503 status codes with user-friendly error messages when cloud provider data fetch fails.

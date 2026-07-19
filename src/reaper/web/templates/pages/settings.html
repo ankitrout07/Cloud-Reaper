@@ -138,6 +138,12 @@
     color: #fb7185;
 }
 
+.section-icon-red .section-icon {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.15) 100%);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #f87171;
+}
+
 .settings-nav {
     display: flex;
     gap: 6px;
@@ -629,7 +635,7 @@
                 <div class="section-header">
                     <div class="section-title">
                         <div class="section-icon">
-                            <i class="fas fa-shield-alt"></i>
+                            <i class="fas fa-gavel"></i>
                         </div>
                         <div>
                             <h3>Governance Rules</h3>
@@ -701,6 +707,74 @@
                     </div>
                     <button onclick="saveBilling()" class="btn-primary">
                         Update Budget
+                    </button>
+                </div>
+            </div>
+
+            <!-- Security & Remediation -->
+            <div class="settings-section section-icon-red">
+                <div class="section-header">
+                    <div class="section-title">
+                        <div class="section-icon">
+                            <i class="fas fa-lock"></i>
+                        </div>
+                        <div>
+                            <h3>Security & Remediation</h3>
+                            <p>Safety controls and execution permissions</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div class="flex items-center justify-between p-4 rounded-xl border border-gray-700 mb-4" style="background: rgba(31, 41, 55, 0.4);">
+                        <div>
+                            <p class="text-sm font-bold text-gray-300">Dry-Run Mode</p>
+                            <p class="text-xs text-gray-500 mt-1">Report only, no changes to infrastructure</p>
+                        </div>
+                        <div id="dry-run-toggle" class="toggle-switch active" onclick="toggleDryRun()"></div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-4 rounded-xl border border-gray-700 mb-4" style="background: rgba(31, 41, 55, 0.4);">
+                        <div>
+                            <p class="text-sm font-bold text-gray-300">Enable Remediation</p>
+                            <p class="text-xs text-gray-500 mt-1">Allow execution of cost optimization actions</p>
+                        </div>
+                        <div id="remediation-toggle" class="toggle-switch" onclick="toggleRemediation()"></div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between p-4 rounded-xl border border-gray-700 mb-6" style="background: rgba(31, 41, 55, 0.4);">
+                        <div>
+                            <p class="text-sm font-bold text-gray-300">Enable Orchestration</p>
+                            <p class="text-xs text-gray-500 mt-1">Automated execution of optimization schedules</p>
+                        </div>
+                        <div id="orchestration-toggle" class="toggle-switch" onclick="toggleOrchestration()"></div>
+                    </div>
+                    
+                    <div id="remediation-warning" class="hidden p-4 rounded-xl border border-yellow-600 bg-yellow-900/20 mb-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-triangle text-yellow-500 mt-1"></i>
+                            <div>
+                                <p class="text-sm font-bold text-yellow-400">Write Access Required</p>
+                                <p class="text-xs text-gray-400 mt-1">Enabling remediation requires IAM roles with write permissions. See <a href="/docs/SECURITY_IAM_POLICIES.md" class="text-blue-400 hover:underline">Security Documentation</a> for details.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="orchestration-warning" class="hidden p-4 rounded-xl border border-red-600 bg-red-900/20 mb-6">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-exclamation-circle text-red-500 mt-1"></i>
+                            <div>
+                                <p class="text-sm font-bold text-red-400">Secondary IAM Role Required</p>
+                                <p class="text-xs text-gray-400 mt-1">Orchestration requires a secondary IAM role scoped to specific actions (e.g., ec2:StopInstances, ec2:ModifyInstanceAttribute). Please deploy the orchestration-specific IAM role before enabling this feature.</p>
+                                <div class="mt-3 p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+                                    <p class="text-xs text-gray-300 font-mono">aws: iam create-role --role-name CloudReaperOrchestrator</p>
+                                    <p class="text-xs text-gray-300 font-mono">azure: az role definition create --role-definition orchestrator-role.json</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button onclick="saveSecuritySettings()" class="btn-primary">
+                        Save Security Settings
                     </button>
                 </div>
             </div>
@@ -982,6 +1056,124 @@ function toggleAutoFlag() {
     const toggle = document.getElementById('auto-flag-toggle');
     if (toggle) {
         toggle.classList.toggle('active');
+    }
+}
+
+// Security & Remediation Toggle Functions
+function toggleDryRun() {
+    const toggle = document.getElementById('dry-run-toggle');
+    if (toggle) {
+        toggle.classList.toggle('active');
+        // If dry-run is disabled, show remediation warning
+        if (!toggle.classList.contains('active')) {
+            document.getElementById('remediation-warning').classList.remove('hidden');
+        } else {
+            document.getElementById('remediation-warning').classList.add('hidden');
+        }
+    }
+}
+
+function toggleRemediation() {
+    const toggle = document.getElementById('remediation-toggle');
+    if (toggle) {
+        toggle.classList.toggle('active');
+        // If enabling remediation, show warning about write access
+        if (toggle.classList.contains('active')) {
+            document.getElementById('remediation-warning').classList.remove('hidden');
+        } else {
+            // If disabling remediation, also disable orchestration
+            const orchToggle = document.getElementById('orchestration-toggle');
+            if (orchToggle && orchToggle.classList.contains('active')) {
+                orchToggle.classList.remove('active');
+            }
+        }
+    }
+}
+
+function toggleOrchestration() {
+    const toggle = document.getElementById('orchestration-toggle');
+    const remediationToggle = document.getElementById('remediation-toggle');
+    
+    if (toggle) {
+        // Can only enable orchestration if remediation is enabled
+        if (remediationToggle && !remediationToggle.classList.contains('active')) {
+            alert('Please enable remediation first before enabling orchestration.');
+            return;
+        }
+        
+        const isEnabling = !toggle.classList.contains('active');
+        
+        if (isEnabling) {
+            // Show orchestration-specific warning
+            document.getElementById('orchestration-warning').classList.remove('hidden');
+            if (!confirm('WARNING: Orchestration requires a secondary IAM role with specific write permissions.\n\nPlease ensure you have:\n1. Deployed the orchestration-specific IAM role\n2. Scoped permissions to required actions only\n3. Tested in non-production environment\n\nProceed?')) {
+                document.getElementById('orchestration-warning').classList.add('hidden');
+                return;
+            }
+        } else {
+            document.getElementById('orchestration-warning').classList.add('hidden');
+        }
+        
+        toggle.classList.toggle('active');
+        if (toggle.classList.contains('active')) {
+            document.getElementById('remediation-warning').classList.remove('hidden');
+        }
+    }
+}
+
+async function saveSecuritySettings() {
+    const dryRunEnabled = document.getElementById('dry-run-toggle').classList.contains('active');
+    const remediationEnabled = document.getElementById('remediation-toggle').classList.contains('active');
+    const orchestrationEnabled = document.getElementById('orchestration-toggle').classList.contains('active');
+    
+    // Validation: orchestration requires remediation
+    if (orchestrationEnabled && !remediationEnabled) {
+        alert('Orchestration cannot be enabled without remediation. Please enable remediation first.');
+        return;
+    }
+    
+    // Validation: remediation/orchestration requires write access confirmation
+    if ((remediationEnabled || orchestrationEnabled) && dryRunEnabled) {
+        if (!confirm('You are enabling remediation/orchestration while dry-run mode is active. This is contradictory. Disable dry-run mode to proceed.')) {
+            return;
+        }
+    }
+    
+    if ((remediationEnabled || orchestrationEnabled) && !dryRunEnabled) {
+        if (!confirm('WARNING: You are about to enable write access to your cloud infrastructure. This will allow Cloud-Reaper to execute cost optimization actions.\n\nPlease ensure:\n1. You have deployed the appropriate IAM roles with write permissions\n2. You have reviewed the security documentation\n3. You understand the potential impact on your resources\n\nProceed?')) {
+            return;
+        }
+    }
+    
+    // Additional orchestration-specific confirmation
+    if (orchestrationEnabled && !dryRunEnabled) {
+        if (!confirm('FINAL WARNING: Orchestration will automatically execute optimization schedules without manual approval.\n\nThis requires:\n1. Secondary IAM role with scoped write permissions\n2. Proper testing in non-production environment\n3. Understanding of automated execution impact\n\nAre you absolutely sure you want to proceed?')) {
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch('/api/settings/security', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                dry_run_mode: dryRunEnabled,
+                enable_remediation: remediationEnabled,
+                enable_orchestration: orchestrationEnabled
+            })
+        });
+        
+        if (response.ok) {
+            notify('Security settings saved successfully', 'success');
+        } else {
+            const errorData = await response.json();
+            notify(`Failed to save security settings: ${errorData.message || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error saving security settings:', error);
+        notify('Error saving security settings', 'error');
     }
 }
 

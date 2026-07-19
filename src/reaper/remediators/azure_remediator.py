@@ -19,7 +19,12 @@ class AzureRemediator:
 
     def __init__(self, subscription_id: str | None = None):
         self.subscription_id = subscription_id or os.getenv("AZURE_SUBSCRIPTION_ID")
+        # Security-first: dry-run mode is enabled by default
+        # Requires explicit ENABLE_REMEDIATION=true to allow actual changes
         self.is_dry_run = os.getenv("ENABLE_REMEDIATION", "false").lower() != "true"
+        # Additional safety: check DRY_RUN_MODE explicitly
+        if os.getenv("DRY_RUN_MODE", "true").lower() == "true":
+            self.is_dry_run = True
 
         if not self.subscription_id:
             logger.warning("[AzureRemediator] No Azure Subscription ID configured.")

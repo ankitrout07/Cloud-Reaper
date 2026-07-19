@@ -123,9 +123,21 @@ AZURE_CLIENT_SECRET=your-client-secret
 # Database (SQLite - no setup required)
 DATABASE_URL=sqlite:///./data/reaper.db
 
+# Security Settings (IMPORTANT: Start with these defaults)
+DRY_RUN_MODE=true
+ENABLE_REMEDIATION=false
+ENABLE_ORCHESTRATION=false
+
 # Notifications (optional)
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 ```
+
+**⚠️ Security Note**: Cloud-Reaper uses a **Security-First Architecture**:
+- **DRY_RUN_MODE=true** (default): Only reports recommendations, no changes made
+- **ENABLE_REMEDIATION=false** (default): Active remediation disabled
+- **ENABLE_ORCHESTRATION=false** (default): Automated schedules disabled
+
+Start with read-only IAM policies (Reader/Viewer/ReadOnlyAccess) and only enable write permissions after reviewing recommendations. See [Security & IAM Policies](docs/SECURITY_IAM_POLICIES.md) for details.
 
 ### Step 6 — Launch the Dashboard
 ```bash
@@ -194,6 +206,9 @@ safety check --file requirements.txt
 | `FLASK_PORT` | ❌ | Dashboard port | `5001` |
 | `FLASK_HOST` | ❌ | Dashboard bind address | `127.0.0.1` |
 | `FLASK_DEBUG` | ❌ | Enable debug mode | `True` |
+| `DRY_RUN_MODE` | ❌ | Dry-run mode (recommended: true) | `true` |
+| `ENABLE_REMEDIATION` | ❌ | Enable active remediation (recommended: false) | `false` |
+| `ENABLE_ORCHESTRATION` | ❌ | Enable automated schedules (recommended: false) | `false` |
 | `DISCORD_WEBHOOK_URL` | ❌ | Budget alert notifications | — |
 
 ---
