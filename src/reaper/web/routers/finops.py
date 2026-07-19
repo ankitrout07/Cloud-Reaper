@@ -848,3 +848,46 @@ async def ai_token_tracking(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+
+# ─── Frontend Alias Routes ────────────────────────────────────────────────────
+# These aliases bridge URL mismatches between frontend calls and canonical routes.
+# Frontend uses singular "commitment" and hyphenated paths; backend uses plural
+# and slash-separated paths.  All aliases delegate to the canonical handlers.
+
+@router.post("/api/finops/commitment/simulate")
+async def commitment_simulate_alias(request: Request):
+    """Alias: singular 'commitment' → canonical 'commitments/simulate'."""
+    return await simulate_commitment_api(request)
+
+
+@router.post("/api/finops/commitment/purchase")
+async def commitment_purchase_alias(request: Request):
+    """Alias: singular 'commitment' → canonical 'commitments/purchase'."""
+    return await purchase_commitment_api(request)
+
+
+@router.get("/api/finops/budget-status")
+async def budget_status_alias(request: Request):
+    """Alias: 'budget-status' (hyphen) → canonical 'budget/status'."""
+    return await budget_status(request)
+
+
+@router.get("/api/finops/tag-health")
+async def tag_health_alias(request: Request):
+    """Alias: 'tag-health' → canonical 'tags/health'."""
+    return await tag_health(request)
+
+
+@router.post("/api/finops/business-metrics")
+async def business_metrics_alias(request: Request):
+    """Alias: 'business-metrics' → canonical 'metrics/add'."""
+    return await add_business_metric(request)
+
+
+@router.post("/api/finops/budget/update")
+async def budget_update_alias(request: Request):
+    """Alias: 'budget/update' → canonical 'budget/threshold'.
+    Frontend sends { threshold: <value> } which matches the threshold handler.
+    """
+    return await update_budget_threshold(request)
+

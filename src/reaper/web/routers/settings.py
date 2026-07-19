@@ -691,3 +691,21 @@ async def update_security_settings(request: Request):
             },
         )
 
+
+# ─── Frontend Alias Routes ─────────────────────────────────────────────────────
+# These aliases bridge URL mismatches used by the frontend JS files.
+
+@router.get("/api/credentials/status")
+async def credentials_status_alias(request: Request):
+    """Alias: '/api/credentials/status' → canonical '/api/settings/credentials/status'.
+    Used by ui-interactions.js on initialization.
+    """
+    return await credentials_status(request)
+
+
+@router.post("/api/settings/save")
+async def settings_save_alias(request: Request):
+    """Alias: '/api/settings/save' → canonical '/api/settings/update'.
+    Used by performance-utils.js for debounced settings persistence.
+    """
+    return await update_settings(request)

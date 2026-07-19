@@ -407,3 +407,14 @@ def _unlock_vault_session(request: Request, passcode: str, settings: VaultSettin
     request.session["vault_unlock_expires"] = time.time() + VAULT_UNLOCK_TTL_SEC
     return True
 
+
+# ─── Frontend Alias Routes ─────────────────────────────────────────────────────
+
+@router.post("/api/vault/config")
+async def vault_config_alias(request: Request):
+    """Alias: '/api/vault/config' → canonical '/api/vault/setup'.
+    Used by performance-utils.js to persist vault configuration.
+    The payload shape is identical to the setup endpoint.
+    """
+    from reaper.web.routers.vault import setup_vault
+    return await setup_vault(request)

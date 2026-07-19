@@ -75,12 +75,12 @@
     async function loadReportsData() {
         try {
             const endpoints = [
-                { url: '/api/cost-reports/executive-summary?provider=azure&period=monthly', fn: displayExecutiveSummary, key: 'summary' },
-                { url: '/api/cost-reports/trends', fn: displayTrends, key: 'trends_data' },
-                { url: '/api/cost-reports/category-analysis', fn: displayCategoryAnalysis, key: 'category_analysis' },
-                { url: '/api/cost-reports/risk-assessment', fn: displayRiskAssessment, key: 'risk_assessment' },
-                { url: '/api/cost-reports/next-steps', fn: displayNextSteps, key: 'next_steps' },
-                { url: '/api/cost-reports/implementation-progress', fn: displayImplementationProgress, key: 'progress' },
+                { url: '/api/cost-optimization/executive-summary?provider=azure&period=monthly', fn: displayExecutiveSummary, key: 'summary' },
+                { url: '/api/cost-optimization/trends', fn: displayTrends, key: 'trends_data' },
+                { url: '/api/cost-optimization/category-analysis', fn: displayCategoryAnalysis, key: 'category_analysis' },
+                { url: '/api/cost-optimization/risk-assessment', fn: displayRiskAssessment, key: 'risk_assessment' },
+                { url: '/api/cost-optimization/next-steps', fn: displayNextSteps, key: 'next_steps' },
+                { url: '/api/cost-optimization/implementation/progress', fn: displayImplementationProgress, key: 'progress' },
             ];
 
             for (const ep of endpoints) {
@@ -297,7 +297,7 @@
         const format = document.getElementById('report-format').value;
 
         try {
-            const response = await fetch('/api/cost-reports/generate', {
+            const response = await fetch('/api/cost-optimization/report/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ provider: 'azure', period: period, format: format }),
@@ -435,7 +435,7 @@
         if (!status) return;
 
         try {
-            const response = await fetch('/api/cost-reports/track-status', {
+            const response = await fetch('/api/cost-optimization/recommendation/track', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ recommendation_id: recId, status: status, notes: notes }),

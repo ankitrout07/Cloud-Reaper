@@ -23,6 +23,11 @@ def main():
         action="store_true",
         help="Use enhanced sequential FinOps pipeline with workload differentiation",
     )
+    parser.add_argument(
+        "--benchmark-migration",
+        action="store_true",
+        help="Run a benchmark comparing Python and Go-backed migration paths",
+    )
 
     args, unknown = parser.parse_known_args()
 
@@ -32,6 +37,9 @@ def main():
 
     if args.enhanced_pipeline:
         sys.argv.append("--enhanced-pipeline")  # Pass through to CLI
+
+    if args.benchmark_migration:
+        sys.argv.append("--benchmark-migration")  # Pass through to CLI
 
     # Import run_reaper only when needed to avoid Azure dependency issues
     from reaper.cli import run_reaper

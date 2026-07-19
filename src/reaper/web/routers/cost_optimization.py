@@ -8,13 +8,12 @@ from fastapi.responses import JSONResponse
 
 from reaper.collectors.providers.azure_collector import AzureCollector
 from reaper.engine.core.cost_optimizer import (
-    CostOptimizer,
+    ComprehensiveCostOptimizer,
     Priority,
     ResourceMetrics,
 )
-from reaper.engine.core.cost_reporter import CostReporter, ReportFormat, ReportPeriod
+from reaper.engine.core.cost_reporter import AutomatedCostReporter, ReportFormat, ReportPeriod
 from reaper.utils.error_handler import get_logger
-from reaper.web.app_async import is_first_run
 
 
 def jsonify(*args, **kwargs):
@@ -26,8 +25,8 @@ def jsonify(*args, **kwargs):
 logger = get_logger(__name__)
 
 # Initialize global instances
-cost_optimizer = CostOptimizer()
-cost_reporter = CostReporter()
+cost_optimizer = ComprehensiveCostOptimizer()
+cost_reporter = AutomatedCostReporter()
 
 router = APIRouter(tags=["cost_optimization"])
 

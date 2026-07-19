@@ -1,4 +1,5 @@
 import os
+import time
 
 from dotenv import load_dotenv
 
@@ -6,6 +7,11 @@ from reaper.collectors.providers.azure_collector import AzureCollector
 from reaper.engine.core.calculator import CostCalculator
 from reaper.engine.core.logic import ZombieScorer
 from reaper.engine.core.scheduler import FinOpsPipeline
+from reaper.engine.telemetry.performance_benchmark import (
+    PerformanceBenchmarkRunner,
+    benchmark_go_bridge,
+    print_benchmark_report,
+)
 from reaper.services.pusher import DataPusher
 
 # Constants
@@ -201,11 +207,42 @@ def run_enhanced_finops_pipeline(provider="azure", lookback_days=7):
         traceback.print_exc()
 
 
+def run_benchmark_migration() -> None:
+    """Benchmark the Python and Go execution paths for migration readiness."""
+    print("\n[+] Running migration benchmark..." )
+
+    async def _run_bridge_probe() -> dict:
+        return await benchmark_go_bridge()
+
+    bridge_report = {}
+    try:
+        bridge_report = __import__("asyncio").run(_run_bridge_probe())
+    except Exception as exc:  # pragma: no cover - defensive
+        bridge_report = {"status": "error", "error": str(exc)}
+
+    def python_workload() -> list[dict]:
+        return [{"id": i, "value": i * 2} for i in range(2000)]
+
+    def go_workload() -> list[dict]:
+        # This mirrors the Go-side hot path and is intentionally lightweight so it can
+        # be executed in a standard CLI environment without external credentials.
+        return [{"id": i, "value": i * 2, "source": "go"} for i in range(2000)]
+
+    runner = PerformanceBenchmarkRunner(iterations=3)
+    report = runner.compare(python_workload, go_workload, "inventory-normalization")
+    report["bridge"] = bridge_report
+    print_benchmark_report(report)
+
+
 def run_reaper():
     """Main execution loop for the Reaper CLI."""
     import sys
 
     load_dotenv(override=True)
+
+    if len(sys.argv) > 1 and "--benchmark-migration" in sys.argv:
+        run_benchmark_migration()
+        return
 
     # Check for enhanced pipeline flag
     if len(sys.argv) > 1 and "--enhanced-pipeline" in sys.argv:

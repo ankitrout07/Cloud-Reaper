@@ -639,3 +639,22 @@ async def update_spend_config(request: Request):
         print(f"[!] Error updating spend config: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+
+# ─── Frontend Alias Routes ─────────────────────────────────────────────────────
+# The financial.html template uses legacy endpoint paths that differ from the
+# canonical routes refactored into this router.  These aliases keep backwards
+# compatibility without modifying the template.
+
+@router.get("/api/financial/spend/current")
+async def spend_current_alias(request: Request):
+    """Alias: 'spend/current' → canonical 'current-spend'."""
+    return await get_current_spend(request)
+
+
+@router.post("/api/financial/spend/update")
+async def spend_update_alias(request: Request):
+    """Alias: 'spend/update' → canonical 'spend-config'.
+    Frontend sends { current_spend } or { target_spend } which both match
+    the spend-config handler body schema.
+    """
+    return await update_spend_config(request)

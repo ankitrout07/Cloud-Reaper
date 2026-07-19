@@ -1067,6 +1067,8 @@ async def search_resources(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
+
+@router.post("/api/resources/{resource_id}/dismiss")
 async def dismiss_resource(request: Request, resource_id: str):
     """Mark a resource for dismissal/cleanup."""
     try:

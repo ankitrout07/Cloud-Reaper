@@ -76,7 +76,53 @@ capabilities of both developer ecosystems:
     updates and managing a production-grade cryptographic credential store.
 
 
-3. WORKSPACE DIRECTORY STRUCTURE
+3. STRATEGIC GO MIGRATION AND MODERNIZATION ROADMAP
+--------------------------------------------------
+Cloud-Reaper's hybrid architecture already demonstrates a strong foundation for
+expanding the Go-based performance core. The recommended modernization strategy is
+to progressively migrate the highest-impact, latency-sensitive, and
+resource-intensive components from Python to Go while preserving the Python
+layer for advanced ML, orchestration, and AI-driven optimization.
+
+Why Go is a strong fit for the next phase of the platform:
+  * Memory Efficiency: Go uses significantly less memory for concurrent
+    operations, making it well-suited for high-volume cloud inventory scanning.
+  * Deployment Simplicity: A single binary deployment reduces Python runtime and
+    dependency management overhead.
+  * Scalability: Go's lightweight goroutines provide superior horizontal scaling
+    characteristics for background collectors and streaming workloads.
+  * Maintenance: Strong typing and robust error handling improve long-term
+    reliability and operability.
+  * Cloud Native: Go is highly compatible with containerized, Kubernetes-based,
+    and serverless deployment patterns.
+
+Recommended migration path:
+  1. Benchmark current Python performance for the most expensive target
+     components and establish baseline latency, memory, and throughput metrics.
+  2. Enhance existing Go services to match or exceed Python functionality for
+     parsing, ingestion, rate limiting, anomaly detection, and real-time updates.
+  3. Implement an A/B testing framework to compare Python and Go implementations
+     under identical workloads before full rollout.
+  4. Roll out gradually, starting with non-critical services and expanding to the
+     most performance-sensitive workloads once parity is validated.
+
+Success metrics for the migration:
+  * Query latency reduced by more than 50%
+  * Memory usage reduced by more than 30%
+  * Throughput increased by more than 200%
+  * Error rates maintained or improved
+
+Existing Go infrastructure analysis:
+  * Cloud scrapers for Azure, AWS, and GCP already exist and provide the core
+    multi-cloud discovery layer.
+  * Parallel price scraping with rate limiting is already implemented and forms a
+    solid basis for broader migration.
+  * The anomaly detection engine and ML rightsizing agent are strong candidates
+    for deeper Go adoption.
+  * The WebSocket server and task manager demonstrate that the project already has
+    a proven foundation for high-throughput, concurrent backend services.
+
+4. WORKSPACE DIRECTORY STRUCTURE
 ---------------------------------
 The codebase is structured logically to maintain a clean boundary between the
 high-velocity Go collector core, the Python intelligence/web layer, and automated

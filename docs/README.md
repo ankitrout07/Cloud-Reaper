@@ -78,6 +78,7 @@ Welcome to the comprehensive documentation hub for Cloud-Reaper, a high-performa
 - **Anomaly Explainer** - Advanced anomaly detection and explanation system
 - **Multi-Cloud Support** - Extended documentation for Azure, AWS, and GCP integration
 - **Security Enhancements** - Updated audit trail and vault management documentation
+- **Go Migration Roadmap** - Added a strategic plan for moving performance-sensitive workloads from Python to Go with benchmarking, phased rollout, and success metrics
 
 ### Version History
 - **v2.0** - Comprehensive documentation restructure with enhanced navigation
