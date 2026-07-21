@@ -529,17 +529,7 @@ async def background_metrics_worker():
             await asyncio.sleep(backoff_time)
 
 
-# Start the worker after the app is ready
-@app.on_event("startup")
-async def startup_event():
-    # Initialize global credential service
-    credential_service = get_credential_service()
-    logger = get_logger(__name__)
-    logger.info(
-        f"Credential service initialized with providers: {list(credential_service.get_all_providers().keys())}"
-    )
 
-    asyncio.create_task(background_metrics_worker())
 
 
 init_db()
@@ -589,6 +579,13 @@ async def check_setup(request: Request, call_next):
 @app.on_event("startup")
 async def startup_event():
     """Initialize background tasks and warm up caches."""
+    # Initialize global credential service
+    credential_service = get_credential_service()
+    logger = get_logger(__name__)
+    logger.info(
+        f"Credential service initialized with providers: {list(credential_service.get_all_providers().keys())}"
+    )
+
     # Start background metrics worker
     asyncio.create_task(background_metrics_worker())
 

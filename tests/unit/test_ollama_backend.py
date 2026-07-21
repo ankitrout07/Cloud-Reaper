@@ -50,7 +50,9 @@ class TestOllamaEmbeddingBackend:
         mock_response = Mock()
         mock_response.raise_for_status = Mock()
         mock_response.json = Mock(return_value={"embedding": [0.1, 0.2, 0.3]})
-        mock_client.return_value.__enter__.return_value.post.return_value = mock_response
+        mock_client_instance = Mock()
+        mock_client_instance.post.return_value = mock_response
+        mock_client.return_value = mock_client_instance
 
         backend = OllamaEmbeddingBackend()
         embedding = backend.embed_text("test text")
@@ -60,7 +62,9 @@ class TestOllamaEmbeddingBackend:
     @patch("reaper.engine.ai_backends.ollama_backend.httpx.Client")
     def test_embed_text_failure(self, mock_client):
         """Test text embedding failure handling."""
-        mock_client.return_value.__enter__.return_value.post.side_effect = Exception("Connection error")
+        mock_client_instance = Mock()
+        mock_client_instance.post.side_effect = Exception("Connection error")
+        mock_client.return_value = mock_client_instance
 
         backend = OllamaEmbeddingBackend()
         with pytest.raises(RuntimeError, match="Ollama embedding error"):
@@ -77,7 +81,9 @@ class TestOllamaEmbeddingBackend:
                 {"name": "llama3.1:latest"},
             ]
         })
-        mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+        mock_client_instance = Mock()
+        mock_client_instance.get.return_value = mock_response
+        mock_client.return_value = mock_client_instance
 
         backend = OllamaEmbeddingBackend()
         assert backend.health_check() is True
@@ -92,7 +98,9 @@ class TestOllamaEmbeddingBackend:
                 {"name": "llama3.1:latest"},
             ]
         })
-        mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+        mock_client_instance = Mock()
+        mock_client_instance.get.return_value = mock_response
+        mock_client.return_value = mock_client_instance
 
         backend = OllamaEmbeddingBackend()
         assert backend.health_check() is False
@@ -100,7 +108,9 @@ class TestOllamaEmbeddingBackend:
     @patch("reaper.engine.ai_backends.ollama_backend.httpx.Client")
     def test_health_check_connection_failure(self, mock_client):
         """Test health check when connection fails."""
-        mock_client.return_value.__enter__.return_value.get.side_effect = Exception("Connection error")
+        mock_client_instance = Mock()
+        mock_client_instance.get.side_effect = Exception("Connection error")
+        mock_client.return_value = mock_client_instance
 
         backend = OllamaEmbeddingBackend()
         assert backend.health_check() is False
@@ -154,7 +164,9 @@ class TestOllamaGenerationBackend:
         mock_response = Mock()
         mock_response.raise_for_status = Mock()
         mock_response.json = Mock(return_value={"response": "Generated text"})
-        mock_client.return_value.__enter__.return_value.post.return_value = mock_response
+        mock_client_instance = Mock()
+        mock_client_instance.post.return_value = mock_response
+        mock_client.return_value = mock_client_instance
 
         backend = OllamaGenerationBackend()
         response = backend.generate_text("test prompt")
@@ -167,7 +179,9 @@ class TestOllamaGenerationBackend:
         mock_response = Mock()
         mock_response.raise_for_status = Mock()
         mock_response.json = Mock(return_value={"response": "Generated text"})
-        mock_client.return_value.__enter__.return_value.post.return_value = mock_response
+        mock_client_instance = Mock()
+        mock_client_instance.post.return_value = mock_response
+        mock_client.return_value = mock_client_instance
 
         backend = OllamaGenerationBackend()
         response = backend.generate_text(
@@ -183,7 +197,9 @@ class TestOllamaGenerationBackend:
         mock_response = Mock()
         mock_response.raise_for_status = Mock()
         mock_response.json = Mock(return_value={"response": '{"key": "value"}'})
-        mock_client.return_value.__enter__.return_value.post.return_value = mock_response
+        mock_client_instance = Mock()
+        mock_client_instance.post.return_value = mock_response
+        mock_client.return_value = mock_client_instance
 
         backend = OllamaGenerationBackend()
         response = backend.generate_text(
@@ -196,7 +212,9 @@ class TestOllamaGenerationBackend:
     @patch("reaper.engine.ai_backends.ollama_backend.httpx.Client")
     def test_generate_text_failure(self, mock_client):
         """Test text generation failure handling."""
-        mock_client.return_value.__enter__.return_value.post.side_effect = Exception("Connection error")
+        mock_client_instance = Mock()
+        mock_client_instance.post.side_effect = Exception("Connection error")
+        mock_client.return_value = mock_client_instance
 
         backend = OllamaGenerationBackend()
         with pytest.raises(RuntimeError, match="Ollama generation error"):
@@ -213,7 +231,9 @@ class TestOllamaGenerationBackend:
                 {"name": "nomic-embed-text:latest"},
             ]
         })
-        mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+        mock_client_instance = Mock()
+        mock_client_instance.get.return_value = mock_response
+        mock_client.return_value = mock_client_instance
 
         backend = OllamaGenerationBackend()
         assert backend.health_check() is True
@@ -228,7 +248,9 @@ class TestOllamaGenerationBackend:
                 {"name": "nomic-embed-text:latest"},
             ]
         })
-        mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+        mock_client_instance = Mock()
+        mock_client_instance.get.return_value = mock_response
+        mock_client.return_value = mock_client_instance
 
         backend = OllamaGenerationBackend()
         assert backend.health_check() is False

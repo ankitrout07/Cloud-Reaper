@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 import os
 import platform
 import subprocess
@@ -62,6 +63,8 @@ def _get_azure_client(service_name):
 from reaper.collectors.prices.azure import AzurePriceClient
 from reaper.engine.core.logic import BudgetForecaster
 from reaper.engine.models.resources import CostHistory, RegionPriceCache, SessionLocal
+
+logger = logging.getLogger(__name__)
 
 
 def _reaper_engine_binary() -> Path | None:
@@ -201,7 +204,8 @@ class AzureCollector:
 
         try:
             self.resource_client = ResourceManagementClient(self.credentials, self.subscription_id)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to initialize ResourceManagementClient: {e}")
             self.resource_client = None
 
         # Extended clients — lazily initialized via properties
@@ -235,7 +239,7 @@ class AzureCollector:
             try:
                 vms = list(self.compute.virtual_machines.list_all())
             except Exception as e:
-                print(f"[!] Error listing VMs: {e}")
+                logger.error(f"Error listing VMs: {e}")
                 return []
 
             def process_vm(vm):
@@ -281,7 +285,7 @@ class AzureCollector:
                         if data_points:
                             cpu_utilization = sum(data_points) / len(data_points)
                 except Exception as e:
-                    print(f"[!] Error fetching metrics for VM {vm.name}: {e}")
+                    logger.error(f"Error fetching metrics for VM {vm.name}: {e}")
 
                 return {
                     "name": vm.name,
@@ -306,7 +310,7 @@ class AzureCollector:
                     if result is not None:
                         results.append(result)
                 except Exception as e:
-                    print(f"[!] Error processing VM: {e}")
+                    logger.error(f"Error processing VM: {e}")
             return results
 
         return get_cached_data(cache_key, fetch, ttl_seconds=60)
@@ -376,7 +380,7 @@ class AzureCollector:
                         "location": location,
                     }
             except Exception as e:
-                print(f"[!] Error checking idle VM {vm.name}: {e}")
+                logger.error(f"Error checking idle VM {vm.name}: {e}")
             return None
 
         # Query in parallel using shared executor to eliminate long loading lag in dashboard
@@ -489,7 +493,7 @@ class AzureCollector:
             empty["peak_cpu_utilization"] = cpu_avg
             return empty
         except Exception as e:
-            print(f"[-] Error fetching metrics for {resource_id}: {e}")
+            logger.error(f"Error fetching metrics for {resource_id}: {e}")
             return empty
 
     def get_vm_metric_latest(
@@ -514,7 +518,7 @@ class AzureCollector:
                     return float(point.average)
             return None
         except Exception as e:
-            print(f"[-] Error fetching {metric_name} for {resource_id}: {e}")
+            logger.error(f"Error fetching {metric_name} for {resource_id}: {e}")
             return None
 
     def get_live_subscription_cpu_average(self, max_vms: int = 6) -> float | None:
@@ -570,7 +574,7 @@ class AzureCollector:
         try:
             return sorted([rg.name for rg in self.resource_client.resource_groups.list()])
         except Exception as e:
-            print(f"[!] Error fetching resource groups: {e}")
+            logger.error(f"Error fetching resource groups: {e}")
             return []
 
     def get_cost_vs_budget_series(self, monthly_budget: float = 5000.0, resource_group: str = None) -> dict:
@@ -637,7 +641,7 @@ class AzureCollector:
                     continue
                 by_service[str(row[2])] += float(row[0])
         except Exception as e:
-            print(f"[-] Service bucket spend query failed: {e}")
+            logger.error(f"Service bucket spend query failed: {e}")
             return default
 
         buckets = {"Compute": 0.0, "Storage": 0.0, "Networking": 0.0, "Other": 0.0}
@@ -775,7 +779,7 @@ class AzureCollector:
                 return empty
             return {"labels": labels[-24:], "values": values[-24:]}
         except Exception as e:
-            print(f"[-] Hourly CPU profile failed: {e}")
+            logger.error(f"Hourly CPU profile failed: {e}")
             return empty
 
     def get_finops_dashboard_snapshot(self, monthly_budget: float, resource_group: str = None) -> dict:
@@ -910,7 +914,7 @@ class AzureCollector:
                                 avg_cpu = sum(data_points) / len(data_points)
                                 is_idle = avg_cpu < 5.0  # Consider idle if average CPU < 5%
                     except Exception as e:
-                        print(f"[!] Error checking SQL database metrics for {db.name}: {e}")
+                        logger.error(f"Error checking SQL database metrics for {db.name}: {e}")
                         # Default to not idle if metrics check fails
                         is_idle = False
 
@@ -1095,7 +1099,7 @@ class AzureCollector:
             anomalies.sort(key=lambda x: x["cost"], reverse=True)
             return anomalies[:5]
         except Exception as e:
-            print(f"Cost Management API Error: {e}")
+            logger.error(f"Cost Management API Error: {e}")
             return []
 
     def get_ri_sp_candidates(self):
@@ -1114,7 +1118,7 @@ class AzureCollector:
                     }
                 )
         except Exception as e:
-            print(f"[-] RI Recommendation API Error (Falling back to heuristic): {e}")
+            logger.error(f"RI Recommendation API Error (Falling back to heuristic): {e}")
 
         if not candidates:
             # If no API recommendations, we look at the inventory for high-usage families
@@ -1136,7 +1140,7 @@ class AzureCollector:
                             }
                         )
             except Exception as e:
-                print(f"[-] RI Fallback Inventory Scan Error: {e}")
+                logger.error(f"RI Fallback Inventory Scan Error: {e}")
         return candidates[:5]
 
     def get_cold_storage_candidates(self):
@@ -1169,7 +1173,7 @@ class AzureCollector:
                                     size_bytes = sum(data_points) / len(data_points)
                                     size_gb = size_bytes / (1024**3)
                     except Exception as e:
-                        print(f"[!] Error getting storage size for {acc.name}: {e}")
+                        logger.error(f"Error getting storage size for {acc.name}: {e}")
 
                     if size_gb > 0:
                         candidates.append(
@@ -1182,7 +1186,7 @@ class AzureCollector:
                             }
                         )
         except Exception as e:
-            print(f"[!] Error fetching cold storage candidates: {e}")
+            logger.error(f"Error fetching cold storage candidates: {e}")
 
         return candidates[:5]
 
@@ -1202,7 +1206,7 @@ class AzureCollector:
                         {"name": vm.name, "target": "Azure SQL (Managed)", "annual_savings": 2160.0}
                     )
         except Exception as e:
-            print(f"[!] Error fetching modernization candidates: {e}")
+            logger.error(f"Error fetching modernization candidates: {e}")
 
         if not candidates:
             # High-fidelity realistic modernization targets based on VM sizing standards
@@ -1260,7 +1264,7 @@ class AzureCollector:
 
             return violations
         except Exception as e:
-            print(f"Resource Graph API Error: {e}")
+            logger.error(f"Resource Graph API Error: {e}")
             return []
 
     def get_budget_status(self):
@@ -1301,7 +1305,7 @@ class AzureCollector:
                 )
             return results
         except Exception as e:
-            print(f"[-] Budget API Error: {e}")
+            logger.error(f"Budget API Error: {e}")
             return []
 
     def fast_scan(self):
@@ -1318,7 +1322,7 @@ class AzureCollector:
         try:
             return AzurePriceClient().get_catalog_prices()
         except Exception as e:
-            print(f"[-] Failed to fetch Azure prices: {e}")
+            logger.error(f"Failed to fetch Azure prices: {e}")
             return []
 
     def get_go_scan_results(self):
@@ -1346,10 +1350,10 @@ class AzureCollector:
                 )
                 if result.returncode == 0:
                     return json.loads(result.stdout)
-                print(f"[-] Go Engine Error: {result.stderr}")
+                logger.error(f"Go Engine Error: {result.stderr}")
                 return {}
             except Exception as e:
-                print(f"[-] Failed to execute Go Scraper: {e}")
+                logger.error(f"Failed to execute Go Scraper: {e}")
                 return {}
 
         return get_cached_data(cache_key, fetch, ttl_seconds=60)
@@ -1423,7 +1427,7 @@ class AzureCollector:
                     with _COST_CACHE_LOCK:
                         _COST_FORECAST_CACHE[cache_key] = (now, spend_data)
             except Exception as e:
-                print(f"Cost Management API Error: {e}")
+                logger.error(f"Cost Management API Error: {e}")
 
         # Fallback to DB if API fails
         if not spend_data:
@@ -1566,7 +1570,7 @@ class AzureCollector:
                         }
                     )
         except Exception as e:
-            print(f"[!] Error fetching regional arbitrage recommendations: {e}")
+            logger.error(f"Error fetching regional arbitrage recommendations: {e}")
 
         # Fallback to highly detailed grid savings examples if no live VMs or API connection fails
         if not recommendations:
@@ -1629,9 +1633,9 @@ class AzureCollector:
                     actual_costs = self._get_actual_cost_management_costs()
                     if actual_costs:
                         current_month_spend = actual_costs.get("total_monthly_cost", 0.0)
-                        print(f"[TMF] Using actual current month spend: ${current_month_spend:.2f}")
+                        logger.info(f"Using actual current month spend: ${current_month_spend:.2f}")
                 except Exception as e:
-                    print(f"[!] Error fetching actual current month spend: {e}")
+                    logger.error(f"Error fetching actual current month spend: {e}")
 
             # Fall back to get_cost_vs_budget_series if actual costs not available
             if current_month_spend == 0.0:
@@ -1669,7 +1673,7 @@ class AzureCollector:
                 "forecast": forecast,
             }
         except Exception as e:
-            print(f"[!] Error in get_cost_vs_budget: {e}")
+            logger.error(f"Error in get_cost_vs_budget: {e}")
             return {
                 "cumulative_spend": [],
                 "budget_pace": [],
@@ -1692,7 +1696,7 @@ class AzureCollector:
                 "source": "live" if series.get("cumulative_spend") else "empty",
             }
         except Exception as e:
-            print(f"[!] Cost vs budget chart error: {e}")
+            logger.error(f"Cost vs budget chart error: {e}")
             return {"labels": [], "cumulative_spend": [], "budget_pace": [], "source": "error"}
 
     def get_active_commitments(self) -> list:
@@ -1822,7 +1826,7 @@ class AzureCollector:
                     }
                 )
         except Exception as e:
-            print(f"[!] Error fetching policy violations: {e}")
+            logger.error(f"Error fetching policy violations: {e}")
 
         try:
             # Get idle VMs
@@ -1841,7 +1845,7 @@ class AzureCollector:
                         }
                     )
         except Exception as e:
-            print(f"[!] Error fetching idle VMs: {e}")
+            logger.error(f"Error fetching idle VMs: {e}")
 
         try:
             # Get orphaned disks
@@ -1860,7 +1864,7 @@ class AzureCollector:
                         }
                     )
         except Exception as e:
-            print(f"[!] Error processing orphaned disks: {e}")
+            logger.error(f"Error processing orphaned disks: {e}")
 
         return issues
 

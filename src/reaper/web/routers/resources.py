@@ -158,7 +158,7 @@ async def get_resource_inventory(request: Request):
                     },
                 )
         except Exception as e:
-            print(f"[!] Error fetching VMs: {e}")
+            logger.error(f"Error fetching VMs: {e}")
 
         # ---- Disks ----
         try:
