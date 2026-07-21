@@ -212,13 +212,18 @@ Cloud-Reaper/
 │   │   ├── services/           # Background services
 │   │   │   ├── log_streamer.py       # WebSocket log streaming service
 │   │   │   └── pusher.py             # Notification service (placeholder for future telemetry)
-│   │   └── web/                # Flask app, templates, static assets
+│   │   └── web/                # FastAPI app, templates, static assets
 │   │       ├── app_async.py          # Main FastAPI/SocketIO application
+│   │       ├── routers/              # Modular API routers
+│   │       │   ├── settings.py       # Blueprint: /api/settings
+│   │       │   ├── vault.py          # Blueprint: /api/vault
+│   │       │   ├── financial.py      # Blueprint: /api/financial
+│   │       │   ├── finops.py         # Blueprint: /api/finops
+│   │       │   ├── resources.py      # Blueprint: /api/resources
+│   │       │   └── cost_optimization.py # Blueprint: /api/cost-optimization
 │   │       ├── copilot_router.py     # Blueprint: /api/v1/copilot/optimize
 │   │       ├── metrics_router.py     # Blueprint: /api/metrics/*
 │   │       ├── search_router.py      # Blueprint: /api/search
-│   │       ├── go_bridge.py          # HTTP bridge to Go engine
-│   │       ├── vault_crypto.py       # PBKDF2 + Fernet encryption helpers
 │   │       ├── templates/            # Jinja2 templates (15 pages)
 │   │       └── static/              # CSS (Glassmorphism Dark Theme), JS, assets
 │   └── engine-go/              # Go High-Velocity Performance Core
@@ -300,6 +305,7 @@ The Cloud-Reaper project has been verified to be correctly wired and fully funct
 **Test Coverage**: 53/53 Python unit tests passing across all core modules including RAG search, copilot engine, financial routes, workload analysis, and webhook integrations.
 
 **Recent Updates**:
+- **Architecture**: Refactored monolithic web routes into a modular `routers/` package for improved maintainability.
 - **Security First**: Implemented dry-run mode as default, read-only IAM policies, and explicit remediation toggles
 - **Data Integrity**: Eliminated all simulated/fake data fallbacks from entire codebase
 - **Error Handling**: API endpoints return 503 errors with user-friendly messages when cloud provider data fetch fails

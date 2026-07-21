@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] / Recent Updates
 
+### 🏗️ Architecture & Refactoring
+- **Modular Web Routing**: Refactored the `app_async.py` main application file by splitting monolithic routes into a dedicated `routers/` package. Routes are now logically separated into `settings.py`, `vault.py`, `financial.py`, `finops.py`, `resources.py`, and `cost_optimization.py` for improved maintainability.
+
+### 🛠️ Bug Fixes & Stabilization
+- **Logging Improvements**: Replaced `print()` statements with proper `logger.error()` and `logger.info()` in `azure_collector.py` and `resources.py`.
+- **Startup Sequence**: Reordered initialization events in `app_async.py` to ensure the credential service initializes before the background metrics worker starts.
+- **Testing Fixes**: Resolved mock context manager issues in `test_ollama_backend.py` for `httpx.Client` and dynamically patched `is_first_run` properly in `test_financial_routes.py`.
+
 ### 🔒 Security-First Architecture
 - **Dry-Run Mode by Default**: Implemented dry-run mode as default behavior to prevent accidental resource modifications in production environments
 - **Read-Only IAM Policies**: Updated default IAM policies to use ReadOnlyAccess/ViewOnlyAccess permissions for initial setup
