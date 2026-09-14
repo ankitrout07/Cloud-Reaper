@@ -144,7 +144,9 @@ func (s *AWSScraper) ScanResources() ([]models.Resource, error) {
 	for snapPager.HasMorePages() {
 		page, err := snapPager.NextPage(ctx)
 		if err != nil {
-			break // Non-fatal; skip snapshots on error
+			// Non-fatal; log and skip snapshots on error
+			fmt.Printf("[aws] describe snapshots error (non-fatal): %v\n", err)
+			break
 		}
 		for _, snap := range page.Snapshots {
 			if snap.StartTime != nil && time.Since(*snap.StartTime) > 30*24*time.Hour {
@@ -288,6 +290,8 @@ func (a *AzureScraper) scanVMs(ctx context.Context) ([]models.Resource, error) {
 		_ = a.limiter.Wait(ctx)
 		page, err := pager.NextPage(ctx)
 		if err != nil {
+			// Non-fatal; log and continue with other resources
+			fmt.Printf("[azure] scan vms error (non-fatal): %v\n", err)
 			break
 		}
 
@@ -389,6 +393,8 @@ func (a *AzureScraper) scanDisks(ctx context.Context) ([]models.Resource, error)
 		_ = a.limiter.Wait(ctx)
 		page, err := diskPager.NextPage(ctx)
 		if err != nil {
+			// Non-fatal; log and continue with other resources
+			fmt.Printf("[azure] scan disks error (non-fatal): %v\n", err)
 			break
 		}
 		for _, disk := range page.Value {
@@ -586,12 +592,14 @@ func (s *GCPScraper) ScanResources() ([]models.Resource, error) {
 
 	disks, err := s.scanDisks(now)
 	if err != nil {
+		fmt.Printf("[gcp] scan disks error (non-fatal, returning partial results): %v\n", err)
 		return resources, err
 	}
 	resources = append(resources, disks...)
 
 	snaps, err := s.scanSnapshots(now)
 	if err != nil {
+		fmt.Printf("[gcp] scan snapshots error (non-fatal, returning partial results): %v\n", err)
 		return resources, err
 	}
 	resources = append(resources, snaps...)
