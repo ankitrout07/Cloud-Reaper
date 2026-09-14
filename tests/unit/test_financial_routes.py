@@ -13,11 +13,14 @@ from reaper.web.app_async import app
 class FinancialRoutesTestCase(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
-        self.patcher = patch("reaper.web.routers.financial.app_is_first_run", return_value=False)
-        self.mock_first_run = self.patcher.start()
+        self.patcher1 = patch("reaper.web.app_async.is_first_run", return_value=False)
+        self.patcher2 = patch("reaper.web.routers.financial.app_is_first_run", return_value=False)
+        self.patcher1.start()
+        self.patcher2.start()
 
     def tearDown(self):
-        self.patcher.stop()
+        self.patcher1.stop()
+        self.patcher2.stop()
 
     def test_financial_page_redirect_or_load(self):
         """Test that the /financial page loads successfully with various tabs."""

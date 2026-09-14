@@ -17,7 +17,7 @@ import numpy as np
 from unittest.mock import Mock, patch, MagicMock
 import time
 
-from src.reaper.rag.enhanced_engine import (
+from reaper.rag.enhanced_engine import (
     LearnableRanking,
     DeterminantalPointProcesses,
     LocalSemanticSearch,
@@ -163,7 +163,7 @@ class TestDeterminantalPointProcesses:
 class TestLocalSemanticSearch:
     """Test local semantic search functionality."""
 
-    @patch('src.reaper.rag.enhanced_engine.SentenceTransformer')
+    @patch('reaper.rag.enhanced_engine.SentenceTransformer')
     def test_model_initialization(self, mock_transformer):
         """Test local model initialization."""
         mock_model = Mock()
@@ -184,7 +184,7 @@ class TestLocalSemanticSearch:
 
         assert len(embeddings) == 0
 
-    @patch('src.reaper.rag.enhanced_engine.SentenceTransformer')
+    @patch('reaper.rag.enhanced_engine.SentenceTransformer')
     def test_query_embedding(self, mock_transformer):
         """Test query embedding generation."""
         mock_model = Mock()
@@ -524,7 +524,7 @@ class TestPersonalizationEngine:
 class TestEnhancedRAGEngine:
     """Test integrated enhanced RAG engine."""
 
-    @patch('src.reaper.rag.enhanced_engine.redis')
+    @patch('reaper.rag.enhanced_engine.redis')
     def test_initialization(self, mock_redis):
         """Test enhanced RAG engine initialization."""
         mock_client = Mock()
@@ -545,7 +545,7 @@ class TestEnhancedRAGEngine:
         assert engine.faceted_search is not None
         assert engine.query_optimizer is not None
 
-    @patch('src.reaper.rag.enhanced_engine.redis')
+    @patch('reaper.rag.enhanced_engine.redis')
     def test_search_with_caching(self, mock_redis):
         """Test search with result caching."""
         mock_client = Mock()
@@ -564,7 +564,7 @@ class TestEnhancedRAGEngine:
         assert result['cache_hit'] == True
         assert result['results'] == test_results
 
-    @patch('src.reaper.rag.enhanced_engine.redis')
+    @patch('reaper.rag.enhanced_engine.redis')
     def test_search_with_query_optimization(self, mock_redis):
         """Test search with query optimization."""
         mock_client = Mock()
@@ -582,7 +582,7 @@ class TestEnhancedRAGEngine:
         assert 'query_optimization' in result
         assert result['query_optimization']['original_query'] == "how to optimize costs"
 
-    @patch('src.reaper.rag.enhanced_engine.redis')
+    @patch('reaper.rag.enhanced_engine.redis')
     def test_feedback_integration(self, mock_redis):
         """Test feedback integration across components."""
         mock_client = Mock()
@@ -600,7 +600,7 @@ class TestEnhancedRAGEngine:
         # Check that personalization was updated
         assert "user-1" in engine.personalization.user_history
 
-    @patch('src.reaper.rag.enhanced_engine.redis')
+    @patch('reaper.rag.enhanced_engine.redis')
     def test_analytics_collection(self, mock_redis):
         """Test analytics collection across components."""
         mock_client = Mock()

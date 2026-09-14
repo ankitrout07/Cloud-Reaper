@@ -9,8 +9,8 @@ from reaper.collectors.providers.azure_collector import AzureCollector
 from reaper.utils.error_handler import get_logger
 from reaper.web.app_async import is_first_run as app_is_first_run, settings_state
 
-# Export is_first_run for testing
-is_first_run = app_is_first_run
+def is_first_run():
+    return app_is_first_run()
 
 
 def jsonify(*args, **kwargs):

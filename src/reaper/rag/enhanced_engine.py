@@ -24,14 +24,30 @@ from typing import Any, Dict, List, Optional, Tuple
 from functools import lru_cache
 
 import numpy as np
-import redis
-import xgboost as xgb
-from sentence_transformers import SentenceTransformer
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import StandardScaler
-import faiss
+
+try:
+    import redis
+except ImportError:
+    redis = None
+
+try:
+    import xgboost as xgb
+except Exception:
+    xgb = None
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None
+
+try:
+    import faiss
+except ImportError:
+    faiss = None
 
 from reaper.utils.error_handler import get_logger
 
@@ -67,7 +83,7 @@ class LearnableRanking:
     
     def _initialize_model(self):
         """Initialize the ranking model based on type."""
-        if self.model_type == "xgboost":
+        if self.model_type == "xgboost" and xgb is not None:
             self.model = xgb.XGBRegressor(
                 n_estimators=100,
                 max_depth=6,
@@ -85,15 +101,26 @@ class LearnableRanking:
                     random_state=42
                 )
             except ImportError:
-                logger.warning("LightGBM not available, falling back to XGBoost")
-                self.model = xgb.XGBRegressor(
-                    n_estimators=100,
-                    max_depth=6,
-                    learning_rate=0.1,
-                    objective='reg:squarederror',
-                    random_state=42
-                )
-        else:  # sklearn
+                if xgb is not None:
+                    logger.warning("LightGBM not available, falling back to XGBoost")
+                    self.model = xgb.XGBRegressor(
+                        n_estimators=100,
+                        max_depth=6,
+                        learning_rate=0.1,
+                        objective='reg:squarederror',
+                        random_state=42
+                    )
+                else:
+                    logger.warning("LightGBM/XGBoost not available, falling back to sklearn")
+                    self.model = GradientBoostingRegressor(
+                        n_estimators=100,
+                        max_depth=6,
+                        learning_rate=0.1,
+                        random_state=42
+                    )
+        else:  # sklearn or xgboost fallback
+            if self.model_type == "xgboost" and xgb is None:
+                logger.warning("XGBoost library not available, falling back to sklearn GradientBoostingRegressor")
             self.model = GradientBoostingRegressor(
                 n_estimators=100,
                 max_depth=6,
@@ -524,9 +551,13 @@ class LocalSemanticSearch:
     def _load_model(self):
         """Load the local embedding model."""
         try:
-            logger.info(f"Loading local embedding model: {self.model_name}")
-            self.model = SentenceTransformer(self.model_name)
-            logger.info("Local embedding model loaded successfully")
+            if SentenceTransformer is not None:
+                logger.info(f"Loading local embedding model: {self.model_name}")
+                self.model = SentenceTransformer(self.model_name)
+                logger.info("Local embedding model loaded successfully")
+            else:
+                logger.warning("SentenceTransformer package not installed, local embeddings disabled")
+                self.model = None
         except Exception as e:
             logger.error(f"Failed to load local embedding model: {e}")
             self.model = None
