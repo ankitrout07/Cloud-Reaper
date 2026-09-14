@@ -267,14 +267,16 @@ class WebSocketBatcher:
         # Try to use Go backend if available and enabled
         self.use_go_backend = use_go_backend and GO_WEBSOCKET_AVAILABLE
         self.go_batcher: GoWebSocketBatcher | None = None
+        self.websocket_host = "localhost"  # Default host
+        self.websocket_port = 7072  # Default port
 
         if self.use_go_backend:
             try:
                 # Get Go WebSocket batcher host/port from environment or use defaults
-                os.getenv("GO_WEBSOCKET_HOST", "localhost")
-                int(os.getenv("GO_WEBSOCKET_PORT", "7072"))
+                self.websocket_host = os.getenv("GO_WEBSOCKET_HOST", "localhost")
+                self.websocket_port = int(os.getenv("GO_WEBSOCKET_PORT", "7072"))
                 # Don't initialize immediately, will be done lazily
-                print("[Go WebSocket Batcher] Using Go backend for enhanced performance")
+                print(f"[Go WebSocket Batcher] Using Go backend at {self.websocket_host}:{self.websocket_port}")
             except (ValueError, TypeError) as e:
                 print(f"[Go WebSocket Batcher] Invalid configuration: {e}, falling back to Python")
                 self.use_go_backend = False
@@ -283,8 +285,6 @@ class WebSocketBatcher:
                 print(
                     f"[Go WebSocket Batcher] Unexpected error initializing: {e}, falling back to Python"
                 )
-                self.use_go_backend = False
-                self.go_batcher = None
 
     async def emit(self, event: str, data: dict, room: str | None = None):
         """Queue a message for batched emission."""

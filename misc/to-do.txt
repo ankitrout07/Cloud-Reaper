@@ -1,0 +1,51 @@
+Cloud-Reaper: Architectural Assessment & Improvement Plan
+Based on a comprehensive review of the Cloud-Reaper repository (26k+ lines of Python, 13k+ lines of Go), this document outlines the key areas for technical improvement, debt reduction, and architectural scaling.
+
+User Review Required
+IMPORTANT
+
+The following represents a high-level strategic roadmap for improving the codebase. Please review the proposed phases below and let me know which area(s) you would like to prioritize for execution first.
+
+1. Modularization of "God Classes" (High Priority)
+The Python intelligence layer currently suffers from severe centralization in a few massive files, making maintenance and concurrent development difficult.
+
+Proposed Changes
+Deconstruct azure_collector.py (3,186 lines):
+Split into a dedicated azure/ package: compute.py, storage.py, network.py, cost.py, and governance.py.
+Use azure_collector.py solely as a Facade class that delegates to these domain-specific modules.
+Deconstruct app_async.py (2,029 lines):
+While routes have been successfully moved to the routers/ package, app_async.py is still monolithic.
+Extract background tasks (like background_metrics_worker) into a dedicated workers/ package.
+Extract the FastAPI/SocketIO initialization and middleware into a core/app_factory.py.
+Refactor cost_optimizer.py (1,265 lines) & architect.py (903 lines):
+Extract large heuristics and RL configuration dictionaries into YAML/JSON config files or dedicated config classes.
+Break down monolithic optimization pipelines into smaller, composable rule-engine classes.
+2. Go-Python Inter-Process Communication (IPC)
+Currently, the Dual-Core architecture communicates via custom HTTP bridges and WebSockets (go_bridge.py, go_stream_bridge.py).
+
+Proposed Changes
+Migrate to gRPC & Protocol Buffers:
+Replace the REST/WebSocket bridges with gRPC.
+Why? Protobufs enforce strict data contracts between Go and Python, preventing runtime type errors. gRPC streaming is significantly more efficient and robust than raw WebSockets for internal microservice communication.
+Define .proto files for resource payloads and telemetry streams.
+3. Testing & CI/CD Robustness
+With ~26k lines of Python code, 53 unit tests implies critically low test coverage, particularly for a financial/optimization engine where calculation errors are expensive.
+
+Proposed Changes
+Expand Core Logic Coverage: Add parameterized tests for logic.py, calculator.py, and architect.py.
+Fix Failing Tests: Investigate and resolve the collection error currently plaguing test_enhanced_rag.py in the CI pipeline.
+Dependency Injection: Refactor the collectors to accept mocked cloud provider clients via Dependency Injection, eliminating the need for complex, brittle patch decorators (like the one skipped in test_financial_routes.py).
+4. Database Concurrency Constraints
+The project aims for "massive scanning speeds" using highly concurrent Go scrapers, but defaults to SQLite (sqlite:///./data/reaper.db).
+
+Proposed Changes
+PostgreSQL Readiness: SQLite threading.Lock and file-level locks will severely bottleneck the 10 req/s Go goroutines when they write results.
+Introduce a clear migration path or docker-compose setup for PostgreSQL (the Go bridge already imports pgx/v5 according to the architecture diagram, but Python is heavily leaning on SQLite).
+Ensure SQLAlchemy models are strictly using aiosqlite or asyncpg async sessions to prevent event loop blocking in FastAPI.
+Next Steps
+Which of the above areas should we tackle first?
+
+Refactoring monolithic files (e.g., slicing up azure_collector.py)
+Upgrading IPC (Starting the gRPC migration)
+Test Stabilization (Fixing current test errors and expanding coverage)
+Database/Async optimizations

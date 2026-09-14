@@ -416,5 +416,4 @@ async def vault_config_alias(request: Request):
     Used by performance-utils.js to persist vault configuration.
     The payload shape is identical to the setup endpoint.
     """
-    from reaper.web.routers.vault import setup_vault
-    return await setup_vault(request)
+    return await vault_setup(request)

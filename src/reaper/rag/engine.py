@@ -8,6 +8,7 @@ import re
 import time
 from collections import Counter
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from google import genai
 
@@ -327,9 +328,7 @@ class DocSearchEngine:
                     if ai_summary:
                         summary = ai_summary.strip()
             # Only generate via API if client looks real and has models
-            elif hasattr(self.client, "models") and not isinstance(
-                self.client, MagicMock if "MagicMock" in globals() else object
-            ):
+            elif hasattr(self.client, "models") and not isinstance(self.client, MagicMock):
                 prompt = (
                     f"Create a 1-sentence global summary of this document to situational-contextualize short chunks for a RAG retriever.\n"
                     f"Document Title: {h1_title}\n\nContent:\n{content[:1500]}"
@@ -522,10 +521,7 @@ class DocSearchEngine:
 
     def _rerank_candidates_gemini(self, user_query: str, top_candidates: list) -> list:
         scored_candidates = []
-        if not (
-            hasattr(self.client, "models")
-            and not isinstance(self.client, MagicMock if "MagicMock" in globals() else object)
-        ):
+        if not (hasattr(self.client, "models") and not isinstance(self.client, MagicMock)):
             return []
 
         candidates_str = ""
