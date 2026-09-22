@@ -191,6 +191,17 @@ def cmd_check(args: argparse.Namespace) -> int:  # noqa: ARG001
     print("      curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash")
     return 1
 
+def _quick_check() -> bool:
+    """Fast prerequisite check for run command (verifies core tools exist)."""
+    required = ["python3", "go"]
+    if platform.system() == "Linux":
+        required.append("pkg-config")
+    missing = [b for b in required if not shutil.which(b)]
+    if missing:
+        print(c(f"  {c('✗', RED)}  Missing required tool(s): {', '.join(missing)}", RED))
+        return False
+    return True
+
 
 def cmd_install(args: argparse.Namespace) -> int:
     """Create venv and install Python runtime + dev dependencies."""
@@ -199,6 +210,28 @@ def cmd_install(args: argparse.Namespace) -> int:
     venv_dir = REPO_ROOT / "venv"
     bindir = _venv_bin_dir(venv_dir)
     pip_path = bindir / "pip"
+
+    req = REPO_ROOT / "requirements.txt"
+    dev_req = REPO_ROOT / "requirements-dev.txt"
+    no_dev = getattr(args, "no_dev", False)
+    force = getattr(args, "force", False)
+
+    # Check cached deps stamp for fast startup
+    deps_stamp = venv_dir / ".deps_stamp"
+    deps_fingerprint = ""
+    for r in [req, dev_req if not no_dev else None]:
+        if r and r.is_file():
+            deps_fingerprint += f"{r.name}:{r.stat().st_mtime}:{r.stat().st_size};"
+
+    if (
+        not force
+        and venv_dir.exists()
+        and pip_path.is_file()
+        and deps_stamp.is_file()
+        and deps_stamp.read_text(encoding="utf-8").strip() == deps_fingerprint
+    ):
+        print(c("  Virtual environment and dependencies up-to-date (cached).", GREEN))
+        return 0
 
     # --- Create venv ---
     if not venv_dir.exists():
@@ -216,7 +249,6 @@ def cmd_install(args: argparse.Namespace) -> int:
     run_cmd([str(pip_path), "install", "--upgrade", "pip", "--quiet"], env=venv_env)
 
     # --- Runtime deps ---
-    req = REPO_ROOT / "requirements.txt"
     if not req.is_file():
         print(c(f"[!] requirements.txt not found at {req}", RED))
         return 1
@@ -226,8 +258,7 @@ def cmd_install(args: argparse.Namespace) -> int:
         return 1
 
     # --- Dev deps ---
-    dev_req = REPO_ROOT / "requirements-dev.txt"
-    if dev_req.is_file() and not getattr(args, "no_dev", False):
+    if dev_req.is_file() and not no_dev:
         print(c("  Installing dev dependencies (requirements-dev.txt) …", CYAN))
         if not run_cmd([str(pip_path), "install", "-r", str(dev_req), "--quiet"], env=venv_env):
             print(c("[!] pip install -r requirements-dev.txt failed.", RED))
@@ -239,6 +270,12 @@ def cmd_install(args: argparse.Namespace) -> int:
         if engine_dir.is_dir():
             print(c("  Downloading Go modules …", CYAN))
             run_cmd(["go", "mod", "download"], cwd=engine_dir)
+
+    # Write stamp on success
+    try:
+        deps_stamp.write_text(deps_fingerprint, encoding="utf-8")
+    except OSError:
+        pass
 
     print(c("\n[✔] Install complete.\n", GREEN))
     return 0
@@ -296,10 +333,28 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
         {"name": "ratelimitserver", "path": "./cmd/ratelimitserver", "tags": ""},
     ]
 
+    rebuild = getattr(args, "rebuild", False)
+
+    def _needs_build(out_file: Path) -> bool:
+        if rebuild or not out_file.exists():
+            return True
+        bin_mtime = out_file.stat().st_mtime
+        for f in engine_dir.rglob("*.go"):
+            try:
+                if f.stat().st_mtime > bin_mtime:
+                    return True
+            except OSError:
+                pass
+        return False
+
     failed = False
     for target in targets:
         binary_name = f"{target['name']}{exe_ext}"
         output_path = (bin_dir / binary_name).resolve()
+        if not _needs_build(output_path):
+            print(c(f"  ✓ {target['name']} up-to-date", GREEN))
+            continue
+
         print(c(f"  Building → {output_path}", CYAN))
         
         cmd = [go_bin, "build"]
@@ -404,12 +459,16 @@ def cmd_metrics(args: argparse.Namespace) -> int:  # noqa: ARG001
 
 
 def _init_database() -> bool:
-    """Initialize the SQLite database with schema."""
-    print(c("  Initializing database …", CYAN))
+    """Initialize the SQLite database with schema if not already initialized."""
     data_dir = REPO_ROOT / "data"
     data_dir.mkdir(exist_ok=True)
     db_path = data_dir / "reaper.db"
 
+    if db_path.exists() and db_path.stat().st_size > 0:
+        print(c(f"  Database ready: {db_path}", GREEN))
+        return True
+
+    print(c("  Initializing database …", CYAN))
     try:
         # Use venv Python for database initialization to ensure all dependencies are available
         venv_dir, py_exe = _require_venv()
@@ -434,10 +493,7 @@ def _init_database() -> bool:
         )
 
         if result.returncode == 0:
-            if db_path.exists():
-                print(c(f"  Database ready: {db_path}", GREEN))
-            else:
-                print(c(f"  Database created: {db_path}", GREEN))
+            print(c(f"  Database created: {db_path}", GREEN))
             return True
         print(c(f"  Database initialization warning: {result.stderr}", YELLOW))
         # Don't fail - SQLite will auto-create on first use
@@ -452,14 +508,12 @@ def cmd_web(args: argparse.Namespace) -> int:
     """Launch the FastAPI ASGI dashboard and Go HTTP bridge."""
     print(c("\n[web] Starting FastAPI ASGI dashboard\n", BOLD))
 
-    # Setup env file (safe to call multiple times)
-    _setup_env_file()
+    port = str(getattr(args, "port", None) or _setup_env_file())
 
     venv_dir, py_exe = _require_venv()
     if py_exe is None:
         return 1
 
-    port = getattr(args, "port", None) or _read_port_from_env()
     env = merge_venv_into_environ(venv_dir)
     env["PYTHONPATH"] = str((REPO_ROOT / "src").resolve())
     env["FLASK_PORT"] = str(port)
@@ -487,20 +541,24 @@ def cmd_web(args: argparse.Namespace) -> int:
             {"name": "ratelimitserver", "args": ["-port", env.get("GO_RATELIMITER_PORT", "7073")], "port": 7073},
         ]
         
-        for svc in services:
+        def _start_service(svc: dict) -> subprocess.Popen | None:
             go_bin = REPO_ROOT / "bin" / f"{svc['name']}{exe_ext}"
             if go_bin.exists():
                 print(c(f"  Starting {svc['name']} (port {svc['port']}) …", CYAN))
-                proc = subprocess.Popen(
+                return subprocess.Popen(
                     [str(go_bin)] + svc["args"],
                     cwd=str(REPO_ROOT),
                     env=env,
                     stdout=subprocess.DEVNULL,  # Keep Uvicorn logs clean
                     stderr=subprocess.DEVNULL,
                 )
-                go_procs.append(proc)
             else:
                 print(c(f"  [⚠] {svc['name']} binary not found in bin/. Features may fallback.", YELLOW))
+                return None
+
+        with ThreadPoolExecutor(max_workers=len(services)) as executor:
+            started = list(executor.map(_start_service, services))
+            go_procs = [p for p in started if p is not None]
 
         subprocess.run(
             [
@@ -566,13 +624,12 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     # Phase 1 — Requirements
     print(c("[1/4] VERIFYING SYSTEM CORE …", BOLD + CYAN))
-    if cmd_check(args) != 0:
+    if not _quick_check():
         sys.exit(1)
+    print(c("  ✔ Core system prerequisites satisfied.\n", GREEN))
 
     # Phase 2 — Parallel install + build
     print(c("[2/4] ASSEMBLING COMPONENTS (parallel) …", BOLD + CYAN))
-    context: dict[str, str] = {"port": _read_port_from_env()}
-
     with ThreadPoolExecutor(max_workers=2) as executor:
         install_future = executor.submit(cmd_install, args)
         build_future = executor.submit(cmd_build, args)
@@ -585,22 +642,15 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     print(c("[✔] Components assembled.\n", GREEN))
 
-    # Phase 3 — Setup environment
+    # Phase 3 & 4 — Setup environment & launch web dashboard
     print(c("[3/4] CONFIGURING ENVIRONMENT …", BOLD + CYAN))
-    _setup_env_file()
-    context["port"] = _read_port_from_env()
+    port = _setup_env_file()
     if getattr(args, "port", None):
-        context["port"] = str(args.port)
-
-    # Initialize database
-    _init_database()
+        port = str(args.port)
+    args.port = port
     print(c("[✔] Environment configured.\n", GREEN))
 
-    # Phase 4 — Launch web dashboard
     print(c("[4/4] INITIALIZING INTELLIGENCE …", BOLD + CYAN))
-
-    # Inject --port into args so cmd_web can read it
-    args.port = context["port"]
     return cmd_web(args)
 
 
@@ -634,8 +684,8 @@ def _read_port_from_env() -> str:
     return "5001"
 
 
-def _setup_env_file() -> None:
-    """Create a default .env if one doesn't exist; patch missing keys."""
+def _setup_env_file() -> str:
+    """Create a default .env if one doesn't exist; patch missing keys. Returns configured port."""
     env_file = REPO_ROOT / ".env"
     default_port = "5001"
 
@@ -668,11 +718,18 @@ def _setup_env_file() -> None:
             )
         print(c(f"  .env created at {env_file}", GREEN))
         print(c("  → Fill in optional secrets as needed for full functionality", YELLOW))
-        return
+        return default_port
 
     # Patch: append any missing keys
     with env_file.open("r", encoding="utf-8") as f:
         content = f.read()
+
+    port = default_port
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("FLASK_PORT="):
+            port = stripped.split("=", 1)[1].strip().strip('"').strip("'")
+            break
 
     additions: list[str] = []
     for key, default in [
@@ -688,7 +745,6 @@ def _setup_env_file() -> None:
         print(c(f"  Patched .env with {len(additions)} missing key(s).", CYAN))
 
     # Port busy check
-    port = _read_port_from_env()
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             if s.connect_ex(("127.0.0.1", int(port))) == 0:
@@ -700,6 +756,8 @@ def _setup_env_file() -> None:
                 )
     except ValueError:
         pass
+
+    return port
 
 
 def _print_success_report(port: str) -> None:
@@ -753,6 +811,8 @@ examples:
         "--port", type=int, help="Override dashboard port (default: FLASK_PORT in .env or 5001)"
     )
     p_run.add_argument("--no-dev", dest="no_dev", action="store_true", help="Skip dev dependencies")
+    p_run.add_argument("--force", "-f", dest="force", action="store_true", help="Force reinstall dependencies")
+    p_run.add_argument("--rebuild", dest="rebuild", action="store_true", help="Force rebuild Go binaries")
     p_run.set_defaults(func=cmd_run)
 
     # ---- install ----
@@ -760,10 +820,16 @@ examples:
     p_install.add_argument(
         "--no-dev", dest="no_dev", action="store_true", help="Skip requirements-dev.txt"
     )
+    p_install.add_argument(
+        "--force", "-f", dest="force", action="store_true", help="Force reinstall dependencies"
+    )
     p_install.set_defaults(func=cmd_install)
 
     # ---- build ----
     p_build = sub.add_parser("build", help="Compile the Go performance engine (outputs to bin/)")
+    p_build.add_argument(
+        "--rebuild", dest="rebuild", action="store_true", help="Force rebuild Go binaries"
+    )
     p_build.set_defaults(func=cmd_build)
 
     # ---- check ----

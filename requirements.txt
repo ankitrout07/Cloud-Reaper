@@ -76,7 +76,6 @@ anthropic>=0.34.0
 # google-generativeai is intentionally omitted — codebase uses google-genai (google.genai) exclusively
 google-genai>=1.15.0
 prometheus-client>=0.20.0
-ollama>=0.1.0  # Local LLM support for cost-free AI operations
 
 tenacity>=8.2.3
 eval-type-backport>=0.2.0     # Python 3.9 typing compatibility for Pydantic
