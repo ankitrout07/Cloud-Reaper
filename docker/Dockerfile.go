@@ -1,30 +1,38 @@
-# Go Services Dockerfile for Cloud-Reaper
-# This is a template - each service will use this with different commands
+# ==============================================================================
+# Go Microservices Dockerfile for Cloud-Reaper
+# Builds a lightweight Alpine image with all Go microservice binaries
+# ==============================================================================
 
-FROM golang:1.25-alpine AS builder
-
-WORKDIR /app
-
-# Copy Go source code
-COPY src/engine-go/ .
-
-# Build all Go servers
-RUN CGO_ENABLED=0 go build -o taskserver ./cmd/taskserver
-RUN CGO_ENABLED=0 go build -o websocketserver ./cmd/websocketserver
-RUN CGO_ENABLED=0 go build -o ratelimitserver ./cmd/ratelimitserver
-
-# Final stage - minimal alpine image
-FROM alpine:latest
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-# Install wget for health checks
-RUN apk add --no-cache wget
+RUN apk add --no-cache git
 
-# Copy binaries from builder
-COPY --from=builder /app/taskserver .
-COPY --from=builder /app/websocketserver .
-COPY --from=builder /app/ratelimitserver .
+COPY src/engine-go/go.mod src/engine-go/go.sum ./
+RUN go mod download
 
-# Default command (will be overridden in docker-compose)
-CMD ["sh", "-c", "echo 'Go services container ready. Use docker-compose to start specific services.'"]
+COPY src/engine-go/ ./
+
+# Build all Go microservices and the core reaper-engine bridge
+RUN mkdir -p /build/bin && \
+    CGO_ENABLED=0 go build -tags=cli -ldflags="-s -w" -o /build/bin/reaper-engine . && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o /build/bin/taskserver ./cmd/taskserver && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o /build/bin/websocketserver ./cmd/websocketserver && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o /build/bin/ratelimitserver ./cmd/ratelimitserver && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o /build/bin/ragserver ./cmd/ragserver && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o /build/bin/calculatorserver ./cmd/calculatorserver && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o /build/bin/anomalyserver ./cmd/anomalyserver
+
+# Minimal Alpine runtime
+FROM alpine:3.20
+
+WORKDIR /app
+
+RUN apk add --no-cache wget ca-certificates tzdata
+
+# Copy all compiled binaries to system PATH
+COPY --from=builder /build/bin/* /usr/local/bin/
+
+# Default entrypoint to reaper-engine HTTP bridge (override in docker-compose for each microservice)
+CMD ["reaper-engine", "--mode", "serve", "--port", "7070"]

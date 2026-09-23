@@ -1,11 +1,12 @@
 # ==============================================================================
-# Cloud-Reaper Multi-Service Docker Compose Architecture (Subdirectory invocation)
+# Cloud-Reaper Multi-Service Docker Compose Architecture
 # ==============================================================================
-# Note: You can run directly from project root via:
-#   docker compose up --build
+# Usage:
+#   1. Full Microservices Stack:
+#        docker compose up --build
 #
-# Or from this directory via:
-#   docker compose up --build
+#   2. Standalone Single-Container (All-in-One):
+#        docker compose --profile standalone up --build app-standalone
 # ==============================================================================
 
 services:
@@ -14,7 +15,7 @@ services:
   # ----------------------------------------------------------------------------
   app:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile
     container_name: cloud-reaper-app
     restart: unless-stopped
@@ -56,7 +57,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - DRY_RUN_MODE=${DRY_RUN_MODE:-true}
     volumes:
-      - ../data:/app/data
+      - ./data:/app/data
     depends_on:
       go-bridge:
         condition: service_healthy
@@ -82,7 +83,7 @@ services:
   # ----------------------------------------------------------------------------
   go-bridge:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.go
     container_name: cloud-reaper-go-bridge
     restart: unless-stopped
@@ -103,7 +104,7 @@ services:
   # ----------------------------------------------------------------------------
   task-server:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.go
     container_name: cloud-reaper-task-server
     restart: unless-stopped
@@ -124,7 +125,7 @@ services:
   # ----------------------------------------------------------------------------
   websocket-server:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.go
     container_name: cloud-reaper-websocket-server
     restart: unless-stopped
@@ -145,7 +146,7 @@ services:
   # ----------------------------------------------------------------------------
   ratelimit-server:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.go
     container_name: cloud-reaper-ratelimit-server
     restart: unless-stopped
@@ -166,7 +167,7 @@ services:
   # ----------------------------------------------------------------------------
   rag-server:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.go
     container_name: cloud-reaper-rag-server
     restart: unless-stopped
@@ -187,7 +188,7 @@ services:
   # ----------------------------------------------------------------------------
   calculator-server:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.go
     container_name: cloud-reaper-calculator-server
     restart: unless-stopped
@@ -208,7 +209,7 @@ services:
   # ----------------------------------------------------------------------------
   anomaly-server:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile.go
     container_name: cloud-reaper-anomaly-server
     restart: unless-stopped
@@ -250,7 +251,7 @@ services:
   app-standalone:
     profiles: ["standalone"]
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile
     container_name: cloud-reaper-standalone
     restart: unless-stopped
@@ -281,7 +282,7 @@ services:
       - GO_ANOMALY_PORT=7076
       - DRY_RUN_MODE=${DRY_RUN_MODE:-true}
     volumes:
-      - ../data:/app/data
+      - ./data:/app/data
     networks:
       - reaper-net
 

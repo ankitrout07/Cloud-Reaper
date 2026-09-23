@@ -1,6 +1,9 @@
+# ==============================================================================
+# Cloud-Reaper Runtime Dependencies
+# ==============================================================================
+
 # === Core Web Framework ===
-# App runs on FastAPI + uvicorn (ASGI, async).
-weasyprint
+# FastAPI + Uvicorn ASGI stack with Socket.IO real-time support
 fastapi>=0.111.0
 uvicorn[standard]>=0.30.0
 python-multipart>=0.0.9
@@ -8,75 +11,77 @@ python-socketio[asyncio]>=5.11.0
 websockets>=12.0
 starlette>=0.37.0
 itsdangerous>=2.1.2
+jinja2>=3.1.0           # Explicit: used directly via Jinja2Templates in app_async.py
+pydantic>=2.0.0         # Explicit: used directly in schemas.py and architect.py
+weasyprint               # PDF bill-of-materials export (requires libcairo etc. — see Dockerfile)
 
-# === Azure SDKs ===
-azure-identity==1.15.0
-azure-mgmt-authorization==4.0.0
-azure-mgmt-compute==30.0.0
-azure-mgmt-consumption==10.0.0
-azure-mgmt-costmanagement==4.0.1
-azure-mgmt-monitor==4.0.0
-azure-mgmt-network==25.0.0
-azure-mgmt-recoveryservices==2.0.0
-azure-mgmt-resource==25.0.0
-azure-mgmt-resourcegraph
-azure-mgmt-sql==3.0.1
-azure-mgmt-storage==24.0.1
-azure-mgmt-subscription==3.1.1
-azure-mgmt-web==7.0.0
-azure-monitor-query
+# === Azure SDKs — Core ===
+azure-core>=1.30.0       # Explicit: azure.core.exceptions imported in azure_remediator.py
+azure-identity>=1.19.0
+azure-mgmt-compute>=33.0.0
+azure-mgmt-consumption>=10.0.0
+azure-mgmt-costmanagement>=4.0.1
+azure-mgmt-monitor>=6.0.0
+azure-mgmt-network>=27.0.0
+azure-mgmt-recoveryservices>=2.0.0
+azure-mgmt-resource>=23.0.0
+azure-mgmt-resourcegraph>=8.0.0
+azure-mgmt-sql>=3.0.1
+azure-mgmt-storage>=21.0.0
+azure-mgmt-subscription>=3.1.1
+azure-mgmt-web>=7.0.0
+azure-monitor-query>=1.2.0
+
 # === Azure SDKs — Extended Services ===
-azure-mgmt-containerservice>=26.0.0
-azure-mgmt-containerinstance>=9.0.0
-azure-mgmt-keyvault>=10.0.0
-azure-mgmt-redis>=13.0.0
-azure-mgmt-cosmosdb>=9.0.0
-azure-mgmt-datafactory>=3.0.0
+azure-mgmt-containerservice>=32.0.0
+azure-mgmt-containerinstance>=10.1.0
+azure-mgmt-keyvault>=10.3.0
+azure-mgmt-redis>=14.0.0
+azure-mgmt-cosmosdb>=9.7.0
+azure-mgmt-datafactory>=8.0.0
 azure-mgmt-logic>=9.0.0
-azure-mgmt-eventhub>=11.0.0
-azure-mgmt-servicebus>=8.0.0
+azure-mgmt-eventhub>=11.1.0
+azure-mgmt-servicebus>=8.2.0
 azure-mgmt-iothub>=3.0.0
-azure-mgmt-cognitiveservices>=13.0.0
-azure-mgmt-applicationinsights>=2.0.0
-azure-mgmt-cdn>=12.0.0
-azure-mgmt-apimanagement>=3.0.0
+azure-mgmt-cognitiveservices>=13.5.0
+azure-mgmt-applicationinsights>=4.0.0
+azure-mgmt-cdn>=13.1.0
+azure-mgmt-apimanagement>=4.0.0
 
 # === Database ===
-# psycopg2-binary / asyncpg removed — app uses SQLite (Go engine: go-sqlite3, Python: aiosqlite).
-# Add back if you adopt PostgreSQL as the primary store.
-sqlalchemy==2.0.25
-aiosqlite>=0.19.0  # Async SQLite driver
+# App uses embedded SQLite by default; PostgreSQL optional (add psycopg2-binary/asyncpg if needed)
+sqlalchemy>=2.0.25
+aiosqlite>=0.19.0        # Async SQLite driver for SQLAlchemy async sessions
 
 # === Data & ML ===
-# scipy, pyarrow, stable-baselines3, gymnasium removed — zero usages in codebase.
-numpy==1.26.3
-pandas==2.2.0
-scikit-learn==1.4.0
-statsmodels==0.14.1
-scipy>=1.11.0
-redis>=5.0.0
-shap>=0.42.0
-joblib>=1.3.0
-xgboost>=2.0.0
-lightgbm>=4.0.0
-sentence-transformers>=2.2.0
-faiss-cpu>=1.7.0
+numpy>=1.26.3
+pandas>=2.2.0
+scikit-learn>=1.4.0
+statsmodels>=0.14.1
+redis>=5.0.0             # Redis client for RAG result caching and telemetry
+xgboost>=2.0.0           # Gradient boosting (LearnableRanking in enhanced_engine.py)
+lightgbm>=4.0.0          # Gradient boosting alternative backend
+sentence-transformers>=2.2.0  # Local semantic embeddings (LocalSemanticSearch)
+faiss-cpu>=1.7.0         # Dense vector similarity search (FAISS index)
 
 # === Security ===
-cryptography==42.0.5
+cryptography>=42.0.5     # Vault: PBKDF2-HMAC key derivation + Fernet AES encryption
+
+# === Cloud Provider SDKs ===
+boto3>=1.34.0            # AWS SDK (EC2, S3, cost explorer price queries)
 
 # === Utilities ===
-boto3==1.34.0
-python-dotenv==1.0.0
-pyyaml==6.0.1
-requests==2.31.0
-httpx[http2]>=0.27.0
-openai>=1.50.0
-anthropic>=0.34.0
-# google-generativeai is intentionally omitted — codebase uses google-genai (google.genai) exclusively
-google-genai>=1.15.0
-prometheus-client>=0.20.0
-ollama>=0.1.0  # Local LLM support for cost-free AI operations
+python-dotenv>=1.0.0     # .env file loading
+pyyaml>=6.0.1            # price_book.yaml + config parsing
+requests>=2.31.0         # Synchronous HTTP (price catalog warmup, webhook notifications)
+httpx[http2]>=0.27.0     # Async HTTP client with HTTP/2 (Go microservice bridges)
+tenacity>=8.2.3          # Retry logic with exponential backoff (embedding API calls)
+eval-type-backport>=0.2.0  # Python 3.9 typing compatibility shim for Pydantic v2
 
-tenacity>=8.2.3
-eval-type-backport>=0.2.0     # Python 3.9 typing compatibility for Pydantic
+# === AI / GenAI Backends ===
+google-genai>=1.15.0     # Google Gemini API (embeddings, Copilot, AI Architect)
+openai>=1.50.0           # OpenAI GPT API (Copilot alternative backend)
+anthropic>=0.34.0        # Anthropic Claude API (Copilot alternative backend)
+
+# === Observability ===
+prometheus-client>=0.20.0  # FinOps metrics push to Prometheus Pushgateway

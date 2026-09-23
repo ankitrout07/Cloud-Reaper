@@ -11,8 +11,6 @@ from pathlib import Path
 
 from google import genai
 
-from reaper.engine.ai_backends.ollama_backend import OllamaBackendFactory
-
 
 class BM25:
     def __init__(self, documents: list[str], k1: float = 1.5, b: float = 0.75):
@@ -98,28 +96,14 @@ class DocSearchEngine:
     def __init__(self):
         import os
 
-        # Determine which AI backend to use
-        ai_backend = os.getenv("AI_BACKEND", "gemini").lower()
-        
-        if ai_backend == "ollama":
-            # Use Ollama local backend
-            self.embedding_backend = OllamaBackendFactory.create_embedding_backend()
-            self.client = None  # Not used for Ollama
-            self.embedding_model = "ollama"
-            if not self.embedding_backend.health_check():
-                raise ValueError(
-                    "CRITICAL: Ollama server is not accessible. "
-                    "Ensure Ollama is running and the embedding model is downloaded."
-                )
-        else:
-            # Use Gemini cloud API (default)
-            api_key = os.getenv("GEMINI_API_KEY")
-            if not api_key:
-                raise ValueError("CRITICAL: GEMINI_API_KEY environment variable is unconfigured.")
-            self.client = genai.Client(api_key=api_key)
-            self.embedding_model = "models/gemini-embedding-2"
-            self.embedding_backend = None  # Not used for Gemini
-        
+        # Determine which AI backend to use (Gemini is the sole cloud embedding backend)
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("CRITICAL: GEMINI_API_KEY environment variable is unconfigured.")
+        self.client = genai.Client(api_key=api_key)
+        self.embedding_model = "models/gemini-embedding-2"
+        self.embedding_backend = None  # Reserved for future pluggable backends
+
         self.docs_index = []
         self._bm25 = None
         # Circuit-breaker: set True when the API quota is exhausted (HTTP 429).
@@ -132,7 +116,7 @@ class DocSearchEngine:
     # ------------------------------------------------------------------
 
     def _embed_with_backoff(self, content: str) -> list[float] | None:
-        """Call the embedding API with exponential back-off for transient errors.
+        """Call the Gemini embedding API with exponential back-off for transient errors.
 
         Returns the embedding vector on success, or ``None`` if the chunk
         should be skipped (permanent error / quota exhausted).
@@ -140,15 +124,6 @@ class DocSearchEngine:
         Side-effect: sets ``self._quota_exhausted = True`` when a 429 is
         encountered so the caller can stop all further embedding calls.
         """
-        # Use Ollama backend if configured
-        if self.embedding_backend:
-            try:
-                return self.embedding_backend.embed_text(content)
-            except Exception as exc:
-                print(f"WARN: Ollama embedding error: {exc}")
-                return None
-        
-        # Use Gemini cloud API (default)
         for attempt in range(self._EMBED_MAX_RETRIES):
             try:
                 response = self.client.models.embed_content(
@@ -314,20 +289,8 @@ class DocSearchEngine:
             return f"Document: {file_name}\nTitle: {h1_title}\nSummary: {summary}"
 
         try:
-            # Use Ollama backend if configured
-            if self.embedding_backend:
-                prompt = (
-                    f"Create a 1-sentence global summary of this document to situational-contextualize short chunks for a RAG retriever.\n"
-                    f"Document Title: {h1_title}\n\nContent:\n{content[:1500]}"
-                )
-                from reaper.engine.ai_backends.ollama_backend import OllamaBackendFactory
-                gen_backend = OllamaBackendFactory.create_generation_backend()
-                if gen_backend.health_check():
-                    ai_summary = gen_backend.generate_text(prompt, temperature=0.3)
-                    if ai_summary:
-                        summary = ai_summary.strip()
             # Only generate via API if client looks real and has models
-            elif hasattr(self.client, "models") and not isinstance(
+            if hasattr(self.client, "models") and not isinstance(
                 self.client, MagicMock if "MagicMock" in globals() else object
             ):
                 prompt = (
@@ -482,19 +445,11 @@ class DocSearchEngine:
         return self._bm25
 
     def _dense_search(self, user_query: str) -> list:
-        # Use Ollama backend if configured
-        if self.embedding_backend:
-            try:
-                query_vector = self.embedding_backend.embed_text(user_query)
-            except Exception as exc:
-                print(f"WARN: Ollama query embedding error: {exc}")
-                return []
-        else:
-            # Use Gemini cloud API (default)
-            query_response = self.client.models.embed_content(
-                model=self.embedding_model, contents=user_query
-            )
-            query_vector = query_response.embeddings[0].values
+        # Use Gemini cloud API for query embedding
+        query_response = self.client.models.embed_content(
+            model=self.embedding_model, contents=user_query
+        )
+        query_vector = query_response.embeddings[0].values
         
         q_norm = sum(q * q for q in query_vector) ** 0.5
 

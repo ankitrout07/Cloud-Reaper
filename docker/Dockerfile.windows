@@ -1,4 +1,9 @@
-FROM golang:bookworm
+# ==============================================================================
+# Cross-Compilation Dockerfile for Windows (MinGW-w64)
+# Produces Cloud-Reaper Windows 64-bit binaries
+# ==============================================================================
+
+FROM golang:1.24-bookworm AS builder
 
 RUN dpkg --add-architecture i386 && \
     apt-get update && \
@@ -8,6 +13,9 @@ RUN dpkg --add-architecture i386 && \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
+COPY src/engine-go/go.mod src/engine-go/go.sum ./
+RUN go mod download
+
 COPY src/engine-go/ .
 
 ENV CGO_ENABLED=1 \
@@ -16,6 +24,16 @@ ENV CGO_ENABLED=1 \
     CC=x86_64-w64-mingw32-gcc \
     CXX=x86_64-w64-mingw32-g++
 
-RUN go mod download && \
-    mkdir -p /output && \
-    go build -ldflags="-w -s -H windowsgui" -o /output/CloudReaper.exe .
+RUN mkdir -p /output && \
+    go build -tags=cli -ldflags="-w -s" -o /output/reaper-engine.exe . && \
+    go build -ldflags="-w -s" -o /output/taskserver.exe ./cmd/taskserver && \
+    go build -ldflags="-w -s" -o /output/websocketserver.exe ./cmd/websocketserver && \
+    go build -ldflags="-w -s" -o /output/ratelimitserver.exe ./cmd/ratelimitserver && \
+    go build -ldflags="-w -s" -o /output/ragserver.exe ./cmd/ragserver && \
+    go build -ldflags="-w -s" -o /output/calculatorserver.exe ./cmd/calculatorserver && \
+    go build -ldflags="-w -s" -o /output/anomalyserver.exe ./cmd/anomalyserver
+
+FROM alpine:3.20
+WORKDIR /dist
+COPY --from=builder /output/* ./
+CMD ["ls", "-la", "/dist"]

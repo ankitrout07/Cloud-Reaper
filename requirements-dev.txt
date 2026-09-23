@@ -1,9 +1,20 @@
-# Development & Testing Tools
-ruff==0.15.15
-pytest==7.4.3
-pytest-cov==4.1.0
-mypy==1.8.0
-types-PyYAML
-types-requests
-bandit==1.7.6
-safety==2.3.5
+# ==============================================================================
+# Cloud-Reaper Development & Testing Dependencies
+# ==============================================================================
+
+# === Linting & Formatting ===
+ruff>=0.15.15            # Fast Python linter + formatter (replaces flake8, isort, black)
+
+# === Testing ===
+pytest>=7.4.3
+pytest-cov>=4.1.0        # Coverage reporting (--cov flag)
+pytest-asyncio>=0.23.0   # Async test support (test_go_integration.py)
+
+# === Type Checking ===
+mypy>=1.8.0
+types-PyYAML             # Type stubs for pyyaml
+types-requests           # Type stubs for requests
+
+# === Security Scanning ===
+bandit>=1.7.6            # Static security analysis
+safety>=2.3.5            # Known vulnerability scanning in dependencies

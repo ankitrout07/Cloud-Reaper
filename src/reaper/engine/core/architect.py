@@ -8,8 +8,6 @@ from anthropic import Anthropic
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-from reaper.engine.ai_backends.ollama_backend import OllamaBackendFactory
-
 
 # Define the strict structure for each infrastructure component
 class CloudComponent(BaseModel):
@@ -163,16 +161,6 @@ class AIArchitectManager:
         self.claude_key = os.getenv("ANTHROPIC_API_KEY")
         self.client = None
         self.claude_client = None
-        
-        # Check for Ollama backend
-        ai_backend = os.getenv("AI_BACKEND", "openai").lower()
-        if ai_backend == "ollama":
-            self.ollama_backend = OllamaBackendFactory.create_generation_backend()
-            if not self.ollama_backend.health_check():
-                print("WARN: Ollama server not accessible, falling back to cloud APIs")
-                self.ollama_backend = None
-        else:
-            self.ollama_backend = None
 
     def verify_api_status(self) -> dict:
         """
@@ -244,11 +232,7 @@ class AIArchitectManager:
         )
 
         try:
-            # Ollama mode
-            if model_provider == "ollama" and self.ollama_backend:
-                return self._generate_ollama_blueprint(user_prompt, provider, system_instructions)
-
-            # Ensemble mode: use all available AI models and combine results
+            # Ensemble mode: use all available cloud AI models and combine results
             if model_provider == "ensemble":
                 return self._generate_ensemble_blueprint(user_prompt, provider, system_instructions)
 
@@ -412,82 +396,12 @@ class AIArchitectManager:
         blueprint_dict = json.loads(content_text)
         return ArchitectureBlueprint(**blueprint_dict)
 
-    def _generate_ollama_blueprint(
-        self, user_prompt: str, provider: str, system_instructions: str
-    ) -> ArchitectureBlueprint:
-        """Generate blueprint using Ollama local model."""
-        if not self.ollama_backend:
-            raise ValueError("Ollama backend is not configured or healthy.")
-
-        # Create JSON schema for Ollama
-        schema = {
-            "type": "object",
-            "properties": {
-                "architecture_summary": {"type": "string"},
-                "components": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "component_type": {"type": "string"},
-                            "generic_name": {"type": "string"},
-                            "provider_sku_keyword": {"type": "string"},
-                            "quantity": {"type": "integer"},
-                            "reasoning": {"type": "string"},
-                        },
-                        "required": [
-                            "component_type",
-                            "generic_name",
-                            "provider_sku_keyword",
-                            "quantity",
-                            "reasoning",
-                        ],
-                    },
-                },
-                "security_warning": {"type": "string"},
-            },
-            "required": ["architecture_summary", "components"],
-        }
-
-        prompt = (
-            f"Generate a cloud architecture blueprint for: {user_prompt}\n\n"
-            f"Respond ONLY with valid JSON matching this schema:\n{json.dumps(schema, indent=2)}"
-        )
-
-        response_text = self.ollama_backend.generate_text(
-            prompt=prompt,
-            system_instruction=system_instructions,
-            temperature=0.3,
-            response_format={"type": "json_object"},
-        )
-
-        # Clean up any markdown code blocks
-        if "```json" in response_text:
-            response_text = response_text.split("```json")[1].split("```")[0].strip()
-        elif "```" in response_text:
-            response_text = response_text.split("```")[1].split("```")[0].strip()
-
-        blueprint_dict = json.loads(response_text)
-        return ArchitectureBlueprint(**blueprint_dict)
-
     def _generate_ensemble_blueprint(
         self, user_prompt: str, provider: str, system_instructions: str
     ) -> ArchitectureBlueprint:
-        """Generate blueprint using ensemble of all available AI models."""
+        """Generate blueprint using ensemble of all available cloud AI models."""
         blueprints = []
         errors = []
-
-        # Try Ollama
-        try:
-            if self.ollama_backend:
-                blueprints.append(
-                    (
-                        "ollama",
-                        self._generate_ollama_blueprint(user_prompt, provider, system_instructions),
-                    )
-                )
-        except Exception as e:
-            errors.append(f"Ollama: {e}")
 
         # Try OpenAI
         try:
