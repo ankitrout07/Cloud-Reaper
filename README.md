@@ -147,17 +147,20 @@ Cloud-Reaper uses a **Dual-Core Architecture** (Python + Go) to achieve massive 
 
 ```text
 Cloud-Reaper/
-├── bin/                        # Compiled Go binaries (reaper-engine)
-├── bootstrap.py                # Universal cross-platform one-click setup script
+├── bin/                        # Compiled Go binaries (reaper-engine, microservices)
+├── bootstrap.py                # Universal cross-platform one-click setup script (CLI)
 ├── main.py                     # CLI entry point
 ├── Makefile                    # Developer shortcuts (install, build, test, lint, fmt)
+├── docker-compose.yml          # Root multi-service Compose cluster (App, 7 Go services, Redis)
+├── .dockerignore               # Docker build ignore filters
 ├── docker/
-│   ├── Dockerfile              # Multi-stage Docker build (Go builder → Python runtime)
-│   └── docker-compose.yml      # Full-stack deployment (app)
+│   ├── Dockerfile              # Multi-stage Docker build (Go builder → Python 3.12 runtime)
+│   ├── Dockerfile.go           # Dedicated Go microservices container build
+│   └── entrypoint.sh           # Container entrypoint & graceful service supervisor
 ├── pyproject.toml              # Ruff, Mypy, Pytest configuration
-├── requirements.txt            # Runtime dependencies (grouped by category)
+├── requirements.txt            # Runtime dependencies (FastAPI, Socket.IO, Azure SDK, AI backends)
 ├── requirements-dev.txt        # Dev/CI dependencies (Ruff, Mypy, Pytest, Bandit)
-├── HOW_TO_RUN.md               # Full setup guide
+├── HOW_TO_RUN.md               # Full setup & execution guide
 ├── scripts/
 │   └── reap.sh                 # Linux/macOS shell entrypoint
 ├── Docs/                       # Project documentation (indexed by RAG engine)
@@ -226,28 +229,35 @@ Cloud-Reaper/
 │   │       ├── search_router.py      # Blueprint: /api/search
 │   │       ├── templates/            # Jinja2 templates (15 pages)
 │   │       └── static/              # CSS (Glassmorphism Dark Theme), JS, assets
-│   └── engine-go/              # Go High-Velocity Performance Core
+│   └── engine-go/              # Go High-Velocity Performance Core & Microservices
+│       ├── cmd/                # Standalone Go microservice servers
+│       │   ├── anomalyserver/        # Time-series anomaly detection (:7076)
+│       │   ├── calculatorserver/     # Vectorized cost & amortized pricing (:7075)
+│       │   ├── ragserver/            # Vectorized RAG index & retrieval (:7074)
+│       │   ├── ratelimitserver/      # Token-bucket rate limiter (:7073)
+│       │   ├── taskserver/           # Async background task coordinator (:7071)
+│       │   └── websocketserver/      # Batching real-time WebSocket broadcaster (:7072)
 │       ├── main.go                   # Desktop entry point
 │       ├── main_cli.go               # CLI entry point (build tag: cli)
 │       ├── main_headless.go          # Headless entry point (build tag: headless)
 │       ├── go.mod & go.sum           # Go module dependencies
-│       ├── internal/                 # Internal packages
-│       │   ├── arbitrage/            # Regional price arbitrage scanner
-│       │   ├── bridge/               # HTTP bridge server for Python integration
-│       │   ├── collectors/           # Multi-cloud resource scrapers
-│       │   │   ├── azure_scraper.go      # Azure ARM resource scanner
-│       │   │   ├── aws_scraper.go        # AWS EC2/EBS/S3 scanner
-│       │   │   ├── gcp_scraper.go        # GCP Compute/GKE scanner
-│       │   │   ├── k8s_scraper.go        # Kubernetes Metrics API scanner
-│       │   │   ├── k8s_optimizer.go      # MostAllocated bin-packing optimizer
-│       │   │   ├── network_scraper.go    # NSG + cross-AZ transit audit scanner
-│       │   │   ├── price_client.go       # Azure Retail Pricing API client
-│       │   │   ├── consts.go             # Shared constants
-│       │   │   ├── auth.go               # Microsoft Graph user identity
-│       │   │   └── provider.go           # CloudProvider interface (Authenticate / ScanResources)
-│       │   ├── db/                   # Database bridge + crypto audit
-│       │   ├── desktop/              # Desktop GUI application
-│       │   └── models/               # Shared Go resource model
+│       └── internal/                 # Internal packages
+│           ├── arbitrage/            # Regional price arbitrage scanner
+│           ├── bridge/               # HTTP bridge server for Python integration
+│           ├── collectors/           # Multi-cloud resource scrapers
+│           │   ├── azure_scraper.go      # Azure ARM resource scanner
+│           │   ├── aws_scraper.go        # AWS EC2/EBS/S3 scanner
+│           │   ├── gcp_scraper.go        # GCP Compute/GKE scanner
+│           │   ├── k8s_scraper.go        # Kubernetes Metrics API scanner
+│           │   ├── k8s_optimizer.go      # MostAllocated bin-packing optimizer
+│           │   ├── network_scraper.go    # NSG + cross-AZ transit audit scanner
+│           │   ├── price_client.go       # Azure Retail Pricing API client
+│           │   ├── consts.go             # Shared constants
+│           │   ├── auth.go               # Microsoft Graph user identity
+│           │   └── provider.go           # CloudProvider interface (Authenticate / ScanResources)
+│           ├── db/                   # Database bridge + crypto audit
+│           ├── desktop/              # Desktop GUI application
+│           └── models/               # Shared Go resource model
 ├── tests/
 │   ├── unit/                   # Python unit tests
 │   ├── integration/            # Integration tests (requires live DB)
@@ -363,21 +373,33 @@ For detailed IAM policies and security configuration, see [Security & IAM Polici
 
 **⚠️ Security Note**: Cloud-Reaper uses a security-first architecture. Start with read-only IAM policies (Reader/Viewer/ReadOnlyAccess) and dry-run mode enabled. See [Security & IAM Policies](docs/SECURITY_IAM_POLICIES.md) for detailed configuration guidance.
 
-### One-Command Setup
+### One-Command Setup (`bootstrap.py`)
+
+Cloud-Reaper includes a universal, cross-platform bootstrapper with zero-setup automation for **Linux**, **macOS**, and **Windows**:
 
 ```bash
 git clone https://github.com/ankitrout07/Cloud-Reaper.git
 cd Cloud-Reaper
-python bootstrap.py
+
+# Full automated boot (prerequisite check → build Go engine → venv install → launch dashboard)
+python3 bootstrap.py
 ```
 
-`bootstrap.py` handles everything automatically:
-1. Detects OS (Windows, macOS, Linux) and creates a Python virtual environment
-2. Installs all dependencies from `requirements.txt` and `requirements-dev.txt`
-3. Builds the Go performance engine binary to `bin/reaper-engine`
-4. Scaffolds `.env` file (prompts for credentials including `GEMINI_API_KEY` and cloud provider credentials)
-5. Initializes SQLite database via `init_db()`
-6. Launches the dashboard at **http://localhost:5001**
+#### Bootstrap Subcommands Reference
+
+| Subcommand | Description | Example |
+|---|---|---|
+| `run` | Full boot sequence: check → build Go binaries → install venv → launch dashboard *(default)* | `python3 bootstrap.py run` |
+| `check` | Verify system prerequisites (Python 3.12+, Go 1.26+, Docker, Azure CLI, Git, Port 5001) | `python3 bootstrap.py check` |
+| `install` | Create virtual environment and install dependencies (`requirements.txt` + `requirements-dev.txt`) | `python3 bootstrap.py install [--no-dev]` |
+| `build` | Compile Go performance engine and microservices into `bin/` | `python3 bootstrap.py build` |
+| `web` | Launch FastAPI ASGI web dashboard + Go microservices | `python3 bootstrap.py web [--port 5001]` |
+| `scan` | Run the Azure FinOps CLI scan inside the virtual environment | `python3 bootstrap.py scan` |
+| `metrics` | Display live FinOps performance metrics | `python3 bootstrap.py metrics` |
+| `pr-simulation` | Run PR cost delta simulation for CI/CD pull request comments | `python3 bootstrap.py pr-simulation [plan.json]` |
+| `clean` | Remove build artifacts, microservices binaries, and cache trees | `python3 bootstrap.py clean [--venv]` |
+
+> **Cross-Platform Assurance:** `bootstrap.py` is fully adapted for Windows (PowerShell / cmd.exe with UTF-8 console output and ANSI escapes), Linux (Ubuntu), and macOS (port 5001 defaults avoid macOS AirPlay Receiver port 5000 conflicts).
 
 > Full setup guide → **[HOW_TO_RUN.md](HOW_TO_RUN.md)**
 
@@ -470,31 +492,58 @@ python main.py --pr-simulation [optional-plan-file.json]
 
 ## 🐳 Docker Deployment
 
-### Docker Compose (Recommended)
+Cloud-Reaper provides an enterprise-ready, containerized multi-service deployment orchestrating the FastAPI ASGI dashboard, Redis 7 cache, and 7 dedicated high-performance Go microservices.
+
+### Option 1 — Full Microservices Cluster (Recommended)
 
 ```bash
-# Full-stack deployment: app
-docker compose -f docker/docker-compose.yml up -d
+# Build and launch all services in detached mode
+docker compose up --build -d
+
+# Check live cluster health status
+docker compose ps
+
+# View real-time logs from the application layer
+docker compose logs -f app
 ```
 
-This launches:
-- **`cloud-reaper-app`** — Multi-stage build (Go builder → Python 3.12 runtime)
+#### Architecture & Service Port Map
+
+| Container | Service | Port | Description |
+|---|---|---|---|
+| `cloud-reaper-app` | FastAPI + Socket.IO | `5001` | ASGI web dashboard, REST APIs, WebSocket real-time events |
+| `cloud-reaper-go-bridge` | Go Core Scanner | `7070` | High-velocity multi-cloud scrapers and price arbitrage engine |
+| `cloud-reaper-task-server` | Go Task Manager | `7071` | High-throughput asynchronous background job coordinator |
+| `cloud-reaper-websocket-server` | Go WebSocket Broadcaster | `7072` | Telemetry batching and metrics event streaming |
+| `cloud-reaper-ratelimit-server` | Go Rate Limiter | `7073` | Token-bucket rate limiting for cloud provider API calls |
+| `cloud-reaper-rag-server` | Go Vector RAG | `7074` | Hybrid BM25 + dense embedding documentation retrieval |
+| `cloud-reaper-calculator-server` | Go Cost Calculator | `7075` | Vectorized cost estimation & amortized pricing engine |
+| `cloud-reaper-anomaly-server` | Go Anomaly Detector | `7076` | Time-series Z-score residual anomaly engine |
+| `cloud-reaper-redis` | Redis 7 Alpine | `6379` | In-memory cache for RAG results, sessions, and telemetry |
 
 Dashboard available at **http://localhost:5001**
 
-### Standalone Docker Build
+### Option 2 — Standalone All-In-One Container
+
+For lightweight testing without individual microservice containers:
+
+```bash
+docker compose --profile standalone up --build app-standalone
+```
+
+Or build directly via `docker build`:
 
 ```bash
 docker build -t cloud-reaper:latest -f docker/Dockerfile .
-docker run -p 5001:5001 \
-  -e DATABASE_URL=sqlite:///./data/reaper.db \
+docker run -p 5001:5001 -p 7070:7070 \
+  -e DATABASE_URL=sqlite:////app/data/reaper.db \
   -e AZURE_SUBSCRIPTION_ID=your-sub-id \
   cloud-reaper:latest
 ```
 
-The Dockerfile uses a multi-stage build:
-1. **Stage 1 (`go-builder`)**: Compiles the Go performance engine on `golang:1.26-alpine`
-2. **Stage 2 (`python:3.12-slim`)**: Installs Python dependencies, copies source code & Go binary, exposes port 5001
+The Dockerfile uses an optimized multi-stage build:
+1. **Stage 1 (`go-builder`)**: Compiles the Go performance engine and microservice binaries using `golang:1.26-alpine`
+2. **Stage 2 (`python:3.12-slim`)**: Installs dependencies with C-extension headers, sets up `reaper` user, and executes via supervised entrypoint (`docker/entrypoint.sh`)
 
 ---
 
@@ -986,10 +1035,12 @@ cp .env.example .env
 Full history in **[CHANGELOG.md](CHANGELOG.md)**.
 
 **Recent Highlights:**
+- **Microservices Docker Composition**: Introduced root `docker-compose.yml` orchestrating 7 dedicated Go microservices (`reaper-engine`, `taskserver`, `websocketserver`, `ratelimitserver`, `ragserver`, `calculatorserver`, `anomalyserver`), Python FastAPI app, and Redis 7 with container healthchecks and standalone profile support.
+- **Cross-Platform Bootstrap CLI**: Enhanced `bootstrap.py` into a versatile CLI tool (`run`, `check`, `install`, `build`, `scan`, `metrics`, `web`, `clean`) with automated Windows UTF-8/ANSI support, fail-fast command execution, and robust pip virtualenv upgrading.
+- **Dependency Hardening**: Upgraded Python runtime dependencies to Python 3.12+ standards with native `python-socketio` and explicit framework dependencies.
 - **Metrics System Overhaul**: Removed all simulated/fallback data from metrics system - now requires real cloud provider credentials only
 - **Enhanced Error Handling**: Improved error messaging for missing cloud credentials and SDK dependencies
 - **Performance**: Upgraded `ruff` for faster static analysis; stabilized hybrid Go/Python execution pipelines and reduced memory footprint across resource scrapers
-- **Fixes**: Iterative improvements to multi-cloud authentication (Azure/AWS/GCP) and enforced vault log retention policies to prevent unbounded DB growth
 - **UI/UX**: Shipped glassmorphism redesign for vault and cloud provider UIs; fine-tuned cyan/slate color palette across the dashboard; added About page, Kubernetes Agent card, and enriched Budget Alerts tab
 - **New Models**: Added `Budget`, `BudgetAlert`, and `CloudCommitment` SQLAlchemy tables with unit tests
 
