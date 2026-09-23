@@ -36,9 +36,16 @@ src/data/
 .DS_Store
 Thumbs.db
 *.swp
+*.bak
 
 # Go
 src/engine-go/reaper-engine
+src/engine-go/websocketserver
+src/engine-go/taskserver
+src/engine-go/ragserver
+src/engine-go/ratelimitserver
+src/engine-go/calculatorserver
+src/engine-go/anomalyserver
 bin/
 build/
 vendor/
