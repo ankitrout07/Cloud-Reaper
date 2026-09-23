@@ -121,6 +121,9 @@ def run_cmd(
     except subprocess.CalledProcessError as exc:
         print(c(f"[!] Command failed (exit {exc.returncode}): {' '.join(cmd)}", RED))
         return False
+    except KeyboardInterrupt:
+        print(c("\n[!] Command cancelled by user.", YELLOW))
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -210,8 +213,8 @@ def cmd_install(args: argparse.Namespace) -> int:
 
     venv_dir = REPO_ROOT / "venv"
     bindir = _venv_bin_dir(venv_dir)
-    pip_name = "pip.exe" if platform.system() == "Windows" else "pip"
-    pip_path = bindir / pip_name
+    py_name = "python.exe" if platform.system() == "Windows" else "python"
+    venv_python = bindir / py_name
 
     # --- Create venv ---
     if not venv_dir.exists():
@@ -226,7 +229,8 @@ def cmd_install(args: argparse.Namespace) -> int:
 
     # --- Upgrade pip ---
     print(c("  Upgrading pip …", CYAN))
-    run_cmd([str(pip_path), "install", "--upgrade", "pip", "--quiet"], env=venv_env)
+    # CRITICAL: Always invoke via python -m pip to prevent Windows in-use executable locking on pip.exe
+    run_cmd([str(venv_python), "-m", "pip", "install", "--upgrade", "pip"], env=venv_env)
 
     # --- Runtime deps ---
     req = REPO_ROOT / "requirements.txt"
@@ -234,7 +238,7 @@ def cmd_install(args: argparse.Namespace) -> int:
         print(c(f"[!] requirements.txt not found at {req}", RED))
         return 1
     print(c("  Installing runtime dependencies (requirements.txt) …", CYAN))
-    if not run_cmd([str(pip_path), "install", "-r", str(req), "--quiet"], env=venv_env):
+    if not run_cmd([str(venv_python), "-m", "pip", "install", "--no-warn-script-location", "-r", str(req)], env=venv_env):
         print(c("[!] pip install -r requirements.txt failed.", RED))
         return 1
 
@@ -242,7 +246,7 @@ def cmd_install(args: argparse.Namespace) -> int:
     dev_req = REPO_ROOT / "requirements-dev.txt"
     if dev_req.is_file() and not getattr(args, "no_dev", False):
         print(c("  Installing dev dependencies (requirements-dev.txt) …", CYAN))
-        if not run_cmd([str(pip_path), "install", "-r", str(dev_req), "--quiet"], env=venv_env):
+        if not run_cmd([str(venv_python), "-m", "pip", "install", "--no-warn-script-location", "-r", str(dev_req)], env=venv_env):
             print(c("[!] pip install -r requirements-dev.txt failed.", RED))
             return 1
 
@@ -582,19 +586,20 @@ def cmd_run(args: argparse.Namespace) -> int:
     if cmd_check(args) != 0:
         sys.exit(1)
 
-    # Phase 2 — Parallel install + build
-    print(c("[2/4] ASSEMBLING COMPONENTS (parallel) …", BOLD + CYAN))
+    # Phase 2 — Assemble components (build Go binaries + install Python dependencies)
+    print(c("[2/4] ASSEMBLING COMPONENTS …", BOLD + CYAN))
     context: dict[str, str] = {"port": _read_port_from_env()}
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        install_future = executor.submit(cmd_install, args)
-        build_future = executor.submit(cmd_build, args)
+    # Build Go binaries first (fast, ~2s)
+    build_rc = cmd_build(args)
+    if build_rc != 0:
+        print(c("[!] Go engine build completed with warnings. Dashboard features may be limited.", YELLOW))
 
-        if install_future.result() != 0:
-            print(c("[!] Install step failed.", RED))
-            sys.exit(1)
-        if build_future.result() != 0:
-            print(c("[!] Go engine build failed. Dashboard features may be limited.", YELLOW))
+    # Install Python dependencies (with visible progress)
+    install_rc = cmd_install(args)
+    if install_rc != 0:
+        print(c("[!] Install step failed.", RED))
+        return 1
 
     print(c("[✔] Components assembled.\n", GREEN))
 
@@ -841,8 +846,12 @@ def main() -> None:
         args.no_dev = False
         args.func = cmd_run
 
-    exit_code = args.func(args)
-    sys.exit(exit_code)
+    try:
+        exit_code = args.func(args)
+        sys.exit(exit_code)
+    except KeyboardInterrupt:
+        print(c("\n[*] Operation cancelled by user.", YELLOW))
+        sys.exit(130)
 
 
 if __name__ == "__main__":
