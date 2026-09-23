@@ -29,8 +29,17 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+if sys.platform == "win32":
+    # Ensure stdout/stderr handle UTF-8 characters without cp1252 charmap errors
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    # Enable ANSI escape sequences in Windows console
+    os.system("")
+
 # ---------------------------------------------------------------------------
-# ANSI colour palette (Ubuntu terminal safe)
+# ANSI colour palette (Ubuntu/Windows terminal safe)
 # ---------------------------------------------------------------------------
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -42,8 +51,8 @@ DIM = "\033[2m"
 
 
 def c(text: str, colour: str) -> str:
-    """Wrap *text* in an ANSI colour code (no-op on Windows without ANSI support)."""
-    if platform.system() == "Windows":
+    """Wrap *text* in an ANSI colour code."""
+    if os.environ.get("NO_COLOR"):
         return text
     return f"{colour}{text}{RESET}"
 
@@ -150,9 +159,12 @@ def cmd_check(args: argparse.Namespace) -> int:  # noqa: ARG001
         checks["pkg-config"] = ("pkg-config", True)
 
     for binary, (label, required) in checks.items():
-        found = shutil.which(binary)
+        if binary == "python3":
+            found = shutil.which("python3") or shutil.which("python") or sys.executable
+        else:
+            found = shutil.which(binary)
         if found:
-            print(f"  {c('✔', GREEN)}  {label:<18} {c(found, DIM)}")
+            print(f"  {c('✔', GREEN)}  {label:<18} {c(str(found), DIM)}")
         elif required:
             print(f"  {c('✗', RED)}  {label:<18} {c('NOT FOUND — required', RED)}")
             ok = False
@@ -198,7 +210,8 @@ def cmd_install(args: argparse.Namespace) -> int:
 
     venv_dir = REPO_ROOT / "venv"
     bindir = _venv_bin_dir(venv_dir)
-    pip_path = bindir / "pip"
+    pip_name = "pip.exe" if platform.system() == "Windows" else "pip"
+    pip_path = bindir / pip_name
 
     # --- Create venv ---
     if not venv_dir.exists():
@@ -612,7 +625,8 @@ def cmd_run(args: argparse.Namespace) -> int:
 def _require_venv() -> tuple[Path, str | None]:
     """Return (venv_dir, python_exe_str).  If venv is missing, print hint and return None."""
     venv_dir = REPO_ROOT / "venv"
-    python_exe = str(_venv_bin_dir(venv_dir) / "python")
+    py_name = "python.exe" if platform.system() == "Windows" else "python"
+    python_exe = str(_venv_bin_dir(venv_dir) / py_name)
 
     if not venv_dir.exists() or not Path(python_exe).is_file():
         print(c("[!] Virtual environment not found. Run first:", YELLOW))
