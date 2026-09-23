@@ -2027,3 +2027,57 @@ app.include_router(finops_router)
 app.include_router(resources_router)
 app.include_router(cost_optimization_router)
 
+
+# ── Topology proxy routes ────────────────────────────────────────────────────
+# Forwards /api/v1/topology/* to the Go bridge so that the Topology Visualizer
+# page can use relative URLs instead of the hardcoded http://localhost:7070 port.
+# This keeps the visualizer working for remote/Docker clients and through HTTPS
+# reverse proxies.
+_TOPOLOGY_BRIDGE_BASE = f"http://127.0.0.1:{int(os.getenv('REAPER_GO_BRIDGE_PORT', '7070'))}"
+
+
+@app.get("/api/v1/topology/graph")
+async def topology_graph_proxy(request: Request):
+    """Proxy GET /api/v1/topology/graph → Go bridge."""
+    import httpx as _httpx
+    params = dict(request.query_params)
+    try:
+        async with _httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(
+                f"{_TOPOLOGY_BRIDGE_BASE}/api/v1/topology/graph",
+                params=params,
+            )
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=resp.headers.get("content-type", "application/json"),
+        )
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": f"Go bridge unavailable: {exc}"},
+        )
+
+
+@app.post("/api/v1/topology/scan")
+async def topology_scan_proxy(request: Request):
+    """Proxy POST /api/v1/topology/scan → Go bridge."""
+    import httpx as _httpx
+    body = await request.body()
+    try:
+        async with _httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(
+                f"{_TOPOLOGY_BRIDGE_BASE}/api/v1/topology/scan",
+                content=body,
+                headers={"Content-Type": request.headers.get("content-type", "application/json")},
+            )
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=resp.headers.get("content-type", "application/json"),
+        )
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "message": f"Go bridge unavailable: {exc}"},
+        )

@@ -315,4 +315,156 @@
 
         <!-- Content goes here -->
     </main>
+
+<script>
+/* ── Predictive Savings Simulator ───────────────────────────────────────────
+   Drives the #savingsSimChart canvas and the three KPI chips below it.
+   Called by the range slider oninput and once at DOMContentLoaded.
+   ─────────────────────────────────────────────────────────────────────────── */
+(function () {
+    'use strict';
+
+    // Baseline assumptions (tunable constants)
+    const BASE_MONTHLY_SPEND = 18500;   // $ — assumed cloud spend / month
+    const BASE_CO2_PER_1K    = 0.42;    // tCO2 per $1,000 spend
+    const ROI_BASE           = 1.8;     // minimum ROI multiplier at 0% intensity
+    const ROI_SCALE          = 4.2;     // additional ROI range across 0–100%
+
+    let simChart = null;
+
+    function generateSimData(intensity) {
+        // intensity: 0–100
+        const ratio        = intensity / 100;
+        const months       = Array.from({ length: 12 }, (_, i) => {
+            const m = new Date();
+            m.setMonth(m.getMonth() + i);
+            return m.toLocaleString('default', { month: 'short' }) + ' ' + m.getFullYear().toString().slice(2);
+        });
+
+        // Baseline spend (flat)
+        const baseline     = months.map(() => BASE_MONTHLY_SPEND);
+
+        // Optimised spend declines as intensity grows over time
+        const optimised    = months.map((_, i) => {
+            const timeEffect   = 1 - (ratio * 0.7 * (i / 11));   // max 70% reduction by month 12
+            const floorSpend   = BASE_MONTHLY_SPEND * (1 - ratio * 0.15); // immediate reduction
+            return Math.round(Math.max(floorSpend * timeEffect, BASE_MONTHLY_SPEND * 0.15));
+        });
+
+        return { months, baseline, optimised };
+    }
+
+    function updateKpis(intensity) {
+        const ratio              = intensity / 100;
+        const projectedSavings   = BASE_MONTHLY_SPEND * 12 * ratio * 0.72;  // 72% recoverable
+        const roi                = ROI_BASE + ROI_SCALE * ratio;
+        const co2Offset          = (projectedSavings / 1000) * BASE_CO2_PER_1K;
+
+        const el = (id) => document.getElementById(id);
+        if (el('sim-savings'))       el('sim-savings').textContent  = '$' + projectedSavings.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        if (el('sim-roi'))           el('sim-roi').textContent      = roi.toFixed(1) + 'x';
+        if (el('sim-co2'))           el('sim-co2').textContent      = co2Offset.toFixed(1) + 't';
+        if (el('sim-intensity-val')) el('sim-intensity-val').textContent = intensity + '%';
+    }
+
+    function buildOrUpdateChart(intensity) {
+        const canvas = document.getElementById('savingsSimChart');
+        if (!canvas) return;
+
+        const { months, baseline, optimised } = generateSimData(intensity);
+
+        if (simChart) {
+            simChart.data.labels                = months;
+            simChart.data.datasets[0].data      = baseline;
+            simChart.data.datasets[1].data      = optimised;
+            simChart.update('active');
+            return;
+        }
+
+        // Chart.js may not be loaded yet — wait for it
+        if (typeof Chart === 'undefined') {
+            window.addEventListener('load', () => buildOrUpdateChart(intensity));
+            return;
+        }
+
+        simChart = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [
+                    {
+                        label: 'Baseline Spend',
+                        data: baseline,
+                        borderColor: 'rgba(239,68,68,0.7)',
+                        backgroundColor: 'rgba(239,68,68,0.08)',
+                        borderWidth: 2,
+                        borderDash: [6, 4],
+                        pointRadius: 3,
+                        fill: false,
+                        tension: 0.4,
+                    },
+                    {
+                        label: 'Optimised Spend',
+                        data: optimised,
+                        borderColor: 'rgba(34,211,238,0.9)',
+                        backgroundColor: 'rgba(34,211,238,0.12)',
+                        borderWidth: 2.5,
+                        pointRadius: 3,
+                        fill: true,
+                        tension: 0.4,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        labels: { color: '#94a3b8', font: { size: 11 } },
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15,23,42,0.95)',
+                        borderColor: 'rgba(34,211,238,0.3)',
+                        borderWidth: 1,
+                        titleColor: '#f1f5f9',
+                        bodyColor: '#94a3b8',
+                        callbacks: {
+                            label: (ctx) => ' ' + ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString(),
+                        },
+                    },
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#475569', font: { size: 10 } },
+                        grid: { color: 'rgba(255,255,255,0.04)' },
+                    },
+                    y: {
+                        ticks: {
+                            color: '#475569',
+                            font: { size: 10 },
+                            callback: (v) => '$' + (v / 1000).toFixed(0) + 'K',
+                        },
+                        grid: { color: 'rgba(255,255,255,0.04)' },
+                    },
+                },
+            },
+        });
+    }
+
+    // ── Public API called by the range slider ──────────────────────────────
+    window.runSimulation = function () {
+        const slider    = document.getElementById('sim-intensity');
+        const intensity = slider ? parseInt(slider.value, 10) : 40;
+        updateKpis(intensity);
+        buildOrUpdateChart(intensity);
+    };
+
+    // ── Auto-run at page load ──────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        // Small defer so Chart.js (loaded via CDN or defer) is ready
+        setTimeout(window.runSimulation, 150);
+    });
+}());
+</script>
 {% endblock %}

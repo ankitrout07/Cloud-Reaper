@@ -44,6 +44,41 @@ _BRIDGE_PORT = int(os.getenv("REAPER_GO_BRIDGE_PORT", "7070"))
 _BRIDGE_BASE = f"http://127.0.0.1:{_BRIDGE_PORT}"
 _TIMEOUT = float(os.getenv("REAPER_GO_BRIDGE_TIMEOUT", "120"))
 
+# ---------------------------------------------------------------------------
+# Persistent HTTP client — shared across all bridge calls in this process.
+# httpx.AsyncClient maintains a connection pool to the Go bridge; opening a
+# new client per call (the old pattern) paid TCP handshake overhead on every
+# scan/price request and defeated keep-alive.
+# ---------------------------------------------------------------------------
+_bridge_client: "httpx.AsyncClient | None" = None
+_bridge_client_lock: asyncio.Lock | None = None
+
+
+def _get_bridge_lock() -> asyncio.Lock:
+    """Lazily create the lock so it is bound to the running event loop."""
+    global _bridge_client_lock
+    if _bridge_client_lock is None:
+        _bridge_client_lock = asyncio.Lock()
+    return _bridge_client_lock
+
+
+async def _get_bridge_client() -> "httpx.AsyncClient":
+    """Return (or create) the module-level persistent httpx client."""
+    import httpx
+
+    global _bridge_client
+    async with _get_bridge_lock():
+        if _bridge_client is None or _bridge_client.is_closed:
+            _bridge_client = httpx.AsyncClient(
+                timeout=_TIMEOUT,
+                limits=httpx.Limits(
+                    max_connections=10,
+                    max_keepalive_connections=5,
+                    keepalive_expiry=30,
+                ),
+            )
+    return _bridge_client
+
 
 def _repo_root() -> Path:
     """
@@ -71,18 +106,16 @@ def _engine_binary() -> Path | None:
 
 
 async def _is_bridge_alive() -> bool:
-    """
-    Quick health check - returns True if the bridge HTTP server is up.
+    """Quick health check — returns True if the bridge HTTP server is up.
 
-    Returns:
-        True if the bridge server is responding, False otherwise
+    Note: The public ``scan()`` function no longer calls this before every
+    request (doing so wasted a full HTTP round-trip per call).  This helper
+    is kept for use by benchmarks and explicit liveness probes only.
     """
     try:
-        import httpx
-
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            resp = await client.get(f"{_BRIDGE_BASE}/health")
-            return resp.status_code == 200
+        client = await _get_bridge_client()
+        resp = await client.get(f"{_BRIDGE_BASE}/health", timeout=2.0)
+        return resp.status_code == 200
     except Exception:
         return False
 
@@ -91,8 +124,10 @@ async def scan(subscription_id: str, provider: str = "azure") -> dict[str, Any] 
     """
     Run a full cloud scan via the Go engine, non-blocking.
 
-    Tries the resident HTTP bridge first (zero fork overhead).
-    Falls back to asyncio subprocess if the bridge is not running.
+    Tries the resident HTTP bridge first (zero fork overhead) by sending
+    the request directly.  Falls back to an asyncio subprocess only if the
+    bridge is not reachable (ConnectError), avoiding a wasted /health
+    round-trip on every call.
 
     Args:
         subscription_id: Cloud subscription ID to scan
@@ -101,14 +136,15 @@ async def scan(subscription_id: str, provider: str = "azure") -> dict[str, Any] 
     Returns:
         The parsed JSON scan result, or None on failure
     """
-    if await _is_bridge_alive():
-        return await _scan_via_bridge(subscription_id, provider)
-    return await _scan_via_subprocess(subscription_id)
+    return await _scan_via_bridge(subscription_id, provider)
 
 
 async def _scan_via_bridge(subscription_id: str, provider: str) -> dict[str, Any] | None:
     """
-    POST /scan to the resident Go bridge server - non-blocking.
+    POST /scan to the resident Go bridge server using the pooled HTTP client.
+
+    Falls back to subprocess on connection errors so the caller never needs
+    to pre-check bridge liveness with a separate /health call.
 
     Args:
         subscription_id: Cloud subscription ID to scan
@@ -117,20 +153,24 @@ async def _scan_via_bridge(subscription_id: str, provider: str) -> dict[str, Any
     Returns:
         The parsed JSON scan result, or None on failure
     """
-    try:
-        import httpx
+    import httpx
 
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await client.post(
-                f"{_BRIDGE_BASE}/scan",
-                json={"subscription_id": subscription_id, "provider": provider},
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                _log_db_stats(data.get("db_stats"))
-                return data
-            print(f"[go_bridge] /scan returned {resp.status_code}: {resp.text[:200]}")
-            return None
+    try:
+        client = await _get_bridge_client()
+        resp = await client.post(
+            f"{_BRIDGE_BASE}/scan",
+            json={"subscription_id": subscription_id, "provider": provider},
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            _log_db_stats(data.get("db_stats"))
+            return data
+        print(f"[go_bridge] /scan returned {resp.status_code}: {resp.text[:200]}")
+        return None
+    except httpx.ConnectError:
+        # Bridge not running — fall back to subprocess without a separate health check
+        print("[go_bridge] bridge unreachable, falling back to subprocess")
+        return await _scan_via_subprocess(subscription_id)
     except Exception as exc:
         print(f"[go_bridge] bridge call failed: {exc}")
         return None
@@ -182,16 +222,17 @@ async def prices(provider: str = "azure") -> dict[str, Any] | None:
     Returns:
         Dictionary with prices data, or None on failure
     """
-    if await _is_bridge_alive():
-        try:
-            import httpx
+    import httpx
 
-            async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-                resp = await client.get(f"{_BRIDGE_BASE}/prices", params={"provider": provider})
-                if resp.status_code == 200:
-                    return resp.json()
-        except Exception as exc:
-            print(f"[go_bridge] /prices error: {exc}")
+    try:
+        client = await _get_bridge_client()
+        resp = await client.get(f"{_BRIDGE_BASE}/prices", params={"provider": provider})
+        if resp.status_code == 200:
+            return resp.json()
+    except httpx.ConnectError:
+        pass
+    except Exception as exc:
+        print(f"[go_bridge] /prices error: {exc}")
     # Fallback: subprocess
     return await _prices_via_subprocess(provider)
 
@@ -220,31 +261,30 @@ async def parallel_prices(
         - error: Error message if the request failed
         Returns None on complete failure
     """
-    if not await _is_bridge_alive():
-        print("[go_bridge] Parallel prices requires Go bridge server to be running")
-        return None
+    import httpx
+
+    request_body = {
+        "services": services or [],
+        "concurrency": concurrency,
+        "region": region
+    }
     
     try:
-        import httpx
-
-        request_body = {
-            "services": services or [],
-            "concurrency": concurrency,
-            "region": region
-        }
-        
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await client.post(
-                f"{_BRIDGE_BASE}/prices/parallel",
-                json=request_body,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                print(f"[go_bridge] Parallel prices fetched: {data.get('count', 0)} items")
-                return data
-            else:
-                print(f"[go_bridge] /prices/parallel returned {resp.status_code}: {resp.text[:200]}")
-                return None
+        client = await _get_bridge_client()
+        resp = await client.post(
+            f"{_BRIDGE_BASE}/prices/parallel",
+            json=request_body,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            print(f"[go_bridge] Parallel prices fetched: {data.get('count', 0)} items")
+            return data
+        else:
+            print(f"[go_bridge] /prices/parallel returned {resp.status_code}: {resp.text[:200]}")
+            return None
+    except httpx.ConnectError:
+        print("[go_bridge] Parallel prices requires Go bridge server to be running")
+        return None
     except Exception as exc:
         print(f"[go_bridge] Parallel prices error: {exc}")
         return None

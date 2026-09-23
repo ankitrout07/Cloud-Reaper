@@ -41,9 +41,15 @@ import (
 	"strings"
 	"time"
 
+	"cloud-reaper/engine-go/internal/anomaly"
+	"cloud-reaper/engine-go/internal/background"
+	"cloud-reaper/engine-go/internal/calculator"
 	"cloud-reaper/engine-go/internal/collectors"
 	"cloud-reaper/engine-go/internal/db"
+	"cloud-reaper/engine-go/internal/rag"
+	"cloud-reaper/engine-go/internal/ratelimiter"
 	"cloud-reaper/engine-go/internal/streaming"
+	"cloud-reaper/engine-go/internal/websocket"
 )
 
 // scanRequest is the POST /scan request body.
@@ -110,6 +116,100 @@ func RunBridgeServer(port int) {
 	}
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		fmt.Fprintf(os.Stderr, "[bridge] fatal: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// RunUnifiedServer starts a collapsed single-process HTTP engine serving all
+// sidecar APIs (bridge, tasks, ratelimiter, RAG, calculator, anomaly, websocket).
+// This eliminates the microservice mesh for local and single-host use.
+func RunUnifiedServer(port int) {
+	primaryMux := http.NewServeMux()
+	primaryMux.HandleFunc("/scan", handleScan)
+	primaryMux.HandleFunc("/prices", handlePrices)
+	primaryMux.HandleFunc("/prices/parallel", handleParallelPrices)
+	primaryMux.HandleFunc("/api/v1/topology/graph", handleTopologyGraph)
+	primaryMux.HandleFunc("/api/v1/topology/scan", handleTopologyScan)
+	streaming.RegisterStreamHandlers(primaryMux)
+
+	taskMux := http.NewServeMux()
+	background.RegisterTaskHandlers(taskMux)
+
+	rateMux := http.NewServeMux()
+	ratelimiter.RegisterRateLimiterHandlers(rateMux)
+
+	ragMux := http.NewServeMux()
+	rag.RegisterRAGHandlers(ragMux)
+
+	calcMux := http.NewServeMux()
+	calculator.RegisterCalculatorHandlers(calcMux)
+
+	anomalyMux := http.NewServeMux()
+	anomaly.RegisterAnomalyHandlers(anomalyMux)
+
+	wsMux := http.NewServeMux()
+	websocket.RegisterBatcherHandlers(wsMux)
+
+	unifiedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if path == "/health" {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"status": "ok",
+				"engine": "cloud-reaper-go",
+				"mode":   "unified",
+				"services": map[string]string{
+					"bridge":      "ok",
+					"tasks":       "ok",
+					"ratelimiter": "ok",
+					"rag":         "ok",
+					"calculator":  "ok",
+					"anomaly":     "ok",
+					"websocket":   "ok",
+					"streaming":   "ok",
+				},
+			})
+			return
+		}
+		if strings.HasPrefix(path, "/api/tasks") {
+			taskMux.ServeHTTP(w, r)
+			return
+		}
+		if strings.HasPrefix(path, "/api/ratelimit") {
+			rateMux.ServeHTTP(w, r)
+			return
+		}
+		if strings.HasPrefix(path, "/api/rag") {
+			ragMux.ServeHTTP(w, r)
+			return
+		}
+		if strings.HasPrefix(path, "/api/calculator") {
+			calcMux.ServeHTTP(w, r)
+			return
+		}
+		if strings.HasPrefix(path, "/api/anomaly") {
+			anomalyMux.ServeHTTP(w, r)
+			return
+		}
+		if strings.HasPrefix(path, "/api/ws") {
+			wsMux.ServeHTTP(w, r)
+			return
+		}
+		primaryMux.ServeHTTP(w, r)
+	})
+
+	addr := fmt.Sprintf("0.0.0.0:%d", port)
+	fmt.Printf("[unified-engine] Go unified engine listening on http://%s (all sidecars collapsed into single process)\n", addr)
+
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      unifiedHandler,
+		ReadTimeout:  120 * time.Second,
+		WriteTimeout: 300 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		fmt.Fprintf(os.Stderr, "[unified-engine] fatal: %v\n", err)
 		os.Exit(1)
 	}
 }

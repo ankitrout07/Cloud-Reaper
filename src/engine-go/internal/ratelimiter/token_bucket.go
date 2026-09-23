@@ -35,25 +35,16 @@ func NewTokenBucketRateLimiter(requestsPerSecond float64, burstSize int) *TokenB
 
 // Allow checks if a request is allowed under the rate limit
 func (tb *TokenBucketRateLimiter) Allow() bool {
-	tb.mu.Lock()
-	defer tb.mu.Unlock()
-
 	return tb.limiter.Allow()
 }
 
-// Wait blocks until a token is available
+// Wait blocks until a token is available without holding a mutex
 func (tb *TokenBucketRateLimiter) Wait(ctx context.Context) error {
-	tb.mu.Lock()
-	defer tb.mu.Unlock()
-
 	return tb.limiter.Wait(ctx)
 }
 
-// WaitDuration blocks until a token is available, returning the wait time
+// WaitDuration blocks until a token is available, sleeping outside the lock
 func (tb *TokenBucketRateLimiter) WaitDuration() time.Duration {
-	tb.mu.Lock()
-	defer tb.mu.Unlock()
-
 	start := time.Now()
 	reservation := tb.limiter.Reserve()
 	if !reservation.OK() {
@@ -62,7 +53,7 @@ func (tb *TokenBucketRateLimiter) WaitDuration() time.Duration {
 
 	delay := reservation.Delay()
 
-	// Actually wait if there's a delay
+	// Actually wait if there's a delay, without holding any lock
 	if delay > 0 {
 		time.Sleep(delay)
 	}
@@ -72,21 +63,22 @@ func (tb *TokenBucketRateLimiter) WaitDuration() time.Duration {
 
 // Tokens returns the number of available tokens
 func (tb *TokenBucketRateLimiter) Tokens() float64 {
+	return tb.limiter.Tokens()
+}
+
+// AdjustForRetryAfter adjusts the rate limit when encountering rate limiting (e.g. HTTP 429)
+func (tb *TokenBucketRateLimiter) AdjustForRetryAfter(retryAfter time.Duration) {
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
 
-	// Estimate available tokens based on rate and time since last sync
-	elapsed := time.Since(tb.lastSync)
-	available := float64(tb.burst) - elapsed.Seconds()*float64(tb.rate)
-
-	if available < 0 {
-		available = 0
+	current := float64(tb.rate)
+	newRate := current * 0.5
+	if newRate < 0.5 {
+		newRate = 0.5
 	}
-	if available > float64(tb.burst) {
-		available = float64(tb.burst)
-	}
-
-	return available
+	tb.rate = rate.Limit(newRate)
+	tb.limiter.SetLimit(tb.rate)
+	tb.lastSync = time.Now()
 }
 
 // UpdateRate dynamically updates the rate limit

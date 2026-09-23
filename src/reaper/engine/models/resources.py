@@ -3,6 +3,7 @@ import time
 from contextlib import asynccontextmanager, contextmanager
 from datetime import UTC, datetime
 from functools import wraps
+from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import (
@@ -12,11 +13,13 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     Text,
     create_engine,
+    event,
 )
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -24,47 +27,82 @@ from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
 load_dotenv()
 
-# We need engine-agnostic JSON (not JSONB) for SQLite compatibility
-# in desktop mode
-# Default to SQLite in a data directory; use PostgreSQL if DATABASE_URL is set
+# ---------------------------------------------------------------------------
+# Database URL resolution
+# ---------------------------------------------------------------------------
+# Unified rule (Python and Go share the same file):
+#   1. Honour DATABASE_URL env-var when explicitly set.
+#   2. Otherwise resolve <repo-root>/data/reaper.db so both runtimes hit the
+#      same file regardless of which Python package directory __file__ resolves
+#      to at import time.
+# ---------------------------------------------------------------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    # Use SQLite by default
-    data_dir = os.path.join(os.path.dirname(__file__), "../../../data")
-    os.makedirs(data_dir, exist_ok=True)
-    db_path = os.path.join(data_dir, "reaper.db")
-    DATABASE_URL = f"sqlite:///{db_path}"
+    # Walk up from this file until we find the repo root (contains pyproject.toml
+    # or .git), then use <repo_root>/data/reaper.db.
+    _this_file = Path(__file__).resolve()
+    _repo_root = _this_file.parent
+    for _parent in _this_file.parents:
+        if (_parent / "pyproject.toml").exists() or (_parent / ".git").exists():
+            _repo_root = _parent
+            break
+    _data_dir = _repo_root / "data"
+    _data_dir.mkdir(parents=True, exist_ok=True)
+    DATABASE_URL = f"sqlite:///{_data_dir / 'reaper.db'}"
 
-# Convert to async URL if using PostgreSQL
-ASYNC_DATABASE_URL = None
+# Convert to async URL
+ASYNC_DATABASE_URL: str | None = None
 if "postgresql" in DATABASE_URL:
     ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 elif "sqlite" in DATABASE_URL:
     ASYNC_DATABASE_URL = DATABASE_URL.replace("sqlite:///", "sqlite+aiosqlite://")
 
-# Configure engine with connection pooling for better performance
-engine_config = (
+
+def _apply_sqlite_pragmas(dbapi_conn, _connection_record) -> None:  # noqa: ANN001
+    """Enable WAL journal mode, busy timeout, and NORMAL fsync on every new
+    SQLite connection.  WAL allows concurrent readers alongside the single
+    writer and eliminates the "database is locked" errors that the old
+    journal=DELETE mode produced under pool_size=20 / MaxOpenConns=25."""
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=5000")  # ms — callers wait up to 5 s
+    cursor.execute("PRAGMA synchronous=NORMAL")  # safe with WAL; faster than FULL
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
+# ---------------------------------------------------------------------------
+# Engine configuration
+# ---------------------------------------------------------------------------
+# SQLite is single-writer by design.  pool_size=20 / max_overflow=10 means 30
+# threads can *hold* a connection simultaneously — but only 1 can write.  The
+# other 29 block, timeout, and raise OperationalError.  Cap to 5 connections
+# (reads can share; the single writer slot is effectively serialised anyway).
+# ---------------------------------------------------------------------------
+engine_config: dict = (
     {
         "connect_args": {"check_same_thread": False},
-        "pool_pre_ping": True,  # Verify connections before using
-        "echo": False,  # Disable SQL logging for performance
-        "pool_size": 20,  # Increased SQLite connection pool for better concurrency
-        "max_overflow": 10,  # Allow overflow for peak loads
+        "pool_pre_ping": True,
+        "echo": False,
+        "pool_size": 5,      # was 20 — SQLite is single-writer; >5 just queues
+        "max_overflow": 0,   # no extra connections beyond pool_size
     }
     if "sqlite" in DATABASE_URL
     else {
-        "pool_size": 40,  # Increased pool size for better concurrency
-        "max_overflow": 60,  # Increased max overflow for peak loads
-        "pool_pre_ping": True,  # Verify connections before using
-        "pool_recycle": 3600,  # Recycle connections after 1 hour (reduced churn)
-        "pool_timeout": 15,  # Reduced timeout for faster connection acquisition
-        "echo": False,  # Disable SQL logging for performance
-        "connect_args": {
-            "connect_timeout": 10,  # Faster connection timeout
-            "options": "-c statement_timeout=30000",  # Prevent long-running queries
-        }
-        if "postgresql" in DATABASE_URL
-        else {},
+        "pool_size": 40,
+        "max_overflow": 60,
+        "pool_pre_ping": True,
+        "pool_recycle": 3600,
+        "pool_timeout": 15,
+        "echo": False,
+        "connect_args": (
+            {
+                "connect_timeout": 10,
+                "options": "-c statement_timeout=30000",
+            }
+            if "postgresql" in DATABASE_URL
+            else {}
+        ),
     }
 )
 
@@ -72,11 +110,15 @@ engine_config = (
 engine = create_engine(DATABASE_URL, **engine_config)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Async engine (for async operations)
+# Wire WAL + busy_timeout for every new SQLite connection in the sync pool
+if "sqlite" in DATABASE_URL:
+    event.listen(engine, "connect", _apply_sqlite_pragmas)
+
+# Async engine
 async_engine_config = engine_config.copy()
 if "sqlite" in DATABASE_URL:
     async_engine_config["connect_args"] = {"check_same_thread": False}
-    # Remove pool_size for aiosqlite which doesn't support connection pooling
+    # aiosqlite uses StaticPool internally; pool_size/max_overflow not supported
     async_engine_config.pop("pool_size", None)
     async_engine_config.pop("max_overflow", None)
 
@@ -85,6 +127,9 @@ if ASYNC_DATABASE_URL:
     AsyncSessionLocal = async_sessionmaker(
         async_engine, class_=AsyncSession, expire_on_commit=False, autocommit=False, autoflush=False
     )
+    # Wire WAL pragmas for async connections too
+    if "sqlite" in ASYNC_DATABASE_URL:
+        event.listen(async_engine.sync_engine, "connect", _apply_sqlite_pragmas)
 else:
     async_engine = None
     AsyncSessionLocal = None
@@ -250,10 +295,22 @@ class CloudResource(Base):
 
     id = Column(String, primary_key=True)
     provider = Column(String, nullable=False, index=True)  # azure, aws, gcp
-    resource_type = Column(String, nullable=False)  # virtual_machines, disks
+    resource_type = Column(String, nullable=False, index=True)  # virtual_machines, disks
     region = Column(String, nullable=False)
-    cost_attributes = Column(JSON, nullable=False)  # Engine-agnostic storage replacement for JSONB
-    last_scanned = Column(DateTime, default=lambda: datetime.now(UTC))
+    # cost_attributes stores all resource metadata as JSON for engine-agnostic portability
+    cost_attributes = Column(JSON, nullable=False)
+    last_scanned = Column(DateTime, default=lambda: datetime.now(UTC), index=True)
+
+    # Composite index for snapshot queries: provider+type+region filtered by watermark
+    __table_args__ = (
+        Index(
+            "ix_resources_lookup",
+            "provider",
+            "resource_type",
+            "region",
+            "last_scanned",
+        ),
+    )
 
 
 class Budget(Base):

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
 
@@ -44,7 +45,9 @@ var AzureRetailServiceNames = []string{
 
 // PriceResult represents a single price item from the Azure Retail Prices API
 type PriceResult struct {
-	Items []map[string]interface{} `json:"Items"`
+	Items        []map[string]interface{} `json:"Items"`
+	NextPageLink string                   `json:"NextPageLink"`
+	Count        int                      `json:"Count"`
 }
 
 // ServicePriceResult contains the results for a single service
@@ -127,6 +130,37 @@ func (p *ParallelPriceClient) ParallelServiceScrape(services []string) []map[str
 	return results
 }
 
+// getWithRetry executes an HTTP GET request with rate limiting and Retry-After backoff on HTTP 429.
+func (p *ParallelPriceClient) getWithRetry(url string) (*http.Response, error) {
+	maxRetries := 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if err := p.limiter.Wait(context.Background()); err != nil {
+			return nil, fmt.Errorf("rate limiter error: %w", err)
+		}
+
+		resp, err := p.httpClient.Get(url)
+		if err != nil {
+			return nil, fmt.Errorf("HTTP request failed: %w", err)
+		}
+
+		if resp.StatusCode == http.StatusTooManyRequests {
+			retryAfterStr := resp.Header.Get("Retry-After")
+			resp.Body.Close()
+			waitSeconds := 2 * (attempt + 1)
+			if retryAfterStr != "" {
+				if sec, parseErr := strconv.Atoi(retryAfterStr); parseErr == nil && sec > 0 {
+					waitSeconds = sec
+				}
+			}
+			time.Sleep(time.Duration(waitSeconds) * time.Second)
+			continue
+		}
+
+		return resp, nil
+	}
+	return nil, fmt.Errorf("exceeded max retries for %s", url)
+}
+
 // fetchServicePrices fetches pricing data for a specific service with pagination
 func (p *ParallelPriceClient) fetchServicePrices(serviceName string, maxPages int) ([]map[string]interface{}, error) {
 	filter := fmt.Sprintf("serviceName eq '%s' and priceType eq 'Consumption'", serviceName)
@@ -141,14 +175,9 @@ func (p *ParallelPriceClient) fetchServicePrices(serviceName string, maxPages in
 	pageCount := 0
 
 	for currentURL != "" {
-		// Respect rate limiter
-		if err := p.limiter.Wait(context.Background()); err != nil {
-			return nil, fmt.Errorf("rate limiter error: %w", err)
-		}
-
-		resp, err := p.httpClient.Get(currentURL)
+		resp, err := p.getWithRetry(currentURL)
 		if err != nil {
-			return nil, fmt.Errorf("HTTP request failed: %w", err)
+			return nil, err
 		}
 
 		if resp.StatusCode != http.StatusOK {
@@ -175,15 +204,8 @@ func (p *ParallelPriceClient) fetchServicePrices(serviceName string, maxPages in
 			break
 		}
 
-		// Check for next page link in the response
-		var nextLink string
-		if len(result.Items) > 0 {
-			// Azure Retail Prices API doesn't always return NextPageLink in the expected format
-			// We'll stop after maxPages to avoid infinite loops
-			break
-		}
-
-		currentURL = nextLink
+		// Follow the NextPageLink returned by Azure Retail Prices API
+		currentURL = result.NextPageLink
 	}
 
 	return allPrices, nil
@@ -249,13 +271,9 @@ func (p *ParallelPriceClient) fetchPricesWithFilter(filter string, maxPages int)
 	pageCount := 0
 
 	for currentURL != "" {
-		if err := p.limiter.Wait(context.Background()); err != nil {
-			return nil, fmt.Errorf("rate limiter error: %w", err)
-		}
-
-		resp, err := p.httpClient.Get(currentURL)
+		resp, err := p.getWithRetry(currentURL)
 		if err != nil {
-			return nil, fmt.Errorf("HTTP request failed: %w", err)
+			return nil, err
 		}
 
 		if resp.StatusCode != http.StatusOK {
@@ -281,7 +299,7 @@ func (p *ParallelPriceClient) fetchPricesWithFilter(filter string, maxPages int)
 			break
 		}
 
-		currentURL = "" // Stop after first page for custom filters
+		currentURL = result.NextPageLink
 	}
 
 	return allPrices, nil

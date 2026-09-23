@@ -15,16 +15,25 @@
                 <div class="page-header__intro">
                     <h1 class="page-header__title">
                         Resource <span class="page-header__title-accent">Inventory</span>
-                        <span class="page-header__badge">Real-Time</span>
+                        <span class="page-header__badge">Snapshot</span>
                     </h1>
                     <p class="page-header__subtitle">
                         Monitor all Azure resources in real-time across 20+ service categories.
                         Identify idle &amp; orphaned resources, estimate costs, and dismiss waste.
                     </p>
+                    <span id="snapshot-timestamp-badge" style="display:none;font-size:0.72rem;font-weight:600;color:#64748b;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:9999px;padding:0.2rem 0.75rem;margin-top:0.5rem;width:fit-content;"></span>
                 </div>
                 <div class="page-header__actions">
+                    <button type="button" id="trigger-scan-btn"
+                            onclick="triggerCloudScan()" class="btn btn-primary">
+                        <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        Scan Cloud
+                    </button>
                     <button type="button" id="refresh-inventory-btn"
-                            onclick="loadResourceInventory()" class="btn btn-primary">
+                            onclick="loadResourceInventory()" class="btn btn-ghost">
                         <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>

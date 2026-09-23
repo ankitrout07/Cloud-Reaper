@@ -39,39 +39,59 @@ func Connect() (*sql.DB, error) {
 	once.Do(func() {
 		dbURL := os.Getenv("DATABASE_URL")
 		if dbURL == "" {
-			configDir, e := os.UserConfigDir()
-			if e == nil {
-				dbURL = fmt.Sprintf("%s/CloudReaper/metadata.db", configDir)
-				os.MkdirAll(fmt.Sprintf("%s/CloudReaper", configDir), 0755)
-			} else {
-				dbURL = "./metadata.db"
+			// ---------------------------------------------------------------------------
+			// Unified default: resolve ./data/reaper.db relative to the working
+			// directory (i.e. the repo root when launched normally).  This matches
+			// the Python default so both runtimes share the same file and the same
+			// schema without needing an explicit DATABASE_URL in development.
+			// ---------------------------------------------------------------------------
+			dataDir := "./data"
+			if e := os.MkdirAll(dataDir, 0755); e != nil {
+				dataDir = "."
 			}
+			dbURL = dataDir + "/reaper.db"
 		} else {
+			// Strip the sqlite:/// scheme prefix if present (e.g. from DATABASE_URL
+			// in docker-compose: "sqlite:////app/data/reaper.db").
+			dbURL = strings.TrimPrefix(dbURL, "sqlite:////")
 			dbURL = strings.TrimPrefix(dbURL, "sqlite:///")
 		}
-		pool, err = sql.Open("sqlite3", dbURL)
+
+		// Embed WAL + busy_timeout pragmas in the DSN so every connection
+		// automatically enables WAL journal mode (concurrent reads + one writer)
+		// and waits up to 5 s on a locked write instead of returning SQLITE_BUSY
+		// immediately.  synchronous=NORMAL is safe with WAL and ~3× faster than FULL.
+		dsn := dbURL +
+			"?_journal_mode=WAL" +
+			"&_busy_timeout=5000" +
+			"&_synchronous=NORMAL" +
+			"&_foreign_keys=on"
+
+		pool, err = sql.Open("sqlite3", dsn)
 		if err == nil {
 			err = pool.Ping()
 		}
 		if err == nil {
-			// Configure connection pool for better stability
-			// Use environment variables or sensible defaults
-			maxOpenConns := 25
-			maxIdleConns := 5
+			// SQLite is single-writer.  Setting MaxOpenConns=25 means 25 goroutines
+			// can hold a connection; 24 of them will block waiting for the write lock
+			// and then time out.  Cap to 2: one for the writer, one spare for readers.
+			// The DB_MAX_OPEN_CONNS env-var can override for Postgres use-cases.
+			maxOpenConns := 2
+			maxIdleConns := 2
 			connMaxLifetime := 5 * time.Minute
 
 			if val := os.Getenv("DB_MAX_OPEN_CONNS"); val != "" {
-				if intVal, err := strconv.Atoi(val); err == nil && intVal > 0 {
+				if intVal, e := strconv.Atoi(val); e == nil && intVal > 0 {
 					maxOpenConns = intVal
 				}
 			}
 			if val := os.Getenv("DB_MAX_IDLE_CONNS"); val != "" {
-				if intVal, err := strconv.Atoi(val); err == nil && intVal >= 0 {
+				if intVal, e := strconv.Atoi(val); e == nil && intVal >= 0 {
 					maxIdleConns = intVal
 				}
 			}
 			if val := os.Getenv("DB_CONN_MAX_LIFETIME_MINUTES"); val != "" {
-				if intVal, err := strconv.Atoi(val); err == nil && intVal > 0 {
+				if intVal, e := strconv.Atoi(val); e == nil && intVal > 0 {
 					connMaxLifetime = time.Duration(intVal) * time.Minute
 				}
 			}
@@ -83,6 +103,7 @@ func Connect() (*sql.DB, error) {
 	})
 	return pool, err
 }
+
 
 func UpsertResources(resources []Resource) error {
 	db, err := Connect()

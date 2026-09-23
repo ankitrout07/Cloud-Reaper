@@ -72,6 +72,100 @@
         return all;
     }
 
+    // ── Toasts ───────────────────────────────────────────────────────────────
+    function toast(msg, type) {
+        if (typeof window.showToast === 'function') { window.showToast(msg, type); return; }
+        if (typeof window.notify   === 'function') { window.notify(msg, type);    return; }
+        // Fallback: inline minimal toast
+        const t = document.createElement('div');
+        t.textContent = msg;
+        t.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;padding:0.75rem 1.25rem;border-radius:0.75rem;font-size:0.85rem;font-weight:600;color:#fff;backdrop-filter:blur(12px);animation:fadeIn 0.2s ease;';
+        t.style.background = type === 'success' ? 'rgba(16,185,129,0.9)' : type === 'error' ? 'rgba(239,68,68,0.9)' : 'rgba(99,102,241,0.9)';
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 3500);
+    }
+
+    // ── Resource Detail Modal ────────────────────────────────────────────────
+    function openDetailModal(resource) {
+        let modal = document.getElementById('resource-detail-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'resource-detail-modal';
+            modal.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);';
+            modal.innerHTML = `
+              <div id="rdm-inner" style="background:rgba(15,23,42,0.95);border:1px solid rgba(255,255,255,0.12);border-radius:1.25rem;padding:2rem;max-width:480px;width:90%;box-shadow:0 25px 60px rgba(0,0,0,0.6);position:relative;">
+                <button onclick="document.getElementById('resource-detail-modal').remove()" style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:50%;width:2rem;height:2rem;cursor:pointer;color:#94a3b8;font-size:1rem;line-height:1;" aria-label="Close">✕</button>
+                <h2 id="rdm-title" style="font-size:1.1rem;font-weight:700;color:#f1f5f9;margin:0 0 1.25rem;letter-spacing:-0.02em;"></h2>
+                <div id="rdm-body" style="display:grid;gap:0.6rem;"></div>
+                <div id="rdm-footer" style="margin-top:1.5rem;display:flex;gap:0.75rem;justify-content:flex-end;"></div>
+              </div>`;
+            modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+            document.body.appendChild(modal);
+        }
+
+        const cat = resource.category || 'other_resources';
+        const meta = CATEGORY_META[cat] || { icon: '❓', label: cat };
+        const cost = typeof resource.estimated_cost === 'number' ? '$' + resource.estimated_cost.toFixed(2) : '$0.00';
+
+        const rows = [
+            ['Name',       resource.name],
+            ['Type',       resource.type],
+            ['Location',   resource.location || '—'],
+            ['Status',     resource.status   || '—'],
+            ['Category',   meta.icon + ' ' + meta.label],
+            ['Est. Cost',  cost + '/mo'],
+        ];
+        if (resource.size) rows.push(['Size', resource.size]);
+        if (resource.sku)  rows.push(['SKU',  resource.sku]);
+        if (resource.kind) rows.push(['Kind', resource.kind]);
+        if (resource.kubernetes_version) rows.push(['K8s', resource.kubernetes_version + ' · ' + resource.node_count + ' nodes']);
+        if (resource.id)   rows.push(['ID',   resource.id]);
+
+        document.getElementById('rdm-title').textContent = '📋 Resource Details';
+        document.getElementById('rdm-body').innerHTML = rows.map(([k, v]) =>
+            `<div style="display:grid;grid-template-columns:130px 1fr;gap:0.5rem;align-items:start;padding:0.4rem 0.6rem;border-radius:0.5rem;background:rgba(255,255,255,0.03);">
+              <span style="font-size:0.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">${escapeHtml(k)}</span>
+              <span style="font-size:0.83rem;color:#e2e8f0;word-break:break-all;">${escapeHtml(String(v))}</span>
+            </div>`
+        ).join('');
+
+        const footer = document.getElementById('rdm-footer');
+        footer.innerHTML = '';
+        if (resource.can_dismiss) {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-error btn-sm';
+            btn.textContent = '🗑 Dismiss Resource';
+            btn.onclick = () => { modal.remove(); dismissResource(resource.id, resource.dismiss_reason || 'Manual dismissal'); };
+            footer.appendChild(btn);
+        }
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'btn btn-ghost btn-sm';
+        closeBtn.textContent = 'Close';
+        closeBtn.onclick = () => modal.remove();
+        footer.appendChild(closeBtn);
+    }
+
+    // ── Inline Confirm ───────────────────────────────────────────────────────
+    function confirmAction(message, onConfirm) {
+        let modal = document.getElementById('resource-confirm-modal');
+        if (modal) modal.remove();
+        modal = document.createElement('div');
+        modal.id = 'resource-confirm-modal';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:10001;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);';
+        modal.innerHTML = `
+          <div style="background:rgba(15,23,42,0.97);border:1px solid rgba(239,68,68,0.3);border-radius:1.25rem;padding:2rem;max-width:400px;width:90%;box-shadow:0 25px 60px rgba(0,0,0,0.6);">
+            <h3 style="color:#f87171;font-size:1rem;font-weight:700;margin:0 0 0.75rem;">⚠️ Confirm Action</h3>
+            <p style="color:#94a3b8;font-size:0.875rem;margin:0 0 1.5rem;">${escapeHtml(message)}</p>
+            <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+              <button id="rcm-cancel" class="btn btn-ghost btn-sm">Cancel</button>
+              <button id="rcm-confirm" class="btn btn-error btn-sm">Confirm</button>
+            </div>
+          </div>`;
+        document.body.appendChild(modal);
+        document.getElementById('rcm-cancel').onclick  = () => modal.remove();
+        document.getElementById('rcm-confirm').onclick = () => { modal.remove(); onConfirm(); };
+    }
+
     // ── API fetch ────────────────────────────────────────────────────────────
     async function fetchInventory(page) {
         const container = document.getElementById('resources-container');
@@ -94,14 +188,22 @@
 
             if (data.status === 'success') {
                 resourceInventory = data.data;
-                currentPage   = data.page       || 1;
-                totalResources = data.total      || 0;
-                totalPages    = data.total_pages || 1;
+                currentPage    = data.page       || 1;
+                totalResources  = data.total      || 0;
+                totalPages     = data.total_pages || 1;
+
+                // Show snapshot timestamp badge
+                const tsBadge = document.getElementById('snapshot-timestamp-badge');
+                if (tsBadge && data.data && data.data.timestamp) {
+                    const d = new Date(data.data.timestamp * 1000);
+                    tsBadge.textContent = '🕐 Snapshot: ' + d.toLocaleString();
+                    tsBadge.style.display = 'inline-flex';
+                }
 
                 updateSummary(resourceInventory.summary);
                 // Use server-paginated flat list if available, otherwise derive client-side
                 const resources = data.resources || flattenResources(resourceInventory);
-                renderResources(resources);
+                renderResources(resources, data.db_empty);
                 renderPagination();
             } else {
                 showError(container, data.message || 'Unknown error');
@@ -137,15 +239,26 @@
     }
 
     // ── Render resource cards ────────────────────────────────────────────────
-    function renderResources(resources) {
+    function renderResources(resources, dbEmpty) {
         const container = document.getElementById('resources-container');
         if (!container) return;
 
-        if (!resources || resources.length === 0) {
+        if (dbEmpty || !resources || resources.length === 0) {
+            const isDbEmpty = dbEmpty || !resources || resources.length === 0;
             container.innerHTML =
-                '<div class="empty-state-pro">' +
-                '<p class="empty-state-pro__title">No resources found</p>' +
-                '<p class="empty-state-pro__desc">Your Azure subscription may not have resources matching the current filter, or there may be a connection issue.</p>' +
+                '<div class="empty-state-pro" style="text-align:center;padding:4rem 2rem;">' +
+                '<div style="font-size:4rem;margin-bottom:1rem;">☁️</div>' +
+                '<p class="empty-state-pro__title" style="font-size:1.25rem;font-weight:700;color:#f1f5f9;margin-bottom:0.5rem;">' +
+                (isDbEmpty ? 'No snapshot found' : 'No resources found') +
+                '</p>' +
+                '<p class="empty-state-pro__desc" style="color:#64748b;margin-bottom:1.5rem;">' +
+                (isDbEmpty
+                    ? 'No inventory data yet. Run a cloud scan to populate the database.'
+                    : 'No resources match the current filters. Try adjusting your search or category.') +
+                '</p>' +
+                (isDbEmpty
+                    ? '<button type="button" class="btn btn-primary" onclick="triggerCloudScan()" style="margin:0 auto;">🚀 Run Cloud Scan</button>'
+                    : '') +
                 '</div>';
             return;
         }
@@ -262,53 +375,69 @@
         if (!resourceInventory) return;
         const resource = flattenResources(resourceInventory).find(r => r.id === resourceId);
         if (!resource) return;
-
-        const lines = [
-            'Resource Details',
-            '',
-            'Name:     ' + resource.name,
-            'Type:     ' + resource.type,
-            'Location: ' + (resource.location || '—'),
-            'Status:   ' + (resource.status || '—'),
-            'Category: ' + (resource.category || '—'),
-            'Est. Cost: $' + (resource.estimated_cost || 0).toFixed(2) + '/mo',
-        ];
-        if (resource.size)   lines.push('Size: ' + resource.size);
-        if (resource.sku)    lines.push('SKU:  ' + resource.sku);
-        if (resource.kind)   lines.push('Kind: ' + resource.kind);
-        alert(lines.join('\n'));
+        openDetailModal(resource);
     };
 
-    window.dismissResource = async function (resourceId, reason) {
-        if (!confirm('Are you sure you want to dismiss this resource? This action may have cost implications.')) return;
+    window.dismissResource = function (resourceId, reason) {
+        confirmAction(
+            'Are you sure you want to dismiss this resource? This action may have cost implications.',
+            async function () {
+                try {
+                    const response = await fetch('/api/resources/' + encodeURIComponent(resourceId) + '/dismiss', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reason }),
+                    });
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        toast(data.message || 'Resource dismissed.', 'success');
+                        fetchInventory(currentPage);
+                    } else {
+                        toast('Error dismissing resource: ' + data.message, 'error');
+                    }
+                } catch (err) {
+                    toast('Error dismissing resource: ' + err.message, 'error');
+                }
+            }
+        );
+    };
+
+    // ── Trigger Cloud Scan ───────────────────────────────────────────────────
+    window.triggerCloudScan = async function () {
+        const btn = document.getElementById('trigger-scan-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;margin-right:6px;"></span> Scanning…';
+        }
+        toast('Cloud scan started — this may take a moment…', 'info');
         try {
-            const response = await fetch('/api/resources/' + encodeURIComponent(resourceId) + '/dismiss', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason }),
-            });
+            const response = await fetch('/api/resources/scan', { method: 'POST' });
             const data = await response.json();
             if (data.status === 'success') {
-                if (typeof showToast === 'function') showToast(data.message, 'success');
-                else alert(data.message);
-                fetchInventory(currentPage);
+                toast('Scan complete! Refreshing inventory…', 'success');
+                setTimeout(() => fetchInventory(1), 800);
             } else {
-                alert('Error dismissing resource: ' + data.message);
+                toast('Scan error: ' + (data.message || 'Unknown error'), 'error');
             }
         } catch (err) {
-            alert('Error dismissing resource: ' + err.message);
+            toast('Scan failed: ' + err.message, 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Scan Cloud';
+            }
         }
     };
 
     // ── Export to CSV ────────────────────────────────────────────────────────
     window.exportInventory = function () {
         if (!resourceInventory) {
-            alert('No inventory data loaded yet. Please click Refresh first.');
+            toast('No inventory data loaded yet. Please click Refresh first.', 'error');
             return;
         }
         const all = flattenResources(resourceInventory);
         if (all.length === 0) {
-            alert('No resources to export.');
+            toast('No resources to export.', 'error');
             return;
         }
         const headers = ['name', 'type', 'category', 'location', 'status', 'estimated_cost', 'id'];

@@ -186,9 +186,6 @@
         const currentPath = window.location.pathname;
         
         async function loadPageScripts() {
-            // Always load UI interactions
-            await lazyLoadScript('/static/js/ui-interactions.js');
-            
             // Page-specific lazy loading
             if (currentPath.includes('settings') || currentPath.includes('vault')) {
                 await lazyLoadScript('/static/js/cloud-providers.js');

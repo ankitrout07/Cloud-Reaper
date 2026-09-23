@@ -50,11 +50,11 @@ type scanResult struct {
 func main() {
 	subscription := flag.String("subscription", "", "Azure subscription ID")
 	listSubs := flag.Bool("list-subs", false, "List accessible Azure subscriptions")
-	mode := flag.String("mode", "scan", "Operation mode: scan, prices, arbitrage, serve")
+	mode := flag.String("mode", "scan", "Operation mode: scan, prices, arbitrage, serve, unified")
 	sku := flag.String("sku", "", "SKU for arbitrage mode")
 	regions := flag.String("regions", "", "Comma-separated regions for arbitrage mode")
 	provider := flag.String("provider", "azure", "Cloud provider: azure, aws, gcp")
-	servePort := flag.Int("port", 7070, "Port for HTTP bridge server (serve mode)")
+	servePort := flag.Int("port", 7070, "Port for HTTP bridge server (serve/unified mode)")
 	flag.Parse()
 
 	if *listSubs {
@@ -75,6 +75,10 @@ func main() {
 		arbitrage.RunArbitrageScan(*sku, regionList)
 	case "prices":
 		outputPrices(*provider)
+	case "unified":
+		// Collapsed single-engine mode: serves all sidecars (bridge, tasks, ratelimiter, RAG, calculator, anomaly, websocket)
+		// on a single port for local/standalone execution without docker network overhead.
+		bridge.RunUnifiedServer(*servePort)
 	case "serve":
 		// HTTP bridge server: lets Python call the Go engine non-blocking over loopback.
 		// Boots in the background during bootstrap; Python calls /scan, /prices, /health.
@@ -90,7 +94,7 @@ func main() {
 		}
 		runScan(subID)
 	default:
-		fmt.Fprintf(os.Stderr, "unknown mode %q (use scan, prices, arbitrage, serve)\n", *mode)
+		fmt.Fprintf(os.Stderr, "unknown mode %q (use scan, prices, arbitrage, serve, unified)\n", *mode)
 		os.Exit(1)
 	}
 }

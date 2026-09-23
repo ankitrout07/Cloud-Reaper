@@ -701,9 +701,10 @@
 'use strict';
 
 // ── Configuration ──────────────────────────────────────────────────────
-const GO_BRIDGE_URL = window.GO_BRIDGE_URL || 'http://localhost:7070';
-const TOPOLOGY_ENDPOINT = `${GO_BRIDGE_URL}/api/v1/topology/graph`;
-const SCAN_ENDPOINT     = `${GO_BRIDGE_URL}/api/v1/topology/scan`;
+// Use relative API proxy routes (served by FastAPI) instead of calling the
+// Go bridge directly. This works for remote clients, Docker, and HTTPS proxies.
+const TOPOLOGY_ENDPOINT = '/api/v1/topology/graph';
+const SCAN_ENDPOINT     = '/api/v1/topology/scan';
 const FETCH_TIMEOUT_MS  = 30_000; // Scans can take a bit longer
 
 // ── State ──────────────────────────────────────────────────────────────
@@ -726,7 +727,7 @@ const elScanModal    = document.getElementById('scan-modal');
 const elScanForm     = document.getElementById('scan-form');
 
 document.addEventListener('DOMContentLoaded', () => {
-    elBridgeLabel.textContent = GO_BRIDGE_URL;
+    if (elBridgeLabel) elBridgeLabel.textContent = 'FastAPI proxy → Go bridge';
     initCytoscape([]);   // mount empty canvas immediately
     fetchAndRender();    // kick off data fetch
 });

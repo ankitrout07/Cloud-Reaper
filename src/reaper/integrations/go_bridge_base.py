@@ -233,7 +233,13 @@ class GoBridgeConfig:
 
     @staticmethod
     def get_port(service_name: str = "bridge") -> int:
-        """Get port for a Go service from environment or default"""
+        """Get port for a Go service from environment or default.
+
+        When REAPER_GO_UNIFIED=true, all sidecars run collapsed inside the
+        single reaper-engine process on the primary bridge port (7070).
+        """
+        if os.getenv("REAPER_GO_UNIFIED", "false").lower() in ("true", "1", "yes"):
+            return int(os.getenv("GO_BRIDGE_PORT", os.getenv("REAPER_GO_BRIDGE_PORT", "7070")))
         env_var = f"GO_{service_name.upper()}_PORT"
         default_port = GoBridgeConfig.DEFAULT_PORTS.get(service_name, 7070)
         return int(os.getenv(env_var, str(default_port)))
