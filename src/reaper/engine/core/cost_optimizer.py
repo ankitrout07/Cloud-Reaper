@@ -13,8 +13,17 @@ This module provides intelligent cost optimization recommendations covering:
 - Multi-cloud cost comparison
 - Regional arbitrage opportunities
 - Architecture-level optimization suggestions
+
+Go integration
+--------------
+The primary analysis path delegates to the Go optimizer engine via
+go_optimizer_bridge.  The Go engine runs all analysis stages in parallel
+goroutines (no GIL, true concurrency).  The Python _analyze_*_resource
+methods below are retained as a transparent fallback for when the Go
+bridge is unavailable.
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -22,6 +31,16 @@ from enum import Enum
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# ── Go optimizer bridge (primary path) ────────────────────────────────────────
+try:
+    from reaper.integrations.go_optimizer_bridge import OptimizerBridge, create_optimizer_bridge
+
+    _GO_OPTIMIZER_BRIDGE: OptimizerBridge | None = create_optimizer_bridge()
+    _GO_OPTIMIZER_AVAILABLE = True
+except Exception:
+    _GO_OPTIMIZER_BRIDGE = None
+    _GO_OPTIMIZER_AVAILABLE = False
 
 
 class OptimizationCategory(Enum):
@@ -270,6 +289,9 @@ class ComprehensiveCostOptimizer:
         """
         Analyze a single resource and generate cost optimization recommendations.
 
+        Primary path: delegates to the Go optimizer engine (parallel goroutines, no GIL).
+        Fallback: runs the original Python serial analysis if Go is unavailable.
+
         Args:
             resource_data: Resource metadata (provider, type, region, current_sku, etc.)
             metrics: Current resource metrics (cpu, memory, network, etc.)
@@ -278,14 +300,62 @@ class ComprehensiveCostOptimizer:
         Returns:
             List of cost optimization recommendations for this resource
         """
-        recommendations = []
+        # ── Go path (primary) ────────────────────────────────────────────────
+        if _GO_OPTIMIZER_AVAILABLE and _GO_OPTIMIZER_BRIDGE is not None:
+            try:
+                metrics_dict = {
+                    "cpu_utilization":        metrics.cpu_utilization,
+                    "memory_utilization":     metrics.memory_utilization,
+                    "disk_utilization":       metrics.disk_utilization,
+                    "network_in_mbps":        metrics.network_in_mbps,
+                    "network_out_mbps":       metrics.network_out_mbps,
+                    "iops":                   metrics.iops,
+                    "latency_ms":             metrics.latency_ms,
+                    "error_rate":             metrics.error_rate,
+                    "uptime_percentage":      metrics.uptime_percentage,
+                    "peak_cpu_utilization":   metrics.peak_cpu_utilization,
+                    "peak_memory_utilization": metrics.peak_memory_utilization,
+                }
+                go_recs = asyncio.get_event_loop().run_until_complete(
+                    _GO_OPTIMIZER_BRIDGE.analyze_single(
+                        resource_data, metrics_dict, current_cost
+                    )
+                )
+                if go_recs:
+                    # Convert Go recommendation dicts back to CostRecommendation dataclasses
+                    return [
+                        CostRecommendation(
+                            id=r.get("id", ""),
+                            title=r.get("title", ""),
+                            description=r.get("description", ""),
+                            category=OptimizationCategory(r.get("category", "compute")),
+                            priority=Priority(r.get("priority", "medium")),
+                            risk_level=RiskLevel(r.get("risk_level", "low")),
+                            estimated_monthly_savings=r.get("estimated_monthly_savings", 0.0),
+                            estimated_savings_percentage=r.get("estimated_savings_percentage", 0.0),
+                            implementation_effort=r.get("implementation_effort", "medium"),
+                            resource_id=r.get("resource_id", ""),
+                            resource_name=r.get("resource_name", ""),
+                            resource_type=r.get("resource_type", ""),
+                            current_cost=r.get("current_cost", 0.0),
+                            recommended_action=r.get("recommended_action", ""),
+                            recommended_config=r.get("recommended_config", {}),
+                            implementation_steps=r.get("implementation_steps", []),
+                            potential_issues=r.get("potential_issues", []),
+                        )
+                        for r in go_recs
+                    ]
+            except Exception as exc:
+                logger.warning(
+                    "[go_optimizer] analyze_resource failed (%s); falling back to Python.", exc
+                )
 
+        # ── Python fallback (retained for offline / dev use) ─────────────────
+        recommendations = []
         provider = resource_data.get("provider", "").lower()
         resource_type = resource_data.get("type", "").lower()
-        resource_data.get("sku", "")
         region = resource_data.get("region", "")
 
-        # Generate recommendations based on resource type
         if "compute" in resource_type or "vm" in resource_type or "instance" in resource_type:
             recommendations.extend(
                 self._analyze_compute_resource(provider, resource_data, metrics, current_cost)
@@ -303,11 +373,9 @@ class ComprehensiveCostOptimizer:
                 self._analyze_network_resource(provider, resource_data, metrics, current_cost)
             )
 
-        # Add regional arbitrage recommendations
         recommendations.extend(
             self._analyze_regional_arbitrage(provider, resource_data, metrics, current_cost, region)
         )
-
         return recommendations
 
     def _analyze_compute_resource(

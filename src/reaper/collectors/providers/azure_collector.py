@@ -66,6 +66,42 @@ from reaper.engine.models.resources import CostHistory, RegionPriceCache, Sessio
 
 logger = logging.getLogger(__name__)
 
+# ── Go bridge for extended resource scraping ─────────────────────────────────
+# NSGs, Public IPs, App Services, SQL DBs and AKS clusters are now fetched
+# by the Go engine's /scan/extended endpoint (5 parallel goroutines, no GIL).
+# The Python methods below delegate to Go and parse the returned JSON.
+try:
+    from reaper.integrations.go_bridge import GoBridgeClient as _GoBridgeClient
+
+    _go_bridge_client: _GoBridgeClient | None = _GoBridgeClient()
+    _GO_EXTENDED_AVAILABLE = True
+except Exception:
+    _go_bridge_client = None
+    _GO_EXTENDED_AVAILABLE = False
+
+
+def _call_go_extended_scan(subscription_id: str) -> list[dict]:
+    """
+    Call the Go bridge POST /scan/extended and return the resource list.
+    Returns an empty list if the Go bridge is unavailable.
+    """
+    if not _GO_EXTENDED_AVAILABLE or _go_bridge_client is None:
+        return []
+    try:
+        import httpx
+
+        go_url = _go_bridge_client.base_url if hasattr(_go_bridge_client, "base_url") else "http://127.0.0.1:7070"
+        resp = httpx.post(
+            f"{go_url}/scan/extended",
+            json={"subscription_id": subscription_id},
+            timeout=60.0,
+        )
+        resp.raise_for_status()
+        return resp.json().get("resources", [])
+    except Exception as exc:
+        logger.warning("[go_extended_scan] failed (%s); extended resources will be empty.", exc)
+        return []
+
 
 def _reaper_engine_binary() -> Path | None:
     """Resolve the Go engine binary (bootstrap builds to repo ``bin/``)."""
@@ -792,7 +828,26 @@ class AzureCollector:
         }
 
     def get_unassociated_public_ips(self):
-        """Finds Public IPs not attached to any NIC/Resource"""
+        """
+        Finds Public IPs not attached to any NIC/Resource.
+
+        Primary: Go engine via POST /scan/extended (concurrent goroutines).
+        Fallback: Python azure-mgmt-network SDK.
+        """
+        go_resources = _call_go_extended_scan(self.subscription_id)
+        if go_resources:
+            return [
+                {
+                    "name":     r.get("Name", r.get("name", "")),
+                    "location": r.get("Region", r.get("region", "")),
+                    "sku":      r.get("SKU", r.get("sku", "Unknown")),
+                }
+                for r in go_resources
+                if r.get("Type", r.get("type", "")) == "PublicIPAddress"
+                and r.get("IsUnallocated", r.get("is_unallocated", False))
+            ]
+
+        # Python fallback
         ips = self.network.public_ip_addresses.list_all()
         unassociated = []
         for ip in ips:
@@ -857,7 +912,27 @@ class AzureCollector:
         return [{"name": v.name, "location": v.location, "sku": v.sku.name} for v in vaults]
 
     def get_empty_app_service_plans(self):
-        """Finds App Service Plans with 0 apps assigned"""
+        """
+        Finds App Services/Plans with no apps assigned or stopped state.
+
+        Primary: Go engine via POST /scan/extended.
+        Fallback: Python azure-mgmt-web SDK.
+        """
+        go_resources = _call_go_extended_scan(self.subscription_id)
+        if go_resources:
+            return [
+                {
+                    "name":     r.get("Name", r.get("name", "")),
+                    "location": r.get("Region", r.get("region", "")),
+                    "sku":      r.get("SKU", r.get("sku", "Unknown")),
+                    "tier":     r.get("SKU", r.get("sku", "Unknown")),
+                }
+                for r in go_resources
+                if r.get("Type", r.get("type", "")) == "AppService"
+                and r.get("IsUnallocated", r.get("is_unallocated", False))
+            ]
+
+        # Python fallback
         plans = self.web.app_service_plans.list()
         empty_plans = []
         for plan in plans:
@@ -872,28 +947,49 @@ class AzureCollector:
                 )
         return empty_plans
 
+
     def get_sql_databases(self):
-        """Finds SQL Databases with idle check using metrics"""
+        """
+        Finds SQL Databases, checking for idle usage.
+
+        Primary: Go engine via POST /scan/extended (uses Azure Monitor in Go goroutines).
+        Fallback: Python azure-mgmt-sql SDK with inline Monitor calls.
+        """
+        go_resources = _call_go_extended_scan(self.subscription_id)
+        if go_resources:
+            return [
+                {
+                    "name":        r.get("Name", r.get("name", "")),
+                    "server":      "",  # Resource Graph doesn't give server name separately
+                    "location":    r.get("Region", r.get("region", "")),
+                    "sku":         r.get("SKU", r.get("sku", "Unknown")),
+                    "is_idle":     r.get("IsUnallocated", r.get("is_unallocated", False)),
+                    "average_cpu": 0.0,
+                }
+                for r in go_resources
+                if r.get("Type", r.get("type", "")) == "SQLDatabase"
+            ]
+
+        # Python fallback (original Monitor-based implementation)
         servers = self.sql.servers.list()
         databases = []
         for server in servers:
             dbs = self.sql.databases.list_by_server(server.resource_group_name, server.name)
             for db in dbs:
                 if db.name != "master":
-                    # Check if database is idle using metrics
                     is_idle = False
                     avg_cpu = 0.0
                     try:
                         monitor_client = self.monitor
-
-                        resource_id = f"/subscriptions/{self.subscription_id}/resourceGroups/{server.resource_group_name}/providers/Microsoft.Sql/servers/{server.name}/databases/{db.name}"
-
-                        # Get CPU metrics for the last 24 hours
+                        resource_id = (
+                            f"/subscriptions/{self.subscription_id}/resourceGroups/"
+                            f"{server.resource_group_name}/providers/Microsoft.Sql/servers/"
+                            f"{server.name}/databases/{db.name}"
+                        )
                         from datetime import datetime, timedelta
 
                         end_time = datetime.utcnow()
                         start_time = end_time - timedelta(hours=24)
-
                         metrics_data = monitor_client.metrics.list(
                             resource_id,
                             timespan=f"{start_time.isoformat()}/{end_time.isoformat()}",
@@ -901,30 +997,27 @@ class AzureCollector:
                             metricnames="cpu_percent",
                             aggregation="Average",
                         )
-
                         if metrics_data.value:
-                            data_points = []
-                            for item in metrics_data.value:
-                                for timeseries in item.timeseries:
-                                    for point in timeseries.data:
-                                        if point.average is not None:
-                                            data_points.append(point.average)
-
+                            data_points = [
+                                pt.average
+                                for item in metrics_data.value
+                                for ts in item.timeseries
+                                for pt in ts.data
+                                if pt.average is not None
+                            ]
                             if data_points:
                                 avg_cpu = sum(data_points) / len(data_points)
-                                is_idle = avg_cpu < 5.0  # Consider idle if average CPU < 5%
+                                is_idle = avg_cpu < 5.0
                     except Exception as e:
-                        logger.error(f"Error checking SQL database metrics for {db.name}: {e}")
-                        # Default to not idle if metrics check fails
-                        is_idle = False
+                        logger.error("Error checking SQL database metrics for %s: %s", db.name, e)
 
                     databases.append(
                         {
-                            "name": db.name,
-                            "server": server.name,
-                            "location": db.location,
-                            "sku": db.sku.name if db.sku else "Unknown",
-                            "is_idle": is_idle,
+                            "name":        db.name,
+                            "server":      server.name,
+                            "location":    db.location,
+                            "sku":         db.sku.name if db.sku else "Unknown",
+                            "is_idle":     is_idle,
                             "average_cpu": round(avg_cpu, 2),
                         }
                     )
@@ -2677,10 +2770,34 @@ class AzureCollector:
         return get_cached_data(cache_key, fetch, ttl_seconds=120)
 
     def get_aks_clusters(self) -> list[dict]:
-        """List all Azure Kubernetes Service managed clusters."""
+        """
+        List all Azure Kubernetes Service managed clusters.
+
+        Primary: Go engine via POST /scan/extended (parallel goroutines, no GIL).
+        Fallback: Python azure-mgmt-containerservice SDK.
+        """
         cache_key = f"aks_clusters_{self.subscription_id}"
 
         def fetch():
+            # Try Go bridge first
+            go_resources = _call_go_extended_scan(self.subscription_id)
+            if go_resources:
+                return [
+                    {
+                        "id":                 r.get("ID", r.get("id", "")),
+                        "name":               r.get("Name", r.get("name", "")),
+                        "location":           r.get("Region", r.get("region", "")),
+                        "kubernetes_version": "unknown",  # Resource Graph gives this via properties
+                        "node_count":         0,
+                        "sku":                r.get("SKU", r.get("sku", "Free")),
+                        "power_state":        "Stopped" if r.get("IsUnallocated", False) else "Running",
+                        "tags":               r.get("Tags", r.get("tags", {})),
+                    }
+                    for r in go_resources
+                    if r.get("Type", r.get("type", "")) == "AKSCluster"
+                ]
+
+            # Python fallback (original ContainerServiceClient implementation)
             client = self._get_container_service()
             if not client:
                 return []
@@ -2693,20 +2810,20 @@ class AzureCollector:
                     )
                     results.append(
                         {
-                            "id": c.id,
-                            "name": c.name,
-                            "location": c.location,
+                            "id":                 c.id,
+                            "name":               c.name,
+                            "location":           c.location,
                             "kubernetes_version": getattr(c, "kubernetes_version", "Unknown"),
-                            "node_count": agent_count,
-                            "sku": getattr(c.sku, "name", "Free") if c.sku else "Free",
-                            "power_state": getattr(
+                            "node_count":         agent_count,
+                            "sku":                getattr(c.sku, "name", "Free") if c.sku else "Free",
+                            "power_state":        getattr(
                                 getattr(c, "power_state", None), "code", "Running"
                             ),
                             "tags": dict(c.tags) if c.tags else {},
                         }
                     )
             except Exception as exc:
-                print(f"[-] Error fetching AKS clusters: {exc}")
+                logger.warning("[aks_clusters] Python fallback error: %s", exc)
             return results
 
         return get_cached_data(cache_key, fetch, ttl_seconds=120)

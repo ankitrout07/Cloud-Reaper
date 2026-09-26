@@ -4,6 +4,7 @@ Enforces sequential optimization operations to prevent capital waste.
 Order: Telemetry Collection → Rightsizing → Baseline Update → Commitment Management
 """
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import Any
@@ -17,6 +18,17 @@ from reaper.engine.models.resources import (
     OptimizationBaseline,
     get_db_session,
 )
+
+# Try to import Go classifier bridge for parallel batch classification.
+# Falls back transparently to the Python implementation if Go is unavailable.
+try:
+    from reaper.integrations.go_classifier_bridge import ClassifierBridge, create_classifier_bridge
+
+    _GO_CLASSIFIER_BRIDGE: ClassifierBridge | None = create_classifier_bridge()
+    GO_CLASSIFIER_AVAILABLE = True
+except Exception:
+    _GO_CLASSIFIER_BRIDGE = None
+    GO_CLASSIFIER_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -73,12 +85,42 @@ class WorkloadClassifier:
         """
         Classifies multiple resources and returns a mapping of resource_id to environment type.
 
+        Attempts the Go classifier bridge first (parallel goroutines, no GIL).
+        Falls back to the local Python for-loop if the bridge is unavailable.
+
         Args:
             resources: List of resource dictionaries
 
         Returns:
             Dictionary mapping resource IDs to 'production' or 'dev-test'
         """
+        if GO_CLASSIFIER_AVAILABLE and _GO_CLASSIFIER_BRIDGE is not None and len(resources) >= 5:
+            try:
+                # Build the classifier request payload.
+                payload = [
+                    {
+                        "id": r.get("id", r.get("name", "unknown")),
+                        "name": r.get("name", ""),
+                        "tags": r.get("tags") or {},
+                    }
+                    for r in resources
+                ]
+                result = asyncio.get_event_loop().run_until_complete(
+                    _GO_CLASSIFIER_BRIDGE.classify_batch(payload)
+                )
+                classifications = result.get("classifications", {})
+                if classifications:
+                    logger.debug(
+                        "[Go classifier] batch=%d prod=%d dev=%d",
+                        len(resources),
+                        result.get("production_count", 0),
+                        result.get("dev_test_count", 0),
+                    )
+                    return classifications
+            except Exception as exc:
+                logger.warning("[Go classifier] batch_classify failed (%s); using Python fallback.", exc)
+
+        # Python fallback (original implementation)
         classification = {}
         for resource in resources:
             resource_id = resource.get("id", resource.get("name", "unknown"))

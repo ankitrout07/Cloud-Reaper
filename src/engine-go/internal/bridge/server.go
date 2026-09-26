@@ -34,6 +34,7 @@
 package bridge
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -41,8 +42,10 @@ import (
 	"strings"
 	"time"
 
+	"cloud-reaper/engine-go/internal/classifier"
 	"cloud-reaper/engine-go/internal/collectors"
 	"cloud-reaper/engine-go/internal/db"
+	"cloud-reaper/engine-go/internal/optimizer"
 	"cloud-reaper/engine-go/internal/streaming"
 )
 
@@ -87,12 +90,21 @@ func RunBridgeServer(port int) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/scan", handleScan)
+	mux.HandleFunc("/scan/extended", handleScanExtended)
 	mux.HandleFunc("/prices", handlePrices)
 	mux.HandleFunc("/prices/parallel", handleParallelPrices)
 
 	// Infrastructure topology graph endpoints (Cytoscape.js compatible)
 	mux.HandleFunc("/api/v1/topology/graph", handleTopologyGraph)
 	mux.HandleFunc("/api/v1/topology/scan", handleTopologyScan)
+
+	// Cost optimizer — replaces Python cost_optimizer.py serial loops
+	// POST /api/v1/optimizer/analyze
+	mux.HandleFunc("/api/v1/optimizer/analyze", handleOptimizerAnalyze)
+
+	// Workload classifier — replaces Python WorkloadClassifier.batch_classify()
+	// POST /api/v1/classifier/classify
+	mux.HandleFunc("/api/v1/classifier/classify", handleClassify)
 
 	// Real-time streaming pipeline endpoints (/stream/*)
 	// Replaces Python realtime_refresh.py threading loop with sub-ms Go workers.
@@ -270,6 +282,99 @@ func writeError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+// handleScanExtended runs the extended Azure resource scan (NSGs, Public IPs,
+// App Services, SQL DBs, AKS clusters) in parallel goroutines and returns the
+// merged result. This endpoint replaces the corresponding Python azure_collector.py
+// calls that were blocking the GIL.
+//
+// POST /scan/extended  body: {"subscription_id":"…"}
+func handleScanExtended(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"POST required"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		SubscriptionID string `json:"subscription_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.SubscriptionID == "" {
+		req.SubscriptionID = os.Getenv("AZURE_SUBSCRIPTION_ID")
+	}
+	if req.SubscriptionID == "" {
+		writeError(w, http.StatusBadRequest, "subscription_id is required")
+		return
+	}
+
+	scraper := &collectors.AzureScraper{}
+	if err := scraper.Authenticate(map[string]string{
+		"subscription_id": req.SubscriptionID,
+	}); err != nil {
+		writeError(w, http.StatusUnauthorized, fmt.Sprintf("authenticate: %v", err))
+		return
+	}
+
+	resources, warnings := scraper.ScanExtendedResources(context.Background())
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"resources": resources,
+		"count":     len(resources),
+		"warnings":  warnings,
+	})
+}
+
+// handleOptimizerAnalyze runs the Go cost optimizer over a batch of resources.
+// This replaces the serial Python cost_optimizer.py _analyze_*_resource loops.
+//
+// POST /api/v1/optimizer/analyze
+// Body: {"resources": [{"resource":{...}, "metrics":{...}, "current_cost": 123.45}]}
+func handleOptimizerAnalyze(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"POST required"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req optimizer.AnalyzeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid JSON: %v", err))
+		return
+	}
+
+	opt := optimizer.NewOptimizer()
+	resp := opt.AnalyzeAll(req)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// handleClassify classifies resources into production or dev-test.
+// This replaces Python WorkloadClassifier.batch_classify() in scheduler.py.
+//
+// POST /api/v1/classifier/classify
+// Body: {"resources": [{"id":"…","name":"…","tags":{}}]}
+func handleClassify(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"POST required"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req classifier.ClassifyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid JSON: %v", err))
+		return
+	}
+
+	c := classifier.NewClassifier()
+	resp := c.ClassifyBatch(req.Resources)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // handleParallelPrices provides high-performance parallel price scraping

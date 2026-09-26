@@ -49,3 +49,185 @@ Refactoring monolithic files (e.g., slicing up azure_collector.py)
 Upgrading IPC (Starting the gRPC migration)
 Test Stabilization (Fixing current test errors and expanding coverage)
 Database/Async optimizations
+
+
+# Cloud-Reaper — Go Migration Analysis
+
+> **Goal:** Identify Python components that are bottlenecks and are good candidates to migrate (or already have partial Go equivalents) to improve speed without memory overkill.
+
+---
+
+## Architecture Overview
+
+The project already runs a **hybrid Python/Go model**:
+
+| Layer | Currently runs in | Bridge |
+|---|---|---|
+| Web server / routing | Python (Flask async + SocketIO) | — |
+| Cloud data collection | Python → already **delegated to Go** via `/scan` on `:7070` | `go_bridge.py` |
+| Price scraping | Go (`parallel_price_scraper.go`) | `go_bridge.py` |
+| Rate limiting | Go (`ratelimiter/`) | `go_ratelimiter.py` |
+| WebSocket batching | Go (`websocket/batcher.go`) | `go_websocket.py` |
+| Task scheduling | Go (`streaming/scheduler.go`) replaces Python threads | `go_stream_bridge.py` |
+| RAG / vector search | Go (`rag/enhanced_search.go`) | `go_rag_bridge.py` |
+| Anomaly detection | Go (`anomaly/anomaly.go`) | `go_anomaly_bridge.py` |
+| Cost calculations | Go (`calculator/calculator.go`) | `go_calculator_bridge.py` |
+| Topology / dependency graph | Go (`bridge/topology.go`) | Python calls Go bridge |
+| Background tasks | Go (`background/`) | `go_task_manager.py` |
+| **FinOps Pipeline (scheduler.py)** | **Python only** | ❌ no Go equivalent |
+| **Azure collector (azure_collector.py)** | **Python only** | ❌ GIL-bound, 3 186 lines |
+| **Cost optimizer (cost_optimizer.py)** | **Python only** | ❌ 1 265 lines of hot loops |
+| **Cost reporter (cost_reporter.py)** | **Python only** | ❌ no Go equivalent |
+| **Price catalog scrapers (aws.py, azure.py, gcp.py)** | Python (`requests`) | partial (Go scraper exists but Python fallback is slow) |
+
+---
+
+## Priority 1 — **High-impact, feasible now**
+
+### 1. `azure_collector.py` → Extend Go `cloud_scrapers.go`
+**File:** [`src/reaper/collectors/providers/azure_collector.py`](file:///home/ankit/git/Cloud-Reaper/src/reaper/collectors/providers/azure_collector.py) (3 186 lines)
+
+**Why it's slow in Python:**
+- Makes dozens of Azure SDK calls (VMs, disks, snapshots, NICs, NSGs, public IPs, storage, databases) — each is I/O-bound and blocks the GIL between SDK deserialisation steps.
+- Uses `azure-identity`, `azure-mgmt-*` — the SDK wraps synchronous HTTP with no native async support for most resource types.
+- `asyncio.to_thread` calls in `app_async.py` work around the GIL but still burn OS threads and cannot parallelize more than `max_workers` at a time.
+
+**Go already has:** [`cloud_scrapers.go`](file:///home/ankit/git/Cloud-Reaper/src/engine-go/internal/collectors/cloud_scrapers.go) and [`auth.go`](file:///home/ankit/git/Cloud-Reaper/src/engine-go/internal/collectors/auth.go) — the Azure scraping foundation is there.
+
+**Migration strategy:**
+- Move remaining Azure resource types (NSGs, public IPs, App Services, SQL DBs, AKS) into `cloud_scrapers.go` using the existing `AzureScraper` struct.
+- Go's `net/http` handles all calls concurrently via goroutines — no GIL, true parallelism.
+- Expected speedup: **5–15×** on large subscriptions.
+
+---
+
+### 2. `cost_optimizer.py` → Extend Go `calculator/` + new `optimizer/` package
+**File:** [`src/reaper/engine/core/cost_optimizer.py`](file:///home/ankit/git/Cloud-Reaper/src/reaper/engine/core/cost_optimizer.py) (1 265 lines)
+
+**Why it's slow in Python:**
+- `analyze_resource()`, `_analyze_compute_resource()`, `_analyze_storage_resource()` etc. are pure CPU-bound loops — each resource goes through 4-6 analysis stages serially.
+- Pandas/NumPy are used for vectorisation in `calculator.py`, but `cost_optimizer.py` itself uses plain Python dicts and for-loops.
+- Called from `background_tasks.py` under a `threading.Semaphore` — GIL still contends.
+
+**Go already has:** [`calculator/calculator.go`](file:///home/ankit/git/Cloud-Reaper/src/engine-go/internal/calculator/calculator.go) with `CalculateMonthlyCost`, `CalculateTotalHourlyBurn`, `BatchCalculate` — the numeric layer is done.
+
+**Migration strategy:**
+- Add a new `internal/optimizer/` package with `AnalyzeResource(resource Resource) Recommendation`.
+- Use goroutines with `errgroup` to run `AnalyzeResource` on all resources in parallel.
+- Return JSON to Python via an existing bridge endpoint (e.g., `POST /analyze`).
+- Python side: replace the 6 `_analyze_*_resource` methods with one `go_calculator_bridge.batch_analyze(resources)` call.
+- Expected speedup: **3–8×** for large resource lists.
+
+---
+
+### 3. `scheduler.py` (FinOps Pipeline) → Go `streaming/scheduler.go`
+**File:** [`src/reaper/engine/core/scheduler.py`](file:///home/ankit/git/Cloud-Reaper/src/reaper/engine/core/scheduler.py) (559 lines)
+
+**Why it's slow in Python:**
+- `WorkloadClassifier.batch_classify()` iterates every resource in a Python for-loop — no parallelism.
+- `FinOpsPipeline.execute_pipeline()` runs 4 stages sequentially because asyncio can't help with CPU-bound stages.
+- `_stage_rightsizing_analysis()` calls `RightsizingAgent.batch_evaluate_migration()` which uses Pandas — good, but the pipeline orchestration overhead is pure Python.
+
+**Go already has:** [`streaming/scheduler.go`](file:///home/ankit/git/Cloud-Reaper/src/engine-go/internal/streaming/scheduler.go) — task dispatch goroutines, jitter, context cancellation.
+
+**Migration strategy:**
+- Move `WorkloadClassifier` logic to a Go `classifier/` package (tag matching is pure string ops — trivially fast in Go).
+- Expose it as `POST /classify` on the bridge server.
+- Keep the ML stages (Q-learning `RightsizingAgent`, `GradientBoostingClassifier`) in Python — scikit-learn has no Go equivalent worth migrating.
+- The pipeline orchestration (`execute_pipeline`) should call Go for stages 1 & 4 (data collection + commitment scoring) and Python for stages 2 & 3 (ML rightsizing + DB update).
+- Expected speedup: **2–4×** for the classification stage.
+
+---
+
+## Priority 2 — **Medium-impact, moderate effort**
+
+### 4. Price Catalog Scrapers → Consolidate in Go
+**Files:**
+- [`collectors/prices/aws.py`](file:///home/ankit/git/Cloud-Reaper/src/reaper/collectors/prices/aws.py) — uses `requests.get()` (blocking, no connection pool reuse)
+- [`collectors/prices/azure.py`](file:///home/ankit/git/Cloud-Reaper/src/reaper/collectors/prices/azure.py) — uses `requests.Session()` with manual retry
+- [`collectors/prices/gcp.py`](file:///home/ankit/git/Cloud-Reaper/src/reaper/collectors/prices/gcp.py) — uses `requests.get()` twice
+
+**Go already has:** [`parallel_price_scraper.go`](file:///home/ankit/git/Cloud-Reaper/src/engine-go/internal/collectors/parallel_price_scraper.go) — concurrent price fetching with `sync.WaitGroup`.
+
+**Migration strategy:**
+- The Go parallel scraper already exists — just route AWS and GCP price fetches through it too (currently only Azure is wired).
+- Add `fetchAWSPrices()` and `fetchGCPPrices()` functions in `parallel_price_scraper.go`.
+- Python side: deprecate `aws.py` and `gcp.py` price scrapers in favour of `go_bridge.fetch_prices(provider="aws")`.
+- Expected speedup: **10–20×** (same ratio quoted in code comments for Azure).
+
+---
+
+### 5. `realtime_refresh.py` → Already largely delegated, complete the migration
+**File:** [`src/reaper/services/realtime_refresh.py`](file:///home/ankit/git/Cloud-Reaper/src/reaper/services/realtime_refresh.py) (341 lines)
+
+**Current state:** Task registration is proxied to Go's `streaming/scheduler.go` via `POST /stream/task/register`. But the `refresh_task()` one-shot path still runs in Python.
+
+**Migration strategy:**
+- Expose `POST /stream/task/run-once/{id}` on the Go bridge to handle ad-hoc one-shot executions.
+- Remove the Python fallback polling loop entirely (currently only used when Go bridge is unreachable).
+- The Python class can shrink to ~30 lines (a thin wrapper).
+
+---
+
+### 6. `background_tasks.py` → Thin wrapper (mostly done)
+**File:** [`src/reaper/engine/core/background_tasks.py`](file:///home/ankit/git/Cloud-Reaper/src/reaper/engine/core/background_tasks.py) (373 lines)
+
+**Current state:** `BackgroundTaskManager` already tries to use `GoTaskManagerBridge`. But the Python fallback has a full `asyncio` implementation that doubles the code surface.
+
+**Migration strategy:**
+- Make the Go backend non-optional (fail fast at startup if `:7071` is not reachable).
+- Remove the Python asyncio fallback (~200 lines) — it only masks misconfiguration.
+- `BackgroundTaskManager` becomes a 30-line facade.
+
+---
+
+## Priority 3 — **Low priority / keep in Python**
+
+| Component | Why keep in Python |
+|---|---|
+| `cost_reporter.py` | Report formatting / Jinja2 templating — no perf issue |
+| `architect.py` | AI backend routing, thin orchestration |
+| `credential_service.py` | Azure identity credential wrapping — must use `azure-identity` |
+| `copilot/` (RAG engine) | LLM calls are network-bound; Go RAG bridge already handles vector search |
+| `workload.py` | Small, pure classification logic; already fast |
+| `economics.py` | 106 lines, trivial math |
+| Flask routes (`app_async.py`, `routers/`) | Keep in Python — HTMX/SocketIO ecosystem; Go HTTP server is for internal bridge only |
+
+> [!CAUTION]
+> **Do NOT migrate the ML pipeline (scikit-learn `GradientBoostingClassifier`, `RightsizingAgent` Q-table) to Go.** There is no mature, battle-tested ML library in Go that replaces scikit-learn's gradient boosting. The CPU cost is acceptable because these run once per pipeline cycle, not on every request.
+
+---
+
+## Memory Safety Notes
+
+The Go engine is already compiled as a single binary (`reaper-engine`, 9.3 MB). Each new Go package adds ~100–500 KB to the binary — negligible. The Go runtime's GC is far more memory-predictable than Python's object allocator.
+
+Key memory concerns to avoid:
+1. **Don't buffer full scan results in Go AND Python simultaneously** — have Go stream results via WebSocket/SSE to the frontend directly, Python only gets summary stats.
+2. **`cloud_scrapers.go` uses `sync.Pool`** for resource arrays — keep this pattern in any new collectors.
+3. **Price cache** (`cache/price_cache.go`) uses TTL eviction — set a reasonable max-size cap (e.g., 10 000 entries) to avoid unbounded growth on large subscriptions.
+
+---
+
+## Recommended Migration Order
+
+```
+Week 1:  Price scrapers (AWS + GCP) → parallel_price_scraper.go  [low risk, big win]
+Week 2:  WorkloadClassifier → Go classifier package               [medium risk]
+Week 3:  cost_optimizer.py analysis stages → optimizer/ package   [higher risk, biggest win]
+Week 4:  azure_collector.py remaining resource types → cloud_scrapers.go [parallel, high win]
+Week 5+: realtime_refresh.py + background_tasks.py cleanup        [low risk, code simplification]
+```
+
+---
+
+## Summary Table
+
+| Component | Current LOC | Priority | Expected Speedup | Effort |
+|---|---|---|---|---|
+| `azure_collector.py` | 3 186 | 🔴 HIGH | 5–15× | High |
+| `cost_optimizer.py` | 1 265 | 🔴 HIGH | 3–8× | Medium |
+| `scheduler.py` (WorkloadClassifier) | 559 | 🟡 MEDIUM | 2–4× | Medium |
+| Price scrapers (aws/gcp) | 256 | 🟡 MEDIUM | 10–20× | Low |
+| `realtime_refresh.py` | 341 | 🟢 LOW | cleanup | Low |
+| `background_tasks.py` | 373 | 🟢 LOW | cleanup | Low |
