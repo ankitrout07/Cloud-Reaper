@@ -12,11 +12,13 @@ tree = ast.parse(source)
 # Actually, moving just the route handlers might leave them without needed imports,
 # but we can copy ALL imports to the new routers, and let `ruff check --fix` clean up unused ones!
 
-imports = []
+imports: list[str] = []
 global_statements = []
 for node in tree.body:
     if isinstance(node, (ast.Import, ast.ImportFrom)):
-        imports.append(ast.get_source_segment(source, node))
+        seg = ast.get_source_segment(source, node)
+        if seg:
+            imports.append(seg)
     elif isinstance(node, ast.Assign) or isinstance(node, ast.AnnAssign):
         # some global vars might be needed, but copying them might cause duplicate state.
         pass
@@ -34,10 +36,10 @@ router_defs = {
     "cost_optimization": 'router = APIRouter(tags=["cost_optimization"])\n\n',
 }
 
-routers_content = {k: import_block + "\n\n" + v for k, v in router_defs.items()}
+routers_content: dict[str, str] = {k: import_block + "\n\n" + v for k, v in router_defs.items()}
 
 # Helper to determine which router a path belongs to
-def get_router_for_path(path: str) -> str:
+def get_router_for_path(path: str) -> str | None:
     if path.startswith("/api/settings"): return "settings"
     if path.startswith("/api/vault") or path.startswith("/api/credentials"): return "vault"
     if path.startswith("/api/financial"): return "financial"
@@ -60,31 +62,27 @@ for node in tree.body:
                 if getattr(dec.func.value, "id", "") == "app":
                     method = dec.func.attr # get, post, etc.
                     if method in ["get", "post", "put", "delete", "patch"]:
-                        if dec.args and isinstance(dec.args[0], ast.Constant):
+                        if dec.args and isinstance(dec.args[0], ast.Constant) and isinstance(dec.args[0].value, str):
                             path = dec.args[0].value
                             router_target = get_router_for_path(path)
                             if router_target:
                                 is_route = True
-                                # modify decorator from @app.get to @router.get
-                                # But we want to remove the prefix if we set prefix on the APIRouter.
-                                # To be safe and simple, we can just NOT use prefix on APIRouter, 
-                                # or we can strip it. It's safer to just replace 'app.' with 'router.' 
-                                # and leave the path as is, removing prefix from APIRouter above.
                                 break
 
-        if is_route:
+        if is_route and router_target:
             # We found a route to move
             route_source = ast.get_source_segment(source, node)
-            # Replace @app. with @router.
-            route_source = route_source.replace("@app.get", "@router.get")
-            route_source = route_source.replace("@app.post", "@router.post")
-            route_source = route_source.replace("@app.delete", "@router.delete")
-            route_source = route_source.replace("@app.put", "@router.put")
-            route_source = route_source.replace("@app.patch", "@router.patch")
-            
-            routers_content[router_target] += route_source + "\n\n"
-            nodes_to_remove.append(node)
-            route_names_to_move.add(node.name)
+            if route_source:
+                # Replace @app. with @router.
+                route_source = route_source.replace("@app.get", "@router.get")
+                route_source = route_source.replace("@app.post", "@router.post")
+                route_source = route_source.replace("@app.delete", "@router.delete")
+                route_source = route_source.replace("@app.put", "@router.put")
+                route_source = route_source.replace("@app.patch", "@router.patch")
+                
+                routers_content[router_target] += route_source + "\n\n"
+                nodes_to_remove.append(node)
+                route_names_to_move.add(node.name)
 
 # Notice: some helper functions are placed right next to routes and might need to be moved too.
 # e.g., handle_set_currency, _write_gcp_service_account_file, etc.

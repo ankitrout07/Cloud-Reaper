@@ -130,5 +130,20 @@
                 </div>
             </div>
         </div>
-    </div>
+    <script>
+        (function() {
+            function initPricing() {
+                if (typeof loadPrices === 'function') {
+                    loadPrices(window.priceCatalogState?.currentProvider || 'azure', 1);
+                } else {
+                    setTimeout(initPricing, 50);
+                }
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initPricing);
+            } else {
+                initPricing();
+            }
+        })();
+    </script>
 {% endblock %}

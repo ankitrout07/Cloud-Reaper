@@ -77,25 +77,27 @@
     }
 
     function hookMetricSocket(state) {
+        window.__reaperActiveCharts = state;
         const sock = window.__reaperEnsureSocket();
         if (!sock || window.__reaperMetricHooked) {
             return;
         }
         window.__reaperMetricHooked = true;
         sock.on('metric_update', function (payload) {
+            const active = window.__reaperActiveCharts;
             const v = payload.value;
             const t = payload.time;
-            if (state.computeChart) {
-                trimLine(state.computeChart, 20);
-                state.computeChart.data.labels.push(t);
-                state.computeChart.data.datasets[0].data.push(v);
-                state.computeChart.update('none');
+            if (active && active.computeChart) {
+                trimLine(active.computeChart, 20);
+                active.computeChart.data.labels.push(t);
+                active.computeChart.data.datasets[0].data.push(v);
+                active.computeChart.update('none');
             }
-            if (state.bigMonitorChart) {
-                trimLine(state.bigMonitorChart, 20);
-                state.bigMonitorChart.data.labels.push(t);
-                state.bigMonitorChart.data.datasets[0].data.push(v);
-                state.bigMonitorChart.update('none');
+            if (active && active.bigMonitorChart) {
+                trimLine(active.bigMonitorChart, 20);
+                active.bigMonitorChart.data.labels.push(t);
+                active.bigMonitorChart.data.datasets[0].data.push(v);
+                active.bigMonitorChart.update('none');
             }
             const cpuEl = document.getElementById('live-cpu');
             if (cpuEl) {
@@ -321,23 +323,35 @@
         // Expose refresh globally for context switcher
         window.reaperDashboardRefreshCharts = refresh;
 
+        // Clear any existing polling interval before starting a new one
+        if (window.__reaperFinopsInterval) {
+            clearInterval(window.__reaperFinopsInterval);
+            window.__reaperFinopsInterval = null;
+        }
+
         // Delay initial refresh to not block page render
         setTimeout(() => {
             refresh();
-            setInterval(refresh, 90000);
+            if (window.__reaperFinopsInterval) clearInterval(window.__reaperFinopsInterval);
+            window.__reaperFinopsInterval = setInterval(refresh, 90000);
         }, 300);
-    }
-
-    // Use DOMContentLoaded instead of load for faster initialization
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initDashboardCharts);
-    } else {
-        initDashboardCharts();
     }
 
     function initDashboardCharts() {
         if (typeof Chart === 'undefined') {
             return;
+        }
+
+        // Clean up previous charts to prevent canvas memory leaks
+        if (window.__reaperActiveCharts) {
+            const old = window.__reaperActiveCharts;
+            ['computeChart', 'bigMonitorChart', 'burnChart', 'serviceChart', 'familyChart', 'heatmapChart'].forEach(k => {
+                if (old[k]) {
+                    try { old[k].destroy(); } catch (e) {}
+                    old[k] = null;
+                }
+            });
+            window.__reaperActiveCharts = null;
         }
 
         const state = {
@@ -348,6 +362,7 @@
             familyChart: null,
             heatmapChart: null,
         };
+        window.__reaperActiveCharts = state;
 
         try {
             if (document.getElementById('computeChart')) {
@@ -405,6 +420,34 @@
             setTimeout(() => initFinopsDashboardCharts(state), 200);
         }
     }
+
+    // Use DOMContentLoaded instead of load for faster initialization
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDashboardCharts);
+    } else {
+        initDashboardCharts();
+    }
+
+    document.addEventListener('htmx:afterSwap', function () {
+        if (document.getElementById('computeChart') || document.getElementById('burnAreaChart')) {
+            initDashboardCharts();
+        } else {
+            // Clean up intervals and charts when navigating away from dashboard to free memory
+            if (window.__reaperFinopsInterval) {
+                clearInterval(window.__reaperFinopsInterval);
+                window.__reaperFinopsInterval = null;
+            }
+            if (window.__reaperActiveCharts) {
+                const old = window.__reaperActiveCharts;
+                ['computeChart', 'bigMonitorChart', 'burnChart', 'serviceChart', 'familyChart', 'heatmapChart'].forEach(k => {
+                    if (old[k]) {
+                        try { old[k].destroy(); } catch (e) {}
+                    }
+                });
+                window.__reaperActiveCharts = null;
+            }
+        }
+    });
 })();
 
 // === Global Console Terminal Functions ===

@@ -1,4 +1,10 @@
 {% extends "layouts/_base.html" if not request.headers.get("HX-Request") else "layouts/_empty.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/docs.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+{% endblock %}
+
 {% block content %}
 <style>
 .doc-nav-item {
@@ -583,11 +589,13 @@
     </div>
 </main>
 
+<script type="application/json" id="docs-filenames">[{% for doc in docs_data %}"{{ doc.filename }}"{% if not loop.last %},{% endif %}{% endfor %}]</script>
+
 <script>
 // Enhanced documentation JavaScript functionality
 let currentDocIndex = 0;
 let searchResults = [];
-const docFilenames = [{% for doc in docs_data %}'{{ doc.filename }}'{% if not loop.last %},{% endif %}{% endfor %}];
+const docFilenames = JSON.parse(document.getElementById('docs-filenames')?.textContent || '[]');
 
 function navigateDoc(direction) {
     currentDocIndex += direction;

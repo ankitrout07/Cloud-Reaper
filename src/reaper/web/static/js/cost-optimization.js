@@ -565,44 +565,37 @@
         }
     }
 
-    // ── Initialization ───────────────────────────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', function () {
-        // Listen for cloud provider activation events
-        window.addEventListener('cloudProviderActivated', function (event) {
+    // ── Initialization & HTMX SPA Navigation Support ────────────────────────
+    function initCostOptimizationPage() {
+        if (!document.getElementById('recommendations-container')) return;
+
+        if (typeof window.getAuthState === 'function') {
+            const state = window.getAuthState();
+            if (state.authenticated) {
+                handleProviderActivated({ detail: state });
+            } else if (isAuthRequired) {
+                handleProviderDeactivated({ detail: state });
+            }
+        }
+        loadInitialData();
+    }
+
+    // Global listener for cloud provider activation (only updates if on cost optimization page)
+    window.addEventListener('cloudProviderActivated', function (event) {
+        if (document.getElementById('recommendations-container')) {
             if (event.detail.authenticated) {
                 handleProviderActivated(event);
             } else {
                 handleProviderDeactivated(event);
             }
-        });
-
-        // Check initial authentication state
-        if (typeof window.getAuthState === 'function') {
-            const initialState = window.getAuthState();
-            if (initialState.authenticated) {
-                handleProviderActivated({ detail: initialState });
-            } else if (isAuthRequired) {
-                handleProviderDeactivated({ detail: initialState });
-            }
-        }
-
-        // Load initial data if authenticated
-        loadInitialData();
-    });
-
-    document.body.addEventListener('htmx:afterSwap', function () {
-        // Re-attach event listeners after SPA navigation
-        if (document.getElementById('recommendations-container')) {
-            // Check authentication state again after navigation
-            if (typeof window.getAuthState === 'function') {
-                const currentState = window.getAuthState();
-                if (currentState.authenticated) {
-                    handleProviderActivated({ detail: currentState });
-                } else if (isAuthRequired) {
-                    handleProviderDeactivated({ detail: currentState });
-                }
-            }
-            loadInitialData();
         }
     });
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCostOptimizationPage);
+    } else {
+        initCostOptimizationPage();
+    }
+
+    document.body.addEventListener('htmx:afterSwap', initCostOptimizationPage);
 })();

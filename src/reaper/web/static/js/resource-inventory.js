@@ -384,47 +384,37 @@
         }
     }
 
-    // ── Auto-load on DOMContentLoaded ────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', function () {
-        // Listen for cloud provider activation events
-        window.addEventListener('cloudProviderActivated', function (event) {
+    // ── Page Initialization & HTMX SPA Navigation Support ────────────────────────
+    function initResourceInventoryPage() {
+        if (!document.getElementById('resources-container')) return;
+        
+        if (typeof window.getAuthState === 'function') {
+            const state = window.getAuthState();
+            if (state.authenticated) {
+                handleProviderActivated({ detail: state });
+            } else if (isAuthRequired) {
+                handleProviderDeactivated({ detail: state });
+            }
+        }
+        loadResourceInventory();
+    }
+
+    // Global listener for cloud provider activation (only updates if on resource inventory page)
+    window.addEventListener('cloudProviderActivated', function (event) {
+        if (document.getElementById('resources-container')) {
             if (event.detail.authenticated) {
                 handleProviderActivated(event);
             } else {
                 handleProviderDeactivated(event);
             }
-        });
-
-        // Check initial authentication state
-        if (typeof window.getAuthState === 'function') {
-            const initialState = window.getAuthState();
-            if (initialState.authenticated) {
-                handleProviderActivated({ detail: initialState });
-            } else if (isAuthRequired) {
-                handleProviderDeactivated({ detail: initialState });
-            }
-        }
-
-        // Load inventory if authenticated
-        if (document.getElementById('resources-container')) {
-            loadResourceInventory();
         }
     });
 
-    // ── HTMX SPA Navigation Support ────────────────────────────────────────────
-    document.body.addEventListener('htmx:afterSwap', function () {
-        // Re-attach event listeners after SPA navigation
-        if (document.getElementById('resources-container')) {
-            // Check authentication state again after navigation
-            if (typeof window.getAuthState === 'function') {
-                const currentState = window.getAuthState();
-                if (currentState.authenticated) {
-                    handleProviderActivated({ detail: currentState });
-                } else if (isAuthRequired) {
-                    handleProviderDeactivated({ detail: currentState });
-                }
-            }
-            loadResourceInventory();
-        }
-    });
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initResourceInventoryPage);
+    } else {
+        initResourceInventoryPage();
+    }
+
+    document.body.addEventListener('htmx:afterSwap', initResourceInventoryPage);
 })();
