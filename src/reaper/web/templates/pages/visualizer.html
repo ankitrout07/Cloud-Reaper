@@ -1114,11 +1114,15 @@ function refreshTopology() {
 
 // ── Keyboard shortcuts ─────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
+    if (e.target && (e.target.matches('input, textarea, select') || e.target.isContentEditable)) return;
     if (e.key === 'r' || e.key === 'R') refreshTopology();
     if (e.key === 'f' || e.key === 'F') fitGraph();
     if (e.key === '+' || e.key === '=') zoomIn();
     if (e.key === '-' || e.key === '_') zoomOut();
-    if (e.key === 'Escape')             hideTooltip();
+    if (e.key === 'Escape') {
+        hideTooltip();
+        closeScanModal();
+    }
 });
 </script>
 {% endblock %}

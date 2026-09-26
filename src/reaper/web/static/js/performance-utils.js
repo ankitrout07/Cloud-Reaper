@@ -34,7 +34,8 @@ function throttle(func, limit = 100) {
 // Debounced search input handler
 function setupDebouncedSearch(inputSelector, searchCallback, delay = 300) {
     const searchInput = document.querySelector(inputSelector);
-    if (!searchInput) return;
+    if (!searchInput || searchInput.dataset.debouncedBound === 'true') return;
+    searchInput.dataset.debouncedBound = 'true';
     
     const debouncedSearch = debounce((query) => {
         searchCallback(query);
@@ -57,7 +58,8 @@ function setupDebouncedSearch(inputSelector, searchCallback, delay = 300) {
 // Auto-save with debouncing
 function setupAutoSave(formSelector, saveCallback, delay = 1000) {
     const form = document.querySelector(formSelector);
-    if (!form) return;
+    if (!form || form.dataset.autoSaveBound === 'true') return;
+    form.dataset.autoSaveBound = 'true';
     
     const debouncedSave = debounce(() => {
         const formData = new FormData(form);
@@ -136,8 +138,8 @@ async function measureAsyncPerformance(name, fn) {
     return result;
 }
 
-// Initialize performance utilities when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize performance utilities when DOM is ready or swapped via HTMX
+function initPerformanceUtils() {
     // Initialize lazy loading for images
     lazyLoadImages();
     
@@ -147,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
         (query) => {
             // Trigger HTMX search with debounced query
             const searchInput = document.querySelector('#resource-search');
-            if (searchInput) {
+            if (searchInput && typeof htmx !== 'undefined') {
                 htmx.trigger(searchInput, 'search', { query });
             }
         },
@@ -167,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (response.ok) {
                     console.log('Settings auto-saved');
                 }
-            });
+            }).catch(err => console.warn('Auto-save settings failed:', err));
         },
         1000
     );
@@ -185,11 +187,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (response.ok) {
                     console.log('Vault config auto-saved');
                 }
-            });
+            }).catch(err => console.warn('Auto-save vault failed:', err));
         },
         1000
     );
-});
+}
+
+document.addEventListener('DOMContentLoaded', initPerformanceUtils);
+document.addEventListener('htmx:afterSwap', initPerformanceUtils);
 
 // Auto-export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {

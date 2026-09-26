@@ -73,6 +73,12 @@ self.addEventListener('fetch', (event) => {
     if (url.origin !== location.origin) {
         return;
     }
+
+    // Never cache HTMX partial fragment requests (prevent cache poisoning of full pages)
+    if (event.request.headers.get('HX-Request')) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
     
     // Handle static assets - cache first, network fallback
     if (url.pathname.startsWith('/static/')) {

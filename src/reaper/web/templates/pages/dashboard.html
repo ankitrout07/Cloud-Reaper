@@ -1050,7 +1050,11 @@ body {
     }
 
     // Professional module interaction handlers
-    document.addEventListener('DOMContentLoaded', () => {
+    function initDashboardPage() {
+        const container = document.querySelector('.dashboard-container');
+        if (!container || container.dataset.initialized === 'true') return;
+        container.dataset.initialized = 'true';
+
         // Add click handlers to module control buttons with smooth animations
         document.querySelectorAll('.module-control-btn').forEach(btn => {
             btn.addEventListener('click', function(e) {
@@ -1058,140 +1062,85 @@ body {
                 const module = this.closest('.dashboard-module');
                 const icon = this.querySelector('i');
 
-                if (icon.classList.contains('fa-sync-alt')) {
-                    // Professional refresh animation
+                if (icon && icon.classList.contains('fa-sync-alt')) {
                     this.style.transform = 'rotate(180deg)';
                     icon.classList.add('fa-spin');
                     setTimeout(() => {
                         icon.classList.remove('fa-spin');
                         this.style.transform = 'rotate(0deg)';
                     }, 1200);
-                } else if (icon.classList.contains('fa-expand')) {
-                    // Expand/collapse with smooth transition
+                } else if (icon && icon.classList.contains('fa-expand')) {
                     const content = module.querySelector('.module-content');
-                    const isExpanded = content.style.display === 'none';
-
-                    if (isExpanded) {
-                        content.style.display = 'block';
-                        content.style.opacity = '0';
-                        setTimeout(() => {
-                            content.style.opacity = '1';
-                        }, 50);
-                    } else {
-                        content.style.opacity = '0';
-                        setTimeout(() => {
-                            content.style.display = 'none';
-                        }, 300);
+                    if (content) {
+                        const isExpanded = content.style.display === 'none';
+                        if (isExpanded) {
+                            content.style.display = 'block';
+                            content.style.opacity = '0';
+                            setTimeout(() => { content.style.opacity = '1'; }, 50);
+                        } else {
+                            content.style.opacity = '0';
+                            setTimeout(() => { content.style.display = 'none'; }, 300);
+                        }
+                        icon.classList.toggle('fa-expand');
+                        icon.classList.toggle('fa-compress');
+                        this.title = isExpanded ? 'Fullscreen' : 'Collapse';
                     }
-
-                    icon.classList.toggle('fa-expand');
-                    icon.classList.toggle('fa-compress');
-
-                    // Update button title
-                    this.title = isExpanded ? 'Fullscreen' : 'Collapse';
                 }
             });
         });
-
-        // Professional status updates with smooth transitions
-        setInterval(() => {
-            document.querySelectorAll('.module-status.live').forEach(status => {
-                status.classList.add('updating');
-                const pulse = status.querySelector('.fa-circle, span');
-                if (pulse) {
-                    pulse.style.animation = 'none';
-                    setTimeout(() => {
-                        pulse.style.animation = '';
-                    }, 100);
-                }
-                setTimeout(() => {
-                    status.classList.remove('updating');
-                }, 2500);
-            });
-        }, 15000);
 
         // Check if device is touch-enabled
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-        // Enhanced 3D hover effect on stat modules (only on non-touch devices)
+        // Enhanced smooth 3D hover effect using requestAnimationFrame and cached rects
         if (!isTouchDevice) {
-            document.querySelectorAll('.stat-module').forEach(module => {
-                module.addEventListener('mousemove', (e) => {
-                    const rect = module.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    const centerX = rect.width / 2;
-                    const centerY = rect.height / 2;
-                    const rotateX = (y - centerY) / 25;
-                    const rotateY = (centerX - x) / 25;
+            function attachTilt(elements, divisorX, divisorY, translateY) {
+                elements.forEach(module => {
+                    let rect = null;
+                    let ticking = false;
 
-                    module.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-4px)`;
+                    module.addEventListener('mouseenter', () => {
+                        rect = module.getBoundingClientRect();
+                    });
+
+                    module.addEventListener('mousemove', (e) => {
+                        if (!rect || ticking) return;
+                        ticking = true;
+                        const clientX = e.clientX;
+                        const clientY = e.clientY;
+                        requestAnimationFrame(() => {
+                            if (!rect) { ticking = false; return; }
+                            const x = clientX - rect.left;
+                            const y = clientY - rect.top;
+                            const centerX = rect.width / 2;
+                            const centerY = rect.height / 2;
+                            const rotateX = (y - centerY) / divisorX;
+                            const rotateY = (centerX - x) / divisorY;
+                            module.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-${translateY}px)`;
+                            ticking = false;
+                        });
+                    });
+
+                    module.addEventListener('mouseleave', () => {
+                        rect = null;
+                        module.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateY(0)';
+                    });
                 });
+            }
 
-                module.addEventListener('mouseleave', () => {
-                    module.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateY(0)';
-                });
-            });
-
-            // Enhanced 3D hover effect on dashboard modules
-            document.querySelectorAll('.dashboard-module:not(.stat-module)').forEach(module => {
-                module.addEventListener('mousemove', (e) => {
-                    const rect = module.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    const centerX = rect.width / 2;
-                    const centerY = rect.height / 2;
-                    const rotateX = (y - centerY) / 30;
-                    const rotateY = (centerX - x) / 30;
-
-                    module.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-2px)`;
-                });
-
-                module.addEventListener('mouseleave', () => {
-                    module.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateY(0)';
-                });
-            });
+            attachTilt(document.querySelectorAll('.stat-module'), 25, 25, 4);
+            attachTilt(document.querySelectorAll('.dashboard-module:not(.stat-module)'), 30, 30, 2);
         }
-
-        // Intersection Observer for scroll animations
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -100px 0px'
-        };
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.style.opacity = '0';
-                    entry.target.style.transform = 'translateY(20px)';
-                    setTimeout(() => {
-                        entry.target.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-                        entry.target.style.opacity = '1';
-                        entry.target.style.transform = 'translateY(0)';
-                    }, 100);
-                    observer.unobserve(entry.target);
-                }
-            });
-        }, observerOptions);
-
-        document.querySelectorAll('.dashboard-module').forEach(module => {
-            observer.observe(module);
-        });
-
-        // Enhanced badge animation
-        document.querySelectorAll('.module-badge').forEach(badge => {
-            badge.style.animation = 'none';
-            badge.offsetHeight; // Trigger reflow
-            badge.style.animation = 'badge-pulse 2s infinite';
-        });
 
         // Fetch and populate scopes
         (async function loadScopes() {
             try {
+                const select = document.getElementById('projectScopeFilter');
+                if (!select || select.dataset.loaded === 'true') return;
                 const res = await fetch('/api/dashboard/scopes');
                 const data = await res.json();
-                const select = document.getElementById('projectScopeFilter');
                 if (data.status === 'ok' && data.scopes && data.scopes.length > 0) {
+                    select.dataset.loaded = 'true';
                     data.scopes.forEach(scope => {
                         const option = document.createElement('option');
                         option.value = scope;
@@ -1203,6 +1152,9 @@ body {
                 console.error('Failed to load project scopes', e);
             }
         })();
-    });
+    }
+
+    document.addEventListener('DOMContentLoaded', initDashboardPage);
+    document.addEventListener('htmx:afterSwap', initDashboardPage);
 </script>
 {% endblock %}

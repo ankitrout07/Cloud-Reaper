@@ -56,6 +56,12 @@
             const data = await response.json();
 
             if (data.provider !== undefined) {
+                const isChanged = (
+                    currentAuthState.provider !== data.provider ||
+                    currentAuthState.authenticated !== (data.authenticated || false) ||
+                    currentAuthState.subscription_id !== data.subscription_id
+                );
+
                 currentAuthState = {
                     provider: data.provider,
                     authenticated: data.authenticated || false,
@@ -63,9 +69,13 @@
                     last_sync: data.last_sync
                 };
 
-                // Update UI and dispatch event if state changed
+                // Update UI status text
                 updateAuthenticationUI();
-                dispatchAuthEvent();
+
+                // Only dispatch global event if auth state actually changed
+                if (isChanged) {
+                    dispatchAuthEvent();
+                }
 
                 return currentAuthState;
             }

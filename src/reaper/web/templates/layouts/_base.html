@@ -170,24 +170,26 @@
     
     <!-- Lazy-loaded scripts based on page context -->
     <script>
+        const loadedScripts = new Set();
+
         // Lazy load scripts based on current page
         function lazyLoadScript(src) {
+            if (loadedScripts.has(src)) return Promise.resolve();
             return new Promise((resolve, reject) => {
                 const script = document.createElement('script');
                 script.src = src;
                 script.defer = true;
-                script.onload = resolve;
+                script.onload = () => {
+                    loadedScripts.add(src);
+                    resolve();
+                };
                 script.onerror = reject;
                 document.body.appendChild(script);
             });
         }
 
-        // Determine which scripts to load based on current path
-        const currentPath = window.location.pathname;
-        
         async function loadPageScripts() {
-            // Always load UI interactions
-            await lazyLoadScript('/static/js/ui-interactions.js');
+            const currentPath = window.location.pathname;
             
             // Page-specific lazy loading
             if (currentPath.includes('settings') || currentPath.includes('vault')) {
@@ -208,12 +210,13 @@
             }
         }
 
-        // Load scripts after DOM is ready
+        // Load scripts after DOM is ready and on SPA navigation
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', loadPageScripts);
         } else {
             loadPageScripts();
         }
+        document.body.addEventListener('htmx:afterSwap', loadPageScripts);
     </script>
 
     <!-- SPA Re-init script -->

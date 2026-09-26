@@ -42,11 +42,18 @@ class WebSocketBatchHandler {
         console.log(`[WebSocket Batch Handler] Processing ${count} batched messages for ${baseEvent}`);
         
         // Process each message in the batch
-        messages.forEach((message, index) => {
-            // Emit individual message to maintain backward compatibility
-            this.socket.emit(baseEvent, message);
+        messages.forEach((message) => {
+            // Trigger any local socket listeners without sending back to server
+            if (typeof this.socket.listeners === 'function') {
+                const listeners = this.socket.listeners(baseEvent);
+                if (listeners && listeners.length > 0) {
+                    listeners.forEach(fn => {
+                        try { fn(message); } catch (e) { console.error(`[WebSocket Batch Handler] Listener error for ${baseEvent}:`, e); }
+                    });
+                }
+            }
             
-            // Also trigger any existing event handlers
+            // Also trigger document event handlers
             const customEvent = new CustomEvent(baseEvent, { detail: message });
             document.dispatchEvent(customEvent);
         });

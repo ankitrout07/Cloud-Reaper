@@ -454,17 +454,23 @@ window.initFinancialIntelligence = () => {
     loadCommitmentsData();
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-    if (window.location.pathname === '/financial') {
-        initFinancialIntelligence();
+function initActivePageView() {
+    const path = window.location.pathname;
+    if (path === '/financial' || document.getElementById('budget-chart')) {
+        if (typeof initFinancialIntelligence === 'function') initFinancialIntelligence();
     }
-    if (window.location.pathname === '/finops') {
-        initFinopsIntelligence();
+    if (path === '/finops' || document.getElementById('finops-kpi-grid')) {
+        if (typeof initFinopsIntelligence === 'function') initFinopsIntelligence();
     }
-    if (window.location.pathname === '/pricing') {
-        loadPrices('azure', 1);
+    if (path === '/pricing' || document.getElementById('priceTableBody')) {
+        if (typeof loadPrices === 'function') {
+            loadPrices(window.priceCatalogState?.currentProvider || 'azure', 1);
+        }
     }
-});
+}
+
+document.addEventListener('DOMContentLoaded', initActivePageView);
+document.addEventListener('htmx:afterSwap', initActivePageView);
 
 window.saveBudgetCap = async () => {
     const threshold = document.getElementById('budget-cap')?.value || document.getElementById('budget-threshold')?.value;

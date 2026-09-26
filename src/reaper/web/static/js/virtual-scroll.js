@@ -41,8 +41,18 @@ class VirtualScroll {
         this.viewport.style.width = '100%';
         this.container.appendChild(this.viewport);
         
-        // Bind scroll event
-        this.container.addEventListener('scroll', this.handleScroll.bind(this));
+        // Bind scroll event properly with a preserved reference and rAF throttling
+        this._scrollTicking = false;
+        this._boundScroll = () => {
+            if (!this._scrollTicking) {
+                this._scrollTicking = true;
+                requestAnimationFrame(() => {
+                    this.handleScroll();
+                    this._scrollTicking = false;
+                });
+            }
+        };
+        this.container.addEventListener('scroll', this._boundScroll, { passive: true });
         
         // Initial render
         this.updateVisibleRange();
@@ -103,7 +113,9 @@ class VirtualScroll {
     }
     
     destroy() {
-        this.container.removeEventListener('scroll', this.handleScroll.bind(this));
+        if (this._boundScroll) {
+            this.container.removeEventListener('scroll', this._boundScroll);
+        }
         this.container.innerHTML = '';
     }
 }
