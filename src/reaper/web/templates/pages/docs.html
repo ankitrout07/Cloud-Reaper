@@ -583,11 +583,13 @@
     </div>
 </main>
 
+<script src="/static/js/docs.js?v=4"></script>
 <script>
 // Enhanced documentation JavaScript functionality
 let currentDocIndex = 0;
 let searchResults = [];
 const docFilenames = [{% for doc in docs_data %}'{{ doc.filename }}'{% if not loop.last %},{% endif %}{% endfor %}];
+window.docFilenames = docFilenames;
 
 function navigateDoc(direction) {
     currentDocIndex += direction;
@@ -694,24 +696,25 @@ function renderSearchResults(results) {
     content.innerHTML = html;
 }
 
-// Update current doc index when showing a document
-const originalShowDoc = showDoc;
-showDoc = function(filename) {
-    currentDocIndex = docFilenames.indexOf(filename);
-    
-    // Update URL hash
-    window.location.hash = filename;
-    
-    originalShowDoc(filename);
-};
+if (typeof showDoc === 'function') {
+    const originalShowDoc = showDoc;
+    window.showDoc = function(filename) {
+        currentDocIndex = docFilenames.indexOf(filename);
+        originalShowDoc(filename);
+    };
+}
 
-// Handle URL hash on page load
-document.addEventListener('DOMContentLoaded', () => {
+function applyDocsHash() {
     const hash = window.location.hash.substring(1);
-    if (hash && docFilenames.includes(hash)) {
+    if (hash && typeof showDoc === 'function') {
         showDoc(hash);
     }
-});
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyDocsHash);
+} else {
+    applyDocsHash();
+}
 </script>
 
 {% endblock %}

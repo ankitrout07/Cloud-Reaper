@@ -1,21 +1,20 @@
 // Enhanced Documentation Page Interactions
 
-// Mobile sidebar toggle
-document.addEventListener('DOMContentLoaded', () => {
+function bootDocsPage() {
     const sidebar = document.getElementById('docs-sidebar');
     const toggleBtn = document.getElementById('mobile-sidebar-toggle');
     const closeBtn = document.getElementById('close-sidebar-btn');
-    
-    if (sidebar && toggleBtn && closeBtn) {
+
+    if (sidebar && toggleBtn && closeBtn && !sidebar.dataset.navBound) {
+        sidebar.dataset.navBound = '1';
         toggleBtn.addEventListener('click', () => {
             sidebar.classList.remove('-translate-x-full');
         });
-        
+
         closeBtn.addEventListener('click', () => {
             sidebar.classList.add('-translate-x-full');
         });
-        
-        // Close sidebar when clicking outside
+
         sidebar.addEventListener('click', (e) => {
             if (e.target === sidebar) {
                 sidebar.classList.add('-translate-x-full');
@@ -23,26 +22,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Initialize search functionality
     initSearchFunctionality();
-    
-    // Initialize markdown rendering
     initMarkdownDocs();
-});
+
+    const hash = window.location.hash.substring(1);
+    if (hash) {
+        showDoc(hash);
+    }
+}
 
 function initSearchFunctionality() {
     const searchInput = document.getElementById('doc-search-input');
     const mobileSearchInput = document.getElementById('doc-search-input-mobile');
-    
-    if (searchInput) {
+
+    if (searchInput && !searchInput.dataset.searchBound) {
+        searchInput.dataset.searchBound = '1';
         searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 triggerDocSearch();
             }
         });
     }
-    
-    if (mobileSearchInput) {
+
+    if (mobileSearchInput && !mobileSearchInput.dataset.searchBound) {
+        mobileSearchInput.dataset.searchBound = '1';
         mobileSearchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 triggerDocSearch();
@@ -198,6 +201,9 @@ function addCodeCopyButtons(container) {
 }
 
 function showDoc(filename) {
+    if (filename) {
+        window.location.hash = filename;
+    }
     // docFilenames is globally defined in docs.html via Jinja
     const availableDocs = window.docFilenames || (typeof docFilenames !== 'undefined' ? docFilenames : []);
     
@@ -457,9 +463,14 @@ function initReadingProgress() {
 // Re-init markdown rendering on htmx swap
 document.addEventListener('htmx:afterSwap', function(evt) {
     if (window.location.pathname.includes('/docs')) {
-        initMarkdownDocs();
+        bootDocsPage();
     }
 });
 
-// Add back the original showDoc function reference for external calls
 window.showDoc = showDoc;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootDocsPage);
+} else {
+    bootDocsPage();
+}

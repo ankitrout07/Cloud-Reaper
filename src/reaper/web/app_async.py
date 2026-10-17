@@ -10,20 +10,22 @@ import threading
 import time
 from functools import wraps
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from reaper.services.credential_service import get_credential_service
 from reaper.utils.error_handler import get_logger
+
+logger = get_logger(__name__)
 
 # Try to import Go WebSocket batcher for enhanced performance
 try:
@@ -90,8 +92,12 @@ load_dotenv()
 
 
 def _repo_root() -> Path:
-    """Repository root (``.../Cloud-Reaper``), derived from this package path."""
-    return Path(__file__).resolve().parent.parent.parent.parent
+    """Repository root (directory containing ``pyproject.toml`` or ``.git``)."""
+    here = Path(__file__).resolve()
+    for parent in (here, *here.parents):
+        if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
+            return parent
+    return here.parent.parent.parent.parent
 
 
 def _reaper_engine_binary() -> Path | None:
@@ -402,7 +408,12 @@ def render_template_string(template_name: str, **kwargs) -> str:
 
 
 def send_from_directory(directory: str, filename: str, **kwargs):
-    return FileResponse(os.path.join(directory, filename))
+    base = Path(directory).resolve()
+    target = (base / filename).resolve()
+    if not str(target).startswith(str(base)) or not target.is_file():
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+    media_type = kwargs.get("media_type") or kwargs.get("mimetype")
+    return FileResponse(str(target), media_type=media_type)
 
 
 app.mount("/static", StaticFiles(directory=str(_web_dir / "static")), name="static")
@@ -591,7 +602,6 @@ async def startup_event():
     """Initialize background tasks and warm up caches."""
     # Initialize global credential service
     credential_service = get_credential_service()
-    logger = get_logger(__name__)
     logger.info(
         f"Credential service initialized with providers: {list(credential_service.get_all_providers().keys())}"
     )
@@ -1042,8 +1052,7 @@ async def about(request: Request):
 
 @app.get("/docs")
 async def docs(request: Request):
-    base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    docs_dir = base_dir / "docs"
+    docs_dir = _repo_root() / "docs"
     docs_data = []
     if docs_dir.exists():
         md_files = list(docs_dir.glob("*.md"))
@@ -1066,6 +1075,23 @@ async def docs(request: Request):
         "pages/docs.html",
         {"request": request, "docs_data": docs_data},
     )
+
+
+@app.get("/docs/{filename:path}")
+async def docs_file_redirect(filename: str):
+    """Map /docs/<file> links to the docs hub hash route (/docs#<file>)."""
+    normalized = filename.replace("\\", "/").strip("/")
+    if not normalized or "/" in normalized or normalized in {".", ".."}:
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+    docs_dir = (_repo_root() / "docs").resolve()
+    target = (docs_dir / normalized).resolve()
+    try:
+        target.relative_to(docs_dir)
+    except ValueError:
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+    if not target.is_file():
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+    return RedirectResponse(url=f"/docs#{normalized}", status_code=302)
 
 
 @app.get("/integrations")

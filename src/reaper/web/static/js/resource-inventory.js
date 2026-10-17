@@ -383,10 +383,10 @@
             'Are you sure you want to dismiss this resource? This action may have cost implications.',
             async function () {
                 try {
-                    const response = await fetch('/api/resources/' + encodeURIComponent(resourceId) + '/dismiss', {
+                    const response = await fetch('/api/resources/dismiss', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ reason }),
+                        body: JSON.stringify({ resource_id: resourceId, reason }),
                     });
                     const data = await response.json();
                     if (data.status === 'success') {
@@ -513,9 +513,7 @@
         }
     }
 
-    // ── Auto-load on DOMContentLoaded ────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', function () {
-        // Listen for cloud provider activation events
+    function bootResourceInventory() {
         window.addEventListener('cloudProviderActivated', function (event) {
             if (event.detail.authenticated) {
                 handleProviderActivated(event);
@@ -524,7 +522,6 @@
             }
         });
 
-        // Check initial authentication state
         if (typeof window.getAuthState === 'function') {
             const initialState = window.getAuthState();
             if (initialState.authenticated) {
@@ -534,11 +531,16 @@
             }
         }
 
-        // Load inventory if authenticated
         if (document.getElementById('resources-container')) {
             loadResourceInventory();
         }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootResourceInventory);
+    } else {
+        bootResourceInventory();
+    }
 
     // ── HTMX SPA Navigation Support ────────────────────────────────────────────
     document.body.addEventListener('htmx:afterSwap', function () {

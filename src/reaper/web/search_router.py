@@ -17,8 +17,12 @@ try:
     if os.getenv("GEMINI_API_KEY"):
         search_engine = DocSearchEngine()
 
-        # Find project root relative to this file
-        base_dir = Path(__file__).resolve().parent.parent.parent.parent
+        here = Path(__file__).resolve()
+        base_dir = here.parent
+        for parent in here.parents:
+            if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
+                base_dir = parent
+                break
         docs_dir_path = base_dir / "docs"
 
         # Pre-load and index the markdown files into memory on server initialization

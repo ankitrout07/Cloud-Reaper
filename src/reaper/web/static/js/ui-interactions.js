@@ -150,6 +150,7 @@ document.addEventListener('htmx:afterSwap', function(evt) {
     loadInitialTabs();
 });
 
+
 // Backend API Integration Functions
 
 async function postApiUpdate(action, payload = {}) {
@@ -454,17 +455,21 @@ window.initFinancialIntelligence = () => {
     loadCommitmentsData();
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-    if (window.location.pathname === '/financial') {
+function initRoutePageScripts() {
+    const path = window.location.pathname;
+    if (path === '/financial') {
         initFinancialIntelligence();
     }
-    if (window.location.pathname === '/finops') {
+    if (path === '/finops') {
         initFinopsIntelligence();
     }
-    if (window.location.pathname === '/pricing') {
+    if (path === '/pricing') {
         loadPrices('azure', 1);
     }
-});
+}
+
+document.addEventListener('DOMContentLoaded', initRoutePageScripts);
+document.addEventListener('htmx:afterSwap', initRoutePageScripts);
 
 window.saveBudgetCap = async () => {
     const threshold = document.getElementById('budget-cap')?.value || document.getElementById('budget-threshold')?.value;

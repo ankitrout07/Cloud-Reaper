@@ -853,6 +853,8 @@ async def ai_token_tracking(request: Request):
 # These aliases bridge URL mismatches between frontend calls and canonical routes.
 # Frontend uses singular "commitment" and hyphenated paths; backend uses plural
 # and slash-separated paths.  All aliases delegate to the canonical handlers.
+# TODO: Standardize on canonical routes and update frontend to use them directly
+# to reduce routing complexity and potential confusion.
 
 @router.post("/api/finops/commitment/simulate")
 async def commitment_simulate_alias(request: Request):

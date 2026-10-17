@@ -279,7 +279,15 @@ async def vault_create_entry(request: Request):
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 @router.get("/api/vault/entries/{entry_id}")
-async def vault_get_entry(request: Request, entry_id: int):
+async def vault_get_entry(request: Request, entry_id: str):
+    # Convert to int for validation, but handle invalid IDs gracefully
+    try:
+        entry_id_int = int(entry_id)
+    except ValueError:
+        return JSONResponse(
+            status_code=404, content={"status": "error", "message": "Entry not found."}
+        )
+
     if not _is_vault_unlocked(request):
         return JSONResponse(
             status_code=403, content={"status": "error", "message": "Vault is locked."}
@@ -294,7 +302,7 @@ async def vault_get_entry(request: Request, entry_id: int):
     def _fetch_entry():
         db = SessionLocal()
         try:
-            row = db.query(VaultEntry).filter_by(id=entry_id).first()
+            row = db.query(VaultEntry).filter_by(id=entry_id_int).first()
             if not row:
                 return None
             return row.encrypted_payload, row.id, row.label, row.entry_type
@@ -335,7 +343,15 @@ async def vault_get_entry(request: Request, entry_id: int):
     )
 
 @router.delete("/api/vault/entries/{entry_id}")
-async def vault_delete_entry(request: Request, entry_id: int):
+async def vault_delete_entry(request: Request, entry_id: str):
+    # Convert to int for validation, but handle invalid IDs gracefully
+    try:
+        entry_id_int = int(entry_id)
+    except ValueError:
+        return JSONResponse(
+            status_code=404, content={"status": "error", "message": "Entry not found."}
+        )
+
     if not _is_vault_unlocked(request):
         return JSONResponse(
             status_code=403, content={"status": "error", "message": "Vault is locked."}
@@ -344,7 +360,7 @@ async def vault_delete_entry(request: Request, entry_id: int):
     def _delete_entry():
         db = SessionLocal()
         try:
-            row = db.query(VaultEntry).filter_by(id=entry_id).first()
+            row = db.query(VaultEntry).filter_by(id=entry_id_int).first()
             if not row:
                 return False
             db.delete(row)
@@ -416,5 +432,4 @@ async def vault_config_alias(request: Request):
     Used by performance-utils.js to persist vault configuration.
     The payload shape is identical to the setup endpoint.
     """
-    from reaper.web.routers.vault import setup_vault
-    return await setup_vault(request)
+    return await vault_setup(request)

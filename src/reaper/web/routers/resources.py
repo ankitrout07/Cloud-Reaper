@@ -492,27 +492,52 @@ async def search_resources(request: Request):
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 
 
+async def _dismiss_resource_payload(resource_id: str, reason: str):
+    return jsonify(
+        {
+            "status": "success",
+            "message": f"Resource {resource_id} marked for dismissal",
+            "resource_id": resource_id,
+            "reason": reason,
+            "action_taken": "marked_for_cleanup",
+        }
+    )
+
+
+@router.post("/api/resources/dismiss")
+async def dismiss_resource_by_body(request: Request):
+    """Dismiss using JSON body so Azure resource IDs (with slashes) route correctly."""
+    try:
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+        resource_id = str((data or {}).get("resource_id") or "").strip()
+        if not resource_id:
+            return JSONResponse(
+                status_code=400, content={"status": "error", "message": "resource_id is required"}
+            )
+        reason = (data or {}).get("reason", "Manual dismissal")
+        return await _dismiss_resource_payload(resource_id, reason)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
 @router.post("/api/resources/{resource_id}/dismiss")
 async def dismiss_resource(request: Request, resource_id: str):
-    """Mark a resource for dismissal/cleanup."""
+    """Mark a resource for dismissal/cleanup (legacy path for IDs without slashes).
+
+    NOTE: Azure resource IDs often contain forward slashes (e.g., /subscriptions/{sub}/...),
+    which will fail to match this path parameter route. Use POST /api/resources/dismiss
+    with the resource_id in the JSON body instead for IDs with slashes.
+    """
     try:
-        data = await request.json() if request.body() else {}
-        reason = data.get("reason", "Manual dismissal")
-
-        # In a real implementation, this would:
-        # 1. Log the dismissal action
-        # 2. Create a cleanup ticket
-        # 3. Optionally trigger actual resource deletion
-
-        return jsonify(
-            {
-                "status": "success",
-                "message": f"Resource {resource_id} marked for dismissal",
-                "resource_id": resource_id,
-                "reason": reason,
-                "action_taken": "marked_for_cleanup",
-            }
-        )
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+        reason = (data or {}).get("reason", "Manual dismissal")
+        return await _dismiss_resource_payload(resource_id, reason)
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 

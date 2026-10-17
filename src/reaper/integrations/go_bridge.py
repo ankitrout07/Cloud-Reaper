@@ -87,7 +87,11 @@ def _repo_root() -> Path:
     Returns:
         Path to the repository root
     """
-    return Path(__file__).resolve().parent.parent.parent.parent
+    here = Path(__file__).resolve()
+    for parent in (here, *here.parents):
+        if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
+            return parent
+    return here.parent.parent.parent.parent
 
 
 def _engine_binary() -> Path | None:

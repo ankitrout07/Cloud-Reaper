@@ -277,8 +277,8 @@ def cmd_install(args: argparse.Namespace) -> int:
 
 
 def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
-    """Compile the Go performance engine binary into bin/."""
-    print(c("\n[build] Compiling Go engine\n", BOLD))
+    """Compile the Go performance engine binary into bin/ with parallel builds and caching."""
+    print(c("\n[build] Compiling Go engine (parallel builds with caching)\n", BOLD))
 
     go_bin = shutil.which("go")
     if not go_bin:
@@ -310,7 +310,7 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
     engine_dir = REPO_ROOT / "src" / "engine-go"
     bin_dir = REPO_ROOT / "bin"
     bin_dir.mkdir(exist_ok=True)
-    
+
     if not engine_dir.is_dir():
         print(c(f"[!] Go engine directory not found: {engine_dir}", RED))
         return 1
@@ -319,8 +319,14 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
     if os.environ.get("PKG_CONFIG_PATH"):
         build_env["PKG_CONFIG_PATH"] = os.environ["PKG_CONFIG_PATH"]
 
+    # Enable Go build cache
+    build_env["GOCACHE"] = str(REPO_ROOT / ".cache" / "go-build")
+    build_env["GOMODCACHE"] = str(REPO_ROOT / ".cache" / "go-mod")
+    (REPO_ROOT / ".cache" / "go-build").mkdir(parents=True, exist_ok=True)
+    (REPO_ROOT / ".cache" / "go-mod").mkdir(parents=True, exist_ok=True)
+
     exe_ext = ".exe" if platform.system() == "Windows" else ""
-    
+
     targets = [
         {"name": "reaper-engine",    "path": ".",                       "tags": "cli"},
         {"name": "taskserver",        "path": "./cmd/taskserver",        "tags": ""},
@@ -331,27 +337,86 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
         {"name": "anomalyserver",     "path": "./cmd/anomalyserver",     "tags": ""},
     ]
 
-    failed = False
+    # Check if rebuild is needed (only rebuild if source files are newer than binary)
+    force_rebuild = getattr(args, "force", False)
+    targets_to_build = []
+
     for target in targets:
         binary_name = f"{target['name']}{exe_ext}"
         output_path = (bin_dir / binary_name).resolve()
-        print(c(f"  Building → {output_path}", CYAN))
-        
-        cmd = [go_bin, "build"]
+
+        if force_rebuild or not output_path.exists():
+            targets_to_build.append(target)
+            continue
+
+        # Check if any Go source file is newer than the binary
+        source_dir = engine_dir / target["path"].lstrip("./")
+        needs_rebuild = False
+        binary_mtime = output_path.stat().st_mtime
+
+        for go_file in source_dir.rglob("*.go"):
+            if go_file.stat().st_mtime > binary_mtime:
+                needs_rebuild = True
+                break
+
+        if needs_rebuild:
+            targets_to_build.append(target)
+        else:
+            print(c(f"  ✓ {target['name']} is up-to-date (skip build)", DIM))
+
+    if not targets_to_build:
+        print(c("\n[✔] All Go binaries are up-to-date. Use --force to rebuild.\n", GREEN))
+        return 0
+
+    print(c(f"  Building {len(targets_to_build)} target(s) in parallel …", CYAN))
+
+    # Build targets in parallel using ThreadPoolExecutor
+    failed = []
+    build_results = []
+
+    def build_target(target):
+        binary_name = f"{target['name']}{exe_ext}"
+        output_path = (bin_dir / binary_name).resolve()
+
+        cmd = [go_bin, "build", "-p", "4"]  # Build with 4 parallel jobs
         if target["tags"]:
             cmd.extend(["-tags", target["tags"]])
+        # Add linker flags to reduce binary size
+        cmd.extend(["-ldflags", "-s -w"])
         cmd.extend(["-o", str(output_path), target["path"]])
-        
-        if not run_cmd(cmd, cwd=engine_dir, env=build_env):
-            print(c(f"[!] Build failed for {target['name']}.", YELLOW))
-            failed = True
-        elif platform.system() != "Windows":
-            output_path.chmod(0o755)
+
+        result = subprocess.run(
+            cmd,
+            cwd=engine_dir,
+            env=build_env,
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode == 0:
+            if platform.system() != "Windows":
+                output_path.chmod(0o755)
+            return (target['name'], True, None)
+        else:
+            return (target['name'], False, result.stderr)
+
+    # Build in parallel (max 4 concurrent builds)
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        build_results = list(executor.map(build_target, targets_to_build))
+
+    for name, success, error in build_results:
+        if success:
+            print(c(f"  ✓ {name} built successfully", GREEN))
+        else:
+            print(c(f"  ✗ {name} build failed", RED))
+            if error:
+                print(c(f"    Error: {error[:200]}", DIM))
+            failed.append(name)
 
     if failed:
-        print(c("\n[!] Go engine build completed with errors. Dashboard features may be limited.\n", YELLOW))
+        print(c(f"\n[!] {len(failed)} build(s) failed. Dashboard features may be limited.\n", YELLOW))
         return 0  # Return 0 to continue since this is not critical
-    
+
     print(c("\n[✔] Go engine and microservices built successfully.\n", GREEN))
     return 0
 
@@ -366,6 +431,7 @@ def cmd_clean(args: argparse.Namespace) -> int:
         REPO_ROOT / ".pytest_cache",
         REPO_ROOT / ".ruff_cache",
         REPO_ROOT / ".mypy_cache",
+        REPO_ROOT / ".cache",  # Go build cache
     ]
 
     for t in targets:
@@ -836,14 +902,15 @@ examples:
   python3 bootstrap.py run                # same as above
   python3 bootstrap.py install            # venv + pip deps only
   python3 bootstrap.py install --no-dev   # skip dev deps
-  python3 bootstrap.py build              # compile Go engine
+  python3 bootstrap.py build              # compile Go engine (with caching & parallel builds)
+  python3 bootstrap.py build --force      # force rebuild all Go binaries
   python3 bootstrap.py check              # prerequisite check
   python3 bootstrap.py scan               # Azure FinOps scan
   python3 bootstrap.py metrics            # live FinOps metrics
   python3 bootstrap.py web                # start dashboard
   python3 bootstrap.py web --port 8080    # dashboard on custom port
   python3 bootstrap.py pr-simulation      # PR cost simulation
-  python3 bootstrap.py clean              # remove build artefacts
+  python3 bootstrap.py clean              # remove build artefacts & caches
   python3 bootstrap.py clean --venv       # also remove venv/
 """,
     )
@@ -867,6 +934,7 @@ examples:
 
     # ---- build ----
     p_build = sub.add_parser("build", help="Compile the Go performance engine (outputs to bin/)")
+    p_build.add_argument("--force", action="store_true", help="Force rebuild even if binaries are up-to-date")
     p_build.set_defaults(func=cmd_build)
 
     # ---- check ----

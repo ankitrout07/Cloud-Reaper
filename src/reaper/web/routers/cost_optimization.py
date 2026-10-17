@@ -99,7 +99,12 @@ async def get_optimization_by_priority(request: Request, priority):
 
 @router.get("/api/cost-optimization/resource/{resource_id}")
 async def get_resource_optimizations(request: Request, resource_id):
-    """Get all optimization recommendations for a specific resource"""
+    """Get all optimization recommendations for a specific resource.
+
+    NOTE: Azure resource IDs often contain forward slashes (e.g., /subscriptions/{sub}/...),
+    which will fail to match this path parameter route. Consider using a query parameter
+    or POST body for resource IDs that may contain slashes.
+    """
     try:
         resource_recs = [
             rec.to_dict()

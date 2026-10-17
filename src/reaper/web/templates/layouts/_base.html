@@ -170,42 +170,38 @@
     
     <!-- Lazy-loaded scripts based on page context -->
     <script>
-        // Lazy load scripts based on current page
+        const loadedPageScripts = new Set();
         function lazyLoadScript(src) {
+            if (loadedPageScripts.has(src) || document.querySelector(`script[src="${src}"]`)) {
+                loadedPageScripts.add(src);
+                return Promise.resolve();
+            }
             return new Promise((resolve, reject) => {
                 const script = document.createElement('script');
                 script.src = src;
-                script.defer = true;
-                script.onload = resolve;
+                script.onload = () => {
+                    loadedPageScripts.add(src);
+                    resolve();
+                };
                 script.onerror = reject;
                 document.body.appendChild(script);
             });
         }
 
-        // Determine which scripts to load based on current path
-        const currentPath = window.location.pathname;
-        
         async function loadPageScripts() {
-            // Page-specific lazy loading
+            const currentPath = window.location.pathname;
             if (currentPath.includes('settings') || currentPath.includes('vault')) {
                 await lazyLoadScript('/static/js/cloud-providers.js');
                 await lazyLoadScript('/static/js/vault.js');
             }
-            
             if (currentPath.includes('docs')) {
-                await lazyLoadScript('/static/js/docs.js?v=3');
+                await lazyLoadScript('/static/js/docs.js?v=4');
             }
-            
-            if (currentPath.includes('cost-optimization') || currentPath.includes('financial')) {
-                await lazyLoadScript('/static/js/cost-optimization.js');
-            }
-            
             if (currentPath.includes('resource-inventory')) {
                 await lazyLoadScript('/static/js/virtual-scroll.js');
             }
         }
 
-        // Load scripts after DOM is ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', loadPageScripts);
         } else {
@@ -216,6 +212,7 @@
     <!-- SPA Re-init script -->
     <script>
         document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if(typeof loadPageScripts === 'function') loadPageScripts();
             if(typeof initCharts === 'function') initCharts();
             if(typeof bindEventListeners === 'function') bindEventListeners();
             if(typeof initializeSidebarHighlighting === 'function') initializeSidebarHighlighting();

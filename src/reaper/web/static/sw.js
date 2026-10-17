@@ -128,7 +128,8 @@ self.addEventListener('fetch', (event) => {
     }
     
     // Handle HTML pages - network first, cache fallback
-    if (url.pathname.endsWith('.html') || url.pathname === '/') {
+    const isAppPage = url.pathname === '/' || (!url.pathname.startsWith('/api/') && !url.pathname.startsWith('/static/') && !url.pathname.includes('.'));
+    if (url.pathname.endsWith('.html') || isAppPage) {
         event.respondWith(
             fetch(event.request)
                 .then((response) => {
