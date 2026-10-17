@@ -5,7 +5,7 @@
 # ==============================================================================
 
 # --- Stage 1: Go Services Builder ---
-FROM golang:1.23.4-alpine3.21 AS go-builder
+FROM golang:1.24-alpine3.21 AS go-builder
 
 WORKDIR /app
 
