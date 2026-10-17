@@ -385,8 +385,9 @@ class AIArchitectManager:
             ],
         )
 
-        # Extract JSON from response
-        content_text = response.content[0].text
+        # Extract JSON from response — content[0] is always TextBlock here
+        first_block = response.content[0]
+        content_text = first_block.text if hasattr(first_block, "text") else "{}"  # type: ignore[union-attr]
         # Clean up any markdown code blocks
         if "```json" in content_text:
             content_text = content_text.split("```json")[1].split("```")[0].strip()
@@ -784,7 +785,7 @@ def resolve_component_costs(blueprint_data, provider: str, region: str) -> dict:
             )
 
             if db_record:
-                hourly_rate = float(db_record.price)
+                hourly_rate = float(str(db_record.price))
             db.close()
         except Exception:
             hourly_rate = None

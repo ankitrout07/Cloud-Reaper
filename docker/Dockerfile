@@ -5,7 +5,7 @@
 # ==============================================================================
 
 # --- Stage 1: Go Services Builder ---
-FROM golang:1.25-alpine AS go-builder
+FROM golang:1.23.4-alpine3.21 AS go-builder
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ RUN mkdir -p /build/bin && \
     CGO_ENABLED=0 go build -ldflags="-s -w" -o /build/bin/anomalyserver ./cmd/anomalyserver
 
 # --- Stage 2: Python Intelligence Layer & Web Application ---
-FROM python:3.12-slim-bookworm
+FROM python:3.13-slim-bookworm
 
 WORKDIR /app
 

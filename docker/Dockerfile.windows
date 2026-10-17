@@ -3,7 +3,7 @@
 # Produces Cloud-Reaper Windows 64-bit binaries
 # ==============================================================================
 
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.23.4-bookworm AS builder
 
 RUN dpkg --add-architecture i386 && \
     apt-get update && \
@@ -34,7 +34,7 @@ RUN mkdir -p /output && \
     go build -ldflags="-w -s" -o /output/calculatorserver.exe ./cmd/calculatorserver && \
     go build -ldflags="-w -s" -o /output/anomalyserver.exe ./cmd/anomalyserver
 
-FROM alpine:3.22
+FROM alpine:3.21
 WORKDIR /dist
 COPY --from=builder /output/* ./
 CMD ["ls", "-la", "/dist"]
