@@ -113,14 +113,18 @@ class AzurePriceClient:
             return [self._extract_specifications(p) for p in raw_prices]
 
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Already inside an async context (FastAPI/SocketIO) — schedule as task
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                # Already inside an async context (FastAPI/SocketIO) — schedule in separate thread
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                     future = pool.submit(asyncio.run, _fetch())
                     return future.result()
-            return loop.run_until_complete(_fetch())
+            return asyncio.run(_fetch())
         except Exception as exc:
             self.logger.error(f"get_catalog_prices error: {exc}")
             return []

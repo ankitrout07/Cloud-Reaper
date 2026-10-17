@@ -836,7 +836,8 @@ window.runScan = async () => {
         const response = await fetch('/api/scan');
         
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.message || `HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
@@ -848,7 +849,7 @@ window.runScan = async () => {
         }
     } catch (e) {
         console.error('[ui-interactions] Error running scan:', e);
-        notify("Error running scan.", "error");
+        notify(e.message || "Error running scan.", "error");
     } finally {
         if (scanBtn) {
             scanBtn.innerHTML = '<i class="fas fa-radar mr-2"></i> Run Cloud Scan';

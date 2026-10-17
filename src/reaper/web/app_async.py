@@ -564,16 +564,26 @@ def _run_collector(method_name: str, *args, **kwargs) -> Any:
 @app.middleware("http")
 async def check_setup(request: Request, call_next):
     path = request.url.path
+    # Always pass through: static assets, API endpoints, favicons, settings, and
+    # pages that work without a cloud connection (home, pricing, AI builder, about, docs)
+    _no_auth_required = (
+        "/",
+        "/pricing",
+        "/build-with-ai",
+        "/about",
+        "/docs",
+        "/integrations",
+    )
     if (
         path.startswith("/static")
         or path.startswith("/api/")
         or "favicon" in path
         or path.startswith("/settings")
+        or path in _no_auth_required
     ):
         return await call_next(request)
-    if is_first_run():
-        return RedirectResponse(url="/settings?tab=cloud")
     return await call_next(request)
+
 
 
 @app.on_event("startup")
@@ -634,6 +644,9 @@ async def _get_cached_user_info(request: Request) -> tuple[str, str]:
     if user_name and sub_name and timestamp and time.time() - float(timestamp) < cache_ttl:
         return user_name, sub_name
 
+    if is_first_run():
+        return "Cloud User", "Demo Mode"
+
     # Fetch fresh data and cache it
     try:
 
@@ -650,8 +663,8 @@ async def _get_cached_user_info(request: Request) -> tuple[str, str]:
 
         return user_name, sub_name
     except Exception as e:
-        print(f"[!] Error fetching user info: {e}")
-        return "Azure User", "Azure Subscription"
+        logger.debug("Could not fetch cloud user info: %s", e)
+        return "Cloud User", "Demo Mode"
 
 
 @app.get("/")
@@ -1227,11 +1240,13 @@ async def scan(request: Request):
         target_subs = settings_state.get("selected_subscriptions", []) or [
             os.getenv("AZURE_SUBSCRIPTION_ID")
         ]
-        # pyrefly: ignore [bad-index, unsupported-operation]
-        if not target_subs[0]:
+        if not target_subs[0] or "your_" in str(target_subs[0]):
             return JSONResponse(
                 status_code=400,
-                content={"status": "error", "message": "No subscription ID configured."},
+                content={
+                    "status": "error",
+                    "message": "No cloud subscription configured. Please add your credentials in Settings → Cloud Providers.",
+                },
             )
 
         # ── Async scan dispatch ──────────────────────────────────────────────

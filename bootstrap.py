@@ -5,13 +5,22 @@ Provides a rich argparse CLI with subcommands:
   python3 bootstrap.py                  # full boot (install + build + launch web)
   python3 bootstrap.py run              # same as above (explicit)
   python3 bootstrap.py install          # create venv & install all Python deps
-  python3 bootstrap.py build            # build Go engine binary
+  python3 bootstrap.py build            # build all 7 Go microservice binaries
   python3 bootstrap.py check            # verify system prerequisites
   python3 bootstrap.py scan             # run the Azure FinOps CLI scan
   python3 bootstrap.py metrics          # display live FinOps performance metrics
-  python3 bootstrap.py web              # launch the FastAPI ASGI dashboard
+  python3 bootstrap.py web              # launch the FastAPI ASGI dashboard + all Go services
   python3 bootstrap.py clean            # remove build artefacts & caches
   python3 bootstrap.py pr-simulation    # run a PR cost delta simulation
+
+Go microservices launched by 'web':
+  reaper-engine    :7070  Core performance engine & scan bridge
+  taskserver       :7071  Background task manager
+  websocketserver  :7072  WebSocket batcher & metrics broadcaster
+  ratelimitserver  :7073  Token-bucket rate limiter
+  ragserver        :7074  Hybrid RAG search engine
+  calculatorserver :7075  Vectorized cost calculator
+  anomalyserver    :7076  ML anomaly detection server
 
 Run  python3 bootstrap.py --help  for the full option reference.
 """
@@ -158,7 +167,7 @@ def cmd_check(args: argparse.Namespace) -> int:  # noqa: ARG001
     ok = True
     checks = {
         "python3": ("Python 3.12+", True),
-        "go": ("Go 1.26+", True),
+        "go": ("Go 1.24+", True),
         "docker": ("Docker", False),
         "az": ("Azure CLI", False),
         "git": ("Git", False),
@@ -313,10 +322,13 @@ def cmd_build(args: argparse.Namespace) -> int:  # noqa: ARG001
     exe_ext = ".exe" if platform.system() == "Windows" else ""
     
     targets = [
-        {"name": "reaper-engine", "path": ".", "tags": "cli"},
-        {"name": "taskserver", "path": "./cmd/taskserver", "tags": ""},
-        {"name": "websocketserver", "path": "./cmd/websocketserver", "tags": ""},
-        {"name": "ratelimitserver", "path": "./cmd/ratelimitserver", "tags": ""},
+        {"name": "reaper-engine",    "path": ".",                       "tags": "cli"},
+        {"name": "taskserver",        "path": "./cmd/taskserver",        "tags": ""},
+        {"name": "websocketserver",   "path": "./cmd/websocketserver",   "tags": ""},
+        {"name": "ratelimitserver",   "path": "./cmd/ratelimitserver",   "tags": ""},
+        {"name": "ragserver",         "path": "./cmd/ragserver",         "tags": ""},
+        {"name": "calculatorserver",  "path": "./cmd/calculatorserver",  "tags": ""},
+        {"name": "anomalyserver",     "path": "./cmd/anomalyserver",     "tags": ""},
     ]
 
     failed = False
@@ -508,24 +520,42 @@ def cmd_web(args: argparse.Namespace) -> int:
             port: int
 
         services: list[GoService] = [
-            {"name": "reaper-engine", "args": ["--mode", "serve", "--port", "7070"], "port": 7070},
-            {"name": "taskserver", "args": ["-port", env.get("GO_TASK_MANAGER_PORT", "7071")], "port": 7071},
-            {"name": "websocketserver", "args": ["-port", env.get("GO_WEBSOCKET_PORT", "7072")], "port": 7072},
-            {"name": "ratelimitserver", "args": ["-port", env.get("GO_RATELIMITER_PORT", "7073")], "port": 7073},
+            {"name": "reaper-engine",   "args": ["--mode", "serve", "--port", "7070"],            "port": 7070},
+            {"name": "taskserver",       "args": ["-port", env.get("GO_TASK_MANAGER_PORT", "7071")], "port": 7071},
+            {"name": "websocketserver",  "args": ["-port", env.get("GO_WEBSOCKET_PORT",    "7072")], "port": 7072},
+            {"name": "ratelimitserver",  "args": ["-port", env.get("GO_RATELIMITER_PORT",  "7073")], "port": 7073},
+            {"name": "ragserver",        "args": ["-port", env.get("GO_RAG_PORT",          "7074")], "port": 7074},
+            {"name": "calculatorserver", "args": ["-port", env.get("GO_CALCULATOR_PORT",   "7075")], "port": 7075},
+            {"name": "anomalyserver",    "args": ["-port", env.get("GO_ANOMALY_PORT",      "7076")], "port": 7076},
         ]
         
         for svc in services:
             go_bin = REPO_ROOT / "bin" / f"{svc['name']}{exe_ext}"
             if go_bin.exists():
                 print(c(f"  Starting {svc['name']} (port {svc['port']}) …", CYAN))
-                proc = subprocess.Popen(
-                    [str(go_bin), *svc["args"]],
-                    cwd=str(REPO_ROOT),
-                    env=env,
-                    stdout=subprocess.DEVNULL,  # Keep Uvicorn logs clean
-                    stderr=subprocess.DEVNULL,
-                )
-                go_procs.append(proc)
+                try:
+                    proc = subprocess.Popen(
+                        [str(go_bin), *svc["args"]],
+                        cwd=str(REPO_ROOT),
+                        env=env,
+                        stdout=subprocess.DEVNULL,  # Keep Uvicorn logs clean
+                        stderr=subprocess.DEVNULL,
+                    )
+                    go_procs.append(proc)
+                except OSError as exc:
+                    # WinError 4551 = Application Control policy blocked the file.
+                    # Treat as a non-fatal warning so uvicorn still starts.
+                    if getattr(exc, "winerror", None) == 4551:
+                        print(
+                            c(
+                                f"  [⚠] {svc['name']} blocked by Windows Application Control policy. "
+                                "Run 'python3 bootstrap.py build' inside a Developer PowerShell "
+                                "or add bin\\ to your AppLocker/WDAC allowlist.",
+                                YELLOW,
+                            )
+                        )
+                    else:
+                        print(c(f"  [⚠] {svc['name']} failed to start: {exc}", YELLOW))
             else:
                 print(c(f"  [⚠] {svc['name']} binary not found in bin/. Features may fallback.", YELLOW))
 
@@ -682,6 +712,26 @@ def _setup_env_file() -> None:
                 f"# To use PostgreSQL instead, set DATABASE_URL=postgresql://user:pass@localhost:5432/reaper\n"
                 f"# DATABASE_URL=sqlite:///./data/reaper.db\n"
                 f"\n"
+                f"# Go Microservice Ports\n"
+                f"GO_BRIDGE_HOST=localhost\n"
+                f"GO_BRIDGE_PORT=7070\n"
+                f"GO_TASK_MANAGER_HOST=localhost\n"
+                f"GO_TASK_MANAGER_PORT=7071\n"
+                f"GO_WEBSOCKET_HOST=localhost\n"
+                f"GO_WEBSOCKET_PORT=7072\n"
+                f"GO_RATELIMITER_HOST=localhost\n"
+                f"GO_RATELIMITER_PORT=7073\n"
+                f"GO_RAG_HOST=localhost\n"
+                f"GO_RAG_PORT=7074\n"
+                f"GO_CALCULATOR_HOST=localhost\n"
+                f"GO_CALCULATOR_PORT=7075\n"
+                f"GO_ANOMALY_HOST=localhost\n"
+                f"GO_ANOMALY_PORT=7076\n"
+                f"\n"
+                f"# AI Backend Selection (options: gemini, openai, ensemble)\n"
+                f"AI_BACKEND=gemini\n"
+                f"AI_ML_ENABLED=true\n"
+                f"\n"
                 f"# Optional: Azure Credentials (for cloud scanning features)\n"
                 f"# AZURE_SUBSCRIPTION_ID=your_subscription_id\n"
                 f"# AZURE_TENANT_ID=your_tenant_id\n"
@@ -689,8 +739,16 @@ def _setup_env_file() -> None:
                 f"# AZURE_CLIENT_SECRET=your_client_secret\n"
                 f"\n"
                 f"# Optional: AI/GenAI API Keys (for Copilot & AI Architect)\n"
-                f"# OPENAI_API_KEY=your_openai_api_key\n"
                 f"# GEMINI_API_KEY=your_gemini_api_key\n"
+                f"# OPENAI_API_KEY=your_openai_api_key\n"
+                f"# ANTHROPIC_API_KEY=your_anthropic_api_key\n"
+                f"\n"
+                f"# Optional: Redis (for RAG caching and telemetry)\n"
+                f"# REDIS_URL=redis://localhost:6379/0\n"
+                f"\n"
+                f"# Safety: dry-run mode prevents any live remediation actions\n"
+                f"DRY_RUN_MODE=true\n"
+                f"ENABLE_REMEDIATION=false\n"
                 f"\n"
                 f"# Optional: Notifications\n"
                 f"# DISCORD_WEBHOOK_URL=your_discord_webhook\n"
@@ -706,6 +764,15 @@ def _setup_env_file() -> None:
     additions: list[str] = []
     for key, default in [
         ("FLASK_HOST", "0.0.0.0"),
+        ("GO_BRIDGE_PORT", "7070"),
+        ("GO_TASK_MANAGER_PORT", "7071"),
+        ("GO_WEBSOCKET_PORT", "7072"),
+        ("GO_RATELIMITER_PORT", "7073"),
+        ("GO_RAG_PORT", "7074"),
+        ("GO_CALCULATOR_PORT", "7075"),
+        ("GO_ANOMALY_PORT", "7076"),
+        ("AI_BACKEND", "gemini"),
+        ("DRY_RUN_MODE", "true"),
     ]:
         if f"{key}=" not in content:
             additions.append(f"{key}={default}")
@@ -732,15 +799,22 @@ def _setup_env_file() -> None:
 
 
 def _print_success_report(port: str) -> None:
-    width = 62
+    width = 66
     print()
     print(c("=" * width, GREEN))
     print(c("  🚀  CLOUD-REAPER INTELLIGENCE ENGINE IS ONLINE", BOLD + GREEN))
     print(c("=" * width, GREEN))
-    print(f"  {c('▸ Dashboard:', BOLD)}  http://localhost:{port}")
-    print(f"  {c('▸ Port:     ', BOLD)}  {port}")
-    print(f"  {c('▸ Status:   ', BOLD)}  {c('HEALTHY', GREEN)}")
-    print(f"  {c('▸ Engine:   ', BOLD)}  FastAPI + Uvicorn + Go HTTP Bridge")
+    print(f"  {c('▸ Dashboard:   ', BOLD)}  http://localhost:{port}")
+    print(f"  {c('▸ Port:        ', BOLD)}  {port}")
+    print(f"  {c('▸ Status:      ', BOLD)}  {c('HEALTHY', GREEN)}")
+    print(f"  {c('▸ Python Layer:', BOLD)}  FastAPI + Uvicorn + Socket.IO")
+    print(f"  {c('▸ Go Services: ', BOLD)}  reaper-engine  :7070")
+    print(f"                       taskserver       :7071")
+    print(f"                       websocketserver  :7072")
+    print(f"                       ratelimitserver  :7073")
+    print(f"                       ragserver        :7074")
+    print(f"                       calculatorserver :7075")
+    print(f"                       anomalyserver    :7076")
     print(c("=" * width, GREEN))
     print(c("  Press Ctrl+C to terminate the session safely.", DIM))
     print()
