@@ -64,3 +64,11 @@ coverage.xml
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+
+# Build Cache
+.cache/
+
+# Temporary Files
+scratch/
+*.tmp
+*.temp
