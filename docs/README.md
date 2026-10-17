@@ -7,7 +7,6 @@ Welcome to the comprehensive documentation hub for Cloud-Reaper, a high-performa
 ### Getting Started
 - [README](../README.md) - Project overview, architecture, and quick start guide
 - [How to Run](../HOW_TO_RUN.md) - Comprehensive installation and setup instructions for Linux, macOS, and Windows
-- [Ollama Setup Guide](OLLAMA_SETUP.md) - Configure local AI models for cost-free operations
 
 ### Core Features & Capabilities
 - [Product Documentation](1_product_docs.txt) - Complete product features and capabilities overview
@@ -41,7 +40,6 @@ Welcome to the comprehensive documentation hub for Cloud-Reaper, a high-performa
 2. Review [Security & IAM Policies](SECURITY_IAM_POLICIES.md) for security-first configuration
 3. Follow [How to Run](../HOW_TO_RUN.md) for comprehensive setup instructions
 4. Explore [Product Documentation](1_product_docs.txt) to understand capabilities
-5. Configure [Ollama Setup Guide](OLLAMA_SETUP.md) for AI backend setup
 
 ### For Developers
 1. Review [Executive Summary and Architecture](5_executive_summary_and_architecture.txt) for system design
@@ -60,7 +58,6 @@ Welcome to the comprehensive documentation hub for Cloud-Reaper, a high-performa
 1. Study [AI Copilot and Token Usage](8_ai_copilot_and_token_usage.txt) for AI assistant
 2. Explore [Enhanced RAG Guide](enhanced_rag_guide.md) for search implementation
 3. Review [Anomaly Explainer Enhancements](anomaly_explainer_enhancements.md) for ML systems
-4. Configure [Ollama Setup Guide](OLLAMA_SETUP.md) for local model integration
 
 ### For FinOps Practitioners
 1. Start with [Product Documentation](1_product_docs.txt) for FinOps capabilities
@@ -73,7 +70,6 @@ Welcome to the comprehensive documentation hub for Cloud-Reaper, a high-performa
 ### Recent Additions
 - **Security-First Architecture** - Implemented dry-run mode as default, read-only IAM policies, and explicit remediation toggles
 - **Orchestration Prompts** - Added UI prompts for secondary IAM role deployment when enabling orchestration
-- **Ollama Integration** - New local model support for cost-free AI operations
 - **Enhanced RAG** - Improved retrieval-augmented generation capabilities with hybrid search
 - **Anomaly Explainer** - Advanced anomaly detection and explanation system
 - **Multi-Cloud Support** - Extended documentation for Azure, AWS, and GCP integration
@@ -84,7 +80,6 @@ Welcome to the comprehensive documentation hub for Cloud-Reaper, a high-performa
 - **v2.0** - Comprehensive documentation restructure with enhanced navigation
 - **v1.3** - Added anomaly explainer enhancements and FinOps practitioner guidance
 - **v1.2** - Enhanced RAG documentation with implementation details
-- **v1.1** - Added Ollama integration guide for local AI models
 - **v1.0** - Initial documentation structure
 
 ## 📖 Documentation Standards
@@ -118,7 +113,6 @@ Welcome to the comprehensive documentation hub for Cloud-Reaper, a high-performa
 - **Kubernetes**: [Kubernetes Documentation](https://kubernetes.io/docs/)
 
 ### AI & ML Resources
-- **Ollama**: [Ollama Documentation](https://github.com/ollama/ollama) - Local model integration
 - **Google Gemini**: [Google AI Documentation](https://ai.google.dev/docs) - AI backend integration
 - **OpenAI**: [OpenAI API Documentation](https://platform.openai.com/docs) - Alternative AI backend
 

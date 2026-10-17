@@ -44,8 +44,7 @@ Cloud-Reaper employs a **Dual-Core Architecture** (FastAPI Python + Go Performan
 ## 🚀 Key Features
 
 ### 🤖 AI Backend Flexibility
-- **Multi-Provider Support**: Choose between Gemini, OpenAI, or Ollama local models
-- **Cost-Free Operations**: Use Ollama for zero API costs while maintaining privacy
+- **Multi-Provider Support**: Choose between Gemini or OpenAI cloud models
 - **Hybrid Ensemble Mode**: Combine multiple AI backends for improved results
 - **Easy Switching**: Change AI backends via simple environment variable configuration
 
@@ -376,8 +375,7 @@ For detailed IAM policies and security configuration, see [Security & IAM Polici
   - **AWS**: `AWS_DEFAULT_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
   - **GCP**: `GOOGLE_CLOUD_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS`
 - `GEMINI_API_KEY` — Google AI Studio API key (required for AI Copilot & RAG search)
-- `AI_BACKEND` — AI backend selection: `gemini`, `openai`, `ollama`, or `ensemble` (default: `gemini`)
-- For Ollama local model support, see [Ollama Setup Guide](docs/OLLAMA_SETUP.md)
+- `AI_BACKEND` — AI backend selection: `gemini`, `openai`, or `ensemble` (default: `gemini`)
 
 **⚠️ Security Note**: Cloud-Reaper uses a security-first architecture. Start with read-only IAM policies (Reader/Viewer/ReadOnlyAccess) and dry-run mode enabled. See [Security & IAM Policies](docs/SECURITY_IAM_POLICIES.md) for detailed configuration guidance.
 
@@ -839,7 +837,6 @@ Cloud-Reaper supports multiple AI backends for flexibility in cost, performance,
 |---------|------|---------|-------------|-------|
 | **Gemini** | Pay-per-token | Cloud | High | API Key |
 | **OpenAI** | Pay-per-token | Cloud | Highest | API Key |
-| **Ollama** | Free (hardware) | Local | Medium (CPU) / High (GPU) | Local setup |
 | **Ensemble** | Variable | Hybrid | Best | Multiple configs |
 
 ### Configuration
@@ -853,55 +850,22 @@ AI_BACKEND=gemini
 # Use OpenAI
 AI_BACKEND=openai
 
-# Use Ollama local models
-AI_BACKEND=ollama
-
 # Use ensemble mode (combine all available)
 AI_BACKEND=ensemble
 ```
 
-### Ollama Setup
-
-For cost-free local AI operations, use Ollama:
-
-1. **Install Ollama**:
-   ```bash
-   curl -fsSL https://ollama.com/install.sh | sh
-   ```
-
-2. **Pull Required Models**:
-   ```bash
-   ollama pull nomic-embed-text  # For embeddings
-   ollama pull llama3.1          # For generation
-   ```
-
-3. **Configure Cloud-Reaper**:
-   ```env
-   AI_BACKEND=ollama
-   OLLAMA_BASE_URL=http://localhost:11434
-   OLLAMA_MODEL=llama3.1
-   OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-   ```
-
-4. **Start Ollama**:
-   ```bash
-   ollama serve
-   ```
-
-For detailed setup instructions, see [Ollama Setup Guide](docs/OLLAMA_SETUP.md).
-
 For complete documentation, see the [Documentation Hub](docs/README.md).
 
-### Backend Features
+n### Backend Features
 
-| Feature | Gemini | OpenAI | Ollama |
-|---------|--------|--------|--------|
-| RAG Search | ✅ | ❌ | ✅ |
-| AI Copilot | ✅ | ❌ | ✅ |
-| AI Architect | ✅ | ✅ | ✅ |
-| Anomaly Triage | ✅ | ❌ | ✅ |
-| JSON Mode | ✅ | ✅ | ⚠️ |
-| Streaming | ✅ | ✅ | ❌ |
+|| Feature | Gemini | OpenAI |
+||---------|--------|--------|
+|| RAG Search | ✅ | ❌ |
+|| AI Copilot | ✅ | ❌ |
+|| AI Architect | ✅ | ✅ |
+|| Anomaly Triage | ✅ | ❌ |
+|| JSON Mode | ✅ | ✅ |
+|| Streaming | ✅ | ✅ |
 
 ### Health Check
 
@@ -916,9 +880,7 @@ print(health)
 
 ### Best Practices
 
-- **Development**: Use Ollama for cost savings
 - **Production**: Use cloud APIs for best quality
-- **Privacy**: Use Ollama for sensitive data
 - **Hybrid**: Use ensemble mode for best results
 - **Testing**: Test with local models before cloud APIs
 
