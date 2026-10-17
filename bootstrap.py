@@ -19,6 +19,7 @@ Run  python3 bootstrap.py --help  for the full option reference.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import logging
 import os
 import platform
@@ -28,6 +29,7 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import TypedDict
 
 if sys.platform == "win32":
     # Ensure stdout/stderr handle UTF-8 characters without cp1252 charmap errors
@@ -36,7 +38,11 @@ if sys.platform == "win32":
     if hasattr(sys.stderr, "reconfigure"):
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     # Enable ANSI escape sequences in Windows console
-    os.system("")
+    kernel32 = ctypes.windll.kernel32
+    stdout_handle = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+    console_mode = ctypes.c_uint32()
+    if kernel32.GetConsoleMode(stdout_handle, ctypes.byref(console_mode)):
+        kernel32.SetConsoleMode(stdout_handle, console_mode.value | 0x0004)
 
 # ---------------------------------------------------------------------------
 # ANSI colour palette (Ubuntu/Windows terminal safe)
@@ -167,7 +173,7 @@ def cmd_check(args: argparse.Namespace) -> int:  # noqa: ARG001
         else:
             found = shutil.which(binary)
         if found:
-            print(f"  {c('✔', GREEN)}  {label:<18} {c(str(found), DIM)}")
+            print(f"  {c('✔', GREEN)}  {label:<18} {c(found, DIM)}")
         elif required:
             print(f"  {c('✗', RED)}  {label:<18} {c('NOT FOUND — required', RED)}")
             ok = False
@@ -496,8 +502,12 @@ def cmd_web(args: argparse.Namespace) -> int:
     try:
         exe_ext = ".exe" if platform.system() == "Windows" else ""
         
-        # Define Go microservices to start
-        services = [
+        class GoService(TypedDict):
+            name: str
+            args: list[str]
+            port: int
+
+        services: list[GoService] = [
             {"name": "reaper-engine", "args": ["--mode", "serve", "--port", "7070"], "port": 7070},
             {"name": "taskserver", "args": ["-port", env.get("GO_TASK_MANAGER_PORT", "7071")], "port": 7071},
             {"name": "websocketserver", "args": ["-port", env.get("GO_WEBSOCKET_PORT", "7072")], "port": 7072},
@@ -509,7 +519,7 @@ def cmd_web(args: argparse.Namespace) -> int:
             if go_bin.exists():
                 print(c(f"  Starting {svc['name']} (port {svc['port']}) …", CYAN))
                 proc = subprocess.Popen(
-                    [str(go_bin)] + svc["args"],
+                    [str(go_bin), *svc["args"]],
                     cwd=str(REPO_ROOT),
                     env=env,
                     stdout=subprocess.DEVNULL,  # Keep Uvicorn logs clean

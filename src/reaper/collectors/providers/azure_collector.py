@@ -9,16 +9,20 @@ import subprocess
 import threading
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar, TypedDict, cast
 
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.consumption import ConsumptionManagementClient
 from azure.mgmt.monitor import MonitorManagementClient
 from azure.mgmt.network import NetworkManagementClient
-from azure.mgmt.resource import ResourceManagementClient
+try:
+    from azure.mgmt.resource import ResourceManagementClient
+except ImportError:
+    from azure.mgmt.resource.resources import ResourceManagementClient
 from azure.mgmt.sql import SqlManagementClient
 from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.subscription import SubscriptionClient
@@ -66,6 +70,76 @@ from reaper.engine.models.resources import CostHistory, RegionPriceCache, Sessio
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
+
+
+class ResourceCostBucket(TypedDict):
+    count: int
+    total_cost: float
+    resources: list[dict[str, Any]]
+
+
+class ResourceCostSummary(TypedDict):
+    virtual_machines: ResourceCostBucket
+    storage: ResourceCostBucket
+    networking: ResourceCostBucket
+    databases: ResourceCostBucket
+    other: ResourceCostBucket
+    total_monthly_cost: float
+
+
+def _empty_resource_costs() -> ResourceCostSummary:
+    return {
+        "virtual_machines": {"count": 0, "total_cost": 0.0, "resources": []},
+        "storage": {"count": 0, "total_cost": 0.0, "resources": []},
+        "networking": {"count": 0, "total_cost": 0.0, "resources": []},
+        "databases": {"count": 0, "total_cost": 0.0, "resources": []},
+        "other": {"count": 0, "total_cost": 0.0, "resources": []},
+        "total_monthly_cost": 0.0,
+    }
+
+
+def _as_float(value: Any, default: float = 0.0) -> float:
+    raw: Any = value
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _row_as_dict(row: Any) -> dict[str, Any]:
+    if isinstance(row, dict):
+        return dict(row)
+    if row is None or isinstance(row, (str, bytes)):
+        return {}
+    items = getattr(row, "items", None)
+    if callable(items):
+        try:
+            return {str(k): v for k, v in items()}
+        except Exception:
+            return {}
+    return {}
+
+
+def _metric_averages(metrics: Any) -> list[float]:
+    points: list[float] = []
+    for item in getattr(metrics, "value", None) or []:
+        for timeseries in getattr(item, "timeseries", None) or []:
+            for point in getattr(timeseries, "data", None) or []:
+                average = getattr(point, "average", None)
+                if average is not None:
+                    points.append(average)
+    return points
+
+
+def _rg_from_id(resource_id: str | None) -> str:
+    if not resource_id or "/" not in resource_id:
+        return "Unknown"
+    parts = resource_id.split("/")
+    return parts[4] if len(parts) > 4 else "Unknown"
+
 
 def _reaper_engine_binary() -> Path | None:
     """Resolve the Go engine binary (bootstrap builds to repo ``bin/``)."""
@@ -103,7 +177,7 @@ def _cleanup_expired_locks():
             del _FETCH_LOCKS[k]
 
 
-def get_cached_data(cache_key, fetch_fn, ttl_seconds=60):
+def get_cached_data(cache_key: str, fetch_fn: Callable[[], T], ttl_seconds: int = 60) -> T:
     """
     Get data from global memory cache or fetch it if missing/expired.
     Thread-safe with per-key fetch deduplication to prevent cache stampedes.
@@ -113,7 +187,7 @@ def get_cached_data(cache_key, fetch_fn, ttl_seconds=60):
         if cache_key in _GLOBAL_CACHE:
             timestamp, data = _GLOBAL_CACHE[cache_key]
             if now - timestamp < ttl_seconds:
-                return data
+                return cast(T, data)
         if cache_key not in _FETCH_LOCKS:
             _FETCH_LOCKS[cache_key] = threading.Lock()
         fetch_lock = _FETCH_LOCKS[cache_key]
@@ -124,7 +198,7 @@ def get_cached_data(cache_key, fetch_fn, ttl_seconds=60):
             if cache_key in _GLOBAL_CACHE:
                 timestamp, data = _GLOBAL_CACHE[cache_key]
                 if now - timestamp < ttl_seconds:
-                    return data
+                    return cast(T, data)
 
         data = fetch_fn()
 
@@ -183,12 +257,13 @@ def _vm_series_family(vm_size: str) -> str:
 
 
 class AzureCollector:
-    def __init__(self, subscription_id=None):
-        self.subscription_id = subscription_id or os.getenv("AZURE_SUBSCRIPTION_ID")
+    def __init__(self, subscription_id: str | None = None):
+        sub_id = subscription_id or os.getenv("AZURE_SUBSCRIPTION_ID")
+        if not sub_id:
+            raise ValueError("AZURE_SUBSCRIPTION_ID is required to initialize AzureCollector")
+        self.subscription_id: str = sub_id
         self.credentials = DefaultAzureCredential()
-        # pyrefly: ignore [bad-argument-type]
         self.compute = ComputeManagementClient(self.credentials, self.subscription_id)
-        # pyrefly: ignore [bad-argument-type]
         self.network = NetworkManagementClient(self.credentials, self.subscription_id)
         self.monitor = MonitorManagementClient(self.credentials, self.subscription_id)
         self.web = WebSiteManagementClient(self.credentials, self.subscription_id)
@@ -203,7 +278,9 @@ class AzureCollector:
             self.cost_management = None  # pyrefly: ignore [bad-assignment]
 
         try:
-            self.resource_client = ResourceManagementClient(self.credentials, self.subscription_id)
+            self.resource_client = ResourceManagementClient(
+                self.credentials, self.subscription_id
+            )
         except Exception as e:
             logger.warning(f"Failed to initialize ResourceManagementClient: {e}")
             self.resource_client = None
@@ -235,7 +312,7 @@ class AzureCollector:
         """Fetches all VMs with sizes, utilization metrics, and estimated costs."""
         cache_key = f"vm_inventory_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             try:
                 vms = list(self.compute.virtual_machines.list_all())
             except Exception as e:
@@ -257,7 +334,7 @@ class AzureCollector:
                 memory_utilization = None
 
                 try:
-                    resource_group = vm.id.split("/")[4] if len(vm.id.split("/")) > 4 else "unknown"
+                    resource_group = _rg_from_id(vm.id)
                     resource_id = (
                         f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
                         f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
@@ -276,14 +353,9 @@ class AzureCollector:
                         aggregation="Average",
                     )
 
-                    if metrics.value and metrics.value[0].timeseries:
-                        data_points = [
-                            point.average
-                            for point in metrics.value[0].timeseries[0].data
-                            if point.average is not None
-                        ]
-                        if data_points:
-                            cpu_utilization = sum(data_points) / len(data_points)
+                    data_points = _metric_averages(metrics)
+                    if data_points:
+                        cpu_utilization = sum(data_points) / len(data_points)
                 except Exception as e:
                     logger.error(f"Error fetching metrics for VM {vm.name}: {e}")
 
@@ -338,7 +410,7 @@ class AzureCollector:
 
         def _check_idle_vm(vm):
             try:
-                resource_group = vm.id.split("/")[4] if len(vm.id.split("/")) > 4 else "unknown"
+                resource_group = _rg_from_id(vm.id)
                 resource_id = (
                     f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
                     f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
@@ -352,14 +424,8 @@ class AzureCollector:
                     aggregation="Average",
                 )
 
-                avg_usages = []
-                for item in metrics.value:
-                    for timeseries in item.timeseries:
-                        data_points = [
-                            point.average for point in timeseries.data if point.average is not None
-                        ]
-                        if data_points:
-                            avg_usages.append(sum(data_points) / len(data_points))
+                data_points = _metric_averages(metrics)
+                avg_usages = [sum(data_points) / len(data_points)] if data_points else []
 
                 if avg_usages and (sum(avg_usages) / len(avg_usages)) < cpu_threshold:
                     avg_usage = sum(avg_usages) / len(avg_usages)
@@ -434,7 +500,7 @@ class AzureCollector:
                     "Premium_LRS": 0.20,  # $0.20 per GB/month
                     "Premium_ZRS": 0.25,  # $0.25 per GB/month
                 }
-                cost_per_gb = tier_cost_map.get(disk_tier, 0.05)
+                cost_per_gb = tier_cost_map.get(str(disk_tier) if disk_tier is not None else "Standard_LRS", 0.05)
                 estimated_monthly_cost = disk_size * cost_per_gb
 
                 orphaned_disks.append(
@@ -442,7 +508,7 @@ class AzureCollector:
                         "name": disk.name,
                         "size_gb": disk_size,
                         "tier": disk_tier,
-                        "rg": disk.id.split("/")[4] if "/" in disk.id else "Unknown",
+                        "rg": _rg_from_id(disk.id),
                         "id": disk.id,
                         "cost": round(estimated_monthly_cost, 2),
                         "location": location,
@@ -546,7 +612,7 @@ class AzureCollector:
 
         def _fetch_cpu(vm):
             try:
-                resource_group = vm.id.split("/")[4]
+                resource_group = _rg_from_id(vm.id)
                 resource_id = (
                     f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
                     f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
@@ -572,12 +638,14 @@ class AzureCollector:
         if not self.resource_client:
             return []
         try:
-            return sorted([rg.name for rg in self.resource_client.resource_groups.list()])
+            return sorted([rg.name for rg in self.resource_client.resource_groups.list() if rg.name])
         except Exception as e:
             logger.error(f"Error fetching resource groups: {e}")
             return []
 
-    def get_cost_vs_budget_series(self, monthly_budget: float = 5000.0, resource_group: str = None) -> dict:
+    def get_cost_vs_budget_series(
+        self, monthly_budget: float = 5000.0, resource_group: str | None = None
+    ) -> dict:
         """Cumulative daily spend vs linear budget pace (FinOps burn view)."""
         burn = self.get_burn_rate_forecast(resource_group)
         daily = burn.get("daily_history") or []
@@ -598,7 +666,7 @@ class AzureCollector:
             "budget_cap": monthly_budget,
         }
 
-    def get_service_bucket_spend(self, resource_group: str = None) -> dict:
+    def get_service_bucket_spend(self, resource_group: str | None = None) -> dict:
         """Aggregate last-30-day cost into Compute / Storage / Networking / Other."""
         default = {
             "labels": ["Compute", "Storage", "Networking", "Other"],
@@ -636,7 +704,8 @@ class AzureCollector:
         by_service: dict[str, float] = defaultdict(float)
         try:
             result = self.cost_management.query.usage(scope, query)
-            for row in result.rows or []:
+            rows = getattr(result, "rows", None) or []
+            for row in rows:
                 if len(row) < 3:
                     continue
                 by_service[str(row[2])] += float(row[0])
@@ -682,7 +751,7 @@ class AzureCollector:
             "data": [round(v, 2) for v in buckets.values()],
         }
 
-    def get_instance_family_cpu_ram(self, resource_group: str = None) -> dict:
+    def get_instance_family_cpu_ram(self, resource_group: str | None = None) -> dict:
         """
         Per VM-series: average 24h CPU and optional ``Available Memory Bytes`` (GiB) from host metrics.
         """
@@ -735,7 +804,7 @@ class AzureCollector:
 
         return {"labels": labels, "cpu": cpu_avgs, "memory_gib": mem_gib_avgs}
 
-    def get_hourly_cpu_profile(self, resource_group: str = None) -> dict:
+    def get_hourly_cpu_profile(self, resource_group: str | None = None) -> dict:
         """Last ~24h hourly Percentage CPU for the first VM (auto-shutdown / heatmap signal)."""
         empty = {"labels": [f"{h:02d}:00" for h in range(24)], "values": [0.0] * 24}
         vms = list(self.compute.virtual_machines.list_all())
@@ -782,7 +851,9 @@ class AzureCollector:
             logger.error(f"Hourly CPU profile failed: {e}")
             return empty
 
-    def get_finops_dashboard_snapshot(self, monthly_budget: float, resource_group: str = None) -> dict:
+    def get_finops_dashboard_snapshot(
+        self, monthly_budget: float, resource_group: str | None = None
+    ) -> dict:
         """Single JSON payload for FinOps dashboard charts (HTTP refresh, not WebSocket)."""
         return {
             "cost_vs_budget": self.get_cost_vs_budget_series(monthly_budget, resource_group),
@@ -842,7 +913,11 @@ class AzureCollector:
                     {
                         "name": gw.name,
                         "location": gw.location,
-                        "sku": f"{gw.sku.name}_{gw.sku.tier}",
+                        "sku": (
+                            f"{gw.sku.name}_{gw.sku.tier}"
+                            if gw.sku and gw.sku.name and gw.sku.tier
+                            else "Unknown"
+                        ),
                     }
                 )
         return idle_gateways
@@ -853,8 +928,15 @@ class AzureCollector:
             from azure.mgmt.recoveryservices import RecoveryServicesClient
 
             self._recovery = RecoveryServicesClient(self.credentials, self.subscription_id)
-        vaults = self._recovery.vaults.list_by_subscription()
-        return [{"name": v.name, "location": v.location, "sku": v.sku.name} for v in vaults]
+        vaults = self._recovery.vaults.list_by_subscription()  # type: ignore[attr-defined]
+        return [
+            {
+                "name": v.name,
+                "location": v.location,
+                "sku": v.sku.name if v.sku else "Unknown",
+            }
+            for v in vaults
+        ]
 
     def get_empty_app_service_plans(self):
         """Finds App Service Plans with 0 apps assigned"""
@@ -866,8 +948,8 @@ class AzureCollector:
                     {
                         "name": plan.name,
                         "location": plan.location,
-                        "sku": plan.sku.name,
-                        "tier": plan.sku.tier,
+                        "sku": plan.sku.name if plan.sku else "Unknown",
+                        "tier": plan.sku.tier if plan.sku else "Unknown",
                     }
                 )
         return empty_plans
@@ -877,6 +959,8 @@ class AzureCollector:
         servers = self.sql.servers.list()
         databases = []
         for server in servers:
+            if not server.resource_group_name or not server.name:
+                continue
             dbs = self.sql.databases.list_by_server(server.resource_group_name, server.name)
             for db in dbs:
                 if db.name != "master":
@@ -889,9 +973,9 @@ class AzureCollector:
                         resource_id = f"/subscriptions/{self.subscription_id}/resourceGroups/{server.resource_group_name}/providers/Microsoft.Sql/servers/{server.name}/databases/{db.name}"
 
                         # Get CPU metrics for the last 24 hours
-                        from datetime import datetime, timedelta
+                        from datetime import datetime, timedelta, timezone
 
-                        end_time = datetime.utcnow()
+                        end_time = datetime.now(timezone.utc).replace(tzinfo=None)
                         start_time = end_time - timedelta(hours=24)
 
                         metrics_data = monitor_client.metrics.list(
@@ -902,17 +986,10 @@ class AzureCollector:
                             aggregation="Average",
                         )
 
-                        if metrics_data.value:
-                            data_points = []
-                            for item in metrics_data.value:
-                                for timeseries in item.timeseries:
-                                    for point in timeseries.data:
-                                        if point.average is not None:
-                                            data_points.append(point.average)
-
-                            if data_points:
-                                avg_cpu = sum(data_points) / len(data_points)
-                                is_idle = avg_cpu < 5.0  # Consider idle if average CPU < 5%
+                        data_points = _metric_averages(metrics_data)
+                        if data_points:
+                            avg_cpu = sum(data_points) / len(data_points)
+                            is_idle = avg_cpu < 5.0  # Consider idle if average CPU < 5%
                     except Exception as e:
                         logger.error(f"Error checking SQL database metrics for {db.name}: {e}")
                         # Default to not idle if metrics check fails
@@ -954,7 +1031,7 @@ class AzureCollector:
         start_time = end_time - datetime.timedelta(days=7)
 
         for vm in vms:
-            resource_group = vm.id.split("/")[4] if "/" in vm.id else "Unknown"
+            resource_group = _rg_from_id(vm.id)
             resource_id = (
                 f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
                 f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
@@ -967,12 +1044,7 @@ class AzureCollector:
                     metricnames="Percentage CPU",
                     aggregation="Average",
                 )
-                all_points = []
-                for item in metrics.value:
-                    for timeseries in item.timeseries:
-                        all_points.extend(
-                            p.average for p in timeseries.data if p.average is not None
-                        )
+                all_points = _metric_averages(metrics)
 
                 has_data = bool(all_points)
                 avg_usage = sum(all_points) / len(all_points) if has_data else 0.0
@@ -1004,7 +1076,7 @@ class AzureCollector:
         )
 
         def _vm_usage(vm):
-            resource_group = vm.id.split("/")[4] if "/" in vm.id else "Unknown"
+            resource_group = _rg_from_id(vm.id)
             resource_id = (
                 f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/"
                 f"providers/Microsoft.Compute/virtualMachines/{vm.name}"
@@ -1017,12 +1089,7 @@ class AzureCollector:
                     metricnames="Percentage CPU",
                     aggregation="Average",
                 )
-                all_points = []
-                for item in metrics.value:
-                    for timeseries in item.timeseries:
-                        all_points.extend(
-                            p.average for p in timeseries.data if p.average is not None
-                        )
+                all_points = _metric_averages(metrics)
                 avg_usage = sum(all_points) / len(all_points) if all_points else 0.0
                 return {"name": vm.name, "usage": round(avg_usage, 1), "rg": resource_group}
             except Exception:
@@ -1066,8 +1133,7 @@ class AzureCollector:
         try:
             result = self.cost_management.query.usage(scope, query)
             services_data = {}
-            # pyrefly: ignore [missing-attribute]
-            for row in result.rows:
+            for row in getattr(result, "rows", None) or []:
                 cost = float(row[0])
                 service = row[2]
                 if service not in services_data:
@@ -1153,7 +1219,7 @@ class AzureCollector:
                     # Fetch actual UsedCapacity from Azure Monitor
                     size_gb = 0.0
                     try:
-                        resource_group = acc.id.split("/")[4]
+                        resource_group = _rg_from_id(acc.id)
                         resource_id = f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.Storage/storageAccounts/{acc.name}"
                         end_time = datetime.datetime.now(datetime.UTC)
                         start_time = end_time - datetime.timedelta(days=1)
@@ -1164,14 +1230,10 @@ class AzureCollector:
                             metricnames="UsedCapacity",
                             aggregation="Average",
                         )
-                        for item in metrics.value:
-                            for timeseries in item.timeseries:
-                                data_points = [
-                                    p.average for p in timeseries.data if p.average is not None
-                                ]
-                                if data_points:
-                                    size_bytes = sum(data_points) / len(data_points)
-                                    size_gb = size_bytes / (1024**3)
+                        data_points = _metric_averages(metrics)
+                        if data_points:
+                            size_bytes = sum(data_points) / len(data_points)
+                            size_gb = size_bytes / (1024**3)
                     except Exception as e:
                         logger.error(f"Error getting storage size for {acc.name}: {e}")
 
@@ -1196,7 +1258,7 @@ class AzureCollector:
         try:
             vms = list(self.compute.virtual_machines.list_all())
             for vm in vms:
-                name_lower = vm.name.lower()
+                name_lower = (vm.name or "").lower()
                 if any(k in name_lower for k in ("web", "app", "frontend")):
                     candidates.append(
                         {"name": vm.name, "target": "App Service (PaaS)", "annual_savings": 1440.0}
@@ -1331,7 +1393,7 @@ class AzureCollector:
         """
         cache_key = f"go_scan_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> dict:
             go_binary = _reaper_engine_binary()
             if go_binary is None:
                 repo_root = Path(__file__).resolve().parents[4]
@@ -1349,7 +1411,7 @@ class AzureCollector:
                     check=False,
                 )
                 if result.returncode == 0:
-                    return json.loads(result.stdout)
+                    return cast(dict, json.loads(result.stdout))
                 logger.error(f"Go Engine Error: {result.stderr}")
                 return {}
             except Exception as e:
@@ -1380,7 +1442,7 @@ class AzureCollector:
         except Exception as e:
             return {"error": str(e)}
 
-    def get_burn_rate_forecast(self, resource_group: str = None):
+    def get_burn_rate_forecast(self, resource_group: str | None = None):
         """Calculates burn rate and EOM forecast using real Azure Cost data and ARIMA."""
         now = datetime.datetime.now(datetime.UTC)
         spend_data = []
@@ -1418,10 +1480,9 @@ class AzureCollector:
 
             try:
                 result = self.cost_management.query.usage(scope, query)
-                # pyrefly: ignore [missing-attribute]
-                if result.rows:
-                    # pyrefly: ignore [no-matching-overload]
-                    rows = sorted(result.rows, key=lambda x: x[1])
+                rows = list(getattr(result, "rows", None) or [])
+                if rows:
+                    rows = sorted(rows, key=lambda x: x[1])
                     spend_data = [float(r[0]) for r in rows]
                     # Update cache
                     with _COST_CACHE_LOCK:
@@ -1440,7 +1501,7 @@ class AzureCollector:
                     .limit(30)
                     .all()
                 )
-                spend_data = [float(h.cost) for h in reversed(history)]
+                spend_data = [_as_float(h.cost) for h in reversed(history)]
             except Exception as e:
                 print(f"[-] DB Cost History Fetch Error: {e}")
             finally:
@@ -1608,9 +1669,7 @@ class AzureCollector:
         # entry point, we default to deleting virtual machines if the type is compute.
         # More specific remediation should use the AzureRemediator class directly.
         if "compute" in resource_type.lower() and "virtualmachines" in resource_type.lower():
-            rg_name = resource_id.split("/")[4]
-            vm_name = resource_id.split("/")[-1]
-            return remediator.delete_vm(rg_name, vm_name)
+            return remediator.delete_vm(resource_id)
 
         return {
             "status": "failed",
@@ -1878,7 +1937,7 @@ class AzureCollector:
             )
             if cached:
                 # Basic cache invalidation (e.g., if older than 24h, you could add logic here)
-                return [{"retailPrice": float(cached.price), "currencyCode": cached.currency}]
+                return [{"retailPrice": _as_float(cached.price), "currencyCode": cached.currency}]
 
             # Not in cache, call API
             pricing_client = AzurePriceClient()
@@ -2070,7 +2129,7 @@ class AzureCollector:
 
                     if hasattr(response, "data") and response.data:
                         all_items.extend(
-                            row if isinstance(row, dict) else dict(row) for row in response.data
+                            _row_as_dict(row) for row in response.data
                         )
 
                     skip_token = getattr(response, "skip_token", None)
@@ -2123,7 +2182,7 @@ class AzureCollector:
 
                     if hasattr(response, "data") and response.data:
                         all_items.extend(
-                            row if isinstance(row, dict) else dict(row) for row in response.data
+                            _row_as_dict(row) for row in response.data
                         )
 
                     skip_token = getattr(response, "skip_token", None)
@@ -2240,28 +2299,21 @@ class AzureCollector:
         self._price_cache[cache_key_tuple] = (now, price)
         return price
 
-    def get_resource_cost_summary(self) -> dict:
+    def get_resource_cost_summary(self) -> ResourceCostSummary:
         """
         Aggregates costs from all Azure resources to provide comprehensive current month spend.
         This is used by the Target-Margin Forecasting Engine to display actual resource costs.
         Uses Azure Cost Management API for real cost data when available.
         """
         try:
-            resource_costs = {
-                "virtual_machines": {"count": 0, "total_cost": 0.0, "resources": []},
-                "storage": {"count": 0, "total_cost": 0.0, "resources": []},
-                "networking": {"count": 0, "total_cost": 0.0, "resources": []},
-                "databases": {"count": 0, "total_cost": 0.0, "resources": []},
-                "other": {"count": 0, "total_cost": 0.0, "resources": []},
-                "total_monthly_cost": 0.0,
-            }
+            resource_costs: ResourceCostSummary = _empty_resource_costs()
 
             # Try to get actual costs from Azure Cost Management API first
             actual_costs_fetched = False
             if self.cost_management:
                 try:
                     actual_costs = self._get_actual_cost_management_costs()
-                    if actual_costs and actual_costs.get("total_monthly_cost", 0) > 0:
+                    if actual_costs and actual_costs["total_monthly_cost"] > 0:
                         resource_costs = actual_costs
                         actual_costs_fetched = True
                         print("[TMF] Using actual Azure Cost Management data")
@@ -2433,14 +2485,7 @@ class AzureCollector:
 
             traceback.print_exc()
             # Return empty data instead of fallback
-            return {
-                "virtual_machines": {"count": 0, "total_cost": 0.0, "resources": []},
-                "storage": {"count": 0, "total_cost": 0.0, "resources": []},
-                "networking": {"count": 0, "total_cost": 0.0, "resources": []},
-                "databases": {"count": 0, "total_cost": 0.0, "resources": []},
-                "other": {"count": 0, "total_cost": 0.0, "resources": []},
-                "total_monthly_cost": 0.0,
-            }
+            return _empty_resource_costs()
 
     def _get_current_month_daily_spend(self) -> list:
         """Get daily spend breakdown for current month."""
@@ -2472,12 +2517,11 @@ class AzureCollector:
             result = self.cost_management.query.usage(scope, query)
 
             daily_spend = []
-            if result.rows:
-                for row in result.rows:
-                    if len(row) >= 2:
-                        date = row[1]
-                        cost = float(row[0])
-                        daily_spend.append({"date": str(date), "cost": round(cost, 2)})
+            for row in getattr(result, "rows", None) or []:
+                if len(row) >= 2:
+                    date = row[1]
+                    cost = float(row[0])
+                    daily_spend.append({"date": str(date), "cost": round(cost, 2)})
 
             return daily_spend
 
@@ -2485,7 +2529,7 @@ class AzureCollector:
             print(f"[!] Error fetching daily spend: {e}")
             return []
 
-    def _get_actual_cost_management_costs(self) -> dict | None:
+    def _get_actual_cost_management_costs(self) -> ResourceCostSummary | None:
         """
         Fetch actual current month costs from Azure Cost Management API.
         Returns detailed cost breakdown by resource type.
@@ -2527,18 +2571,12 @@ class AzureCollector:
 
             result = self.cost_management.query.usage(scope, query)
 
-            resource_costs = {
-                "virtual_machines": {"count": 0, "total_cost": 0.0, "resources": []},
-                "storage": {"count": 0, "total_cost": 0.0, "resources": []},
-                "networking": {"count": 0, "total_cost": 0.0, "resources": []},
-                "databases": {"count": 0, "total_cost": 0.0, "resources": []},
-                "other": {"count": 0, "total_cost": 0.0, "resources": []},
-                "total_monthly_cost": 0.0,
-            }
+            resource_costs: ResourceCostSummary = _empty_resource_costs()
 
-            if result.rows:
-                print(f"[TMF] Retrieved {len(result.rows)} cost records from Azure Cost Management")
-                for row in result.rows:
+            rows = getattr(result, "rows", None) or []
+            if rows:
+                print(f"[TMF] Retrieved {len(rows)} cost records from Azure Cost Management")
+                for row in rows:
                     if len(row) >= 3:
                         cost = float(row[0])
                         service_name = str(row[2]).lower()
@@ -2653,7 +2691,7 @@ class AzureCollector:
         """List all Storage Accounts with tier, kind, and replication info."""
         cache_key = f"storage_accounts_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             results = []
             try:
                 accounts = self.storage.storage_accounts.list()
@@ -2680,7 +2718,7 @@ class AzureCollector:
         """List all Azure Kubernetes Service managed clusters."""
         cache_key = f"aks_clusters_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_container_service()
             if not client:
                 return []
@@ -2715,7 +2753,7 @@ class AzureCollector:
         """List all Container Instance groups."""
         cache_key = f"container_instances_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_container_instance()
             if not client:
                 return []
@@ -2745,7 +2783,7 @@ class AzureCollector:
         """List all Azure Function Apps (kind contains 'functionapp')."""
         cache_key = f"function_apps_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             results = []
             try:
                 apps = self.web.web_apps.list()
@@ -2776,7 +2814,7 @@ class AzureCollector:
         """List all Key Vault instances."""
         cache_key = f"key_vaults_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_keyvault()
             if not client:
                 return []
@@ -2803,7 +2841,7 @@ class AzureCollector:
         """List all Redis Cache instances."""
         cache_key = f"redis_caches_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_redis()
             if not client:
                 return []
@@ -2835,7 +2873,7 @@ class AzureCollector:
         """List all Cosmos DB database accounts."""
         cache_key = f"cosmos_db_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_cosmosdb()
             if not client:
                 return []
@@ -2872,7 +2910,7 @@ class AzureCollector:
         """List all Azure Data Factory instances."""
         cache_key = f"data_factories_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_datafactory()
             if not client:
                 return []
@@ -2899,7 +2937,7 @@ class AzureCollector:
         """List all Logic App workflows."""
         cache_key = f"logic_apps_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_logic()
             if not client:
                 return []
@@ -2929,7 +2967,7 @@ class AzureCollector:
         """List all Event Hub namespaces."""
         cache_key = f"event_hubs_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_eventhub()
             if not client:
                 return []
@@ -2960,7 +2998,7 @@ class AzureCollector:
         """List all Service Bus namespaces."""
         cache_key = f"service_bus_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_servicebus()
             if not client:
                 return []
@@ -2990,7 +3028,7 @@ class AzureCollector:
         """List all IoT Hub instances."""
         cache_key = f"iot_hubs_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_iothub()
             if not client:
                 return []
@@ -3020,7 +3058,7 @@ class AzureCollector:
         """List all Cognitive Services accounts (includes Azure OpenAI)."""
         cache_key = f"cognitive_services_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_cognitive()
             if not client:
                 return []
@@ -3050,7 +3088,7 @@ class AzureCollector:
         """List all Application Insights components."""
         cache_key = f"app_insights_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_appinsights()
             if not client:
                 return []
@@ -3079,7 +3117,7 @@ class AzureCollector:
         """List all CDN profiles."""
         cache_key = f"cdn_profiles_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_cdn()
             if not client:
                 return []
@@ -3108,7 +3146,7 @@ class AzureCollector:
         """List all API Management instances."""
         cache_key = f"apim_{self.subscription_id}"
 
-        def fetch():
+        def fetch() -> list[dict]:
             client = self._get_apim()
             if not client:
                 return []

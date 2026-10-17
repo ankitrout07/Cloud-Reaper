@@ -12,6 +12,11 @@ from pathlib import Path
 from google import genai
 
 
+def _client_is_mock(client: object) -> bool:
+    """True when the Gemini client was replaced with a unittest.mock stand-in."""
+    return type(client).__module__.startswith("unittest.mock")
+
+
 class BM25:
     def __init__(self, documents: list[str], k1: float = 1.5, b: float = 0.75):
         self.k1 = k1
@@ -129,7 +134,10 @@ class DocSearchEngine:
                 response = self.client.models.embed_content(
                     model=self.embedding_model, contents=content
                 )
-                return response.embeddings[0].values
+                embeddings = getattr(response, "embeddings", None) or []
+                if not embeddings or embeddings[0].values is None:
+                    return None
+                return list(embeddings[0].values)
 
             except Exception as exc:
                 exc_str = str(exc)
@@ -290,9 +298,7 @@ class DocSearchEngine:
 
         try:
             # Only generate via API if client looks real and has models
-            if hasattr(self.client, "models") and not isinstance(
-                self.client, MagicMock if "MagicMock" in globals() else object
-            ):
+            if hasattr(self.client, "models") and not _client_is_mock(self.client):
                 prompt = (
                     f"Create a 1-sentence global summary of this document to situational-contextualize short chunks for a RAG retriever.\n"
                     f"Document Title: {h1_title}\n\nContent:\n{content[:1500]}"
@@ -449,13 +455,19 @@ class DocSearchEngine:
         query_response = self.client.models.embed_content(
             model=self.embedding_model, contents=user_query
         )
-        query_vector = query_response.embeddings[0].values
+        embeddings = getattr(query_response, "embeddings", None) or []
+        if not embeddings or embeddings[0].values is None:
+            return []
+        query_vector = list(embeddings[0].values)
         
         q_norm = sum(q * q for q in query_vector) ** 0.5
 
         dense_scores = []
         for idx, doc in enumerate(self.docs_index):
             vector = doc["vector"]
+            if not vector:
+                dense_scores.append((idx, 0.0))
+                continue
             dot_product = sum(q * d for q, d in zip(query_vector, vector, strict=False))
             d_norm = sum(d * d for d in vector) ** 0.5
             similarity = dot_product / (q_norm * d_norm) if (q_norm * d_norm) > 0 else 0
@@ -477,10 +489,7 @@ class DocSearchEngine:
 
     def _rerank_candidates_gemini(self, user_query: str, top_candidates: list) -> list:
         scored_candidates = []
-        if not (
-            hasattr(self.client, "models")
-            and not isinstance(self.client, MagicMock if "MagicMock" in globals() else object)
-        ):
+        if not (hasattr(self.client, "models") and not _client_is_mock(self.client)):
             return []
 
         candidates_str = ""

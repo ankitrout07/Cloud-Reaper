@@ -61,7 +61,7 @@ class AIBackendManager:
 
     def get_backend_info(self) -> dict[str, Any]:
         """Get information about current backend configuration."""
-        info = {
+        info: dict[str, Any] = {
             "backend_type": self._backend_type,
             "embedding_backend": None,
             "generation_backend": None,

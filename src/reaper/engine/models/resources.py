@@ -48,14 +48,15 @@ if not DATABASE_URL:
             break
     _data_dir = _repo_root / "data"
     _data_dir.mkdir(parents=True, exist_ok=True)
-    DATABASE_URL = f"sqlite:///{_data_dir / 'reaper.db'}"
+    _db_file = (_data_dir / "reaper.db").resolve().as_posix()
+    DATABASE_URL = f"sqlite:///{_db_file}"
 
 # Convert to async URL
 ASYNC_DATABASE_URL: str | None = None
 if "postgresql" in DATABASE_URL:
     ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 elif "sqlite" in DATABASE_URL:
-    ASYNC_DATABASE_URL = DATABASE_URL.replace("sqlite:///", "sqlite+aiosqlite://")
+    ASYNC_DATABASE_URL = DATABASE_URL.replace("sqlite://", "sqlite+aiosqlite://")
 
 
 def _apply_sqlite_pragmas(dbapi_conn, _connection_record) -> None:  # noqa: ANN001
@@ -432,7 +433,7 @@ def retry_on_db_error(max_retries=3, delay=1.0):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            last_exception = None
+            last_exception: OperationalError | None = None
             for attempt in range(max_retries):
                 try:
                     return func(*args, **kwargs)
@@ -445,7 +446,9 @@ def retry_on_db_error(max_retries=3, delay=1.0):
                 except Exception:
                     # Don't retry non-database errors
                     raise
-            raise last_exception
+            if last_exception is not None:
+                raise last_exception
+            raise RuntimeError("retry_on_db_error exhausted retries without an exception")
 
         return wrapper
 

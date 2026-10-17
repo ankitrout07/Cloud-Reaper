@@ -5,12 +5,12 @@
 # ==============================================================================
 
 # --- Stage 1: Go Services Builder ---
-FROM golang:1.24-alpine AS go-builder
+FROM golang:1.25-alpine AS go-builder
 
 WORKDIR /app
 
 # Install build tools
-RUN apk add --no-cache git
+RUN apk upgrade --no-cache && apk add --no-cache git
 
 # Cache Go modules
 COPY src/engine-go/go.mod src/engine-go/go.sum ./
@@ -30,12 +30,12 @@ RUN mkdir -p /build/bin && \
     CGO_ENABLED=0 go build -ldflags="-s -w" -o /build/bin/anomalyserver ./cmd/anomalyserver
 
 # --- Stage 2: Python Intelligence Layer & Web Application ---
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
 # Install system dependencies for WeasyPrint PDF generation and container healthchecks
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     build-essential \
     python3-dev \
     libcairo2 \

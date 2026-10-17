@@ -3,11 +3,11 @@
 # Builds a lightweight Alpine image with all Go microservice binaries
 # ==============================================================================
 
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache git
+RUN apk upgrade --no-cache && apk add --no-cache git
 
 COPY src/engine-go/go.mod src/engine-go/go.sum ./
 RUN go mod download
@@ -25,11 +25,11 @@ RUN mkdir -p /build/bin && \
     CGO_ENABLED=0 go build -ldflags="-s -w" -o /build/bin/anomalyserver ./cmd/anomalyserver
 
 # Minimal Alpine runtime
-FROM alpine:3.20
+FROM alpine:3.22
 
 WORKDIR /app
 
-RUN apk add --no-cache wget ca-certificates tzdata
+RUN apk upgrade --no-cache && apk add --no-cache wget ca-certificates tzdata
 
 # Copy all compiled binaries to system PATH
 COPY --from=builder /build/bin/* /usr/local/bin/
