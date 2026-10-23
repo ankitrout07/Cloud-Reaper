@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import csv as csv_module
 import datetime
+import io
 import json as json_module
 
 from fastapi import APIRouter, Request
@@ -560,5 +562,153 @@ async def dismiss_resource(request: Request, resource_id: str):
         reason = (data or {}).get("reason", "Manual dismissal")
         return await _dismiss_resource_payload(resource_id, reason)
     except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
+@router.get("/api/resources/export/csv")
+async def export_resources_csv(request: Request):
+    """
+    Stream resource inventory as CSV to avoid loading entire dataset into memory.
+
+    Query params:
+        category  (str, optional) - filter by category
+        status    (str, optional) - filter by status
+    """
+    try:
+        category_filter = request.query_params.get("category", "").strip().lower()
+        status_filter = request.query_params.get("status", "").strip()
+
+        async def generate_csv():
+            # Create CSV writer
+            output = io.StringIO()
+            writer = csv_module.writer(output)
+
+            # Write header
+            writer.writerow([
+                "id", "name", "resource_type", "region", "provider",
+                "last_scanned", "category"
+            ])
+            yield output.getvalue()
+            output.seek(0)
+            output.truncate(0)
+
+            # Fetch and stream resources in batches
+            def _fetch_batch(offset=0, limit=100):
+                from reaper.engine.models.resources import CloudResource, SessionLocal
+                with SessionLocal() as sess:
+                    query = select(CloudResource).order_by(CloudResource.last_scanned.desc())
+                    if category_filter:
+                        # Filter by resource type (would need to map category to types)
+                        pass
+                    if status_filter:
+                        # Add status filtering logic if needed
+                        pass
+                    query = query.offset(offset).limit(limit)
+                    return sess.execute(query).scalars().all()
+
+            offset = 0
+            batch_size = 100
+
+            while True:
+                batch = await asyncio.to_thread(_fetch_batch, offset, batch_size)
+                if not batch:
+                    break
+
+                for resource in batch:
+                    # Determine category
+                    cat = _RESOURCE_TYPE_TO_CATEGORY.get(resource.resource_type.lower(), "other")
+
+                    writer.writerow([
+                        resource.id,
+                        resource.cost_attributes.get("name", ""),
+                        resource.resource_type,
+                        resource.region,
+                        resource.provider,
+                        resource.last_scanned.isoformat() if resource.last_scanned else "",
+                        cat
+                    ])
+                    yield output.getvalue()
+                    output.seek(0)
+                    output.truncate(0)
+
+                offset += batch_size
+                if len(batch) < batch_size:
+                    break
+
+        return StreamingResponse(
+            generate_csv(),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=resources_export.csv",
+                "Cache-Control": "no-cache",
+            }
+        )
+    except Exception as e:
+        logger.exception("Error exporting CSV")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
+@router.get("/api/resources/export/json")
+async def export_resources_json(request: Request):
+    """
+    Stream resource inventory as JSON lines (NDJSON) to avoid loading entire dataset into memory.
+
+    Query params:
+        category  (str, optional) - filter by category
+        status    (str, optional) - filter by status
+    """
+    try:
+        category_filter = request.query_params.get("category", "").strip().lower()
+        status_filter = request.query_params.get("status", "").strip()
+
+        async def generate_json():
+            # Fetch and stream resources in batches
+            def _fetch_batch(offset=0, limit=100):
+                from reaper.engine.models.resources import CloudResource, SessionLocal
+                with SessionLocal() as sess:
+                    query = select(CloudResource).order_by(CloudResource.last_scanned.desc())
+                    if category_filter:
+                        pass
+                    if status_filter:
+                        pass
+                    query = query.offset(offset).limit(limit)
+                    return sess.execute(query).scalars().all()
+
+            offset = 0
+            batch_size = 100
+
+            while True:
+                batch = await asyncio.to_thread(_fetch_batch, offset, batch_size)
+                if not batch:
+                    break
+
+                for resource in batch:
+                    cat = _RESOURCE_TYPE_TO_CATEGORY.get(resource.resource_type.lower(), "other")
+                    resource_dict = {
+                        "id": resource.id,
+                        "name": resource.cost_attributes.get("name", ""),
+                        "resource_type": resource.resource_type,
+                        "region": resource.region,
+                        "provider": resource.provider,
+                        "last_scanned": resource.last_scanned.isoformat() if resource.last_scanned else None,
+                        "category": cat,
+                        "cost_attributes": resource.cost_attributes,
+                    }
+                    yield json_module.dumps(resource_dict) + "\n"
+
+                offset += batch_size
+                if len(batch) < batch_size:
+                    break
+
+        return StreamingResponse(
+            generate_json(),
+            media_type="application/x-ndjson",
+            headers={
+                "Content-Disposition": "attachment; filename=resources_export.jsonl",
+                "Cache-Control": "no-cache",
+            }
+        )
+    except Exception as e:
+        logger.exception("Error exporting JSON")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
 

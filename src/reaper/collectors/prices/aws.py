@@ -25,9 +25,9 @@ class AWSPriceClient:
         prices = []
 
         try:
-            prices.extend(self._fetch_ec2_prices())
-            prices.extend(self._fetch_rds_prices())
-            prices.extend(self._fetch_elasticache_prices())
+            prices.extend(list(self._fetch_ec2_prices_generator()))
+            prices.extend(list(self._fetch_rds_prices_generator()))
+            prices.extend(list(self._fetch_elasticache_prices_generator()))
         except Exception as e:
             self.logger.error(f"Error fetching AWS prices: {e}")
 
@@ -42,7 +42,10 @@ class AWSPriceClient:
             return []
 
     def _fetch_ec2_prices(self):
-        prices = []
+        return list(self._fetch_ec2_prices_generator())
+
+    def _fetch_ec2_prices_generator(self):
+        """Generator version of _fetch_ec2_prices for memory efficiency."""
         ec2_data = self._fetch_json(self.URLS["EC2"])
         for item in ec2_data:
             inst_type = item.get("instance_type", "")
@@ -63,13 +66,13 @@ class AWSPriceClient:
             for region, reg_pricing in pricing.items():
                 ondemand = reg_pricing.get("linux", {}).get("ondemand")
                 if ondemand is not None:
-                    prices.append(
-                        self._build_price(inst_type, "Virtual Machines", region, ondemand, specs)
-                    )
-        return prices
+                    yield self._build_price(inst_type, "Virtual Machines", region, ondemand, specs)
 
     def _fetch_rds_prices(self):
-        prices = []
+        return list(self._fetch_rds_prices_generator())
+
+    def _fetch_rds_prices_generator(self):
+        """Generator version of _fetch_rds_prices for memory efficiency."""
         rds_data = self._fetch_json(self.URLS["RDS"])
         for item in rds_data:
             inst_type = item.get("instance_type", "")
@@ -89,13 +92,13 @@ class AWSPriceClient:
                     "MySQL", {}
                 ).get("ondemand")
                 if ondemand is not None:
-                    prices.append(
-                        self._build_price(inst_type, "SQL Database", region, ondemand, specs)
-                    )
-        return prices
+                    yield self._build_price(inst_type, "SQL Database", region, ondemand, specs)
 
     def _fetch_elasticache_prices(self):
-        prices = []
+        return list(self._fetch_elasticache_prices_generator())
+
+    def _fetch_elasticache_prices_generator(self):
+        """Generator version of _fetch_elasticache_prices for memory efficiency."""
         cache_data = self._fetch_json(self.URLS["ElastiCache"])
         for item in cache_data:
             inst_type = item.get("instance_type", "")
@@ -114,12 +117,9 @@ class AWSPriceClient:
                     "Memcached", {}
                 ).get("ondemand")
                 if ondemand is not None:
-                    prices.append(
-                        self._build_price(
-                            inst_type, "Azure Cache for Redis", region, ondemand, specs
-                        )
+                    yield self._build_price(
+                        inst_type, "Azure Cache for Redis", region, ondemand, specs
                     )
-        return prices
 
     def lookup_price(self, sku: str, region: str) -> float | None:
         """Resolve a single EC2 on-demand Linux price without loading the full catalog."""

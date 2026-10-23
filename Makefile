@@ -27,7 +27,7 @@ venv:
 
 build:
 	mkdir -p bin
-	cd src/engine-go && go build -tags cli -o ../../bin/reaper-engine .
+	cd src/engine-go && go build -tags cli -ldflags="-s -w" -o ../../bin/reaper-engine .
 
 test: test-python test-go
 

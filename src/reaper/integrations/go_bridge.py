@@ -243,18 +243,18 @@ async def prices(provider: str = "azure") -> dict[str, Any] | None:
 
 async def parallel_prices(
     services: list[str] | None = None,
-    concurrency: int = 10,
+    concurrency: int | None = None,
     region: str = ""
 ) -> dict[str, Any] | None:
     """
     Fetch Azure pricing data using high-performance parallel scraping.
-    
+
     This leverages the new Go parallel price scraper for 10-20x faster performance
     compared to the sequential Python implementation.
 
     Args:
         services: List of Azure service names to fetch (uses default list if None)
-        concurrency: Number of parallel workers (default: 10)
+        concurrency: Number of parallel workers (default from env var GO_PRICE_SCRAPER_CONCURRENCY or 10)
         region: Optional region filter for regional pricing
 
     Returns:
@@ -267,12 +267,16 @@ async def parallel_prices(
     """
     import httpx
 
+    # Get default concurrency from environment variable
+    if concurrency is None:
+        concurrency = int(os.getenv("GO_PRICE_SCRAPER_CONCURRENCY", "10"))
+
     request_body = {
         "services": services or [],
         "concurrency": concurrency,
         "region": region
     }
-    
+
     try:
         client = await _get_bridge_client()
         resp = await client.post(

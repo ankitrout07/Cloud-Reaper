@@ -50,7 +50,12 @@ type scanResult struct {
 func main() {
 	subscription := flag.String("subscription", "", "Azure subscription ID")
 	listSubs := flag.Bool("list-subs", false, "List accessible Azure subscriptions")
-	mode := flag.String("mode", "scan", "Operation mode: scan, prices, arbitrage, serve, unified")
+	// Default to unified mode for production (can be overridden by GO_ENGINE_MODE env var or --mode flag)
+	defaultMode := "unified"
+	if envMode := os.Getenv("GO_ENGINE_MODE"); envMode != "" {
+		defaultMode = envMode
+	}
+	mode := flag.String("mode", defaultMode, "Operation mode: scan, prices, arbitrage, serve, unified")
 	sku := flag.String("sku", "", "SKU for arbitrage mode")
 	regions := flag.String("regions", "", "Comma-separated regions for arbitrage mode")
 	provider := flag.String("provider", "azure", "Cloud provider: azure, aws, gcp")

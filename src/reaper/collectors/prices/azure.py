@@ -47,12 +47,28 @@ class AzurePriceClient:
     def get_prices(self, filter_query=None, max_pages=None):
         """
         Fetches prices from the Azure Retail Prices API with pagination support.
+
+        Returns a list for backward compatibility. For memory-efficient streaming,
+        use get_prices_generator() instead.
+        """
+        return list(self.get_prices_generator(filter_query, max_pages))
+
+    def get_prices_generator(self, filter_query=None, max_pages=None):
+        """
+        Fetches prices from the Azure Retail Prices API with pagination support.
+        Yields items one at a time to reduce memory footprint for large datasets.
+
+        Args:
+            filter_query: Optional filter query for the API
+            max_pages: Maximum number of pages to fetch (None for unlimited)
+
+        Yields:
+            Individual price items from the API
         """
         params = {"currencyCode": self.currency}
         if filter_query:
             params["$filter"] = filter_query
 
-        prices = []
         url = self.BASE_URL
         page_count = 0
 
@@ -67,7 +83,10 @@ class AzurePriceClient:
                 data = response.json()
 
                 items = data.get("Items", [])
-                prices.extend(items)
+                # Yield items one at a time instead of building a list
+                for item in items:
+                    yield item
+
                 page_count += 1
 
                 if max_pages is not None and page_count >= max_pages:
@@ -80,8 +99,6 @@ class AzurePriceClient:
             except Exception as e:
                 self.logger.error(f"Error fetching prices from Azure: {e}")
                 break
-
-        return prices
 
     def get_catalog_prices(self):
         """Fetch the Azure Retail Prices API catalog via the Go parallel price scraper.

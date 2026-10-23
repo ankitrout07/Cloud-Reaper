@@ -2,8 +2,11 @@
 FinOps Pipeline Scheduler
 Enforces sequential optimization operations to prevent capital waste.
 Order: Telemetry Collection → Rightsizing → Baseline Update → Commitment Management
+
+Enhanced with async task queue for parallelizing independent operations.
 """
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import Any
@@ -93,14 +96,17 @@ class FinOpsPipeline:
     2. Rightsizing (Python Q-learning + vectorized analysis)
     3. Baseline Update (SQLite)
     4. Commitment Management (RI/SP Advisor based on optimized baseline)
+
+    Enhanced with async task queue for parallelizing independent operations.
     """
 
-    def __init__(self, price_book=None):
+    def __init__(self, price_book=None, enable_parallel: bool = True):
         self.price_book = price_book or {}
         self.workload_classifier = WorkloadClassifier()
         self.rightsizing_agent = RightsizingAgent()
         self.right_sizer = RightSizer(price_book=price_book)
         self.workload_analyzer = WorkloadPersonality()
+        self.enable_parallel = enable_parallel
 
     def execute_pipeline(
         self,
@@ -174,6 +180,95 @@ class FinOpsPipeline:
 
         except Exception as e:
             logger.error(f"Pipeline execution failed: {e}")
+            results["pipeline_status"] = "failed"
+            results["error"] = str(e)
+            results["execution_time_seconds"] = (datetime.now(UTC) - pipeline_start).total_seconds()
+            return results
+
+    async def execute_pipeline_async(
+        self,
+        telemetry_data: list[dict[str, Any]],
+        provider: str = "azure",
+        lookback_days: int = 7,
+    ) -> dict[str, Any]:
+        """
+        Executes the complete FinOps pipeline with async parallelization for independent operations.
+
+        This version parallelizes independent operations such as:
+        - Workload personality analysis for multiple resources
+        - Telemetry analysis for independent resources
+
+        Args:
+            telemetry_data: Raw telemetry from Go scraper with resource metrics
+            provider: Cloud provider (azure, aws, gcp)
+            lookback_days: Number of days to analyze (7, 14, 30)
+
+        Returns:
+            Pipeline execution results with rightsizing recommendations and commitment insights
+        """
+        logger.info(f"Starting Async FinOps Pipeline for {provider} with {lookback_days}-day lookback")
+        pipeline_start = datetime.now(UTC)
+
+        results = {
+            "pipeline_status": "in_progress",
+            "provider": provider,
+            "lookback_days": lookback_days,
+            "timestamp": pipeline_start.isoformat(),
+            "stages": {},
+            "final_recommendations": [],
+            "parallel_enabled": self.enable_parallel,
+        }
+
+        try:
+            # STAGE 1: Telemetry Collection & Classification (Sequential - required for next stages)
+            logger.info("Stage 1: Telemetry Collection & Workload Classification")
+            stage1_result = self._stage_telemetry_classification(telemetry_data)
+            results["stages"]["telemetry_classification"] = stage1_result
+
+            if not stage1_result["success"]:
+                raise Exception("Telemetry classification failed")
+
+            # STAGE 2: Rightsizing Analysis (Parallel if enabled)
+            logger.info("Stage 2: Rightsizing Analysis with Q-learning (Parallel)")
+            if self.enable_parallel:
+                stage2_result = await self._stage_rightsizing_analysis_parallel(
+                    stage1_result["classified_resources"],
+                    stage1_result["environment_mapping"],
+                    lookback_days,
+                )
+            else:
+                stage2_result = self._stage_rightsizing_analysis(
+                    stage1_result["classified_resources"],
+                    stage1_result["environment_mapping"],
+                    lookback_days,
+                )
+            results["stages"]["rightsizing_analysis"] = stage2_result
+
+            # STAGE 3: Baseline Update (Sequential - SQLite writes)
+            logger.info("Stage 3: Optimization Baseline Update")
+            stage3_result = self._stage_baseline_update(
+                stage2_result["rightsizing_recommendations"], provider
+            )
+            results["stages"]["baseline_update"] = stage3_result
+
+            # STAGE 4: Commitment Management (Independent, can run with Stage 3 in future)
+            logger.info("Stage 4: Commitment Management Analysis")
+            stage4_result = self._stage_commitment_management(
+                stage3_result["optimized_baseline"], provider
+            )
+            results["stages"]["commitment_management"] = stage4_result
+
+            # Compile final recommendations
+            results["final_recommendations"] = stage2_result["rightsizing_recommendations"]
+            results["commitment_recommendations"] = stage4_result["commitment_insights"]
+            results["pipeline_status"] = "completed"
+            results["execution_time_seconds"] = (datetime.now(UTC) - pipeline_start).total_seconds()
+
+            logger.info(f"Async FinOps Pipeline completed in {results['execution_time_seconds']:.2f}s")
+            return results
+
+        except Exception as e:
+            logger.error(f"Async pipeline execution failed: {e}")
             results["pipeline_status"] = "failed"
             results["error"] = str(e)
             results["execution_time_seconds"] = (datetime.now(UTC) - pipeline_start).total_seconds()
@@ -298,6 +393,123 @@ class FinOpsPipeline:
         except Exception as e:
             logger.error(f"Rightsizing analysis failed: {e}")
             return {"success": False, "error": str(e)}
+
+    async def _stage_rightsizing_analysis_parallel(
+        self,
+        classified_resources: list[dict[str, Any]],
+        environment_mapping: dict[str, str],
+        lookback_days: int,
+    ) -> dict[str, Any]:
+        """
+        Stage 2 (Parallel): Perform rightsizing analysis using async tasks for independent resources.
+        This version uses asyncio.gather to parallelize analysis across resources.
+        """
+        try:
+            # Create async tasks for each resource
+            tasks = []
+            for resource in classified_resources:
+                task = self._analyze_single_resource_async(
+                    resource, environment_mapping, lookback_days
+                )
+                tasks.append(task)
+
+            # Execute all tasks in parallel
+            rightsizing_recommendations = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Filter out exceptions and process results
+            valid_recommendations = []
+            for i, result in enumerate(rightsizing_recommendations):
+                if isinstance(result, Exception):
+                    logger.error(f"Error analyzing resource {i}: {result}")
+                    continue
+                if result is not None:
+                    valid_recommendations.append(result)
+
+            return {
+                "success": True,
+                "rightsizing_recommendations": valid_recommendations,
+                "summary": {
+                    "total_recommendations": len(valid_recommendations),
+                    "shutdown_candidates": sum(
+                        1
+                        for r in valid_recommendations
+                        if r["recommended_action"] == "SHUTDOWN"
+                    ),
+                    "rightsizing_candidates": sum(
+                        1
+                        for r in valid_recommendations
+                        if "RIGHTSIZE" in r["recommended_action"]
+                    ),
+                },
+            }
+
+        except Exception as e:
+            logger.error(f"Parallel rightsizing analysis failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _analyze_single_resource_async(
+        self,
+        resource: dict[str, Any],
+        environment_mapping: dict[str, str],
+        lookback_days: int,
+    ) -> dict[str, Any] | None:
+        """
+        Async wrapper for analyzing a single resource.
+        This allows independent resources to be analyzed in parallel.
+        """
+        try:
+            resource_id = resource.get("id", resource.get("name", "unknown"))
+            env_type = environment_mapping.get(resource_id, "production")
+
+            # Extract usage history for vectorized analysis
+            cpu_history = resource.get("cpu_history", [0] * lookback_days)
+            memory_history = resource.get("memory_history", [0] * lookback_days)
+
+            # Convert to numpy arrays for vectorized processing
+            cpu_matrix = np.array([cpu_history[-lookback_days:]], dtype=np.float64)
+            memory_matrix = np.array([memory_history[-lookback_days:]], dtype=np.float64)
+
+            # Perform vectorized compute telemetry analysis
+            telemetry_analysis = self._analyze_single_resource_telemetry(
+                cpu_matrix, memory_matrix, env_type=env_type, lookback_days=lookback_days
+            )
+
+            # Get workload personality for context
+            personality = self.workload_analyzer.analyze(cpu_history)
+
+            # Q-learning agent evaluation
+            current_sku = resource.get("sku", "unknown")
+            metrics = {
+                "cpu": telemetry_analysis["avg_cpu"],
+                "mem": telemetry_analysis["avg_memory"],
+                "iops": resource.get("iops", 50),
+                "net": resource.get("network_throughput", 40),
+            }
+
+            rl_evaluation = self.rightsizing_agent.evaluate_migration(metrics, current_sku)
+
+            # Combine heuristic and RL recommendations
+            recommendation = {
+                "resource_id": resource_id,
+                "resource_name": resource.get("name", "unknown"),
+                "current_sku": current_sku,
+                "environment_type": env_type,
+                "telemetry_analysis": telemetry_analysis,
+                "workload_personality": personality,
+                "rl_evaluation": rl_evaluation,
+                "recommended_action": self._determine_final_action(
+                    telemetry_analysis, rl_evaluation, env_type
+                ),
+                "confidence": self._calculate_confidence(
+                    telemetry_analysis, personality, rl_evaluation
+                ),
+            }
+
+            return recommendation
+
+        except Exception as e:
+            logger.error(f"Error analyzing resource {resource.get('name', 'unknown')}: {e}")
+            return None
 
     def _analyze_single_resource_telemetry(
         self,

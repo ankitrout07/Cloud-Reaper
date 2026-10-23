@@ -66,11 +66,16 @@ type ParallelPriceClient struct {
 	concurrency int
 }
 
-// NewParallelPriceClient creates a new parallel price client
+// NewParallelPriceClient creates a new parallel price client with default rate limit
 func NewParallelPriceClient(concurrency int) *ParallelPriceClient {
-	// Rate limiter: 10 requests per second with burst of 10
-	limiter := rate.NewLimiter(rate.Every(time.Second/10), 10)
-	
+	return NewParallelPriceClientWithRateLimit(concurrency, 10)
+}
+
+// NewParallelPriceClientWithRateLimit creates a new parallel price client with configurable rate limit
+func NewParallelPriceClientWithRateLimit(concurrency int, requestsPerSecond int) *ParallelPriceClient {
+	// Rate limiter: configurable requests per second with burst of the same amount
+	limiter := rate.NewLimiter(rate.Every(time.Second/time.Duration(requestsPerSecond)), requestsPerSecond)
+
 	return &ParallelPriceClient{
 		baseURL:     "https://prices.azure.com/api/retail/prices",
 		currency:    "USD",

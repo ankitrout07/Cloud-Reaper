@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -391,16 +392,32 @@ func handleParallelPrices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get default concurrency from environment variable
+	defaultConcurrency := 10
+	if envConcurrency := os.Getenv("GO_PRICE_SCRAPER_CONCURRENCY"); envConcurrency != "" {
+		if val, err := strconv.Atoi(envConcurrency); err == nil && val > 0 {
+			defaultConcurrency = val
+		}
+	}
+
 	// Set defaults
 	if req.Concurrency == 0 {
-		req.Concurrency = 10
+		req.Concurrency = defaultConcurrency
 	}
 	if len(req.Services) == 0 {
 		req.Services = collectors.AzureRetailServiceNames
 	}
 
-	// Create parallel price client
-	client := collectors.NewParallelPriceClient(req.Concurrency)
+	// Get default rate limit from environment variable
+	defaultRateLimit := 10
+	if envRateLimit := os.Getenv("GO_RATE_LIMIT_REQUESTS_PER_SECOND"); envRateLimit != "" {
+		if val, err := strconv.Atoi(envRateLimit); err == nil && val > 0 {
+			defaultRateLimit = val
+		}
+	}
+
+	// Create parallel price client with configurable rate limit
+	client := collectors.NewParallelPriceClientWithRateLimit(req.Concurrency, defaultRateLimit)
 	
 	var prices []map[string]interface{}
 	var err error
@@ -417,6 +434,8 @@ func handleParallelPrices(w http.ResponseWriter, r *http.Request) {
 		"prices": prices,
 		"count":  len(prices),
 		"region": req.Region,
+		"concurrency": req.Concurrency,
+		"rate_limit": defaultRateLimit,
 	}
 	
 	if err != nil {
